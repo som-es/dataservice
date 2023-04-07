@@ -4,7 +4,7 @@ use scraper::{
     AustriaScraper, ProposalPayload,
 };
 
-use crate::today;
+use crate::{today, Shutdown};
 
 use super::scrape_untill_success;
 
@@ -34,6 +34,11 @@ async fn scrape_new_proposals(prev_proposals: &[Proposal]) -> crate::Result<Vec<
 
 fn update_proposals_in_db(new_proposals: &[Proposal]) {}
 
+#[derive(Debug, Default)]
+pub struct PropInit {}
+
+pub async fn proposals_once2() {}
+
 async fn proposals_once(prev_proposals: &[Proposal]) -> Vec<Proposal> {
     println!("try scraping data");
 
@@ -47,20 +52,45 @@ async fn proposals_once(prev_proposals: &[Proposal]) -> Vec<Proposal> {
     new_proposals
 }
 
-pub fn run() {
-    tokio::spawn(async {
-        let mut prev_proposals = Vec::new();
+pub async fn run() {
+    let mut prev_proposals = Vec::new();
 
-        let start_date = today();
+    let start_date = today();
 
-        loop {
-            prev_proposals.extend(proposals_once(&prev_proposals).await);
-            
-            tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+    loop {
+        prev_proposals.extend(proposals_once(&prev_proposals).await);
 
-            if today() > start_date {
-                prev_proposals.clear();
-            }
+        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+
+        if today() > start_date {
+            prev_proposals.clear();
         }
-    });
+    }
+}
+
+
+pub async fn run_shut(mut shutdown: Shutdown) {
+    let mut prev_proposals = Vec::new();
+
+    let start_date = today();
+
+    while !shutdown.is_shutdown() {
+        tokio::select! {
+            _ = shutdown.recv() => {
+                println!("shutting down");
+                // return ok?
+                break;
+            }
+            _ = async {
+                prev_proposals.extend(proposals_once(&prev_proposals).await);
+
+                tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        
+                if today() > start_date {
+                    prev_proposals.clear();
+                }
+            } => {}
+        }
+    }
+
 }

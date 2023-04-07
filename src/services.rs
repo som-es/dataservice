@@ -1,5 +1,7 @@
 use std::future::Future;
 
+use crate::Shutdown;
+
 pub mod proposals;
 
 pub async fn scrape_untill_success<T, O>(f: impl Fn() -> O) -> T
@@ -14,3 +16,4 @@ where
     }
     new_proposals.expect("Above loop always runs till Ok")
 }
+
