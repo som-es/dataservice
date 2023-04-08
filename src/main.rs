@@ -9,7 +9,7 @@ pub use shutdown::*;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
-use std::future::Future;
+use std::{future::Future, collections::HashSet};
 
 use chrono::NaiveDate;
 use scraper::{
@@ -63,6 +63,9 @@ async fn main() {
 }
 
 pub async fn run_services(state: &State) {
+    let hs = HashSet::new();
+    let res = services::delegates::delegates_once(&hs).await;
+    println!("res: {res:?}");
     tokio::join!(
         // services::proposals::run(),
         services::proposals::run_shut(Shutdown::new(state.notify_shutdown.subscribe()))

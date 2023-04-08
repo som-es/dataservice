@@ -12,7 +12,7 @@ pub struct DbProposal {
     pub description: String,
 }
 
-#[derive(Queryable, Selectable, Identifiable, PartialEq, Debug, Clone)]
+#[derive(Queryable, Selectable, Identifiable, PartialEq, Debug, Clone, Insertable)]
 #[diesel(table_name = delegates)]
 pub struct DbDelegate {
     pub id: i32,

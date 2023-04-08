@@ -3,6 +3,7 @@ use std::future::Future;
 use crate::Shutdown;
 
 pub mod proposals;
+pub mod delegates;
 
 pub async fn scrape_untill_success<T, O>(f: impl Fn() -> O) -> T
 where

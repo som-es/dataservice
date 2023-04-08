@@ -129,9 +129,6 @@ pub async fn run_shut(mut shutdown: Shutdown) {
             }
             _ = async {
                 prev_proposals.extend(proposals_once(&prev_proposals).await);
-                for prop in &prev_proposals {
-                    println!("title: {}, id: {}, issuer: {:?}, recv: {:?},", prop.title, prop.id, prop.issuer_ids, prop.receiver_ids);
-                }
                 tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
         
                 if today() > start_date {
