@@ -1,9 +1,10 @@
+use diesel::RunQueryDsl;
 use scraper::{
     proposals::{Proposal, ProposalScraper},
     AustriaScraper, ProposalPayload,
 };
 
-use crate::{today, Shutdown};
+use crate::{today, Shutdown, models::{DbProposal, ProposalDelegate}};
 
 use super::scrape_untill_success;
 
@@ -33,7 +34,50 @@ async fn scrape_new_proposals(prev_proposals: &[Proposal]) -> crate::Result<Vec<
 }
 
 fn update_proposals_in_db(new_proposals: &[Proposal]) {
+    use crate::schema::proposals;
 
+    for proposal in new_proposals {
+
+        let db_proposal = DbProposal {
+            id: proposal.id.clone(),
+            title: proposal.title.clone(),
+            description: proposal.description.clone(),
+            ityp: proposal.ityp.clone(),
+            gp: proposal.gp.clone(), 
+        };
+
+        diesel::insert_into(proposals::table)
+            .values(&db_proposal)
+            .on_conflict(proposals::id)
+            .do_nothing()
+            .execute(&mut crate::establish_connection())
+            .expect("msg");
+
+        for receiver_id in &proposal.receiver_ids {
+            insert_prop_del(&proposal.id, *receiver_id as i32)
+        }
+
+        for issuer_id in &proposal.receiver_ids {
+            insert_prop_del(&proposal.id, *issuer_id as i32)
+        }
+        
+    }
+}
+
+pub fn insert_prop_del(proposal_id: &str, delegate_id: i32) {
+    use crate::schema::proposal_delegates;
+
+    let db_proposal_delegate = ProposalDelegate {
+        proposal_id: proposal_id.to_string(),
+        delegate_id,
+    };
+
+    diesel::insert_into(proposal_delegates::table)
+        .values(&db_proposal_delegate)
+        .on_conflict((proposal_delegates::proposal_id, proposal_delegates::delegate_id))
+        .do_nothing()
+        .execute(&mut crate::establish_connection())
+        .expect("msg");
 }
 
 #[derive(Debug, Default)]
