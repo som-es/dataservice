@@ -1,5 +1,8 @@
 mod services;
 mod shutdown;
+mod db;
+
+pub use db::*;
 
 use services::{proposals::PropInit};
 pub use shutdown::*;

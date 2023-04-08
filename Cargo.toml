@@ -7,5 +7,8 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4.24"
+diesel = {version = "2.0.3", features = ["postgres"] }
+dotenvy = "0.15.7"
+
 scraper = {path = "../scraper"}
 tokio = { version = "1.26.0", features = ["tokio-macros", "macros", "rt", "rt-multi-thread", "signal"] }
