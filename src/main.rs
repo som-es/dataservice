@@ -32,9 +32,9 @@ async fn main() {
 }
 
 pub async fn run_services(state: &State) {
-    let hs = HashSet::new();
-    let res = services::delegates::delegates_once(&hs).await;
-    println!("res: {res:?}");
+    // let hs = HashSet::new();
+    // let res = services::delegates::delegates_once(&hs).await;
+    // println!("res: {res:?}");
     tokio::join!(
         // services::proposals::run(),
         services::legislative_initiatives::run_shut(Shutdown::new(state.notify_shutdown.subscribe())),

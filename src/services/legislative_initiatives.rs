@@ -38,6 +38,7 @@ async fn legis_init_once() -> Vec<LegislativeInitiative> {
 }
 
 fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
+    log::info!("Updating legislative initiative in database...");
     for legis_init in new_legis_inits {
         let db_legis_init = DbLegislativeInitiative {
             id: legis_init.id.clone(),
