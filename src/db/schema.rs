@@ -13,6 +13,25 @@ diesel::table! {
 }
 
 diesel::table! {
+    legislative_initiatives (id) {
+        id -> Varchar,
+        ityp -> Varchar,
+        gp -> Varchar,
+        title -> Text,
+        description -> Text,
+        accepted -> Bool,
+        created_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    parties (id) {
+        id -> Varchar,
+        name -> Varchar,
+    }
+}
+
+diesel::table! {
     proposal_delegates (proposal_id, delegate_id) {
         proposal_id -> Varchar,
         delegate_id -> Int4,
@@ -31,7 +50,24 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    votes (party, legislative_initiatives_id) {
+        party -> Varchar,
+        fraction -> Int4,
+        infavor -> Bool,
+        legislative_initiatives_id -> Varchar,
+    }
+}
+
 diesel::joinable!(proposal_delegates -> delegates (delegate_id));
 diesel::joinable!(proposal_delegates -> proposals (proposal_id));
+diesel::joinable!(votes -> legislative_initiatives (legislative_initiatives_id));
 
-diesel::allow_tables_to_appear_in_same_query!(delegates, proposal_delegates, proposals,);
+diesel::allow_tables_to_appear_in_same_query!(
+    delegates,
+    legislative_initiatives,
+    parties,
+    proposal_delegates,
+    proposals,
+    votes,
+);

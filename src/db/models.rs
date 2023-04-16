@@ -1,6 +1,6 @@
 use diesel::prelude::*;
 
-use super::schema::{delegates, proposal_delegates, proposals};
+use super::schema::{delegates, proposal_delegates, proposals, legislative_initiatives, votes};
 
 #[derive(Queryable, Selectable, Identifiable, PartialEq, Debug, Clone, Insertable)]
 #[diesel(table_name = proposals)]
@@ -33,4 +33,26 @@ pub struct ProposalDelegate {
     pub proposal_id: String,
     pub delegate_id: i32,
     pub is_receiver: bool,
+}
+
+#[derive(Queryable, Selectable, Identifiable, PartialEq, Debug, Clone, Insertable)]
+#[diesel(table_name = legislative_initiatives)]
+pub struct DbLegislativeInitiative {
+    pub id: String,
+    pub ityp: String,
+    pub gp: String,
+    pub title: String,
+    pub description: String,
+    pub accepted: bool,
+}
+
+#[derive(Queryable, Identifiable, Selectable, PartialEq, Debug, Clone, Insertable)]
+#[diesel(table_name = votes)]
+#[diesel(primary_key(party, legislative_initiatives_id))]
+#[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
+pub struct DbVote {
+    pub party: String,
+    pub fraction: i32,
+    pub infavor: bool,
+    pub legislative_initiatives_id: String,
 }

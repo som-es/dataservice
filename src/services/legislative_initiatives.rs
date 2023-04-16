@@ -1,7 +1,7 @@
-use dotenvy::dotenv;
+use diesel::RunQueryDsl;
 use scraper::{legis_init::{LegislativeInitiative, LegislativeInitiatives}, AustriaScraper};
 
-use crate::{services::scrape_untill_success, today, Shutdown};
+use crate::{services::scrape_untill_success, Shutdown, models::{DbLegislativeInitiative, DbVote}, schema::{legislative_initiatives, votes}};
 
 async fn scrape_new_legis_inits(
 ) -> crate::Result<Vec<LegislativeInitiative>> {
@@ -39,7 +39,40 @@ async fn legis_init_once() -> Vec<LegislativeInitiative> {
 
 fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
     for legis_init in new_legis_inits {
-        println!("legis_init id: {}, title: {}", legis_init.id, legis_init.title);
+        let db_legis_init = DbLegislativeInitiative {
+            id: legis_init.id.clone(),
+            title: legis_init.title.clone(),
+            description: legis_init.description.clone(),
+            ityp: legis_init.ityp.clone(),
+            gp: legis_init.gp.clone(),
+            accepted: legis_init.accepted,
+        };
+
+        diesel::insert_into(legislative_initiatives::table)
+            .values(&db_legis_init)
+            .on_conflict(legislative_initiatives::id)
+            .do_nothing()
+            .execute(&mut crate::establish_connection())
+            .expect("msg");
+        
+        for vote in &legis_init.votes {
+            let db_vote = DbVote {
+                party: vote.party.clone(),
+                fraction: vote.fraction as i32,
+                infavor: vote.infavor,
+                legislative_initiatives_id: db_legis_init.id.clone(),
+            };
+
+            diesel::insert_into(votes::table)
+                .values(&db_vote)
+                .on_conflict((
+                    votes::legislative_initiatives_id,
+                    votes::party,
+                ))
+                .do_nothing()
+                .execute(&mut crate::establish_connection())
+                .expect("msg");
+        }
     }
 }
 

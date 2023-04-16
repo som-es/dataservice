@@ -4,7 +4,6 @@ mod shutdown;
 
 pub use db::*;
 
-use services::proposals::PropInit;
 pub use shutdown::*;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
@@ -12,10 +11,7 @@ pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + S
 use std::{collections::HashSet, future::Future};
 
 use chrono::NaiveDate;
-use scraper::{
-    proposals::{Proposal, ProposalScraper},
-    AustriaScraper,
-};
+
 use tokio::sync::{broadcast, mpsc};
 
 #[inline]
@@ -36,9 +32,9 @@ async fn main() {
 }
 
 pub async fn run_services(state: &State) {
-    // let hs = HashSet::new();
-    // let res = services::delegates::delegates_once(&hs).await;
-    // println!("res: {res:?}");
+    let hs = HashSet::new();
+    let res = services::delegates::delegates_once(&hs).await;
+    println!("res: {res:?}");
     tokio::join!(
         // services::proposals::run(),
         services::legislative_initiatives::run_shut(Shutdown::new(state.notify_shutdown.subscribe())),
