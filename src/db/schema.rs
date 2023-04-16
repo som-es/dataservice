@@ -4,11 +4,11 @@ diesel::table! {
     delegates (id) {
         id -> Int4,
         name -> Varchar,
-        party -> Varchar,
-        constituency -> Varchar,
-        council -> Varchar,
-        seat_row -> Int4,
-        seat_col -> Int4,
+        party -> Nullable<Varchar>,
+        constituency -> Nullable<Varchar>,
+        council -> Nullable<Varchar>,
+        seat_row -> Nullable<Int4>,
+        seat_col -> Nullable<Int4>,
     }
 }
 
@@ -16,6 +16,7 @@ diesel::table! {
     proposal_delegates (proposal_id, delegate_id) {
         proposal_id -> Varchar,
         delegate_id -> Int4,
+        is_receiver -> Bool,
     }
 }
 

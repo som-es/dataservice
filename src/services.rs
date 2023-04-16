@@ -2,8 +2,8 @@ use std::future::Future;
 
 use crate::Shutdown;
 
-pub mod proposals;
 pub mod delegates;
+pub mod proposals;
 
 pub async fn scrape_untill_success<T, O>(f: impl Fn() -> O) -> T
 where
@@ -13,8 +13,8 @@ where
     while let Err(e) = new_proposals {
         new_proposals = f().await;
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        println!("error {e}")
         // log e
     }
     new_proposals.expect("Above loop always runs till Ok")
 }
-

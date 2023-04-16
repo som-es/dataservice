@@ -1,15 +1,15 @@
+mod db;
 mod services;
 mod shutdown;
-mod db;
 
 pub use db::*;
 
-use services::{proposals::PropInit};
+use services::proposals::PropInit;
 pub use shutdown::*;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
-use std::{future::Future, collections::HashSet};
+use std::{collections::HashSet, future::Future};
 
 use chrono::NaiveDate;
 use scraper::{
@@ -59,7 +59,9 @@ async fn main() {
 
     tokio::spawn(async move {
         run(tokio::signal::ctrl_c()).await;
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 }
 
 pub async fn run_services(state: &State) {

@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
 use diesel::RunQueryDsl;
-use scraper::{Delegate, AustriaScraper, delegates::DelegateScraper};
+use scraper::{delegates::DelegateScraper, AustriaScraper, Delegate};
 
-use crate::{Shutdown, services::scrape_untill_success, models::DbDelegate};
+use crate::{models::DbDelegate, services::scrape_untill_success, Shutdown};
 
 async fn scrape_new_delegates(prev_delegates: &HashSet<Delegate>) -> crate::Result<Vec<Delegate>> {
     let scraper = AustriaScraper::default();
@@ -12,10 +12,15 @@ async fn scrape_new_delegates(prev_delegates: &HashSet<Delegate>) -> crate::Resu
 
     let persons = scraper.post_persons_payload().await?;
     for person_path in scraper.person_paths(persons).unwrap_or_default() {
+        println!("person_path: {person_path}");
         let Ok(delegate) = scraper.get_delegate(&person_path).await else {
             continue;
         };
-        
+
+        if !delegate.is_active {
+            continue;
+        }
+
         if prev_delegates.contains(&delegate) {
             continue;
         }
@@ -36,14 +41,15 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
             party: delegate.party.clone(),
             constituency: delegate.constituency.clone(),
             council: delegate.council.clone(),
-            seat_row: delegate.seat.row as i32,
-            seat_col: delegate.seat.col as i32,
+            seat_row: delegate.seat.as_ref().map(|seat| seat.row as i32),
+            seat_col: delegate.seat.as_ref().map(|seat| seat.col as i32),
         };
 
         diesel::insert_into(delegates::table)
             .values(&db_delegate)
             .on_conflict(delegates::id)
-            .do_nothing()
+            .do_update()
+            .set(&db_delegate)
             .execute(&mut crate::establish_connection())
             .expect("msg");
     }
@@ -64,7 +70,7 @@ pub async fn delegates_once(prev_delegates: &HashSet<Delegate>) -> Vec<Delegate>
 
 pub async fn run_shut(mut shutdown: Shutdown) {
     let mut prev_delegates = HashSet::new();
-    
+
     while !shutdown.is_shutdown() {
         tokio::select! {
             _ = shutdown.recv() => {
@@ -73,13 +79,12 @@ pub async fn run_shut(mut shutdown: Shutdown) {
             }
             _ = async {
                 prev_delegates.extend(delegates_once(&prev_delegates).await);
-                
+
                 // println!("dele: {prev_delegates:?}");
 
                 tokio::time::sleep(tokio::time::Duration::from_secs(60 * 60 * 24)).await;
-    
+
             } => {}
         }
     }
-
 }
