@@ -34,6 +34,7 @@ async fn scrape_new_delegates(prev_delegates: &HashSet<Delegate>) -> crate::Resu
 fn update_delegates_in_db(new_delegates: &[Delegate]) {
     use crate::schema::delegates;
 
+    log::info!("Updating delegates in database...");
     for delegate in new_delegates {
         let db_delegate = DbDelegate {
             id: delegate.id as i32,
@@ -56,7 +57,7 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
 }
 
 pub async fn delegates_once(prev_delegates: &HashSet<Delegate>) -> Vec<Delegate> {
-    println!("try scraping data"); // convert to log
+    log::info!("Scraping new delegates...");
 
     let new_delegates = scrape_untill_success::<Vec<Delegate>, _>(|| async {
         scrape_new_delegates(&prev_delegates).await

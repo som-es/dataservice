@@ -1,7 +1,8 @@
 use diesel::RunQueryDsl;
+use dotenvy::dotenv;
 use scraper::{
-    proposals::{Proposal, ProposalScraper},
-    AustriaScraper, ProposalPayload, Scraper,
+    proposals::{Proposal, ProposalScraper, ProposalsPayload},
+    AustriaScraper, Scraper,
 };
 
 use crate::{
@@ -15,12 +16,12 @@ async fn scrape_new_proposals(prev_proposals: &[Proposal]) -> crate::Result<Vec<
     let scraper = AustriaScraper::default();
 
     let today = chrono::Local::now().date_naive();
-    let date_start = today - chrono::Duration::days(5);
-    // let date_start = today;
+    // let date_start = today - chrono::Duration::days(5);
+    let date_start = today;
     let date_end = today + chrono::Duration::days(1);
 
-    let proposal_payload = ProposalPayload::new().with_date_range(date_start, date_end);
-
+    let proposal_payload = ProposalsPayload::new().with_date_range(date_start, date_end);
+        
     let proposals = scraper.post_proposals_payload(proposal_payload).await?;
     let proposal_paths = scraper.proposal_paths(proposals)?;
 
@@ -38,30 +39,20 @@ async fn scrape_new_proposals(prev_proposals: &[Proposal]) -> crate::Result<Vec<
         let documents = proposal.documents.clone();
         tokio::task::spawn_blocking(|| {
             for document in documents {
-                let url = format!("{}{}", AustriaScraper::BASE_URL, document.link);
-                let response = reqwest::blocking::get(&url).unwrap();
-                let contents = response.text().unwrap();
-                
-                let path = std::path::PathBuf::from(format!(".{}", document.link));
-                std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-                std::fs::write(path, contents).unwrap();
+                document.save( ".", AustriaScraper::BASE_URL).unwrap();
             }
-        }).await?;
-        
-        new_proposals.push(proposal);
+        })
+        .await?;
 
+        new_proposals.push(proposal);
     }
     Ok(new_proposals)
 }
 
 fn update_proposals_in_db(new_proposals: &[Proposal]) {
     use crate::schema::proposals;
-
-    println!("props count: {}", new_proposals.len());
+    log::info!("Updating proposals in database...");
     for proposal in new_proposals {
-
-        println!("id: {}, title: {}", proposal.id, proposal.title);
-
         let db_proposal = DbProposal {
             id: proposal.id.clone(),
             title: proposal.title.clone(),
@@ -86,7 +77,6 @@ fn update_proposals_in_db(new_proposals: &[Proposal]) {
             insert_prop_del(&proposal.id, *issuer_id as i32, false);
         }
     }
-    println!("fin");
 }
 
 pub fn insert_prop_del(proposal_id: &str, delegate_id: i32, is_receiver: bool) {
@@ -95,7 +85,7 @@ pub fn insert_prop_del(proposal_id: &str, delegate_id: i32, is_receiver: bool) {
     let db_proposal_delegate = ProposalDelegate {
         proposal_id: proposal_id.to_string(),
         delegate_id,
-        is_receiver
+        is_receiver,
     };
 
     diesel::insert_into(proposal_delegates::table)
@@ -115,7 +105,7 @@ pub struct PropInit {}
 pub async fn proposals_once2() {}
 
 async fn proposals_once(prev_proposals: &[Proposal]) -> Vec<Proposal> {
-    println!("try scraping data"); // convert to log
+    log::info!("Scraping new proposals...");
 
     let new_proposals = scrape_untill_success::<Vec<Proposal>, _>(|| async {
         scrape_new_proposals(&prev_proposals).await
@@ -143,6 +133,10 @@ pub async fn run() {
 }
 
 pub async fn run_shut(mut shutdown: Shutdown) {
+    dotenv().ok();
+
+    let proposal_sleep = std::env::var("PROPOSAL_SLEEP").unwrap_or_else(|_| "10".to_string()).parse().unwrap_or(10);
+    
     let mut prev_proposals = Vec::new();
 
     let start_date = today();
@@ -156,8 +150,9 @@ pub async fn run_shut(mut shutdown: Shutdown) {
             }
             _ = async {
                 prev_proposals.extend(proposals_once(&prev_proposals).await);
-                tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-
+                log::info!("Sleeping for {proposal_sleep} seconds.");
+                tokio::time::sleep(tokio::time::Duration::from_secs(proposal_sleep)).await;
+            
                 if today() > start_date {
                     prev_proposals.clear();
                 }

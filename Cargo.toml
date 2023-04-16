@@ -9,7 +9,9 @@ edition = "2021"
 chrono = "0.4.24"
 diesel = {version = "2.0.3", features = ["postgres"] }
 dotenvy = "0.15.7"
+log = "0.4.17"
 reqwest = { version = "0.11.16", features = ["blocking"] }
 
 scraper = {path = "../scraper"}
+simple_logger = "4.1.0"
 tokio = { version = "1.26.0", features = ["tokio-macros", "macros", "rt", "rt-multi-thread", "signal"] }

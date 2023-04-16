@@ -1,8 +1,11 @@
 use std::future::Future;
 
+use scraper::Document;
+
 use crate::Shutdown;
 
 pub mod delegates;
+pub mod legislative_initiatives;
 pub mod proposals;
 
 pub async fn scrape_untill_success<T, O>(f: impl Fn() -> O) -> T
@@ -11,10 +14,13 @@ where
 {
     let mut new_proposals = f().await;
     while let Err(e) = new_proposals {
+        log::warn!("Could not scrape data: {e}");
         new_proposals = f().await;
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        println!("error {e}")
-        // log e
     }
     new_proposals.expect("Above loop always runs till Ok")
+}
+
+pub async fn fetch_document_and_save(document: Document) {
+
 }

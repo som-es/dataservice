@@ -32,5 +32,5 @@ pub struct DbDelegate {
 pub struct ProposalDelegate {
     pub proposal_id: String,
     pub delegate_id: i32,
-    pub is_receiver: bool
+    pub is_receiver: bool,
 }

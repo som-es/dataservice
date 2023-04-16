@@ -34,8 +34,4 @@ diesel::table! {
 diesel::joinable!(proposal_delegates -> delegates (delegate_id));
 diesel::joinable!(proposal_delegates -> proposals (proposal_id));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    delegates,
-    proposal_delegates,
-    proposals,
-);
+diesel::allow_tables_to_appear_in_same_query!(delegates, proposal_delegates, proposals,);
