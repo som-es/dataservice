@@ -1,5 +1,5 @@
 use diesel::RunQueryDsl;
-use scraper::{legis_init::{LegislativeInitiative, LegislativeInitiatives}, AustriaScraper};
+use scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative};
 
 use crate::{services::scrape_untill_success, Shutdown, models::{DbLegislativeInitiative, DbVote}, schema::{legislative_initiatives, votes}};
 

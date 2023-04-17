@@ -2,7 +2,7 @@ use diesel::RunQueryDsl;
 use dotenvy::dotenv;
 use scraper::{
     proposals::{Proposal, ProposalScraper, ProposalsPayload},
-    AustriaScraper, Scraper,
+    AustriaScraper, Scraper, Fetch,
 };
 
 use crate::{
@@ -39,7 +39,7 @@ async fn scrape_new_proposals(prev_proposals: &[Proposal]) -> crate::Result<Vec<
         let documents = proposal.documents.clone();
         tokio::task::spawn_blocking(|| {
             for document in documents {
-                document.save( ".", AustriaScraper::BASE_URL).unwrap();
+                document.save( ".", document.fetch(AustriaScraper::BASE_URL).unwrap()).unwrap();
             }
         })
         .await?;
