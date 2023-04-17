@@ -37,7 +37,9 @@ pub async fn run_services(state: &State) {
     // println!("res: {res:?}");
     tokio::join!(
         // services::proposals::run(),
-        services::legislative_initiatives::run_shut(Shutdown::new(state.notify_shutdown.subscribe())),
+        services::legislative_initiatives::run_shut(Shutdown::new(
+            state.notify_shutdown.subscribe()
+        )),
         services::proposals::run_shut(Shutdown::new(state.notify_shutdown.subscribe()))
     );
 }

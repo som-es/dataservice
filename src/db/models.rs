@@ -1,6 +1,6 @@
 use diesel::prelude::*;
 
-use super::schema::{delegates, proposal_delegates, proposals, legislative_initiatives, votes};
+use super::schema::{delegates, legislative_initiatives, proposal_delegates, proposals, votes};
 
 #[derive(Queryable, Selectable, Identifiable, PartialEq, Debug, Clone, Insertable)]
 #[diesel(table_name = proposals)]

@@ -2,7 +2,7 @@ use diesel::RunQueryDsl;
 use dotenvy::dotenv;
 use scraper::{
     proposals::{Proposal, ProposalScraper, ProposalsPayload},
-    AustriaScraper, Scraper, Fetch,
+    AustriaScraper, Fetch, Scraper,
 };
 
 use crate::{
@@ -21,7 +21,7 @@ async fn scrape_new_proposals(prev_proposals: &[Proposal]) -> crate::Result<Vec<
     let date_end = today + chrono::Duration::days(1);
 
     let proposal_payload = ProposalsPayload::new().with_date_range(date_start, date_end);
-        
+
     let proposals = scraper.post_proposals_payload(proposal_payload).await?;
     let proposal_paths = scraper.proposal_paths(proposals)?;
 
@@ -39,7 +39,9 @@ async fn scrape_new_proposals(prev_proposals: &[Proposal]) -> crate::Result<Vec<
         let documents = proposal.documents.clone();
         tokio::task::spawn_blocking(|| {
             for document in documents {
-                document.save( ".", document.fetch(AustriaScraper::BASE_URL).unwrap()).unwrap();
+                document
+                    .save(".", document.fetch(AustriaScraper::BASE_URL).unwrap())
+                    .unwrap();
             }
         })
         .await?;
@@ -135,8 +137,11 @@ pub async fn run() {
 pub async fn run_shut(mut shutdown: Shutdown) {
     dotenv().ok();
 
-    let proposal_sleep = std::env::var("PROPOSAL_SLEEP").unwrap_or_else(|_| "10".to_string()).parse().unwrap_or(10);
-    
+    let proposal_sleep = std::env::var("PROPOSAL_SLEEP")
+        .unwrap_or_else(|_| "10".to_string())
+        .parse()
+        .unwrap_or(10);
+
     let mut prev_proposals = Vec::new();
 
     let start_date = today();
@@ -152,7 +157,7 @@ pub async fn run_shut(mut shutdown: Shutdown) {
                 prev_proposals.extend(proposals_once(&prev_proposals).await);
                 log::info!("Sleeping for {proposal_sleep} seconds.");
                 tokio::time::sleep(tokio::time::Duration::from_secs(proposal_sleep)).await;
-            
+
                 if today() > start_date {
                     prev_proposals.clear();
                 }

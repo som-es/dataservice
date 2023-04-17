@@ -1,27 +1,30 @@
 use diesel::RunQueryDsl;
 use scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative};
 
-use crate::{services::scrape_untill_success, Shutdown, models::{DbLegislativeInitiative, DbVote}, schema::{legislative_initiatives, votes}};
+use crate::{
+    models::{DbLegislativeInitiative, DbVote},
+    schema::{legislative_initiatives, votes},
+    services::scrape_untill_success,
+    Shutdown,
+};
 
-async fn scrape_new_legis_inits(
-) -> crate::Result<Vec<LegislativeInitiative>> {
+async fn scrape_new_legis_inits() -> crate::Result<Vec<LegislativeInitiative>> {
     let scraper = AustriaScraper::default();
-    
+
     let legis_inits = scraper.post_legis_payload().await?;
     let legis_init_paths = scraper.legis_paths(legis_inits)?;
 
     let mut new_legis_inits = Vec::new();
 
     for legis_init_path in &legis_init_paths {
-
         // skipping proposals that can't be processed right now
         let Ok(legis_init) = scraper.get_legis_init(&legis_init_path).await else {
             continue;
         };
-        
+
         new_legis_inits.push(legis_init);
     }
-    
+
     Ok(new_legis_inits)
 }
 
@@ -55,7 +58,7 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
             .do_nothing()
             .execute(&mut crate::establish_connection())
             .expect("msg");
-        
+
         for vote in &legis_init.votes {
             let db_vote = DbVote {
                 party: vote.party.clone(),
@@ -66,10 +69,7 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
 
             diesel::insert_into(votes::table)
                 .values(&db_vote)
-                .on_conflict((
-                    votes::legislative_initiatives_id,
-                    votes::party,
-                ))
+                .on_conflict((votes::legislative_initiatives_id, votes::party))
                 .do_nothing()
                 .execute(&mut crate::establish_connection())
                 .expect("msg");

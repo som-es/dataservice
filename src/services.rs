@@ -21,6 +21,4 @@ where
     new_proposals.expect("Above loop always runs till Ok")
 }
 
-pub async fn fetch_document_and_save(document: Document) {
-
-}
+pub async fn fetch_document_and_save(document: Document) {}
