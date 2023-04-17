@@ -6,12 +6,17 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-chrono = "0.4.24"
+chrono = {version="0.4.24", optional=true}
 diesel = {version = "2.0.3", features = ["postgres"] }
-dotenvy = "0.15.7"
-log = "0.4.17"
-reqwest = { version = "0.11.16", features = ["blocking"] }
+dotenvy = { version = "0.15.7", optional=true}
+log = {version = "0.4.17", optional=true}
+reqwest = { version = "0.11.16", features = ["blocking"], optional=true }
 
 scraper = {path = "../scraper"}
-simple_logger = "4.1.0"
-tokio = { version = "1.26.0", features = ["tokio-macros", "macros", "rt", "rt-multi-thread", "signal"] }
+simple_logger = { version="4.1.0", optional = true}
+tokio = { version = "1.26.0", features = ["tokio-macros", "macros", "rt", "rt-multi-thread", "signal"], optional=true }
+
+[features]
+default = ["runner"]
+models = ["dotenvy"]
+runner = ["models", "chrono", "reqwest", "simple_logger", "tokio", "log", "dotenvy"]

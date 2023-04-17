@@ -1,23 +1,8 @@
-mod db;
-mod services;
-mod shutdown;
 
-pub use db::*;
 
-pub use shutdown::*;
-
-pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
-
-use std::{collections::HashSet, future::Future};
-
-use chrono::NaiveDate;
-
+use std::future::Future;
+use dataservice::{services, Shutdown};
 use tokio::sync::{broadcast, mpsc};
-
-#[inline]
-pub fn today() -> NaiveDate {
-    chrono::Local::now().date_naive()
-}
 
 #[tokio::main]
 async fn main() {

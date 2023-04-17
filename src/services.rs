@@ -1,9 +1,3 @@
-use std::future::Future;
-
-use scraper::Document;
-
-use crate::Shutdown;
-
 pub mod delegates;
 pub mod legislative_initiatives;
 pub mod proposals;
@@ -20,5 +14,3 @@ where
     }
     new_proposals.expect("Above loop always runs till Ok")
 }
-
-pub async fn fetch_document_and_save(document: Document) {}
