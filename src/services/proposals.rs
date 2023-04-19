@@ -16,7 +16,7 @@ async fn scrape_new_proposals(prev_proposals: &[Proposal]) -> crate::Result<Vec<
     let scraper = AustriaScraper::default();
 
     let today = chrono::Local::now().date_naive();
-    // let date_start = today - chrono::Duration::days(5);
+    //let date_start = today - chrono::Duration::days(55);
     let date_start = today;
     let date_end = today + chrono::Duration::days(1);
 
@@ -38,11 +38,13 @@ async fn scrape_new_proposals(prev_proposals: &[Proposal]) -> crate::Result<Vec<
 
         let documents = proposal.documents.clone();
         tokio::task::spawn_blocking(|| {
+            /*
             for document in documents {
                 document
                     .save(".", document.fetch(AustriaScraper::BASE_URL).unwrap())
                     .unwrap();
             }
+            */
         })
         .await?;
 

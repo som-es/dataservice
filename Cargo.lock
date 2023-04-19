@@ -100,6 +100,7 @@ dependencies = [
  "js-sys",
  "num-integer",
  "num-traits",
+ "serde",
  "time 0.1.45",
  "wasm-bindgen",
  "winapi",
@@ -204,6 +205,8 @@ dependencies = [
  "log",
  "reqwest",
  "scraper",
+ "serde",
+ "serde_derive",
  "simple_logger",
  "tokio",
 ]
@@ -216,6 +219,7 @@ checksum = "4391a22b19c916e50bec4d6140f29bdda3e3bb187223fe6e3ea0b6e4d1021c04"
 dependencies = [
  "bitflags",
  "byteorder",
+ "chrono",
  "diesel_derives",
  "itoa",
  "pq-sys",
