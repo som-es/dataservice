@@ -5,6 +5,7 @@ diesel::table! {
         id -> Int4,
         name -> Varchar,
         party -> Nullable<Varchar>,
+        image_url -> Nullable<Varchar>,
         constituency -> Nullable<Varchar>,
         council -> Nullable<Varchar>,
         seat_row -> Nullable<Int4>,

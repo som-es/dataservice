@@ -32,6 +32,7 @@ pub struct DbProposalQuery {
 pub struct DbDelegate {
     pub id: i32,
     pub name: String,
+    pub image_url: Option<String>,
     pub party: Option<String>,
     pub constituency: Option<String>,
     pub council: Option<String>,

@@ -17,9 +17,9 @@ async fn main() {
 }
 
 pub async fn run_services(state: &State) {
-    // let hs = std::collections::HashSet::new();
-    // let res = services::delegates::delegates_once(&hs).await;
-    // println!("res: {res:?}");
+    let hs = std::collections::HashSet::new();
+    let res = services::delegates::delegates_once(&hs).await;
+    println!("res: {res:?}");
     tokio::join!(
         // services::proposals::run(),
         services::legislative_initiatives::run_shut(Shutdown::new(
