@@ -32,8 +32,8 @@ pub struct DbProposalQuery {
 pub struct DbDelegate {
     pub id: i32,
     pub name: String,
-    pub image_url: Option<String>,
     pub party: Option<String>,
+    pub image_url: Option<String>,
     pub constituency: Option<String>,
     pub council: Option<String>,
     pub seat_row: Option<i32>,
@@ -60,6 +60,7 @@ pub struct DbLegislativeInitiative {
     pub title: String,
     pub description: String,
     pub accepted: bool,
+    pub created_at: NaiveDateTime,
 }
 
 #[derive(Queryable, Identifiable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize)]

@@ -1,3 +1,4 @@
+use chrono::NaiveDateTime;
 use diesel::RunQueryDsl;
 use scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative};
 
@@ -5,7 +6,7 @@ use crate::{
     models::{DbLegislativeInitiative, DbVote},
     schema::{legislative_initiatives, votes},
     services::scrape_untill_success,
-    Shutdown,
+    Shutdown, today_and_time,
 };
 
 async fn scrape_new_legis_inits() -> crate::Result<Vec<LegislativeInitiative>> {
@@ -50,6 +51,7 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
             ityp: legis_init.ityp.clone(),
             gp: legis_init.gp.clone(),
             accepted: legis_init.accepted,
+            created_at: NaiveDateTime::parse_from_str("2014-5-17T12:34:56", "%Y-%m-%dT%H:%M:%S").unwrap_or(today_and_time())
         };
 
         diesel::insert_into(legislative_initiatives::table)
@@ -90,5 +92,16 @@ pub async fn run_shut(mut shutdown: Shutdown) {
                 tokio::time::sleep(tokio::time::Duration::from_secs(10000)).await;
             } => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::NaiveDateTime;
+
+    #[test]
+    fn test_date_time_parse() {
+        let x = NaiveDateTime::parse_from_str("2014-5-17T12:34:56", "%Y-%m-%dT%H:%M:%S").unwrap();
+        println!("x: {x:?}");
     }
 }

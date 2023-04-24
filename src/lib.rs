@@ -24,3 +24,9 @@ pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + S
 pub fn today() -> NaiveDate {
     chrono::Local::now().date_naive()
 }
+
+#[cfg(feature = "runner")]
+#[inline]
+pub fn today_and_time() -> chrono::NaiveDateTime {
+    chrono::Local::now().naive_local()
+}

@@ -40,11 +40,11 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
             id: delegate.id as i32,
             name: delegate.name.clone(),
             party: delegate.party.clone(),
+            image_url: delegate.image_url.clone(),
             constituency: delegate.constituency.clone(),
             council: delegate.council.clone(),
             seat_row: delegate.seat.as_ref().map(|seat| seat.row as i32),
             seat_col: delegate.seat.as_ref().map(|seat| seat.col as i32),
-            image_url: delegate.image_url.clone(),
         };
 
         diesel::insert_into(delegates::table)
