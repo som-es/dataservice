@@ -3,10 +3,10 @@ use diesel::RunQueryDsl;
 use scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative};
 
 use crate::{
-    models::{DbLegislativeInitiative, DbVote, DbSpeech},
-    schema::{legislative_initiatives, votes, speeches},
+    models::{DbLegislativeInitiative, DbSpeech, DbVote},
+    schema::{legislative_initiatives, speeches, votes},
     services::scrape_untill_success,
-    Shutdown, today_and_time,
+    today_and_time, Shutdown,
 };
 
 async fn scrape_new_legis_inits() -> crate::Result<Vec<LegislativeInitiative>> {
@@ -18,7 +18,7 @@ async fn scrape_new_legis_inits() -> crate::Result<Vec<LegislativeInitiative>> {
     let mut new_legis_inits = Vec::new();
 
     for legis_init_path in &legis_init_paths {
-        // skipping proposals that can't be processed right now
+        // skipping legis inits that can't be processed right now
         let Ok(legis_init) = scraper.get_legis_init(&legis_init_path).await else {
             continue;
         };
@@ -43,6 +43,8 @@ async fn legis_init_once() -> Vec<LegislativeInitiative> {
 
 fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
     log::info!("Updating legislative initiative in database...");
+
+    let conn = &mut crate::establish_connection();
     for legis_init in new_legis_inits {
         let db_legis_init = DbLegislativeInitiative {
             id: legis_init.id.clone(),
@@ -51,14 +53,15 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
             ityp: legis_init.ityp.clone(),
             gp: legis_init.gp.clone(),
             accepted: legis_init.accepted,
-            created_at: NaiveDateTime::parse_from_str(&legis_init.date, "%Y-%m-%dT%H:%M:%S").unwrap_or(today_and_time())
+            created_at: NaiveDateTime::parse_from_str(&legis_init.date, "%Y-%m-%dT%H:%M:%S")
+                .unwrap_or(today_and_time()),
         };
 
         diesel::insert_into(legislative_initiatives::table)
             .values(&db_legis_init)
             .on_conflict(legislative_initiatives::id)
             .do_nothing()
-            .execute(&mut crate::establish_connection())
+            .execute(conn)
             .expect("msg");
 
         for vote in &legis_init.votes {
@@ -73,7 +76,7 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
                 .values(&db_vote)
                 .on_conflict((votes::legislative_initiatives_id, votes::party))
                 .do_nothing()
-                .execute(&mut crate::establish_connection())
+                .execute(conn)
                 .expect("msg");
         }
 
@@ -84,12 +87,14 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
                 legislative_initiatives_id: db_legis_init.id.clone(),
             };
 
-            diesel::insert_into(speeches::table)
+            if let Err(e) = diesel::insert_into(speeches::table)
                 .values(&db_speech)
                 .on_conflict((speeches::legislative_initiatives_id, speeches::delegate_id))
                 .do_nothing()
-                .execute(&mut crate::establish_connection())
-                .expect("msg");
+                .execute(conn)
+            {
+                log::warn!("Error inserting speech, probably delegate does not exist in database and has got inactive recently: {:?}", e)
+            }
         }
     }
 }
@@ -103,7 +108,13 @@ pub async fn run_shut(mut shutdown: Shutdown) {
                 break;
             }
             _ = async {
-                legis_init_once().await;
+                if let Err(e) = tokio::task::spawn(async move {
+                    log::info!("Starting legislative initiative scraper");
+                    legis_init_once().await;
+                }).await {
+                    log::error!("Error in legislative initiative scraper: {:?}", e);
+                }
+                // legis_init_once().await;
                 tokio::time::sleep(tokio::time::Duration::from_secs(10000)).await;
             } => {}
         }

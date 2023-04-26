@@ -17,6 +17,7 @@ async fn scrape_new_delegates(prev_delegates: &HashSet<Delegate>) -> crate::Resu
             continue;
         };
 
+        // delegates that were active before but aren't anymore remain (as active) in the database
         if !delegate.is_active {
             continue;
         }

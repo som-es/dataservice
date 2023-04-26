@@ -1,7 +1,5 @@
-
-
-use std::future::Future;
 use dataservice::{services, Shutdown};
+use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
 
 #[tokio::main]
