@@ -51,7 +51,7 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
             ityp: legis_init.ityp.clone(),
             gp: legis_init.gp.clone(),
             accepted: legis_init.accepted,
-            created_at: NaiveDateTime::parse_from_str("2014-5-17T12:34:56", "%Y-%m-%dT%H:%M:%S").unwrap_or(today_and_time())
+            created_at: NaiveDateTime::parse_from_str(&legis_init.date, "%Y-%m-%dT%H:%M:%S").unwrap_or(today_and_time())
         };
 
         diesel::insert_into(legislative_initiatives::table)

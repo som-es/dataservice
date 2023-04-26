@@ -4,6 +4,8 @@ use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 
+use crate::schema::speeches;
+
 use super::schema::{delegates, legislative_initiatives, proposal_delegates, proposals, votes};
 
 #[derive(Queryable, Selectable, Identifiable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize)]
@@ -70,6 +72,16 @@ pub struct DbLegislativeInitiative {
 pub struct DbVote {
     pub party: String,
     pub fraction: i32,
+    pub infavor: bool,
+    pub legislative_initiatives_id: String,
+}
+#[derive(Queryable, Identifiable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize)]
+#[diesel(table_name = speeches)]
+#[diesel(primary_key(delegate_id, legislative_initiatives_id))]
+#[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
+#[diesel(belongs_to(DbDelegate, foreign_key = delegate_id))]
+pub struct DbSpeech {
+    pub delegate_id: i32,
     pub infavor: bool,
     pub legislative_initiatives_id: String,
 }

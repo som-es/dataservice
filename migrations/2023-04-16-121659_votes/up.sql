@@ -1,4 +1,4 @@
--- Your SQL goes here
+-- add party table
 create table votes (
     party varchar(30) not null,
     fraction int not null,
