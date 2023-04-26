@@ -3,8 +3,8 @@ use diesel::RunQueryDsl;
 use scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative};
 
 use crate::{
-    models::{DbLegislativeInitiative, DbVote},
-    schema::{legislative_initiatives, votes},
+    models::{DbLegislativeInitiative, DbVote, DbSpeech},
+    schema::{legislative_initiatives, votes, speeches},
     services::scrape_untill_success,
     Shutdown, today_and_time,
 };
@@ -72,6 +72,21 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
             diesel::insert_into(votes::table)
                 .values(&db_vote)
                 .on_conflict((votes::legislative_initiatives_id, votes::party))
+                .do_nothing()
+                .execute(&mut crate::establish_connection())
+                .expect("msg");
+        }
+
+        for speech in &legis_init.speeches {
+            let db_speech = DbSpeech {
+                delegate_id: speech.delegate_id as i32,
+                infavor: speech.infavor,
+                legislative_initiatives_id: db_legis_init.id.clone(),
+            };
+
+            diesel::insert_into(speeches::table)
+                .values(&db_speech)
+                .on_conflict((speeches::legislative_initiatives_id, speeches::delegate_id))
                 .do_nothing()
                 .execute(&mut crate::establish_connection())
                 .expect("msg");

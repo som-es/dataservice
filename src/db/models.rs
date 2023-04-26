@@ -4,9 +4,7 @@ use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::schema::speeches;
-
-use super::schema::{delegates, legislative_initiatives, proposal_delegates, proposals, votes};
+use super::schema::{speeches, delegates, legislative_initiatives, proposal_delegates, proposals, votes};
 
 #[derive(Queryable, Selectable, Identifiable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize)]
 #[diesel(table_name = proposals)]
