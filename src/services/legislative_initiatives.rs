@@ -57,12 +57,15 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
                 .unwrap_or(today_and_time()),
         };
 
-        diesel::insert_into(legislative_initiatives::table)
+        if let Err(e) = diesel::insert_into(legislative_initiatives::table)
             .values(&db_legis_init)
             .on_conflict(legislative_initiatives::id)
             .do_nothing()
             .execute(conn)
-            .expect("msg");
+        {
+            log::error!("Error inserting legislative initiative: '{e}'. Error occured for legislative initiative: {legis_init:?}");
+            continue;
+        }
 
         for vote in &legis_init.votes {
             let db_vote = DbVote {
@@ -72,12 +75,14 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
                 legislative_initiatives_id: db_legis_init.id.clone(),
             };
 
-            diesel::insert_into(votes::table)
+            if let Err(e) = diesel::insert_into(votes::table)
                 .values(&db_vote)
                 .on_conflict((votes::legislative_initiatives_id, votes::party))
                 .do_nothing()
                 .execute(conn)
-                .expect("msg");
+            {
+                log::warn!("Error inserting vote: '{e}'. The error occured for the following vote: {vote:?}")
+            }
         }
 
         for speech in &legis_init.speeches {
@@ -93,7 +98,7 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
                 .do_nothing()
                 .execute(conn)
             {
-                log::warn!("Error inserting speech, probably delegate does not exist in database and has got inactive recently: {:?}", e)
+                log::warn!("Error inserting speech, probably delegate does not exist in database and has got inactive recently: {e}, for speech: {speech:?}")
             }
         }
     }

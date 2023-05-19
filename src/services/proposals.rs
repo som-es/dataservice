@@ -65,25 +65,37 @@ fn update_proposals_in_db(new_proposals: &[Proposal]) {
             gp: proposal.gp.clone(),
         };
 
-        diesel::insert_into(proposals::table)
+        if let Err(e) = diesel::insert_into(proposals::table)
             .values(&db_proposal)
             .on_conflict(proposals::id)
             .do_nothing()
             .execute(&mut crate::establish_connection())
-            .expect("msg");
+        {
+            log::error!("Error inserting proposal into database: '{e}'. The following proposal was not inserted: {proposal:?}");
+            continue;
+        }
 
         for receiver_id in &proposal.receiver_ids {
-            println!("receiver_id: {}", receiver_id);
-            insert_prop_del(&proposal.id, *receiver_id as i32, true);
+            if let Err(e) = insert_prop_del(&proposal.id, *receiver_id as i32, true) {
+                log::error!("Error inserting receiver of proposal into database: '{e}'. The following proposal receiver was not inserted: {receiver_id:?}, for proposal: {proposal:?}");
+                continue;
+            }
         }
 
         for issuer_id in &proposal.issuer_ids {
-            insert_prop_del(&proposal.id, *issuer_id as i32, false);
+            if let Err(e) = insert_prop_del(&proposal.id, *issuer_id as i32, false){
+                log::error!("Error inserting issuer of proposal into database: '{e}'. The following proposal issuer was not inserted: {issuer_id:?}, for proposal: {proposal:?}");
+                continue;
+            }
         }
     }
 }
 
-pub fn insert_prop_del(proposal_id: &str, delegate_id: i32, is_receiver: bool) {
+pub fn insert_prop_del(
+    proposal_id: &str,
+    delegate_id: i32,
+    is_receiver: bool,
+) -> diesel::QueryResult<usize> {
     use crate::schema::proposal_delegates;
 
     let db_proposal_delegate = ProposalDelegate {
@@ -100,7 +112,6 @@ pub fn insert_prop_del(proposal_id: &str, delegate_id: i32, is_receiver: bool) {
         ))
         .do_nothing()
         .execute(&mut crate::establish_connection())
-        .unwrap_or_default();
 }
 
 #[derive(Debug, Default)]

@@ -48,13 +48,15 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
             seat_col: delegate.seat.as_ref().map(|seat| seat.col as i32),
         };
 
-        diesel::insert_into(delegates::table)
+        if let Err(e) = diesel::insert_into(delegates::table)
             .values(&db_delegate)
             .on_conflict(delegates::id)
             .do_update()
             .set(&db_delegate)
             .execute(&mut crate::establish_connection())
-            .expect("msg");
+        {
+            log::error!("Error adding/updating delegate in database: {e}, for delegate {delegate:?}");
+        }
     }
 }
 
