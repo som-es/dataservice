@@ -57,13 +57,13 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
         let contacts_id = match diesel::insert_into(contacts::table)
             .values(&db_contact)
             .returning(contacts::id)
-            .get_result::<i32>(&mut conn) 
+            .get_result::<i32>(&mut conn)
         {
             Ok(contacts_id) => Some(contacts_id),
             Err(e) => {
-                log::error!("Error inserting contact information for delegate {delegate:?}: {e}");                
+                log::error!("Error inserting contact information for delegate {delegate:?}: {e}");
                 None
-            },
+            }
         };
 
         let db_delegate = DbDelegate {
@@ -75,7 +75,7 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
             council: delegate.council.clone(),
             seat_row: delegate.seat.as_ref().map(|seat| seat.row as i32),
             seat_col: delegate.seat.as_ref().map(|seat| seat.col as i32),
-            contacts_id
+            contacts_id,
         };
 
         if let Err(e) = diesel::insert_into(delegates::table)

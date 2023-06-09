@@ -1,6 +1,15 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    call_to_order (id) {
+        id -> Varchar,
+        plenar_id -> Varchar,
+        inr -> Int4,
+        receiver_id -> Int4,
+    }
+}
+
+diesel::table! {
     contacts (id) {
         id -> Int4,
         mail -> Nullable<Varchar>,
@@ -11,6 +20,14 @@ diesel::table! {
         tiktok_url -> Nullable<Varchar>,
         instagram_url -> Nullable<Varchar>,
         youtube_url -> Nullable<Varchar>,
+    }
+}
+
+diesel::table! {
+    debates (id) {
+        id -> Int4,
+        plenar_id -> Varchar,
+        about -> Varchar,
     }
 }
 
@@ -45,6 +62,28 @@ diesel::table! {
     parties (id) {
         id -> Varchar,
         name -> Varchar,
+    }
+}
+
+diesel::table! {
+    plenar_infos (id) {
+        id -> Varchar,
+        add_date -> Timestamptz,
+        inr -> Int4,
+        title -> Varchar,
+        description -> Varchar,
+    }
+}
+
+diesel::table! {
+    plenar_speeches (id) {
+        id -> Int4,
+        delegate_id -> Int4,
+        debate_id -> Int4,
+        opinion -> Nullable<Varchar>,
+        spoken_text -> Nullable<Text>,
+        duration_in_seconds -> Nullable<Int4>,
+        ty -> Nullable<Varchar>,
     }
 }
 
@@ -84,7 +123,11 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(call_to_order -> plenar_infos (plenar_id));
+diesel::joinable!(debates -> plenar_infos (plenar_id));
 diesel::joinable!(delegates -> contacts (contacts_id));
+diesel::joinable!(plenar_speeches -> debates (debate_id));
+diesel::joinable!(plenar_speeches -> delegates (delegate_id));
 diesel::joinable!(proposal_delegates -> delegates (delegate_id));
 diesel::joinable!(proposal_delegates -> proposals (proposal_id));
 diesel::joinable!(speeches -> delegates (delegate_id));
@@ -92,10 +135,14 @@ diesel::joinable!(speeches -> legislative_initiatives (legislative_initiatives_i
 diesel::joinable!(votes -> legislative_initiatives (legislative_initiatives_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
+    call_to_order,
     contacts,
+    debates,
     delegates,
     legislative_initiatives,
     parties,
+    plenar_infos,
+    plenar_speeches,
     proposal_delegates,
     proposals,
     speeches,

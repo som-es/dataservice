@@ -93,7 +93,7 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
         for speech in &legis_init.speeches {
             let db_speech = DbSpeech {
                 delegate_id: speech.delegate_id as i32,
-                
+
                 // TODO: get opinion even if none is given
                 infavor: match speech.opinion {
                     Opinion::Infavor => Some(true),

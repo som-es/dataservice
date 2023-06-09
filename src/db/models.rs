@@ -4,7 +4,7 @@ use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::schema::contacts;
+use crate::schema::{call_to_order, contacts, debates, plenar_infos, plenar_speeches};
 
 use super::schema::{
     delegates, legislative_initiatives, proposal_delegates, proposals, speeches, votes,
@@ -132,4 +132,58 @@ pub struct DbContact {
     pub tiktok_url: Option<String>,
     pub instagram_url: Option<String>,
     pub youtube_url: Option<String>,
+}
+
+#[derive(
+    Queryable,
+    Selectable,
+    Identifiable,
+    PartialEq,
+    Debug,
+    Clone,
+    Insertable,
+    Serialize,
+    Deserialize,
+    AsChangeset,
+)]
+#[diesel(table_name = plenar_infos)]
+#[diesel(primary_key(id))]
+pub struct DbPlenar {
+    pub id: String,
+    pub inr: i32,
+    pub title: String,
+    pub description: String,
+    pub add_date: NaiveDateTime,
+}
+
+#[derive(
+    Queryable, Identifiable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize,
+)]
+#[diesel(table_name = call_to_order)]
+#[diesel(primary_key(id))]
+pub struct DbCallToOrder {
+    pub id: String,
+    pub plenar_id: String,
+    pub inr: i32,
+    pub receiver_id: i32,
+}
+
+#[derive(Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize)]
+#[diesel(table_name = debates)]
+#[diesel(primary_key(id))]
+pub struct DbDebate {
+    pub plenar_id: String,
+    pub about: String,
+}
+
+#[derive(Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize)]
+#[diesel(table_name = plenar_speeches)]
+#[diesel(primary_key(id))]
+pub struct DbPlenarSpeech {
+    pub delegate_id: i32,
+    pub debate_id: i32,
+    pub opinion: Option<String>,
+    pub spoken_text: Option<String>,
+    pub duration_in_seconds: i32,
+    pub ty: String,
 }

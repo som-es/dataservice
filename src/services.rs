@@ -1,7 +1,7 @@
 pub mod delegates;
 pub mod legislative_initiatives;
-pub mod proposals;
 pub mod plenar;
+pub mod proposals;
 
 pub async fn scrape_untill_success<T, O>(f: impl Fn() -> O) -> T
 where
