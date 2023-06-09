@@ -1,5 +1,3 @@
-use std::time::SystemTime;
-
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde_derive::{Deserialize, Serialize};
@@ -157,7 +155,16 @@ pub struct DbPlenar {
 }
 
 #[derive(
-    Queryable, Identifiable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize,
+    Queryable,
+    Identifiable,
+    Selectable,
+    PartialEq,
+    Debug,
+    Clone,
+    Insertable,
+    Serialize,
+    Deserialize,
+    AsChangeset,
 )]
 #[diesel(table_name = call_to_order)]
 #[diesel(primary_key(id))]
@@ -168,7 +175,9 @@ pub struct DbCallToOrder {
     pub receiver_id: i32,
 }
 
-#[derive(Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize)]
+#[derive(
+    Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
+)]
 #[diesel(table_name = debates)]
 #[diesel(primary_key(id))]
 pub struct DbDebate {
