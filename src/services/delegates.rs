@@ -3,7 +3,12 @@ use std::collections::HashSet;
 use diesel::RunQueryDsl;
 use scraper::{delegates::DelegateScraper, AustriaScraper, Delegate};
 
-use crate::{models::DbDelegate, services::scrape_untill_success, Shutdown};
+use crate::{
+    models::{DbContact, DbDelegate},
+    schema::contacts,
+    services::scrape_untill_success,
+    Shutdown,
+};
 
 async fn scrape_new_delegates(prev_delegates: &HashSet<Delegate>) -> crate::Result<Vec<Delegate>> {
     let scraper = AustriaScraper::default();
@@ -34,9 +39,33 @@ async fn scrape_new_delegates(prev_delegates: &HashSet<Delegate>) -> crate::Resu
 
 fn update_delegates_in_db(new_delegates: &[Delegate]) {
     use crate::schema::delegates;
+    let mut conn = crate::establish_connection();
 
     log::info!("Updating delegates in database...");
     for delegate in new_delegates {
+        let db_contact = DbContact {
+            mail: delegate.contact.mail.clone(),
+            phone_number: delegate.contact.phone_number.clone(),
+            twitter_url: delegate.contact.social_media.twitter.clone(),
+            facebook_url: delegate.contact.social_media.facebook.clone(),
+            website_url: delegate.contact.social_media.website.clone(),
+            tiktok_url: delegate.contact.social_media.tiktok.clone(),
+            instagram_url: delegate.contact.social_media.instagram.clone(),
+            youtube_url: delegate.contact.social_media.youtube.clone(),
+        };
+
+        let contacts_id = match diesel::insert_into(contacts::table)
+            .values(&db_contact)
+            .returning(contacts::id)
+            .get_result::<i32>(&mut conn) 
+        {
+            Ok(contacts_id) => Some(contacts_id),
+            Err(e) => {
+                log::error!("Error inserting contact information for delegate {delegate:?}: {e}");                
+                None
+            },
+        };
+
         let db_delegate = DbDelegate {
             id: delegate.id as i32,
             name: delegate.name.clone(),
@@ -46,6 +75,7 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
             council: delegate.council.clone(),
             seat_row: delegate.seat.as_ref().map(|seat| seat.row as i32),
             seat_col: delegate.seat.as_ref().map(|seat| seat.col as i32),
+            contacts_id
         };
 
         if let Err(e) = diesel::insert_into(delegates::table)
@@ -53,9 +83,11 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
             .on_conflict(delegates::id)
             .do_update()
             .set(&db_delegate)
-            .execute(&mut crate::establish_connection())
+            .execute(&mut conn)
         {
-            log::error!("Error adding/updating delegate in database: {e}, for delegate {delegate:?}");
+            log::error!(
+                "Error adding/updating delegate in database: {e}, for delegate {delegate:?}"
+            );
         }
     }
 }

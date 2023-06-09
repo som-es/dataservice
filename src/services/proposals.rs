@@ -54,6 +54,7 @@ async fn scrape_new_proposals(prev_proposals: &[Proposal]) -> crate::Result<Vec<
 }
 
 fn update_proposals_in_db(new_proposals: &[Proposal]) {
+    let mut conn = crate::establish_connection();
     use crate::schema::proposals;
     log::info!("Updating proposals in database...");
     for proposal in new_proposals {
@@ -69,7 +70,7 @@ fn update_proposals_in_db(new_proposals: &[Proposal]) {
             .values(&db_proposal)
             .on_conflict(proposals::id)
             .do_nothing()
-            .execute(&mut crate::establish_connection())
+            .execute(&mut conn)
         {
             log::error!("Error inserting proposal into database: '{e}'. The following proposal was not inserted: {proposal:?}");
             continue;
@@ -83,7 +84,7 @@ fn update_proposals_in_db(new_proposals: &[Proposal]) {
         }
 
         for issuer_id in &proposal.issuer_ids {
-            if let Err(e) = insert_prop_del(&proposal.id, *issuer_id as i32, false){
+            if let Err(e) = insert_prop_del(&proposal.id, *issuer_id as i32, false) {
                 log::error!("Error inserting issuer of proposal into database: '{e}'. The following proposal issuer was not inserted: {issuer_id:?}, for proposal: {proposal:?}");
                 continue;
             }

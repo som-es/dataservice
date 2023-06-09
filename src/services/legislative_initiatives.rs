@@ -1,6 +1,6 @@
 use chrono::NaiveDateTime;
 use diesel::RunQueryDsl;
-use scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative};
+use scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative, Opinion};
 
 use crate::{
     models::{DbLegislativeInitiative, DbSpeech, DbVote},
@@ -19,7 +19,11 @@ async fn scrape_new_legis_inits() -> crate::Result<Vec<LegislativeInitiative>> {
 
     for legis_init_path in &legis_init_paths {
         // skipping legis inits that can't be processed right now
+        // mainly many I and A
+        // https://www.parlament.gv.at/gegenstand/XXVII/I/1494
+        // https://www.parlament.gv.at/gegenstand/XXVII/A/2686
         let Ok(legis_init) = scraper.get_legis_init(&legis_init_path).await else {
+            log::debug!("Cannot process legislative initiative: '{legis_init_path}'");
             continue;
         };
 
@@ -49,6 +53,7 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
         let db_legis_init = DbLegislativeInitiative {
             id: legis_init.id.clone(),
             title: legis_init.title.clone(),
+            emphasis: legis_init.emphasis.clone(),
             description: legis_init.description.clone(),
             ityp: legis_init.ityp.clone(),
             gp: legis_init.gp.clone(),
@@ -88,7 +93,16 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
         for speech in &legis_init.speeches {
             let db_speech = DbSpeech {
                 delegate_id: speech.delegate_id as i32,
-                infavor: speech.infavor,
+                
+                // TODO: get opinion even if none is given
+                infavor: match speech.opinion {
+                    Opinion::Infavor => Some(true),
+                    Opinion::Against => Some(false),
+                    _ => {
+                        log::info!("No opinion given for speech: {speech:?}");
+                        None
+                    }
+                },
                 legislative_initiatives_id: db_legis_init.id.clone(),
             };
 
@@ -120,7 +134,7 @@ pub async fn run_shut(mut shutdown: Shutdown) {
                     log::error!("Error in legislative initiative scraper: {:?}", e);
                 }
                 // legis_init_once().await;
-                tokio::time::sleep(tokio::time::Duration::from_secs(10000)).await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(1000)).await;
             } => {}
         }
     }
