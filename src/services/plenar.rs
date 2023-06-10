@@ -4,7 +4,7 @@ use crate::{
     services::scrape_untill_success,
     Shutdown,
 };
-use diesel::{PgConnection, QueryResult, RunQueryDsl};
+use diesel::{ExpressionMethods, PgConnection, QueryDsl, QueryResult, RunQueryDsl};
 use scraper::{
     call_to_order::CallToOrderInfo,
     plenar::{Debate, Plenar, PlenarInfo},
@@ -98,7 +98,7 @@ async fn insert_plenar_speech(
     debate_id: i32,
     conn: &mut PgConnection,
     text_extractor: &mut TextExtractor,
-) -> QueryResult<usize> {
+) -> QueryResult<()> {
     let db_plenar_speech = DbPlenarSpeech {
         delegate_id: plenar_speech.delegate_id as i32,
         debate_id,
@@ -124,16 +124,39 @@ async fn insert_plenar_speech(
                 None
             }
         },
-        spoken_text: Some(text_extractor.extract_text_from_url(&plenar_speech).await),
+        spoken_text: None,
         duration_in_seconds: plenar_speech.duration_in_seconds as i32,
         ty: plenar_speech.ty.clone(),
     };
+
+    // Some(text_extractor.extract_text_from_url(&plenar_speech).await)
 
     diesel::insert_into(plenar_speeches::table)
         .values(&db_plenar_speech)
         .on_conflict((plenar_speeches::debate_id, plenar_speeches::delegate_id))
         .do_nothing()
-        .execute(conn)
+        .execute(conn)?;
+    {
+        use crate::db::schema::plenar_speeches::dsl::plenar_speeches;
+        use crate::db::schema::plenar_speeches::{debate_id, delegate_id, spoken_text};
+
+        let has_spoken_text: Vec<Option<String>> = plenar_speeches
+            .select(spoken_text)
+            .filter(debate_id.eq(db_plenar_speech.debate_id))
+            .filter(delegate_id.eq(db_plenar_speech.delegate_id))
+            .load::<Option<String>>(conn)?;
+        if has_spoken_text.len() == 1 && has_spoken_text[0].is_none() {
+            let updated_spoken_text =
+                Some(text_extractor.extract_text_from_url(&plenar_speech).await);
+
+            diesel::update(plenar_speeches)
+                .filter(debate_id.eq(db_plenar_speech.debate_id))
+                .filter(delegate_id.eq(db_plenar_speech.delegate_id))
+                .set(spoken_text.eq(updated_spoken_text))
+                .execute(conn)?;
+        }
+    }
+    Ok(())
 }
 
 fn insert_debate(debate: &Debate, plenar_id: String, conn: &mut PgConnection) -> QueryResult<i32> {
@@ -143,7 +166,7 @@ fn insert_debate(debate: &Debate, plenar_id: String, conn: &mut PgConnection) ->
     };
     diesel::insert_into(debates::table)
         .values(&db_debate)
-        .on_conflict(debates::plenar_id)
+        .on_conflict((debates::plenar_id, debates::about))
         .do_update()
         .set(&db_debate)
         .returning(debates::id)
@@ -165,8 +188,7 @@ pub fn insert_plenar_info(
     diesel::insert_into(plenar_infos::table)
         .values(&db_plenar_info)
         .on_conflict(plenar_infos::id)
-        .do_update()
-        .set(&db_plenar_info)
+        .do_nothing()
         .execute(conn)
 }
 

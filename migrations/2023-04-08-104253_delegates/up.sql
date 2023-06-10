@@ -23,39 +23,3 @@ create table delegates (
     contacts_id int,
     FOREIGN KEY (contacts_id) REFERENCES contacts(id)
 );
-
-CREATE TABLE plenar_infos (
-    id varchar(20) primary key,
-    add_date timestamptz not null,
-    inr int not null,
-    title varchar(255) not null,
-    description varchar(255) not null
-);
-
-CREATE TABLE call_to_order (
-    id varchar(20) primary key,
-    plenar_id varchar(20) not null,
-    inr int not null,
-    receiver_id int not null,
-    FOREIGN KEY (plenar_id) REFERENCES plenar_infos(id)
-);
-
-CREATE TABLE debates (
-    id serial primary key,
-    plenar_id varchar(20) not null,
-    about varchar(512) not null,
-    FOREIGN KEY (plenar_id) REFERENCES plenar_infos(id)
-);
-
-CREATE TABLE plenar_speeches (
-    id serial,
-    delegate_id int not null,
-    debate_id int not null,
-    opinion varchar(40),
-    spoken_text text,
-    duration_in_seconds int,
-    ty varchar(40),
-    FOREIGN KEY (debate_id) REFERENCES debates(id),
-    FOREIGN KEY (delegate_id) REFERENCES delegates(id),
-    PRIMARY KEY (id, delegate_id, debate_id)
-);
