@@ -95,13 +95,13 @@ static mut NO_OPINION_COUNT: usize = 0;
 
 async fn insert_plenar_speech(
     plenar_speech: &PlenarSpeech,
-    debate_id: i32,
+    val_debate_id: i32,
     conn: &mut PgConnection,
     text_extractor: &mut TextExtractor,
 ) -> QueryResult<()> {
     let db_plenar_speech = DbPlenarSpeech {
         delegate_id: plenar_speech.delegate_id as i32,
-        debate_id,
+        debate_id: val_debate_id,
         opinion: match &plenar_speech.opinion {
             scraper::Opinion::Infavor => Some("Pro".into()),
             scraper::Opinion::Against => Some("Contra".into()),
@@ -146,8 +146,13 @@ async fn insert_plenar_speech(
             .filter(delegate_id.eq(db_plenar_speech.delegate_id))
             .load::<Option<String>>(conn)?;
         if has_spoken_text.len() == 1 && has_spoken_text[0].is_none() {
+            let Some(text_html_url) = plenar_speech.spoken_text_html_urls.first() else {
+                log::info!("DEBATE_ID: {val_debate_id}, No spoken text html urls for plenar speech: {:?}", plenar_speech);
+                return Ok(());
+            };
+
             let updated_spoken_text =
-                Some(text_extractor.extract_text_from_url(&plenar_speech).await);
+                Some(text_extractor.extract_text_from_url(text_html_url).await);
 
             diesel::update(plenar_speeches)
                 .filter(debate_id.eq(db_plenar_speech.debate_id))
