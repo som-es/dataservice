@@ -187,7 +187,7 @@ pub struct DbDebate {
 
 #[derive(Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize)]
 #[diesel(table_name = plenar_speeches)]
-#[diesel(primary_key(id))]
+#[diesel(primary_key(id, delegate_id, debate_id))]
 pub struct DbPlenarSpeech {
     pub delegate_id: i32,
     pub debate_id: i32,

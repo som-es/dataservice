@@ -1,15 +1,15 @@
 use crate::{
-    models::{DbCallToOrder, DbDebate, DbPlenar},
-    schema::{call_to_order, debates, plenar_infos},
+    models::{DbCallToOrder, DbDebate, DbPlenar, DbPlenarSpeech},
+    schema::{call_to_order, debates, plenar_infos, plenar_speeches},
     services::scrape_untill_success,
     Shutdown,
 };
-use diesel::RunQueryDsl;
+use diesel::{PgConnection, QueryResult, RunQueryDsl};
 use scraper::{
     call_to_order::CallToOrderInfo,
     legis_init::LegislativeInitiatives,
     plenar::{Debate, Plenar, PlenarInfo},
-    AustriaScraper,
+    AustriaScraper, PlenarSpeech, Scraper, TextExtractor,
 };
 
 async fn scrape_new_plenar_infos() -> crate::Result<Vec<PlenarInfo>> {
@@ -38,67 +38,124 @@ async fn plenar_info_once() -> Vec<PlenarInfo> {
     let new_plenar_infos =
         scrape_untill_success::<Vec<PlenarInfo>, _>(|| async { scrape_new_plenar_infos().await })
             .await;
-    update_plenar_infos_in_db(&new_plenar_infos);
+    update_plenar_infos_in_db(&new_plenar_infos).await;
 
     new_plenar_infos
 }
 
-fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo]) {
-    log::info!("Updating legislative initiative in database...");
+async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo]) {
+    log::info!("Updating plenar infos in database...");
 
     let mut conn = crate::establish_connection();
+    let mut text_extractor = scraper::TextExtractor::new(AustriaScraper::BASE_URL);
+
     for plenar_info in new_plenar_infos {
         let plenar_id = format!("{}/{}", plenar_info.ityp, plenar_info.inr);
-        insert_plenar_info(plenar_info, plenar_id.clone(), &mut conn);
+        if let Err(e) = insert_plenar_info(plenar_info, plenar_id.clone(), &mut conn) {
+            log::error!(
+                "Error inserting plenar info: '{e}'. Error occured for plenar info: {plenar_info:?}. Skipping adding call to orders and debates."
+            );
+            continue;
+        }
 
         for call_to_order_entry in &plenar_info.call_to_orders {
-            insert_call_to_order(call_to_order_entry, plenar_id.clone(), &mut conn);
+            if let Err(e) = insert_call_to_order(call_to_order_entry, plenar_id.clone(), &mut conn)
+            {
+                log::warn!("Error inserting call to order: '{e}'. Error occured for call to order: {call_to_order_entry:?}");
+            }
         }
 
         for debate in &plenar_info.debates {
             // get id from here, log here
-            insert_debate(debate, plenar_id.clone(), &mut conn);
+
+            let debate_id = match insert_debate(debate, plenar_id.clone(), &mut conn) {
+                Ok(debate_id) => debate_id,
+                Err(e) => {
+                    log::warn!(
+                        "Error inserting debate: '{e}'. Error occured for debate: {debate:?}"
+                    );
+                    continue;
+                }
+            };
 
             for plenar_speech in &debate.speeches {
-                insert_plenar_speech(plenar_speech, debate_id, &mut conn);
+                if let Err(e) =
+                    insert_plenar_speech(plenar_speech, debate_id, &mut conn, &mut text_extractor)
+                        .await
+                {
+                    log::warn!(
+                        "Error inserting plenar speech: '{e}'. Error occured for plenar speech: {plenar_speech:?}"
+                    );
+                }
             }
         }
-
-        /*for speech in &legis_init.speeches {
-
-            if let Err(e) = diesel::insert_into(speeches::table)
-                .values(&db_speech)
-                .on_conflict((speeches::legislative_initiatives_id, speeches::delegate_id))
-                .do_nothing()
-                .execute(conn)
-            {
-                log::warn!("Error inserting speech, probably delegate does not exist in database and has got inactive recently: {e}, for speech: {speech:?}")
-            }
-        }*/
     }
 }
 
-fn insert_debate(debate: &Debate, plenar_id: String, conn: &mut diesel::PgConnection) {
+static mut NO_OPINION_COUNT: usize = 0;
+
+async fn insert_plenar_speech(
+    plenar_speech: &PlenarSpeech,
+    debate_id: i32,
+    conn: &mut PgConnection,
+    text_extractor: &mut TextExtractor,
+) -> QueryResult<usize> {
+    let db_plenar_speech = DbPlenarSpeech {
+        delegate_id: plenar_speech.delegate_id as i32,
+        debate_id,
+        opinion: match &plenar_speech.opinion {
+            scraper::Opinion::Infavor => Some("Pro".into()),
+            scraper::Opinion::Against => Some("Contra".into()),
+            scraper::Opinion::Other(text) => {
+                unsafe { NO_OPINION_COUNT += 1 };
+                log::info!(
+                    "No opinion for speech: {:?}. 'Opinion': {text}, no opinion count: {}",
+                    plenar_speech.spoken_text_html_urls,
+                    unsafe { NO_OPINION_COUNT }
+                );
+                Some(text.clone())
+            }
+            scraper::Opinion::None => {
+                unsafe { NO_OPINION_COUNT += 1 };
+                log::info!(
+                    "No opinion for speech: {:?}, no opinion_count: {}",
+                    plenar_speech.spoken_text_html_urls,
+                    unsafe { NO_OPINION_COUNT }
+                );
+                None
+            }
+        },
+        spoken_text: Some(text_extractor.extract_text_from_url(&plenar_speech).await),
+        duration_in_seconds: plenar_speech.duration_in_seconds as i32,
+        ty: plenar_speech.ty.clone(),
+    };
+
+    diesel::insert_into(plenar_speeches::table)
+        .values(&db_plenar_speech)
+        .on_conflict((plenar_speeches::debate_id, plenar_speeches::delegate_id))
+        .do_nothing()
+        .execute(conn)
+}
+
+fn insert_debate(debate: &Debate, plenar_id: String, conn: &mut PgConnection) -> QueryResult<i32> {
     let db_debate = DbDebate {
         plenar_id,
         about: debate.about.clone(),
     };
-    if let Err(e) = diesel::insert_into(debates::table)
+    diesel::insert_into(debates::table)
         .values(&db_debate)
         .on_conflict(debates::plenar_id)
         .do_update()
         .set(&db_debate)
-        .execute(conn)
-    {
-        log::error!("Error inserting debate: '{e}'. Error occured for debate: {debate:?}");
-    }
+        .returning(debates::id)
+        .get_result(conn)
 }
 
 pub fn insert_plenar_info(
     plenar_info: &PlenarInfo,
     plenar_id: String,
-    conn: &mut diesel::PgConnection,
-) {
+    conn: &mut PgConnection,
+) -> QueryResult<usize> {
     let db_plenar_info = DbPlenar {
         id: plenar_id,
         inr: plenar_info.inr as i32,
@@ -106,39 +163,31 @@ pub fn insert_plenar_info(
         description: plenar_info.description.clone(),
         add_date: plenar_info.date.clone(),
     };
-    if let Err(e) = diesel::insert_into(plenar_infos::table)
+    diesel::insert_into(plenar_infos::table)
         .values(&db_plenar_info)
         .on_conflict(plenar_infos::id)
         .do_update()
         .set(&db_plenar_info)
         .execute(conn)
-    {
-        log::error!(
-            "Error inserting plenar info: '{e}'. Error occured for plenar info: {plenar_info:?}"
-        );
-    }
 }
 
 pub fn insert_call_to_order(
     call_to_order: &CallToOrderInfo,
     plenar_id: String,
-    conn: &mut diesel::PgConnection,
-) {
+    conn: &mut PgConnection,
+) -> QueryResult<usize> {
     let db_call_to_order = DbCallToOrder {
         id: format!("{}/{}", call_to_order.ityp, call_to_order.inr),
         plenar_id,
         inr: call_to_order.inr as i32,
         receiver_id: call_to_order.receiver_id.clone() as i32,
     };
-    if let Err(e) = diesel::insert_into(call_to_order::table)
+    diesel::insert_into(call_to_order::table)
         .values(&db_call_to_order)
         .on_conflict(call_to_order::id)
         .do_update()
         .set(&db_call_to_order)
         .execute(conn)
-    {
-        log::error!("Error inserting call to order: '{e}'. Error occured for call to order: {call_to_order:?}");
-    }
 }
 
 pub async fn run_shut(mut shutdown: Shutdown) {

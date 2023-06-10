@@ -48,7 +48,7 @@ CREATE TABLE debates (
 );
 
 CREATE TABLE plenar_speeches (
-    id serial primary key,
+    id serial,
     delegate_id int not null,
     debate_id int not null,
     opinion varchar(40),
@@ -56,5 +56,6 @@ CREATE TABLE plenar_speeches (
     duration_in_seconds int,
     ty varchar(40),
     FOREIGN KEY (debate_id) REFERENCES debates(id),
-    FOREIGN KEY (delegate_id) REFERENCES delegates(id)
+    FOREIGN KEY (delegate_id) REFERENCES delegates(id),
+    PRIMARY KEY (id, delegate_id, debate_id)
 );
