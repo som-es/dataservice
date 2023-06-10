@@ -16,14 +16,15 @@ async fn main() {
 
 pub async fn run_services(state: &State) {
     // let hs = std::collections::HashSet::new();
-    // let res = services::delegates::delegates_once(&hs).await;
-    // println!("res: {res:?}");
+    // let _res = services::delegates::delegates_once(&hs).await;
+    // println!("res: {_res:?}");
     tokio::join!(
         // services::proposals::run(),
         services::legislative_initiatives::run_shut(Shutdown::new(
             state.notify_shutdown.subscribe()
         )),
-        services::proposals::run_shut(Shutdown::new(state.notify_shutdown.subscribe()))
+        services::proposals::run_shut(Shutdown::new(state.notify_shutdown.subscribe())),
+        services::plenar::run_shut(Shutdown::new(state.notify_shutdown.subscribe()))
     );
 }
 

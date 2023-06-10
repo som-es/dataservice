@@ -7,7 +7,6 @@ use crate::{
 use diesel::{PgConnection, QueryResult, RunQueryDsl};
 use scraper::{
     call_to_order::CallToOrderInfo,
-    legis_init::LegislativeInitiatives,
     plenar::{Debate, Plenar, PlenarInfo},
     AustriaScraper, PlenarSpeech, Scraper, TextExtractor,
 };
@@ -16,7 +15,7 @@ async fn scrape_new_plenar_infos() -> crate::Result<Vec<PlenarInfo>> {
     let scraper = AustriaScraper::default();
 
     let raw_plenar = scraper.post_plenar_payload().await?;
-    let plenar_paths = scraper.legis_paths(raw_plenar)?;
+    let plenar_paths = scraper.plenar_paths(raw_plenar)?;
 
     let mut new_plenar_infos = Vec::new();
 

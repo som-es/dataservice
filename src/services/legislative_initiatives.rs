@@ -98,10 +98,7 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
                 infavor: match speech.opinion {
                     Opinion::Infavor => Some(true),
                     Opinion::Against => Some(false),
-                    _ => {
-                        log::info!("No opinion given for speech: {speech:?}");
-                        None
-                    }
+                    _ => None
                 },
                 legislative_initiatives_id: db_legis_init.id.clone(),
             };
