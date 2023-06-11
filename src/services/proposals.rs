@@ -2,7 +2,7 @@ use diesel::RunQueryDsl;
 use dotenvy::dotenv;
 use scraper::{
     proposals::{Proposal, ProposalScraper, ProposalsPayload},
-    AustriaScraper, Fetch, Scraper,
+    AustriaScraper,
 };
 
 use crate::{

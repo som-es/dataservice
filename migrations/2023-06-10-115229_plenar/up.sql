@@ -4,7 +4,8 @@ CREATE TABLE plenar_infos (
     add_date timestamptz not null,
     inr int not null,
     title varchar(255) not null,
-    description varchar(255) not null
+    description varchar(255) not null,
+    legislative_period varchar(9) not null
 );
 
 CREATE TABLE call_to_order (
@@ -37,4 +38,5 @@ CREATE TABLE plenar_speeches (
     UNIQUE (delegate_id, debate_id)
 );
 
+-- index is too large for speech text
 alter table plenar_speeches drop constraint plenar_speeches_spoken_text_key;

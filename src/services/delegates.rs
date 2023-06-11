@@ -17,7 +17,7 @@ async fn scrape_new_delegates(prev_delegates: &HashSet<Delegate>) -> crate::Resu
 
     let persons = scraper.post_persons_payload().await?;
     for person_path in scraper.person_paths(persons).unwrap_or_default() {
-        println!("person_path: {person_path}");
+        // println!("person_path: {person_path}");
         let Ok(delegate) = scraper.get_delegate(&person_path).await else {
             continue;
         };
@@ -93,7 +93,7 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
 }
 
 pub async fn delegates_once(prev_delegates: &HashSet<Delegate>) -> Vec<Delegate> {
-    log::info!("Scraping new delegates...");
+    log::info!("Scraping all delegates...");
 
     let new_delegates = scrape_untill_success::<Vec<Delegate>, _>(|| async {
         scrape_new_delegates(&prev_delegates).await
@@ -106,7 +106,7 @@ pub async fn delegates_once(prev_delegates: &HashSet<Delegate>) -> Vec<Delegate>
 }
 
 pub async fn run_shut(mut shutdown: Shutdown) {
-    let mut prev_delegates = HashSet::new();
+    let prev_delegates = HashSet::new();
 
     while !shutdown.is_shutdown() {
         tokio::select! {
@@ -115,11 +115,14 @@ pub async fn run_shut(mut shutdown: Shutdown) {
                 break;
             }
             _ = async {
-                prev_delegates.extend(delegates_once(&prev_delegates).await);
+                log::info!("Delegates scraper service sleeps for 12 hours before starting first time");
+                tokio::time::sleep(tokio::time::Duration::from_secs(60 * 60 * 12)).await;
+                log::info!("Starting delegates scraper");
+
+                delegates_once(&prev_delegates).await
+                // prev_delegates.extend(delegates_once(&prev_delegates).await);
 
                 // println!("dele: {prev_delegates:?}");
-
-                tokio::time::sleep(tokio::time::Duration::from_secs(60 * 60 * 24)).await;
 
             } => {}
         }

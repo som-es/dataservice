@@ -72,6 +72,7 @@ diesel::table! {
         inr -> Int4,
         title -> Varchar,
         description -> Varchar,
+        legislative_period -> Varchar,
     }
 }
 

@@ -49,7 +49,7 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo]) {
     let mut text_extractor = scraper::TextExtractor::new(AustriaScraper::BASE_URL);
 
     for plenar_info in new_plenar_infos {
-        let plenar_id = format!("{}/{}", plenar_info.ityp, plenar_info.inr);
+        let plenar_id = format!("{}/{}/{}", plenar_info.legislative_period, plenar_info.ityp, plenar_info.inr);
         if let Err(e) = insert_plenar_info(plenar_info, plenar_id.clone(), &mut conn) {
             log::error!(
                 "Error inserting plenar info: '{e}'. Error occured for plenar info: {plenar_info:?}. Skipping adding call to orders and debates."
@@ -147,7 +147,7 @@ async fn insert_plenar_speech(
             .load::<Option<String>>(conn)?;
         if has_spoken_text.len() == 1 && has_spoken_text[0].is_none() {
             let Some(text_html_url) = plenar_speech.spoken_text_html_urls.first() else {
-                log::info!("DEBATE_ID: {val_debate_id}, No spoken text html urls for plenar speech: {:?}", plenar_speech);
+                log::warn!("DEBATE_ID: {val_debate_id}, No spoken text html urls for plenar speech: {:?}", plenar_speech);
                 return Ok(());
             };
 
@@ -189,11 +189,13 @@ pub fn insert_plenar_info(
         title: plenar_info.title.clone(),
         description: plenar_info.description.clone(),
         add_date: plenar_info.date.clone(),
+        legislative_period: plenar_info.legislative_period.clone(),
     };
     diesel::insert_into(plenar_infos::table)
         .values(&db_plenar_info)
         .on_conflict(plenar_infos::id)
-        .do_nothing()
+        .do_update()
+        .set(&db_plenar_info)
         .execute(conn)
 }
 
@@ -211,8 +213,7 @@ pub fn insert_call_to_order(
     diesel::insert_into(call_to_order::table)
         .values(&db_call_to_order)
         .on_conflict(call_to_order::id)
-        .do_update()
-        .set(&db_call_to_order)
+        .do_nothing()
         .execute(conn)
 }
 

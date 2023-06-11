@@ -152,6 +152,7 @@ pub struct DbPlenar {
     pub title: String,
     pub description: String,
     pub add_date: NaiveDateTime,
+    pub legislative_period: String,
 }
 
 #[derive(
