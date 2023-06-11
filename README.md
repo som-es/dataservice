@@ -20,9 +20,15 @@ Look at the data:
 select receiver_id,COUNT(*) from call_to_order group by call_to_order.receiver_id;
 
 --  get the top delegates by seconds spoken, also get the delegate name due to joining
-select delegates.name, delegates.party, SUM(plenar_speeches.duration_in_seconds) AS seconds from plenar_speeches inner join delegates on delegates.id = plenar_speeches.delegate_id group by plenar_speeches.delegate_id, delegates.name, delegates.party where delegates.council = 'nr' order by seconds DESC;
-
 select delegates.name, delegates.party, SUM(plenar_speeches.duration_in_seconds) / (60.0*60.0) AS hours_spoken from plenar_speeches inner join delegates on delegates.id = plenar_speeches.delegate_id group by plenar_speeches.delegate_id, delegates.name, delegates.party,delegates.council having delegates.council = 'nr' order by hours_spoken DESC;
-```
 
-where delegates.council is 'nr'
+-- ... but only from the given legislative period (only that)
+select plenar_speeches.debate_id, plenar_speeches.delegate_id from plenar_speeches inner join debates on plenar_speeches.debate_id = debates.id inner join plenar_infos on debates.plenar_id = plenar_infos.id where plenar_infos.legislative_period = 'XXVII';
+
+-- improve performance by adding an index?
+create index on plenar_infos (legislative_period);
+
+
+select delegates.name, delegates.party, SUM(plenar_speeches.duration_in_seconds) / (60.0*60.0) AS hours_spoken from plenar_speeches inner join debates on plenar_speeches.debate_id = debates.id inner join plenar_infos on debates.plenar_id = plenar_infos.id inner join delegates on delegates.id = plenar_speeches.delegate_id where plenar_infos.legislative_period = 'XXVII'  group by plenar_speeches.delegate_id, delegates.name, delegates.party,delegates.council having delegates.council = 'nr' order by hours_spoken DESC;
+
+```

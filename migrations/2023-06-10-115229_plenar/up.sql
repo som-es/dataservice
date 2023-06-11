@@ -1,5 +1,6 @@
 -- Your SQL goes here
 CREATE TABLE plenar_infos (
+    -- use serial id -> add inr, and UNIQUE of (inr, ityp, gp)
     id varchar(20) primary key,
     add_date timestamptz not null,
     inr int not null,
@@ -18,6 +19,7 @@ CREATE TABLE call_to_order (
 
 CREATE TABLE debates (
     id serial primary key,
+    -- use serial id -> ..
     plenar_id varchar(20) not null,
     about varchar(512) not null,
     FOREIGN KEY (plenar_id) REFERENCES plenar_infos(id),
