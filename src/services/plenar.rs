@@ -221,6 +221,14 @@ pub fn insert_call_to_order(
 }
 
 pub async fn run_shut(mut shutdown: Shutdown) {
+    let plenar_sleep = std::env::var("PLENAR_SLEEP")
+        .unwrap_or_else(|_| "400".to_string())
+        .parse()
+        .unwrap_or_else(|e| {
+            log::warn!("Could not parse PLENAR_SLEEP env var: {e}. Using default value of 400 seconds");
+            400
+        });
+
     while !shutdown.is_shutdown() {
         tokio::select! {
             _ = shutdown.recv() => {
@@ -236,7 +244,8 @@ pub async fn run_shut(mut shutdown: Shutdown) {
                     log::error!("Error in plenar info scraper: {:?}", e);
                 }
                 // legis_init_once().await;
-                tokio::time::sleep(tokio::time::Duration::from_secs(400)).await;
+                log::info!("Plenar info scraper service sleeps for {plenar_sleep} seconds...");
+                tokio::time::sleep(tokio::time::Duration::from_secs(plenar_sleep)).await;
             } => {}
         }
     }

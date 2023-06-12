@@ -42,6 +42,8 @@ diesel::table! {
         seat_row -> Nullable<Int4>,
         seat_col -> Nullable<Int4>,
         contacts_id -> Nullable<Int4>,
+        gender -> Nullable<Varchar>,
+        is_active -> Nullable<Bool>,
     }
 }
 

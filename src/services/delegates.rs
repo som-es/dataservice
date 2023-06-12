@@ -23,9 +23,9 @@ async fn scrape_new_delegates(prev_delegates: &HashSet<Delegate>) -> crate::Resu
         };
 
         // delegates that were active before but aren't anymore remain (as active) in the database
-        if !delegate.is_active {
+        /*if !delegate.is_active {
             continue;
-        }
+        }*/
 
         if prev_delegates.contains(&delegate) {
             continue;
@@ -65,7 +65,7 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
                 None
             }
         };
-
+        
         let db_delegate = DbDelegate {
             id: delegate.id as i32,
             name: delegate.name.clone(),
@@ -76,6 +76,8 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
             seat_row: delegate.seat.as_ref().map(|seat| seat.row as i32),
             seat_col: delegate.seat.as_ref().map(|seat| seat.col as i32),
             contacts_id,
+            gender: delegate.gender.to_string_opt(),
+            is_active: Some(delegate.is_active),
         };
 
         if let Err(e) = diesel::insert_into(delegates::table)

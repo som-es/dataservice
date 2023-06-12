@@ -116,6 +116,14 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
 }
 
 pub async fn run_shut(mut shutdown: Shutdown) {
+    let legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP")
+        .unwrap_or_else(|_| "1000".to_string())
+        .parse()
+        .unwrap_or_else(|e| {
+            log::warn!("Could not parse PLENAR_SLEEP env var: {e}. Using default value of 1000 seconds");
+            1000
+        });
+
     while !shutdown.is_shutdown() {
         tokio::select! {
             _ = shutdown.recv() => {
@@ -131,6 +139,7 @@ pub async fn run_shut(mut shutdown: Shutdown) {
                     log::error!("Error in legislative initiative scraper: {:?}", e);
                 }
                 // legis_init_once().await;
+                log::info!("Legislative initiative scraper service sleeps for {legis_init_sleep} seconds...");
                 tokio::time::sleep(tokio::time::Duration::from_secs(1000)).await;
             } => {}
         }

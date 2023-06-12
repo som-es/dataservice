@@ -154,7 +154,10 @@ pub async fn run_shut(mut shutdown: Shutdown) {
     let proposal_sleep = std::env::var("PROPOSAL_SLEEP")
         .unwrap_or_else(|_| "10".to_string())
         .parse()
-        .unwrap_or(10);
+        .unwrap_or_else(|e| {
+            log::error!("Error parsing PROPOSAL_SLEEP: {e}. Using default value of 10 seconds.");
+            10
+        });
 
     let mut prev_proposals = Vec::new();
 

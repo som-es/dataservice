@@ -55,6 +55,8 @@ pub struct DbDelegate {
     pub seat_row: Option<i32>,
     pub seat_col: Option<i32>,
     pub contacts_id: Option<i32>,
+    pub gender: Option<String>,
+    pub is_active: Option<bool>,
 }
 
 #[derive(
