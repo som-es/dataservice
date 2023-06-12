@@ -120,7 +120,9 @@ pub async fn run_shut(mut shutdown: Shutdown) {
         .unwrap_or_else(|_| "1000".to_string())
         .parse()
         .unwrap_or_else(|e| {
-            log::warn!("Could not parse PLENAR_SLEEP env var: {e}. Using default value of 1000 seconds");
+            log::warn!(
+                "Could not parse PLENAR_SLEEP env var: {e}. Using default value of 1000 seconds"
+            );
             1000
         });
 

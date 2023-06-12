@@ -1,8 +1,8 @@
-use chrono::{NaiveDateTime, NaiveDate};
+use chrono::{NaiveDate, NaiveDateTime};
 use diesel::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::schema::{call_to_order, contacts, debates, plenar_infos, plenar_speeches, mandates};
+use crate::schema::{call_to_order, contacts, debates, mandates, plenar_infos, plenar_speeches};
 
 use super::schema::{
     delegates, legislative_initiatives, proposal_delegates, proposals, speeches, votes,
@@ -211,7 +211,7 @@ pub struct DbMandate {
     pub name: String,
     pub party: Option<String>,
     pub start_date: NaiveDate,
-    pub end_date: Option<NaiveDate>
+    pub end_date: Option<NaiveDate>,
 }
 
 impl DbMandate {

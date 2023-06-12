@@ -58,12 +58,11 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo]) {
                     "Error inserting plenar info: '{e}'. Error occured for plenar info: {plenar_info:?}. Skipping adding call to orders and debates."
                 );
                 continue;
-            },
+            }
         };
 
         for call_to_order_entry in &plenar_info.call_to_orders {
-            if let Err(e) = insert_call_to_order(call_to_order_entry, plenar_id, &mut conn)
-            {
+            if let Err(e) = insert_call_to_order(call_to_order_entry, plenar_id, &mut conn) {
                 log::warn!("Error inserting call to order: '{e}'. Error occured for call to order: {call_to_order_entry:?}");
             }
         }
@@ -182,10 +181,7 @@ fn insert_debate(debate: &Debate, plenar_id: i32, conn: &mut PgConnection) -> Qu
         .get_result(conn)
 }
 
-pub fn insert_plenar_info(
-    plenar_info: &PlenarInfo,
-    conn: &mut PgConnection,
-) -> QueryResult<i32> {
+pub fn insert_plenar_info(plenar_info: &PlenarInfo, conn: &mut PgConnection) -> QueryResult<i32> {
     let db_plenar_info = DbPlenar {
         inr: plenar_info.inr as i32,
         title: plenar_info.title.clone(),
@@ -225,7 +221,9 @@ pub async fn run_shut(mut shutdown: Shutdown) {
         .unwrap_or_else(|_| "400".to_string())
         .parse()
         .unwrap_or_else(|e| {
-            log::warn!("Could not parse PLENAR_SLEEP env var: {e}. Using default value of 400 seconds");
+            log::warn!(
+                "Could not parse PLENAR_SLEEP env var: {e}. Using default value of 400 seconds"
+            );
             400
         });
 

@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
-use diesel::RunQueryDsl;
-use scraper::{delegates::DelegateScraper, AustriaScraper, Delegate};
+use diesel::{PgConnection, QueryResult, RunQueryDsl};
+use scraper::{delegates::DelegateScraper, AustriaScraper, Delegate, Mandate};
 
 use crate::{
-    models::{DbContact, DbDelegate},
-    schema::contacts,
+    models::{DbContact, DbDelegate, DbMandate},
+    schema::{contacts, mandates},
     services::scrape_untill_success,
     Shutdown,
 };
@@ -65,7 +65,7 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
                 None
             }
         };
-        
+
         let db_delegate = DbDelegate {
             id: delegate.id as i32,
             name: delegate.name.clone(),
@@ -91,7 +91,39 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
                 "Error adding/updating delegate in database: {e}, for delegate {delegate:?}"
             );
         }
+
+        for mandate in &delegate.mandates {
+            if let Err(e) = insert_mandate(mandate, delegate.id as i32, &mut conn) {
+                log::error!("Error adding mandate ({mandate:?}) for delegate {delegate:?}: {e}",);
+            }
+        }
     }
+}
+
+pub fn insert_mandate(
+    mandate: &Mandate,
+    delegate_id: i32,
+    conn: &mut PgConnection,
+) -> QueryResult<usize> {
+    let db_mandate = DbMandate {
+        delegate_id,
+        name: mandate.name.clone(),
+        party: mandate.party.clone(),
+        start_date: mandate.start,
+        end_date: mandate.end,
+    };
+
+    diesel::insert_into(mandates::table)
+        .values(&db_mandate)
+        .on_conflict((
+            mandates::delegate_id,
+            mandates::name,
+            mandates::start_date,
+            mandates::party,
+        ))
+        .do_update()
+        .set(&db_mandate)
+        .execute(conn)
 }
 
 pub async fn delegates_once(prev_delegates: &HashSet<Delegate>) -> Vec<Delegate> {
