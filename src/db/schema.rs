@@ -61,6 +61,17 @@ diesel::table! {
 }
 
 diesel::table! {
+    mandates (id) {
+        id -> Int4,
+        delegate_id -> Int4,
+        name -> Varchar,
+        party -> Nullable<Varchar>,
+        start_date -> Date,
+        end_date -> Nullable<Date>,
+    }
+}
+
+diesel::table! {
     parties (id) {
         id -> Varchar,
         name -> Varchar,
@@ -129,6 +140,7 @@ diesel::table! {
 diesel::joinable!(call_to_order -> plenar_infos (plenar_id));
 diesel::joinable!(debates -> plenar_infos (plenar_id));
 diesel::joinable!(delegates -> contacts (contacts_id));
+diesel::joinable!(mandates -> delegates (delegate_id));
 diesel::joinable!(plenar_speeches -> debates (debate_id));
 diesel::joinable!(plenar_speeches -> delegates (delegate_id));
 diesel::joinable!(proposal_delegates -> delegates (delegate_id));
@@ -143,6 +155,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     debates,
     delegates,
     legislative_initiatives,
+    mandates,
     parties,
     plenar_infos,
     plenar_speeches,

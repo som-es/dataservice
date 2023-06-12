@@ -1,8 +1,8 @@
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, NaiveDate};
 use diesel::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::schema::{call_to_order, contacts, debates, plenar_infos, plenar_speeches};
+use crate::schema::{call_to_order, contacts, debates, plenar_infos, plenar_speeches, mandates};
 
 use super::schema::{
     delegates, legislative_initiatives, proposal_delegates, proposals, speeches, votes,
@@ -199,4 +199,24 @@ pub struct DbPlenarSpeech {
     pub spoken_text: Option<String>,
     pub duration_in_seconds: i32,
     pub ty: String,
+}
+
+#[derive(
+    Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
+)]
+#[diesel(table_name = mandates)]
+#[diesel(primary_key(id))]
+pub struct DbMandate {
+    pub delegate_id: i32,
+    pub name: String,
+    pub party: Option<String>,
+    pub start_date: NaiveDate,
+    pub end_date: Option<NaiveDate>
+}
+
+impl DbMandate {
+    #[inline]
+    pub fn is_active(&self) -> bool {
+        self.end_date.is_none()
+    }
 }
