@@ -135,7 +135,7 @@ pub struct DbContact {
 #[derive(
     Queryable,
     Selectable,
-    Identifiable,
+    // Identifiable,
     PartialEq,
     Debug,
     Clone,
@@ -145,9 +145,8 @@ pub struct DbContact {
     AsChangeset,
 )]
 #[diesel(table_name = plenar_infos)]
-#[diesel(primary_key(id))]
+// #[diesel(primary_key(id))]
 pub struct DbPlenar {
-    pub id: String,
     pub inr: i32,
     pub title: String,
     pub description: String,
@@ -171,7 +170,7 @@ pub struct DbPlenar {
 #[diesel(primary_key(id))]
 pub struct DbCallToOrder {
     pub id: String,
-    pub plenar_id: String,
+    pub plenar_id: i32,
     pub inr: i32,
     pub receiver_id: i32,
 }
@@ -182,7 +181,7 @@ pub struct DbCallToOrder {
 #[diesel(table_name = debates)]
 #[diesel(primary_key(id))]
 pub struct DbDebate {
-    pub plenar_id: String,
+    pub plenar_id: i32,
     pub about: String,
 }
 

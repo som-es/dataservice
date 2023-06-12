@@ -1,17 +1,18 @@
 -- Your SQL goes here
 CREATE TABLE plenar_infos (
     -- use serial id -> add inr, and UNIQUE of (inr, ityp, gp)
-    id varchar(20) primary key,
+    id serial primary key,
     add_date timestamptz not null,
     inr int not null,
     title varchar(255) not null,
     description varchar(255) not null,
-    legislative_period varchar(9) not null
+    legislative_period varchar(9) not null,
+    UNIQUE (inr, legislative_period)
 );
 
 CREATE TABLE call_to_order (
     id varchar(20) primary key,
-    plenar_id varchar(20) not null,
+    plenar_id int not null,
     inr int not null,
     receiver_id int not null,
     FOREIGN KEY (plenar_id) REFERENCES plenar_infos(id)
@@ -20,7 +21,8 @@ CREATE TABLE call_to_order (
 CREATE TABLE debates (
     id serial primary key,
     -- use serial id -> ..
-    plenar_id varchar(20) not null,
+    plenar_id int not null,
+    -- plenar_id varchar(20) not null,
     about varchar(512) not null,
     FOREIGN KEY (plenar_id) REFERENCES plenar_infos(id),
     UNIQUE (plenar_id, about)

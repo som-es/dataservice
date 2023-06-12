@@ -29,6 +29,28 @@ select plenar_speeches.debate_id, plenar_speeches.delegate_id from plenar_speech
 create index on plenar_infos (legislative_period);
 
 
-select delegates.name, delegates.party, SUM(plenar_speeches.duration_in_seconds) / (60.0*60.0) AS hours_spoken from plenar_speeches inner join debates on plenar_speeches.debate_id = debates.id inner join plenar_infos on debates.plenar_id = plenar_infos.id inner join delegates on delegates.id = plenar_speeches.delegate_id where plenar_infos.legislative_period = 'XXVII'  group by plenar_speeches.delegate_id, delegates.name, delegates.party,delegates.council having delegates.council = 'nr' order by hours_spoken DESC;
+select 
+  delegates.name, 
+  delegates.party, 
+  SUM(
+    plenar_speeches.duration_in_seconds
+  ) / (60.0 * 60.0) AS hours_spoken 
+from 
+  plenar_speeches 
+  inner join debates on plenar_speeches.debate_id = debates.id 
+  inner join plenar_infos on debates.plenar_id = plenar_infos.id 
+  inner join delegates on delegates.id = plenar_speeches.delegate_id 
+where 
+  plenar_infos.legislative_period = 'XXVII' 
+  and delegates.council = 'nr'
+group by 
+  plenar_speeches.delegate_id, 
+  delegates.name, 
+  delegates.party, 
+  delegates.council 
+-- having 
+--   delegates.council = 'nr' 
+order by 
+  hours_spoken DESC;
 
 ```

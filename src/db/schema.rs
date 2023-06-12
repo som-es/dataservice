@@ -3,7 +3,7 @@
 diesel::table! {
     call_to_order (id) {
         id -> Varchar,
-        plenar_id -> Varchar,
+        plenar_id -> Int4,
         inr -> Int4,
         receiver_id -> Int4,
     }
@@ -26,7 +26,7 @@ diesel::table! {
 diesel::table! {
     debates (id) {
         id -> Int4,
-        plenar_id -> Varchar,
+        plenar_id -> Int4,
         about -> Varchar,
     }
 }
@@ -67,7 +67,7 @@ diesel::table! {
 
 diesel::table! {
     plenar_infos (id) {
-        id -> Varchar,
+        id -> Int4,
         add_date -> Timestamptz,
         inr -> Int4,
         title -> Varchar,

@@ -49,16 +49,20 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo]) {
     let mut text_extractor = scraper::TextExtractor::new(AustriaScraper::BASE_URL);
 
     for plenar_info in new_plenar_infos {
-        let plenar_id = format!("{}/{}/{}", plenar_info.legislative_period, plenar_info.ityp, plenar_info.inr);
-        if let Err(e) = insert_plenar_info(plenar_info, plenar_id.clone(), &mut conn) {
-            log::error!(
-                "Error inserting plenar info: '{e}'. Error occured for plenar info: {plenar_info:?}. Skipping adding call to orders and debates."
-            );
-            continue;
-        }
+        // let plenar_id = format!("{}/{}/{}", plenar_info.legislative_period, plenar_info.ityp, plenar_info.inr);
+
+        let plenar_id = match insert_plenar_info(plenar_info, &mut conn) {
+            Ok(id) => id,
+            Err(e) => {
+                log::error!(
+                    "Error inserting plenar info: '{e}'. Error occured for plenar info: {plenar_info:?}. Skipping adding call to orders and debates."
+                );
+                continue;
+            },
+        };
 
         for call_to_order_entry in &plenar_info.call_to_orders {
-            if let Err(e) = insert_call_to_order(call_to_order_entry, plenar_id.clone(), &mut conn)
+            if let Err(e) = insert_call_to_order(call_to_order_entry, plenar_id, &mut conn)
             {
                 log::warn!("Error inserting call to order: '{e}'. Error occured for call to order: {call_to_order_entry:?}");
             }
@@ -67,7 +71,7 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo]) {
         for debate in &plenar_info.debates {
             // get id from here, log here
 
-            let debate_id = match insert_debate(debate, plenar_id.clone(), &mut conn) {
+            let debate_id = match insert_debate(debate, plenar_id, &mut conn) {
                 Ok(debate_id) => debate_id,
                 Err(e) => {
                     log::warn!(
@@ -164,7 +168,7 @@ async fn insert_plenar_speech(
     Ok(())
 }
 
-fn insert_debate(debate: &Debate, plenar_id: String, conn: &mut PgConnection) -> QueryResult<i32> {
+fn insert_debate(debate: &Debate, plenar_id: i32, conn: &mut PgConnection) -> QueryResult<i32> {
     let db_debate = DbDebate {
         plenar_id,
         about: debate.about.clone(),
@@ -180,11 +184,9 @@ fn insert_debate(debate: &Debate, plenar_id: String, conn: &mut PgConnection) ->
 
 pub fn insert_plenar_info(
     plenar_info: &PlenarInfo,
-    plenar_id: String,
     conn: &mut PgConnection,
-) -> QueryResult<usize> {
+) -> QueryResult<i32> {
     let db_plenar_info = DbPlenar {
-        id: plenar_id,
         inr: plenar_info.inr as i32,
         title: plenar_info.title.clone(),
         description: plenar_info.description.clone(),
@@ -196,12 +198,13 @@ pub fn insert_plenar_info(
         .on_conflict(plenar_infos::id)
         .do_update()
         .set(&db_plenar_info)
-        .execute(conn)
+        .returning(plenar_infos::id)
+        .get_result::<i32>(conn)
 }
 
 pub fn insert_call_to_order(
     call_to_order: &CallToOrderInfo,
-    plenar_id: String,
+    plenar_id: i32,
     conn: &mut PgConnection,
 ) -> QueryResult<usize> {
     let db_call_to_order = DbCallToOrder {
