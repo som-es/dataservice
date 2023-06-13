@@ -1,12 +1,11 @@
-use chrono::NaiveDateTime;
-use diesel::RunQueryDsl;
+use diesel::{ExpressionMethods, RunQueryDsl};
 use scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative, Opinion};
 
 use crate::{
     models::{DbLegislativeInitiative, DbSpeech, DbVote},
     schema::{legislative_initiatives, speeches, votes},
     services::scrape_untill_success,
-    today_and_time, Shutdown,
+    Shutdown,
 };
 
 async fn scrape_new_legis_inits() -> crate::Result<Vec<LegislativeInitiative>> {
@@ -53,19 +52,20 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
         let db_legis_init = DbLegislativeInitiative {
             id: legis_init.id.clone(),
             title: legis_init.title.clone(),
+            inr: legis_init.inr as i32,
             emphasis: legis_init.emphasis.clone(),
             description: legis_init.description.clone(),
             ityp: legis_init.ityp.clone(),
             gp: legis_init.gp.clone(),
             accepted: legis_init.accepted,
-            created_at: NaiveDateTime::parse_from_str(&legis_init.date, "%Y-%m-%dT%H:%M:%S")
-                .unwrap_or(today_and_time()),
+            created_at: legis_init.date,
         };
 
         if let Err(e) = diesel::insert_into(legislative_initiatives::table)
             .values(&db_legis_init)
             .on_conflict(legislative_initiatives::id)
-            .do_nothing()
+            .do_update()
+            .set((legislative_initiatives::created_at.eq(db_legis_init.created_at),))
             .execute(conn)
         {
             log::error!("Error inserting legislative initiative: '{e}'. Error occured for legislative initiative: {legis_init:?}");

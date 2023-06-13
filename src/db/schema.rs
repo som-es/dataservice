@@ -52,6 +52,7 @@ diesel::table! {
         id -> Varchar,
         ityp -> Varchar,
         gp -> Varchar,
+        inr -> Int4,
         emphasis -> Nullable<Varchar>,
         title -> Text,
         description -> Text,

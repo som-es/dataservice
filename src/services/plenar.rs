@@ -191,7 +191,11 @@ pub fn insert_plenar_info(plenar_info: &PlenarInfo, conn: &mut PgConnection) -> 
     };
     diesel::insert_into(plenar_infos::table)
         .values(&db_plenar_info)
-        .on_conflict(plenar_infos::id)
+        .on_conflict((
+            plenar_infos::inr,
+            plenar_infos::add_date,
+            plenar_infos::legislative_period,
+        ))
         .do_update()
         .set(&db_plenar_info)
         .returning(plenar_infos::id)

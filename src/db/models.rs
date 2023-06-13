@@ -2,10 +2,9 @@ use chrono::{NaiveDate, NaiveDateTime};
 use diesel::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::schema::{call_to_order, contacts, debates, mandates, plenar_infos, plenar_speeches};
-
 use super::schema::{
-    delegates, legislative_initiatives, proposal_delegates, proposals, speeches, votes,
+    call_to_order, contacts, debates, delegates, legislative_initiatives, mandates, plenar_infos,
+    plenar_speeches, proposal_delegates, proposals, speeches, votes,
 };
 
 #[derive(
@@ -88,6 +87,7 @@ pub struct DbLegislativeInitiative {
     pub id: String,
     pub ityp: String,
     pub gp: String,
+    pub inr: i32,
     pub emphasis: Option<String>,
     pub title: String,
     pub description: String,

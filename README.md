@@ -53,4 +53,8 @@ group by
 order by 
   hours_spoken DESC;
 
+-- get delegates
+select name from delegates where is_active='t' and council='nr' and seat_row is not null;
+
+
 ```
