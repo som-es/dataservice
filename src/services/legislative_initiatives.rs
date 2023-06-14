@@ -50,7 +50,7 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
     let conn = &mut crate::establish_connection();
     for legis_init in new_legis_inits {
         let db_legis_init = DbLegislativeInitiative {
-            id: legis_init.id.clone(),
+            id: None,
             title: legis_init.title.clone(),
             inr: legis_init.inr as i32,
             emphasis: legis_init.emphasis.clone(),
@@ -61,23 +61,31 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
             created_at: legis_init.date,
         };
 
-        if let Err(e) = diesel::insert_into(legislative_initiatives::table)
+        let legis_init_id = match diesel::insert_into(legislative_initiatives::table)
             .values(&db_legis_init)
-            .on_conflict(legislative_initiatives::id)
+            .on_conflict((
+                legislative_initiatives::inr,
+                legislative_initiatives::ityp,
+                legislative_initiatives::gp,
+            ))
             .do_update()
             .set((legislative_initiatives::created_at.eq(db_legis_init.created_at),))
-            .execute(conn)
+            .returning(legislative_initiatives::id)
+            .get_result(conn)
         {
-            log::error!("Error inserting legislative initiative: '{e}'. Error occured for legislative initiative: {legis_init:?}");
-            continue;
-        }
+            Ok(id) => id,
+            Err(e) => {
+                log::error!("Error inserting legislative initiative: '{e}'. Error occured for legislative initiative: {legis_init:?}");
+                continue;
+            }
+        };
 
         for vote in &legis_init.votes {
             let db_vote = DbVote {
                 party: vote.party.clone(),
                 fraction: vote.fraction as i32,
                 infavor: vote.infavor,
-                legislative_initiatives_id: db_legis_init.id.clone(),
+                legislative_initiatives_id: legis_init_id,
             };
 
             if let Err(e) = diesel::insert_into(votes::table)
@@ -100,7 +108,7 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
                     Opinion::Against => Some(false),
                     _ => None,
                 },
-                legislative_initiatives_id: db_legis_init.id.clone(),
+                legislative_initiatives_id: legis_init_id,
             };
 
             if let Err(e) = diesel::insert_into(speeches::table)

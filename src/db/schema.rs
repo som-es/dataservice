@@ -49,7 +49,7 @@ diesel::table! {
 
 diesel::table! {
     legislative_initiatives (id) {
-        id -> Varchar,
+        id -> Int4,
         ityp -> Varchar,
         gp -> Varchar,
         inr -> Int4,
@@ -57,7 +57,7 @@ diesel::table! {
         title -> Text,
         description -> Text,
         accepted -> Bool,
-        created_at -> Timestamptz,
+        created_at -> Date,
     }
 }
 
@@ -125,7 +125,7 @@ diesel::table! {
     speeches (delegate_id, legislative_initiatives_id) {
         delegate_id -> Int4,
         infavor -> Nullable<Bool>,
-        legislative_initiatives_id -> Varchar,
+        legislative_initiatives_id -> Int4,
     }
 }
 
@@ -134,7 +134,7 @@ diesel::table! {
         party -> Varchar,
         fraction -> Int4,
         infavor -> Bool,
-        legislative_initiatives_id -> Varchar,
+        legislative_initiatives_id -> Int4,
     }
 }
 

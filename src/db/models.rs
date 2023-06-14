@@ -80,11 +80,11 @@ pub struct ProposalDelegate {
 }
 
 #[derive(
-    Queryable, Selectable, Identifiable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize,
+    Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
 )]
 #[diesel(table_name = legislative_initiatives)]
 pub struct DbLegislativeInitiative {
-    pub id: String,
+    pub id: Option<i32>,
     pub ityp: String,
     pub gp: String,
     pub inr: i32,
@@ -92,7 +92,7 @@ pub struct DbLegislativeInitiative {
     pub title: String,
     pub description: String,
     pub accepted: bool,
-    pub created_at: NaiveDateTime,
+    pub created_at: NaiveDate,
 }
 
 #[derive(
@@ -105,7 +105,7 @@ pub struct DbVote {
     pub party: String,
     pub fraction: i32,
     pub infavor: bool,
-    pub legislative_initiatives_id: String,
+    pub legislative_initiatives_id: i32,
 }
 #[derive(
     Queryable, Identifiable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize,
@@ -117,7 +117,7 @@ pub struct DbVote {
 pub struct DbSpeech {
     pub delegate_id: i32,
     pub infavor: Option<bool>,
-    pub legislative_initiatives_id: String,
+    pub legislative_initiatives_id: i32,
 }
 
 #[derive(Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize)]
