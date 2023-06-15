@@ -50,7 +50,6 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
     let conn = &mut crate::establish_connection();
     for legis_init in new_legis_inits {
         let db_legis_init = DbLegislativeInitiative {
-            id: None,
             title: legis_init.title.clone(),
             inr: legis_init.inr as i32,
             emphasis: legis_init.emphasis.clone(),

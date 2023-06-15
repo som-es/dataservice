@@ -8,9 +8,32 @@ macos
 brew install libpq
 ```
 
+# Debian Setup
+
+```
+https://www.postgresql.org/download/linux/debian/
+```
+
+sudo -i
+#### login as postgres user
+sudo -i -u postgres
+
+createdb dataservice
+
 Connect to postgres
 ```
 psql dataservice
+```
+
+Update the password for the postgres user.
+
+```
+alter role postgres password '123';
+```
+
+change the database (username, password) in the .env
+```
+DATABASE_URL=postgres://postgres:123@localhost/dataservice
 ```
 
 Look at the data:
