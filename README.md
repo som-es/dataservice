@@ -51,7 +51,7 @@ select plenar_speeches.debate_id, plenar_speeches.delegate_id from plenar_speech
 -- improve performance by adding an index?
 create index on plenar_infos (legislative_period);
 
-
+-- MIND: the resulting hours are not relative to the total tenure (amtzeit)
 select 
   delegates.name, 
   delegates.party, 
@@ -81,3 +81,49 @@ select name from delegates where is_active='t' and council='nr' and seat_row is 
 
 
 ```
+
+
+```sql
+
+-- received call to orders for delegates in party
+
+select 
+  delegates.party, 
+  COUNT(*) as call_to_order_amount, 
+  delegates_in_party.delegate_amount, 
+  (
+    COUNT(*):: real / delegates_in_party.delegate_amount
+  ) as ratio
+from 
+  call_to_order 
+  inner join delegates on delegates.id = call_to_order.receiver_id 
+  join (
+    select 
+      party, 
+      COUNT(*) as delegate_amount
+    from 
+      delegates 
+    where 
+      is_active = 't' 
+      and council = 'nr' 
+      and seat_row is not null 
+    group by 
+      party
+  ) as delegates_in_party on delegates_in_party.party = delegates.party 
+group by 
+  delegates.party, 
+  delegates_in_party.delegate_amount
+order by
+  ratio DESC;
+```
+
+# other ideas
+
+most proposals per delegate
+most proposals per party
+most proposals per party per legislative period
+
+most speeches held per delegate
+most speeches held per party
+
+
