@@ -11,9 +11,7 @@ use scraper::{
     AustriaScraper, PlenarSpeech, Scraper, TextExtractor,
 };
 
-async fn scrape_new_plenar_infos() -> crate::Result<Vec<PlenarInfo>> {
-    let scraper = AustriaScraper::default();
-
+async fn scrape_new_plenar_infos(scraper: &AustriaScraper) -> crate::Result<Vec<PlenarInfo>> {
     let raw_plenar = scraper.post_plenar_payload().await?;
     let plenar_paths = scraper.plenar_paths(raw_plenar)?;
 
@@ -34,11 +32,21 @@ async fn scrape_new_plenar_infos() -> crate::Result<Vec<PlenarInfo>> {
 async fn plenar_info_once() -> Vec<PlenarInfo> {
     log::info!("Try scraping plenar info");
 
-    let new_plenar_infos =
-        scrape_untill_success::<Vec<PlenarInfo>, _>(|| async { scrape_new_plenar_infos().await })
-            .await;
-    update_plenar_infos_in_db(&new_plenar_infos).await;
+    let mut scraper = AustriaScraper::default();
 
+    let mut new_plenar_infos = vec![];
+
+    for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII"] {
+        log::info!("PLENAR info once GP: {gp}");
+        scraper.scrape_info.gp = vec![gp.into()];
+
+        new_plenar_infos.extend(scrape_untill_success::<Vec<PlenarInfo>, _>(|| async { 
+            scrape_new_plenar_infos(&scraper).await    
+        })
+            .await);
+    }
+
+    update_plenar_infos_in_db(&new_plenar_infos).await;
     new_plenar_infos
 }
 

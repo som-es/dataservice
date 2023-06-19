@@ -117,10 +117,30 @@ order by
   ratio DESC;
 ```
 
+```sql
+select delegates.name,delegates.gender,plenar_speeches.duration_in_seconds from plenar_speeches inner join delegates on 
+delegates.id = plenar_speeches.delegate_id where delegates.is_active='t' and delegates.council='nr' and delegates.seat_row is 
+not null;
+
+select 
+  delegates.gender,
+  SUM(plenar_speeches.duration_in_seconds) 
+from 
+  plenar_speeches 
+  inner join delegates on delegates.id = plenar_speeches.delegate_id 
+  inner join debates on plenar_speeches.debate_id = debates.id
+  inner join plenar_infos on debates.plenar_id = plenar_infos.id
+where plenar_infos.legislative_period = 'XXVII' and delegates.is_active='t' and delegates.council='nr' and delegates.seat_row is not null 
+group by delegates.gender;
+
+  
+```
+
 # other ideas
 
 most proposals per delegate
 most proposals per party
+
 most proposals per party per legislative period
 
 most speeches held per delegate
