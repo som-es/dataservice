@@ -15,6 +15,7 @@ async fn main() {
 }
 
 pub async fn run_services(state: &State) {
+    // only run when delegate db is empty!
     // let hs = std::collections::HashSet::new();
     // let _res = services::delegates::delegates_once(&hs).await;
     // println!("res: {_res:?}");

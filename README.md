@@ -89,18 +89,18 @@ select name from delegates where is_active='t' and council='nr' and seat_row is 
 
 select 
   delegates.party, 
-  COUNT(*) as call_to_order_amount, 
+  COUNT(*)::Integer as call_to_order_amount, 
   delegates_in_party.delegate_amount, 
   (
     COUNT(*):: real / delegates_in_party.delegate_amount
-  ) as ratio
+  )::real as ratio
 from 
   call_to_order 
   inner join delegates on delegates.id = call_to_order.receiver_id 
   join (
     select 
       party, 
-      COUNT(*) as delegate_amount
+      COUNT(*)::Integer as delegate_amount
     from 
       delegates 
     where 

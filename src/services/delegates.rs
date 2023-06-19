@@ -149,11 +149,11 @@ pub async fn run_shut(mut shutdown: Shutdown) {
                 break;
             }
             _ = async {
-                log::info!("Delegates scraper service sleeps for 12 hours before starting first time");
-                tokio::time::sleep(tokio::time::Duration::from_secs(60 * 60 * 12)).await;
                 log::info!("Starting delegates scraper");
 
-                delegates_once(&prev_delegates).await
+                delegates_once(&prev_delegates).await;
+                log::info!("Delegates scraper service sleeps for 3 hours");
+                tokio::time::sleep(tokio::time::Duration::from_secs(60 * 60 * 3)).await;
                 // prev_delegates.extend(delegates_once(&prev_delegates).await);
 
                 // println!("dele: {prev_delegates:?}");
