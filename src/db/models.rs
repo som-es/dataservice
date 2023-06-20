@@ -2,6 +2,8 @@ use chrono::{NaiveDate, NaiveDateTime};
 use diesel::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 
+use crate::schema::parties;
+
 use super::schema::{
     call_to_order, contacts, debates, delegates, legislative_initiatives, mandates, plenar_infos,
     plenar_speeches, proposal_delegates, proposals, speeches, votes,
@@ -235,4 +237,15 @@ impl DbMandate {
     pub fn is_active(&self) -> bool {
         self.end_date.is_none()
     }
+}
+
+#[derive(
+    Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
+)]
+#[diesel(table_name = parties)]
+#[diesel(primary_key(id))]
+pub struct DbParty {
+    pub name: String,
+    pub fraction: i32,
+    pub color: String,
 }

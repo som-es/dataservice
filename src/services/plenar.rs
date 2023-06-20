@@ -36,7 +36,7 @@ async fn plenar_info_once() -> Vec<PlenarInfo> {
 
     let mut new_plenar_infos = vec![];
 
-    for gp in ["XXVII", "XXVI", "XXV", /*"XXIV", "XXIII", "XXII"*/] {
+    for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
         log::info!("PLENAR info once GP: {gp}");
         scraper.scrape_info.gp = vec![gp.into()];
 
@@ -54,6 +54,8 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo]) {
     log::info!("Updating plenar infos in database...");
 
     let mut conn = crate::establish_connection();
+
+    // disable with setting
     let mut text_extractor = scraper::TextExtractor::new(AustriaScraper::BASE_URL);
 
     for plenar_info in new_plenar_infos {
@@ -110,6 +112,10 @@ async fn insert_plenar_speech(
     conn: &mut PgConnection,
     text_extractor: &mut TextExtractor,
 ) -> QueryResult<()> {
+
+    let disable_speech_text = std::env::var("DISABLE_SPEECH_TEXT").unwrap_or("false".into());
+    let disable_speech_text = disable_speech_text == "true";
+
     let db_plenar_speech = DbPlenarSpeech {
         delegate_id: plenar_speech.delegate_id as i32,
         debate_id: val_debate_id,
@@ -162,8 +168,11 @@ async fn insert_plenar_speech(
                 return Ok(());
             };
 
-            let updated_spoken_text =
-                Some(text_extractor.extract_text_from_url(text_html_url).await);
+            let updated_spoken_text = if disable_speech_text {
+                None
+            } else {
+                Some(text_extractor.extract_text_from_url(text_html_url).await)
+            };
 
             diesel::update(plenar_speeches)
                 .filter(debate_id.eq(db_plenar_speech.debate_id))

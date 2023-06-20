@@ -73,9 +73,10 @@ diesel::table! {
 }
 
 diesel::table! {
-    parties (id) {
-        id -> Varchar,
+    parties (name) {
         name -> Varchar,
+        fraction -> Int4,
+        color -> Varchar,
     }
 }
 

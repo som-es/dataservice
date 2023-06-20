@@ -152,6 +152,19 @@ select delegates.name from mandates inner join delegates on delegates.id = manda
 -- looks at a specific debate -> look at opinion
 select debates.about,plenar_speeches.delegate_id,plenar_speeches.opinion,plenar_speeches.spoken_text from plenar_speeches inner join debates on debates.id = plenar_speeches.debdataservice=# select debates.about,plenar_speeches.delegatdataservice=# select debates.about,plenar_speeches.delegate_id,plenar_speeches.opinion,plenar_speeches.spoken_text from plenar_speeches inner join debates on debates.id = plenar_speeches.debate_id where plenar_id=3;
 
+
+select 
+  delegates.gender,
+  SUM(plenar_speeches.duration_in_seconds) 
+from 
+  plenar_speeches 
+  inner join delegates on delegates.id = plenar_speeches.delegate_id
+  inner join mandates on mandates.delegate_id = delegates.id
+  inner join debates on plenar_speeches.debate_id = debates.id
+  inner join plenar_infos on debates.plenar_id = plenar_infos.id
+where plenar_infos.legislative_period = 'XXVI' and mandates.name like '%Abge% %National%' 
+group by delegates.gender;
+
 ```
 
 # other ideas

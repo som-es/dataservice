@@ -1,7 +1,7 @@
 -- Your SQL goes here
 create table contacts(
     id serial primary key,
-    mail varchar(255) unique,
+    mail varchar(255),
     phone_number varchar(255),
     twitter_url varchar(255) unique,
     facebook_url varchar(255) unique,

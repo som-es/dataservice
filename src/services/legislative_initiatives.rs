@@ -81,8 +81,8 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
 
         for vote in &legis_init.votes {
             let db_vote = DbVote {
-                party: vote.party.clone(),
-                fraction: vote.fraction as i32,
+                party: vote.party.name.clone(),
+                fraction: vote.party.fraction as i32,
                 infavor: vote.infavor,
                 legislative_initiatives_id: legis_init_id,
             };
@@ -149,7 +149,7 @@ pub async fn run_shut(mut shutdown: Shutdown) {
                 }
                 // legis_init_once().await;
                 log::info!("Legislative initiative scraper service sleeps for {legis_init_sleep} seconds...");
-                tokio::time::sleep(tokio::time::Duration::from_secs(1000)).await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(legis_init_sleep)).await;
             } => {}
         }
     }
