@@ -36,7 +36,7 @@ async fn plenar_info_once() -> Vec<PlenarInfo> {
 
     let mut new_plenar_infos = vec![];
 
-    for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII"] {
+    for gp in ["XXVII", "XXVI", "XXV", /*"XXIV", "XXIII", "XXII"*/] {
         log::info!("PLENAR info once GP: {gp}");
         scraper.scrape_info.gp = vec![gp.into()];
 
