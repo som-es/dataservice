@@ -26,7 +26,8 @@ pub async fn run_services(state: &State) {
         )),
         services::proposals::run_shut(Shutdown::new(state.notify_shutdown.subscribe())),
         services::plenar::run_shut(Shutdown::new(state.notify_shutdown.subscribe())),
-        services::delegates::run_shut(Shutdown::new(state.notify_shutdown.subscribe()))
+        services::delegates::run_shut(Shutdown::new(state.notify_shutdown.subscribe())),
+        services::parties::run_shut(Shutdown::new(state.notify_shutdown.subscribe())),
     );
 }
 
