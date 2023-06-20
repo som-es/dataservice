@@ -14,7 +14,8 @@ pub fn update_parties_in_db(parties: &[Party]) {
         };
         diesel::insert_into(parties::table)
             .values(&db_party)
-            .on_conflict_do_nothing()
+            .on_conflict(parties::name)
+            .do_nothing()
             .execute(conn)
             .expect("Error saving new party");
     }
@@ -22,14 +23,14 @@ pub fn update_parties_in_db(parties: &[Party]) {
 
 pub async fn parties_once() {
     let mut scraper = AustriaScraper::default();
-    for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI"] {
+    for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII"] {
         scraper.scrape_info.gp = vec![gp.into()];
         
         let parties = scrape_untill_success::<Vec<Party>, _>(|| async {
             scraper.get_parties().await.map_err(|e| e.into())
         })
         .await;
-    
+
         update_parties_in_db(&parties);
     }
 }
