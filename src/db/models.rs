@@ -92,7 +92,7 @@ pub struct DbLegislativeInitiative {
     pub emphasis: Option<String>,
     pub title: String,
     pub description: String,
-    pub accepted: bool,
+    pub accepted: Option<bool>,
     pub created_at: NaiveDate,
 }
 
@@ -108,7 +108,7 @@ pub struct DbLegislativeInitiativeQuery {
     pub emphasis: Option<String>,
     pub title: String,
     pub description: String,
-    pub accepted: bool,
+    pub accepted: Option<bool>,
     pub created_at: NaiveDate,
 }
 

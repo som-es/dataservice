@@ -8,7 +8,7 @@ create table legislative_initiatives (
     emphasis varchar(4000),
     title text not null,
     description text not null,
-    accepted boolean not null default false,
+    accepted boolean,
     created_at date not null default now(),
     UNIQUE (inr, ityp, gp)
 );

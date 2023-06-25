@@ -56,7 +56,7 @@ diesel::table! {
         emphasis -> Nullable<Varchar>,
         title -> Text,
         description -> Text,
-        accepted -> Bool,
+        accepted -> Nullable<Bool>,
         created_at -> Date,
     }
 }
