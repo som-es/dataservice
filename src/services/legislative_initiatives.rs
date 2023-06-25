@@ -8,9 +8,7 @@ use crate::{
     Shutdown,
 };
 
-async fn scrape_new_legis_inits() -> crate::Result<Vec<LegislativeInitiative>> {
-    let scraper = AustriaScraper::default();
-
+async fn scrape_new_legis_inits(scraper: &AustriaScraper) -> crate::Result<Vec<LegislativeInitiative>> {
     let legis_inits = scraper.post_legis_payload().await?;
     let legis_init_paths = scraper.legis_paths(legis_inits)?;
 
@@ -34,14 +32,22 @@ async fn scrape_new_legis_inits() -> crate::Result<Vec<LegislativeInitiative>> {
 
 async fn legis_init_once() -> Vec<LegislativeInitiative> {
     log::info!("Try scraping legislative initiatives");
+    let mut scraper = AustriaScraper::default();
 
-    let new_legis_inits = scrape_untill_success::<Vec<LegislativeInitiative>, _>(|| async {
-        scrape_new_legis_inits().await
-    })
-    .await;
-    update_legis_inits_in_db(&new_legis_inits);
+    for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
+        log::info!("PLENAR info once GP: {gp}");
+        scraper.scrape_info.gp = vec![gp.into()];
 
-    new_legis_inits
+        let new_legis_inits = scrape_untill_success::<Vec<LegislativeInitiative>, _>(|| async {
+            scrape_new_legis_inits(&scraper).await
+        })
+        .await;
+
+        update_legis_inits_in_db(&new_legis_inits);
+    }
+
+    // new_legis_inits
+    vec![]
 }
 
 fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {

@@ -200,4 +200,5 @@ select delegates.name,COUNT(opinion) as opinions from plenar_speeches inner join
 
 select delegates.name,COUNT(opinion) as opinions from plenar_speeches inner join delegates on delegates.id = plenar_speeches.delegate_id where delegates.name like '%Himmelbauer%' group by delegates.name order by opinions desc;
 
+select legislative_initiatives.emphasis,speeches.infavor from speeches inner join delegates on delegates.id = speeches.delegate_id inner join legislative_initiatives on legislative_initiatives.id = speeches.legislative_initiatives_id where speeches.infavor is not null and legislative_initiatives.emphasis is not null and delegates.name like '%Loacker%';
 ```
