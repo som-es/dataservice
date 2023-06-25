@@ -140,6 +140,7 @@ diesel::table! {
 }
 
 diesel::joinable!(call_to_order -> plenar_infos (plenar_id));
+diesel::joinable!(call_to_order -> delegates (receiver_id));
 diesel::joinable!(debates -> plenar_infos (plenar_id));
 diesel::joinable!(delegates -> contacts (contacts_id));
 diesel::joinable!(mandates -> delegates (delegate_id));

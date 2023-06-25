@@ -2,7 +2,7 @@ use chrono::{NaiveDate, NaiveDateTime};
 use diesel::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::schema::parties;
+use crate::db::schema::parties;
 
 use super::schema::{
     call_to_order, contacts, debates, delegates, legislative_initiatives, mandates, plenar_infos,

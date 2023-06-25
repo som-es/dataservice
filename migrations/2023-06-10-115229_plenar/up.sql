@@ -15,7 +15,8 @@ CREATE TABLE call_to_order (
     plenar_id int not null,
     inr int not null,
     receiver_id int not null,
-    FOREIGN KEY (plenar_id) REFERENCES plenar_infos(id)
+    FOREIGN KEY (plenar_id) REFERENCES plenar_infos(id),
+    FOREIGN KEY (receiver_id) REFERENCES delegates(id)
 );
 
 CREATE TABLE debates (

@@ -23,7 +23,7 @@ pub fn update_parties_in_db(parties: &[Party]) {
 
 pub async fn parties_once() {
     let mut scraper = AustriaScraper::default();
-    for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII"] {
+    for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
         scraper.scrape_info.gp = vec![gp.into()];
         
         let parties = scrape_untill_success::<Vec<Party>, _>(|| async {

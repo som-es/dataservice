@@ -145,13 +145,13 @@ async fn insert_plenar_speech(
         duration_in_seconds: plenar_speech.duration_in_seconds as i32,
         ty: plenar_speech.ty.clone(),
     };
-
     // Some(text_extractor.extract_text_from_url(&plenar_speech).await)
 
     diesel::insert_into(plenar_speeches::table)
         .values(&db_plenar_speech)
         .on_conflict((plenar_speeches::debate_id, plenar_speeches::delegate_id))
-        .do_nothing()
+        .do_update()
+        .set(&db_plenar_speech)
         .execute(conn)?;
     {
         use crate::db::schema::plenar_speeches::dsl::plenar_speeches;

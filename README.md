@@ -167,6 +167,21 @@ group by delegates.gender;
 
 ```
 
+```sql
+select 
+        delegates.name,
+        delegates.image_url,
+        delegates.party,
+        cast(COUNT(*) as Integer) as call_to_order_amount
+        from call_to_order 
+        inner join delegates on call_to_order.receiver_id=delegates.id 
+        inner join plenar_infos on call_to_order.plenar_id = plenar_infos.id
+        where plenar_infos.legislative_period = 'XXVI'
+        group by delegates.name,delegates.image_url,delegates.party,call_to_order.receiver_id 
+        order by call_to_order_amount DESC;
+
+```
+
 # other ideas
 
 in which plenar sitzungen received someone call to orders
@@ -175,7 +190,14 @@ most proposals per party
 
 most proposals per party per legislative period
 
-most speeches held per delegate
+most speeches held per delegate (not in hours)
 most speeches held per party
 
+```sql
+select delegates.name,COUNT(opinion) as opinions from plenar_speeches inner join delegates on delegates.id = plenar_speeches.delegate_id where (opinion = 'Pro' or opinion = 'Contra') and is_active='t' group by delegates.name order by opinions desc; -- and is_active='t'
 
+select delegates.name,COUNT(opinion) as opinions from plenar_speeches inner join delegates on delegates.id = plenar_speeches.delegate_id where (opinion = 'Pro' or opinion = 'Contra') and delegates.name like '%Himmelbauer%' group by delegates.name order by opinions desc;
+
+select delegates.name,COUNT(opinion) as opinions from plenar_speeches inner join delegates on delegates.id = plenar_speeches.delegate_id where delegates.name like '%Himmelbauer%' group by delegates.name order by opinions desc;
+
+```
