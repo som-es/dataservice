@@ -35,7 +35,7 @@ async fn legis_init_once() -> Vec<LegislativeInitiative> {
     let mut scraper = AustriaScraper::default();
 
     for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
-        log::info!("PLENAR info once GP: {gp}");
+        log::info!("LEGIS INIT once GP: {gp}");
         scraper.scrape_info.gp = vec![gp.into()];
 
         let new_legis_inits = scrape_untill_success::<Vec<LegislativeInitiative>, _>(|| async {
