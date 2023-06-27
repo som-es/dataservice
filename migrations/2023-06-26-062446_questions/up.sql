@@ -12,5 +12,7 @@ create table questions(
     body text not null,
     created_at timestamp not null default now(),
     updated_at timestamp not null default now(),
+    FOREIGN KEY (issuer_id) REFERENCES users(id),
+    FOREIGN KEY (delegate_id) REFERENCES delegates(id),
     UNIQUE (issuer_id, delegate_id, title, body)
 );

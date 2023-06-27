@@ -138,6 +138,20 @@ pub struct DbSpeech {
     pub legislative_initiatives_id: i32,
 }
 
+#[derive(Queryable, Selectable, Identifiable, PartialEq, Debug, Clone, Serialize, Deserialize)]
+#[diesel(table_name = contacts)]
+pub struct DbContactQuery {
+    pub id: i32,
+    pub mail: Option<String>,
+    pub phone_number: Option<String>,
+    pub twitter_url: Option<String>,
+    pub facebook_url: Option<String>,
+    pub website_url: Option<String>,
+    pub tiktok_url: Option<String>,
+    pub instagram_url: Option<String>,
+    pub youtube_url: Option<String>,
+}
+
 #[derive(Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize)]
 #[diesel(table_name = contacts)]
 #[diesel(primary_key(id))]

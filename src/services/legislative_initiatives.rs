@@ -74,7 +74,8 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
                 legislative_initiatives::gp,
             ))
             .do_update()
-            .set((legislative_initiatives::created_at.eq(db_legis_init.created_at),))
+            // .set((legislative_initiatives::created_at.eq(db_legis_init.created_at),))
+            .set(&db_legis_init)
             .returning(legislative_initiatives::id)
             .get_result(conn)
         {

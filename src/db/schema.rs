@@ -123,10 +123,28 @@ diesel::table! {
 }
 
 diesel::table! {
+    questions (id) {
+        id -> Int4,
+        issuer_id -> Int4,
+        delegate_id -> Int4,
+        title -> Varchar,
+        body -> Text,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     speeches (delegate_id, legislative_initiatives_id) {
         delegate_id -> Int4,
         infavor -> Nullable<Bool>,
         legislative_initiatives_id -> Int4,
+    }
+}
+
+diesel::table! {
+    users (id) {
+        id -> Int4,
     }
 }
 
@@ -140,7 +158,6 @@ diesel::table! {
 }
 
 diesel::joinable!(call_to_order -> plenar_infos (plenar_id));
-diesel::joinable!(call_to_order -> delegates (receiver_id));
 diesel::joinable!(debates -> plenar_infos (plenar_id));
 diesel::joinable!(delegates -> contacts (contacts_id));
 diesel::joinable!(mandates -> delegates (delegate_id));
@@ -148,6 +165,8 @@ diesel::joinable!(plenar_speeches -> debates (debate_id));
 diesel::joinable!(plenar_speeches -> delegates (delegate_id));
 diesel::joinable!(proposal_delegates -> delegates (delegate_id));
 diesel::joinable!(proposal_delegates -> proposals (proposal_id));
+diesel::joinable!(questions -> delegates (delegate_id));
+diesel::joinable!(questions -> users (issuer_id));
 diesel::joinable!(speeches -> delegates (delegate_id));
 diesel::joinable!(speeches -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(votes -> legislative_initiatives (legislative_initiatives_id));
@@ -164,6 +183,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     plenar_speeches,
     proposal_delegates,
     proposals,
+    questions,
     speeches,
+    users,
     votes,
 );

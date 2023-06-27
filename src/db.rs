@@ -1,5 +1,6 @@
 pub mod models;
 pub mod schema;
+pub mod api_models;
 
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
