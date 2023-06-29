@@ -263,3 +263,4 @@ pub struct DbParty {
     pub fraction: i32,
     pub color: String,
 }
+
