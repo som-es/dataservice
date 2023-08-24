@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
-use diesel::{PgConnection, QueryResult, RunQueryDsl};
+use diesel::{PgConnection, QueryResult, RunQueryDsl, QueryDsl};
 use scraper::{delegates::DelegateScraper, AustriaScraper, Delegate, Mandate};
 
 use crate::{
     models::{DbContact, DbDelegate, DbMandate},
-    schema::{contacts, mandates},
+    schema::{contacts, mandates, delegates},
     services::scrape_untill_success,
     Shutdown,
 };
@@ -35,6 +35,10 @@ async fn scrape_new_delegates(prev_delegates: &HashSet<Delegate>) -> crate::Resu
     }
 
     Ok(delegates)
+}
+
+pub fn delegate_count(conn: &mut PgConnection) -> QueryResult<i64> {
+    delegates::table.count().get_result(conn)
 }
 
 fn update_delegates_in_db(new_delegates: &[Delegate]) {

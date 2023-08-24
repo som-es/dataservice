@@ -1,4 +1,4 @@
-use dataservice::{services, Shutdown};
+use dataservice::{services, Shutdown, establish_connection, delegates::delegate_count};
 use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
 
@@ -15,10 +15,14 @@ async fn main() {
 }
 
 pub async fn run_services(state: &State) {
-    // only run when delegate db is empty!
-    // let hs = std::collections::HashSet::new();
-    // let _res = services::delegates::delegates_once(&hs).await;
-    // println!("res: {_res:?}");
+    {
+        let conn = &mut establish_connection();
+        if delegate_count(conn) == Ok(0) {
+            log::info!("Delegates are 0, start scraping ...");
+            let hs = std::collections::HashSet::new();
+            let _res = services::delegates::delegates_once(&hs).await;
+        }
+    }
     tokio::join!(
         // services::proposals::run(),
         services::legislative_initiatives::run_shut(Shutdown::new(
