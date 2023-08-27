@@ -48,7 +48,6 @@ pub struct DbProposalQuery {
     Serialize,
     Deserialize,
 )]
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[diesel(table_name = delegates)]
 #[diesel(primary_key(id))]
 pub struct DbDelegate {
@@ -77,7 +76,6 @@ pub struct DbDelegate {
     Serialize,
     Deserialize,
 )]
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[diesel(table_name = proposal_delegates)]
 #[diesel(primary_key(proposal_id, delegate_id))]
 #[diesel(belongs_to(DbDelegate, foreign_key = delegate_id))]
@@ -215,7 +213,6 @@ pub struct DbPlenar {
     Deserialize,
     AsChangeset,
 )]
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[diesel(table_name = call_to_order)]
 #[diesel(primary_key(id))]
 pub struct DbCallToOrder {
