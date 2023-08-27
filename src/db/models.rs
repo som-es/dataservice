@@ -9,6 +9,10 @@ use super::schema::{
     plenar_speeches, proposal_delegates, proposals, speeches, votes,
 };
 
+#[cfg(feature = "utoipa")]
+use utoipa::ToSchema;
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     Queryable, Selectable, Identifiable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize,
 )]
@@ -20,7 +24,7 @@ pub struct DbProposal {
     pub title: String,
     pub description: String,
 }
-
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Queryable, Selectable, Identifiable, PartialEq, Debug, Clone, Serialize, Deserialize)]
 #[diesel(table_name = proposals)]
 pub struct DbProposalQuery {
@@ -31,7 +35,7 @@ pub struct DbProposalQuery {
     pub description: String,
     pub created_at: NaiveDateTime,
 }
-
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     Queryable,
     Selectable,
@@ -44,6 +48,7 @@ pub struct DbProposalQuery {
     Serialize,
     Deserialize,
 )]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[diesel(table_name = delegates)]
 #[diesel(primary_key(id))]
 pub struct DbDelegate {
@@ -60,6 +65,7 @@ pub struct DbDelegate {
     pub is_active: Option<bool>,
 }
 
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     Identifiable,
     Selectable,
@@ -71,6 +77,7 @@ pub struct DbDelegate {
     Serialize,
     Deserialize,
 )]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[diesel(table_name = proposal_delegates)]
 #[diesel(primary_key(proposal_id, delegate_id))]
 #[diesel(belongs_to(DbDelegate, foreign_key = delegate_id))]
@@ -81,6 +88,7 @@ pub struct ProposalDelegate {
     pub is_receiver: bool,
 }
 
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
 )]
@@ -96,6 +104,7 @@ pub struct DbLegislativeInitiative {
     pub created_at: NaiveDate,
 }
 
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
 )]
@@ -113,6 +122,7 @@ pub struct DbLegislativeInitiativeQuery {
 }
 
 
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     Queryable, Identifiable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize,
 )]
@@ -125,6 +135,7 @@ pub struct DbVote {
     pub infavor: bool,
     pub legislative_initiatives_id: i32,
 }
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     Queryable, Identifiable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize,
 )]
@@ -138,6 +149,7 @@ pub struct DbSpeech {
     pub legislative_initiatives_id: i32,
 }
 
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Queryable, Selectable, Identifiable, PartialEq, Debug, Clone, Serialize, Deserialize)]
 #[diesel(table_name = contacts)]
 pub struct DbContactQuery {
@@ -152,6 +164,7 @@ pub struct DbContactQuery {
     pub youtube_url: Option<String>,
 }
 
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize)]
 #[diesel(table_name = contacts)]
 #[diesel(primary_key(id))]
@@ -166,6 +179,7 @@ pub struct DbContact {
     pub youtube_url: Option<String>,
 }
 
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     Queryable,
     Selectable,
@@ -188,6 +202,7 @@ pub struct DbPlenar {
     pub legislative_period: String,
 }
 
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     Queryable,
     Identifiable,
@@ -200,6 +215,7 @@ pub struct DbPlenar {
     Deserialize,
     AsChangeset,
 )]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[diesel(table_name = call_to_order)]
 #[diesel(primary_key(id))]
 pub struct DbCallToOrder {
@@ -209,6 +225,7 @@ pub struct DbCallToOrder {
     pub receiver_id: i32,
 }
 
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
 )]
@@ -219,6 +236,7 @@ pub struct DbDebate {
     pub about: String,
 }
 
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
 )]
@@ -233,6 +251,7 @@ pub struct DbPlenarSpeech {
     pub ty: String,
 }
 
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
 )]
@@ -253,6 +272,7 @@ impl DbMandate {
     }
 }
 
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
 )]
