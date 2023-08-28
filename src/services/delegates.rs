@@ -82,6 +82,7 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
             contacts_id,
             gender: delegate.gender.to_string_opt(),
             is_active: Some(delegate.is_active),
+            birthdate: delegate.birthdate.clone(),
         };
 
         if let Err(e) = diesel::insert_into(delegates::table)

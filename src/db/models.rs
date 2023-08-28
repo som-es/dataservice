@@ -62,6 +62,7 @@ pub struct DbDelegate {
     pub contacts_id: Option<i32>,
     pub gender: Option<String>,
     pub is_active: Option<bool>,
+    pub birthdate: Option<String>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

@@ -23,5 +23,6 @@ create table delegates (
     contacts_id int,
     gender varchar(1),
     is_active boolean,
+    birthdate varchar(10),
     FOREIGN KEY (contacts_id) REFERENCES contacts(id)
 );
