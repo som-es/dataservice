@@ -1,6 +1,9 @@
 use diesel::{Queryable, Selectable, Insertable, AsChangeset, prelude::QueryableByName};
 use serde_derive::{Serialize, Deserialize};
 
+#[cfg(feature = "utoipa")]
+use utoipa::ToSchema;
+
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
