@@ -1,6 +1,7 @@
-use diesel::{Queryable, Selectable, Insertable, AsChangeset};
+use diesel::{Queryable, Selectable, Insertable, AsChangeset, prelude::QueryableByName};
 use serde_derive::{Serialize, Deserialize};
 
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
 )]
@@ -13,8 +14,9 @@ pub struct DbQuestion {
     pub body: String,
 }
 
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
+    Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset, QueryableByName
 )]
 #[diesel(table_name = crate::db::schema::questions)]
 #[diesel(primary_key(id))]

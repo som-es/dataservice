@@ -60,7 +60,6 @@ diesel::table! {
         #[max_length = 1]
         gender -> Nullable<Varchar>,
         is_active -> Nullable<Bool>,
-        #[max_length = 10]
         birthdate -> Nullable<Date>,
     }
 }
