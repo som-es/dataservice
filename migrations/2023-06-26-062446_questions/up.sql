@@ -17,6 +17,7 @@ create table questions(
     updated_at timestamp not null default now(),
     is_sent boolean default false,
     is_sendable boolean default false,
+    is_answerable boolean default true,
     FOREIGN KEY (issuer_id) REFERENCES users(id),
     FOREIGN KEY (delegate_id) REFERENCES delegates(id),
     UNIQUE (issuer_id, delegate_id, title, body)
