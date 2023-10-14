@@ -1,0 +1,7 @@
+-- Your SQL goes here
+create table topics(
+    id serial primary key,
+    topic varchar(100) not null,
+    legislative_initiatives_id int not null,
+    FOREIGN KEY (legislative_initiatives_id) REFERENCES legislative_initiatives(id)
+);

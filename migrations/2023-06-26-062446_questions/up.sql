@@ -15,9 +15,9 @@ create table questions(
     body text not null,
     created_at timestamp not null default now(),
     updated_at timestamp not null default now(),
-    is_sent boolean default false,
-    is_sendable boolean default false,
-    is_answerable boolean default true,
+    is_sent boolean not null default false,
+    is_sendable boolean not null default false,
+    is_answerable boolean not null default true,
     FOREIGN KEY (issuer_id) REFERENCES users(id),
     FOREIGN KEY (delegate_id) REFERENCES delegates(id),
     UNIQUE (issuer_id, delegate_id, title, body)

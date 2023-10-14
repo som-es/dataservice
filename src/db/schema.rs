@@ -1,6 +1,21 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    answers (id) {
+        id -> Int4,
+        question_id -> Int4,
+        delegate_id -> Nullable<Int4>,
+        via_mail -> Nullable<Bool>,
+        received_at -> Timestamp,
+        #[max_length = 10]
+        text_type -> Nullable<Varchar>,
+        #[max_length = 1024]
+        mail_subject -> Nullable<Varchar>,
+        body -> Text,
+    }
+}
+
+diesel::table! {
     call_to_order (id) {
         #[max_length = 20]
         id -> Varchar,
@@ -160,11 +175,14 @@ diesel::table! {
         id -> Int4,
         issuer_id -> Int4,
         delegate_id -> Int4,
-        #[max_length = 255]
+        #[max_length = 1024]
         title -> Varchar,
         body -> Text,
         created_at -> Timestamp,
         updated_at -> Timestamp,
+        is_sent -> Bool,
+        is_sendable -> Bool,
+        is_answerable -> Bool,
     }
 }
 
@@ -172,6 +190,15 @@ diesel::table! {
     speeches (delegate_id, legislative_initiatives_id) {
         delegate_id -> Int4,
         infavor -> Nullable<Bool>,
+        legislative_initiatives_id -> Int4,
+    }
+}
+
+diesel::table! {
+    topics (id) {
+        id -> Int4,
+        #[max_length = 100]
+        topic -> Varchar,
         legislative_initiatives_id -> Int4,
     }
 }
@@ -198,6 +225,7 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(answers -> questions (question_id));
 diesel::joinable!(call_to_order -> delegates (receiver_id));
 diesel::joinable!(call_to_order -> plenar_infos (plenar_id));
 diesel::joinable!(debates -> plenar_infos (plenar_id));
@@ -211,9 +239,11 @@ diesel::joinable!(questions -> delegates (delegate_id));
 diesel::joinable!(questions -> users (issuer_id));
 diesel::joinable!(speeches -> delegates (delegate_id));
 diesel::joinable!(speeches -> legislative_initiatives (legislative_initiatives_id));
+diesel::joinable!(topics -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(votes -> legislative_initiatives (legislative_initiatives_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
+    answers,
     call_to_order,
     contacts,
     debates,
@@ -227,6 +257,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     proposals,
     questions,
     speeches,
+    topics,
     users,
     votes,
 );

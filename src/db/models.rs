@@ -2,7 +2,7 @@ use chrono::{NaiveDate, NaiveDateTime};
 use diesel::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::db::schema::parties;
+use crate::{db::schema::parties, schema::topics};
 
 use super::schema::{
     call_to_order, contacts, debates, delegates, legislative_initiatives, mandates, plenar_infos,
@@ -145,6 +145,17 @@ pub struct DbVote {
 pub struct DbSpeech {
     pub delegate_id: i32,
     pub infavor: Option<bool>,
+    pub legislative_initiatives_id: i32,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(
+    Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize,
+)]
+#[diesel(table_name = topics)]
+#[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
+pub struct DbTopic {
+    pub topic: String,
     pub legislative_initiatives_id: i32,
 }
 

@@ -2,8 +2,8 @@ use diesel::{ExpressionMethods, RunQueryDsl};
 use scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative, Opinion};
 
 use crate::{
-    models::{DbLegislativeInitiative, DbSpeech, DbVote},
-    schema::{legislative_initiatives, speeches, votes},
+    models::{DbLegislativeInitiative, DbSpeech, DbVote, DbTopic},
+    schema::{legislative_initiatives, speeches, votes, topics},
     services::scrape_untill_success,
     Shutdown,
 };
@@ -124,6 +124,20 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
                 .execute(conn)
             {
                 log::warn!("Error inserting speech, probably delegate does not exist in database and has got inactive recently: {e}, for speech: {speech:?}")
+            }
+        }
+
+        for topic in legis_init.topics.clone() {
+            let topic = DbTopic {
+                topic,
+                legislative_initiatives_id: legis_init_id
+            };
+            
+            if let Err(e) = diesel::insert_into(topics::table)
+                .values(&topic)
+                .execute(conn)
+            {
+                log::error!("Error inserting topic: '{e}'. The error occured for the following topic: {topic:?}")
             }
         }
     }

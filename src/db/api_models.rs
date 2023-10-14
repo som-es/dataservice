@@ -31,4 +31,7 @@ pub struct DbQuestionQuery {
     pub body: String,
     pub created_at: chrono::NaiveDateTime,
     pub updated_at: chrono::NaiveDateTime,
+    pub is_sent: bool,
+    pub is_sendable: bool,
+    pub is_answerable: bool,
 }
