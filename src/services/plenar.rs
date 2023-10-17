@@ -40,10 +40,12 @@ async fn plenar_info_once() -> Vec<PlenarInfo> {
         log::info!("PLENAR info once GP: {gp}");
         scraper.scrape_info.gp = vec![gp.into()];
 
-        new_plenar_infos.extend(scrape_untill_success::<Vec<PlenarInfo>, _>(|| async { 
-            scrape_new_plenar_infos(&scraper).await    
-        })
-            .await);
+        new_plenar_infos.extend(
+            scrape_untill_success::<Vec<PlenarInfo>, _>(|| async {
+                scrape_new_plenar_infos(&scraper).await
+            })
+            .await,
+        );
     }
 
     update_plenar_infos_in_db(&new_plenar_infos).await;
@@ -112,7 +114,6 @@ async fn insert_plenar_speech(
     conn: &mut PgConnection,
     text_extractor: &mut TextExtractor,
 ) -> QueryResult<()> {
-
     let disable_speech_text = std::env::var("DISABLE_SPEECH_TEXT").unwrap_or("false".into());
     let disable_speech_text = disable_speech_text == "true";
 
@@ -164,7 +165,10 @@ async fn insert_plenar_speech(
             .load::<Option<String>>(conn)?;
         if has_spoken_text.len() == 1 && has_spoken_text[0].is_none() {
             let Some(text_html_url) = plenar_speech.spoken_text_html_urls.first() else {
-                log::warn!("DEBATE_ID: {val_debate_id}, No spoken text html urls for plenar speech: {:?}", plenar_speech);
+                log::warn!(
+                    "DEBATE_ID: {val_debate_id}, No spoken text html urls for plenar speech: {:?}",
+                    plenar_speech
+                );
                 return Ok(());
             };
 

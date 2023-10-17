@@ -1,11 +1,11 @@
 use diesel::RunQueryDsl;
-use scraper::{AustriaScraper, parties::Parties, Party};
+use scraper::{parties::Parties, AustriaScraper, Party};
 
-use crate::{Shutdown, scrape_untill_success, schema::parties, models::DbParty};
+use crate::{models::DbParty, schema::parties, scrape_untill_success, Shutdown};
 
 pub fn update_parties_in_db(parties: &[Party]) {
     let conn = &mut crate::establish_connection();
-    
+
     for party in parties {
         let db_party = DbParty {
             name: party.name.clone(),
@@ -25,7 +25,7 @@ pub async fn parties_once() {
     let mut scraper = AustriaScraper::default();
     for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
         scraper.scrape_info.gp = vec![gp.into()];
-        
+
         let parties = scrape_untill_success::<Vec<Party>, _>(|| async {
             scraper.get_parties().await.map_err(|e| e.into())
         })

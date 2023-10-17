@@ -1,4 +1,4 @@
-use dataservice::{services, Shutdown, establish_connection, delegates::delegate_count};
+use dataservice::{delegates::delegate_count, establish_connection, services, Shutdown};
 use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
 

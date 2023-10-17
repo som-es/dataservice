@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
-use diesel::{PgConnection, QueryResult, RunQueryDsl, QueryDsl};
+use diesel::{PgConnection, QueryDsl, QueryResult, RunQueryDsl};
 use scraper::{delegates::DelegateScraper, AustriaScraper, Delegate, Mandate};
 
 use crate::{
     models::{DbContact, DbDelegate, DbMandate},
-    schema::{contacts, mandates, delegates},
+    schema::{contacts, delegates, mandates},
     services::scrape_untill_success,
     Shutdown,
 };

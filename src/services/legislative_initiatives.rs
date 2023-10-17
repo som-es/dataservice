@@ -2,13 +2,15 @@ use diesel::{ExpressionMethods, RunQueryDsl};
 use scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative, Opinion};
 
 use crate::{
-    models::{DbLegislativeInitiative, DbSpeech, DbVote, DbTopic},
-    schema::{legislative_initiatives, speeches, votes, topics},
+    models::{DbLegislativeInitiative, DbSpeech, DbTopic, DbVote},
+    schema::{legislative_initiatives, speeches, topics, votes},
     services::scrape_untill_success,
     Shutdown,
 };
 
-async fn scrape_new_legis_inits(scraper: &AustriaScraper) -> crate::Result<Vec<LegislativeInitiative>> {
+async fn scrape_new_legis_inits(
+    scraper: &AustriaScraper,
+) -> crate::Result<Vec<LegislativeInitiative>> {
     let legis_inits = scraper.post_legis_payload().await?;
     let legis_init_paths = scraper.legis_paths(legis_inits)?;
 
@@ -130,9 +132,9 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
         for topic in legis_init.topics.clone() {
             let topic = DbTopic {
                 topic,
-                legislative_initiatives_id: legis_init_id
+                legislative_initiatives_id: legis_init_id,
             };
-            
+
             if let Err(e) = diesel::insert_into(topics::table)
                 .values(&topic)
                 .execute(conn)

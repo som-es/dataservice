@@ -2,7 +2,7 @@ use chrono::{NaiveDate, NaiveDateTime};
 use diesel::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::{db::schema::parties, schema::topics};
+use crate::{db::schema::parties, db::schema::topics};
 
 use super::schema::{
     call_to_order, contacts, debates, delegates, legislative_initiatives, mandates, plenar_infos,
@@ -120,7 +120,6 @@ pub struct DbLegislativeInitiativeQuery {
     pub created_at: NaiveDate,
 }
 
-
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     Queryable, Identifiable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize,
@@ -149,9 +148,7 @@ pub struct DbSpeech {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(
-    Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize,
-)]
+#[derive(Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize)]
 #[diesel(table_name = topics)]
 #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
 pub struct DbTopic {
@@ -292,4 +289,3 @@ pub struct DbParty {
     pub fraction: i32,
     pub color: String,
 }
-
