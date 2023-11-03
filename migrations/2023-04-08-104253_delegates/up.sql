@@ -1,14 +1,15 @@
 -- Your SQL goes here
 create table contacts(
-    id serial primary key,
+    id int primary key,
     mail varchar(255),
     phone_number varchar(255),
-    twitter_url varchar(255) unique,
-    facebook_url varchar(255) unique,
-    website_url varchar(255) unique,
-    tiktok_url varchar(255) unique,
-    instagram_url varchar(255) unique,
-    youtube_url varchar(255) unique
+    twitter_url varchar(255),
+    facebook_url varchar(255),
+    website_url varchar(255),
+    tiktok_url varchar(255),
+    instagram_url varchar(255),
+    youtube_url varchar(255),
+    unique(twitter_url, facebook_url, website_url, youtube_url, instagram_url, tiktok_url)
 );
 
 create table delegates (
@@ -20,9 +21,8 @@ create table delegates (
     council varchar(200),
     seat_row int,
     seat_col int,
-    contacts_id int,
     gender varchar(1),
     is_active boolean,
     birthdate date,
-    FOREIGN KEY (contacts_id) REFERENCES contacts(id)
+    FOREIGN KEY (id) REFERENCES contacts(id)
 );

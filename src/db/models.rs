@@ -59,7 +59,6 @@ pub struct DbDelegate {
     pub council: Option<String>,
     pub seat_row: Option<i32>,
     pub seat_col: Option<i32>,
-    pub contacts_id: Option<i32>,
     pub gender: Option<String>,
     pub is_active: Option<bool>,
     pub birthdate: Option<NaiveDate>,
@@ -172,10 +171,11 @@ pub struct DbContactQuery {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize)]
+#[derive(AsChangeset, Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize)]
 #[diesel(table_name = contacts)]
 #[diesel(primary_key(id))]
 pub struct DbContact {
+    pub id: i32,
     pub mail: Option<String>,
     pub phone_number: Option<String>,
     pub twitter_url: Option<String>,

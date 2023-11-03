@@ -71,7 +71,6 @@ diesel::table! {
         council -> Nullable<Varchar>,
         seat_row -> Nullable<Int4>,
         seat_col -> Nullable<Int4>,
-        contacts_id -> Nullable<Int4>,
         #[max_length = 1]
         gender -> Nullable<Varchar>,
         is_active -> Nullable<Bool>,
@@ -229,7 +228,7 @@ diesel::joinable!(answers -> questions (question_id));
 diesel::joinable!(call_to_order -> delegates (receiver_id));
 diesel::joinable!(call_to_order -> plenar_infos (plenar_id));
 diesel::joinable!(debates -> plenar_infos (plenar_id));
-diesel::joinable!(delegates -> contacts (contacts_id));
+diesel::joinable!(delegates -> contacts (id));
 diesel::joinable!(mandates -> delegates (delegate_id));
 diesel::joinable!(plenar_speeches -> debates (debate_id));
 diesel::joinable!(plenar_speeches -> delegates (delegate_id));

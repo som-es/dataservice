@@ -42,12 +42,12 @@ pub fn delegate_count(conn: &mut PgConnection) -> QueryResult<i64> {
 }
 
 fn update_delegates_in_db(new_delegates: &[Delegate]) {
-    use crate::schema::delegates;
     let mut conn = crate::establish_connection();
 
     log::info!("Updating delegates in database...");
     for delegate in new_delegates {
         let db_contact = DbContact {
+            id: delegate.id as i32,
             mail: delegate.contact.mail.clone(),
             phone_number: delegate.contact.phone_number.clone(),
             twitter_url: delegate.contact.social_media.twitter.clone(),
@@ -58,16 +58,16 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
             youtube_url: delegate.contact.social_media.youtube.clone(),
         };
 
-        let contacts_id = match diesel::insert_into(contacts::table)
+        if let Err(e) = diesel::insert_into(contacts::table)
             .values(&db_contact)
-            .returning(contacts::id)
-            .get_result::<i32>(&mut conn)
+            .on_conflict(contacts::id)
+            .do_update()
+            .set(&db_contact)
+            .execute(&mut conn)
+            // .returning(contacts::id)
+            // .get_result::<i32>(&mut conn)
         {
-            Ok(contacts_id) => Some(contacts_id),
-            Err(e) => {
-                log::error!("Error inserting contact information for delegate {delegate:?}: {e}");
-                None
-            }
+            log::error!("Error inserting contact information for delegate {delegate:?}: {e}");
         };
 
         let db_delegate = DbDelegate {
@@ -79,7 +79,6 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
             council: delegate.council.clone(),
             seat_row: delegate.seat.as_ref().map(|seat| seat.row as i32),
             seat_col: delegate.seat.as_ref().map(|seat| seat.col as i32),
-            contacts_id,
             gender: delegate.gender.to_string_opt(),
             is_active: Some(delegate.is_active),
             birthdate: delegate.birthdate.clone(),
