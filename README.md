@@ -202,3 +202,27 @@ select delegates.name,COUNT(opinion) as opinions from plenar_speeches inner join
 
 select legislative_initiatives.emphasis,speeches.infavor from speeches inner join delegates on delegates.id = speeches.delegate_id inner join legislative_initiatives on legislative_initiatives.id = speeches.legislative_initiatives_id where speeches.infavor is not null and legislative_initiatives.emphasis is not null and delegates.name like '%Loacker%';
 ```
+
+Welche Interessen vertritt Abgeordneter
+select topic, COUNT(*) from speeches inner join topics on topics.legislative_initiatives_id=speeches.legislative_initiatives_id inner join delegates on speeches.delegate_id = delegates.id where infavor is not null and delegates.name like '%Kickl%' group by topic;
+
+Um für die Interessen einen relativen Wert zu bekommen, muss durch diese Werte dividiert werden:
+select topic, COUNT(*) from speeches inner join topics on topics.legislative_initiatives_id=speeches.legislative_initiatives_id inner join delegate
+s on speeches.delegate_id = delegates.id where infavor is not null and delegates.council = 'nr' and is_active group by topic;
+
+
+Welche Themen werden (absolut) von den Klubs am meisten besprochen?
+select party, topic, COUNT(*) from speeches inner join topics on topics.legislative_initiatives_id=speeches.legislative_initiatives_id inner join delegates on speeches.delegate_id = delegates.id where infavor is not null and delegates.council = 'nr' and is_active group by topic,party order by party;
+
+
+select party, COUNT(*) from speeches inner join topics on topics.legislative_initiatives_id=speeches.legislative_initiatives_id inner join delegate
+s on speeches.delegate_id = delegates.id where infavor is not null and delegates.council = 'nr' and is_active group by party order by party;
+ party | count 
+-------+-------
+ FPÖ   |  4671
+ GRÜNE |  3725
+ NEOS  |  3128
+ OK    |    83
+ ÖVP   |  8080
+ SPÖ   |  5739
+(6 rows)
