@@ -6,7 +6,7 @@ use crate::{db::schema::parties, db::schema::topics};
 
 use super::schema::{
     call_to_order, contacts, debates, delegates, legislative_initiatives, mandates, plenar_infos,
-    plenar_speeches, proposal_delegates, proposals, speeches, votes,
+    plenar_speeches, proposal_delegates, proposals, speeches, votes, legislative_documents
 };
 
 #[cfg(feature = "utoipa")]
@@ -121,7 +121,7 @@ pub struct DbLegislativeInitiativeQuery {
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    Queryable, Identifiable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize,
+    Queryable, Identifiable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset
 )]
 #[diesel(table_name = votes)]
 #[diesel(primary_key(party, legislative_initiatives_id))]
@@ -134,7 +134,7 @@ pub struct DbVote {
 }
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    Queryable, Identifiable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize,
+    Queryable, Identifiable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset
 )]
 #[diesel(table_name = speeches)]
 #[diesel(primary_key(delegate_id, legislative_initiatives_id))]
@@ -147,11 +147,21 @@ pub struct DbSpeech {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize)]
+#[derive(Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset)]
 #[diesel(table_name = topics)]
 #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
 pub struct DbTopic {
     pub topic: String,
+    pub legislative_initiatives_id: i32,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset)]
+#[diesel(table_name = legislative_documents)]
+#[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
+pub struct DbLegisDocument {
+    pub document_type: String,
+    pub document_url: String,
     pub legislative_initiatives_id: i32,
 }
 

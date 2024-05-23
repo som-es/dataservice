@@ -114,7 +114,7 @@ async fn insert_plenar_speech(
     conn: &mut PgConnection,
     text_extractor: &mut TextExtractor,
 ) -> QueryResult<()> {
-    let disable_speech_text = std::env::var("DISABLE_SPEECH_TEXT").unwrap_or("false".into());
+    let disable_speech_text = std::env::var("DISABLE_SPEECH_TEXT").unwrap_or("true".into());
     let disable_speech_text = disable_speech_text == "true";
 
     let db_plenar_speech = DbPlenarSpeech {

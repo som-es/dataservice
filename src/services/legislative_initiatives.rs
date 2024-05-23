@@ -2,8 +2,8 @@ use diesel::{ExpressionMethods, RunQueryDsl};
 use scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative, Opinion};
 
 use crate::{
-    models::{DbLegislativeInitiative, DbSpeech, DbTopic, DbVote},
-    schema::{legislative_initiatives, speeches, topics, votes},
+    models::{DbLegisDocument, DbLegislativeInitiative, DbSpeech, DbTopic, DbVote},
+    schema::{legislative_documents, legislative_initiatives, speeches, topics, votes},
     services::scrape_untill_success,
     Shutdown,
 };
@@ -99,7 +99,8 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
             if let Err(e) = diesel::insert_into(votes::table)
                 .values(&db_vote)
                 .on_conflict((votes::legislative_initiatives_id, votes::party))
-                .do_nothing()
+                .do_update()
+                .set(&db_vote)
                 .execute(conn)
             {
                 log::warn!("Error inserting vote: '{e}'. The error occured for the following vote: {vote:?}")
@@ -122,7 +123,8 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
             if let Err(e) = diesel::insert_into(speeches::table)
                 .values(&db_speech)
                 .on_conflict((speeches::legislative_initiatives_id, speeches::delegate_id))
-                .do_nothing()
+                .do_update()
+                .set(&db_speech)
                 .execute(conn)
             {
                 log::warn!("Error inserting speech, probably delegate does not exist in database and has got inactive recently: {e}, for speech: {speech:?}")
@@ -137,9 +139,29 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
 
             if let Err(e) = diesel::insert_into(topics::table)
                 .values(&topic)
+                .on_conflict((topics::legislative_initiatives_id, topics::topic))
+                .do_update()
+                .set(&topic)
                 .execute(conn)
             {
                 log::error!("Error inserting topic: '{e}'. The error occured for the following topic: {topic:?}")
+            }
+        }
+        for document in &legis_init.documents {
+            let legis_doc = DbLegisDocument {
+                legislative_initiatives_id: legis_init_id,
+                document_type: document.ftype.to_string(),
+                document_url: document.link.clone(),
+            };
+            
+            if let Err(e) = diesel::insert_into(legislative_documents::table)
+                .values(&legis_doc)
+                .on_conflict((legislative_documents::document_url, legislative_documents::legislative_initiatives_id))
+                .do_update()
+                .set(&legis_doc)
+                .execute(conn)
+            {
+                log::error!("Error inserting document: '{e}'. The error occured for the following document: {document:?}")
             }
         }
     }
