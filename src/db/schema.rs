@@ -54,7 +54,6 @@ diesel::table! {
         council -> Nullable<Varchar>,
         seat_row -> Nullable<Int4>,
         seat_col -> Nullable<Int4>,
-        contacts_id -> Nullable<Int4>,
         gender -> Nullable<Varchar>,
         is_active -> Nullable<Bool>,
         birthdate -> Nullable<Date>,
@@ -154,9 +153,9 @@ diesel::table! {
         body -> Text,
         created_at -> Timestamp,
         updated_at -> Timestamp,
-        is_sent -> Nullable<Bool>,
-        is_sendable -> Nullable<Bool>,
-        is_answerable -> Nullable<Bool>,
+        is_sent -> Bool,
+        is_sendable -> Bool,
+        is_answerable -> Bool,
     }
 }
 
@@ -198,7 +197,7 @@ diesel::joinable!(answers -> questions (question_id));
 diesel::joinable!(call_to_order -> delegates (receiver_id));
 diesel::joinable!(call_to_order -> plenar_infos (plenar_id));
 diesel::joinable!(debates -> plenar_infos (plenar_id));
-diesel::joinable!(delegates -> contacts (contacts_id));
+diesel::joinable!(delegates -> contacts (id));
 diesel::joinable!(legislative_documents -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(mandates -> delegates (delegate_id));
 diesel::joinable!(plenar_speeches -> debates (debate_id));
