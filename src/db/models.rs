@@ -2,7 +2,7 @@ use chrono::{NaiveDate, NaiveDateTime};
 use diesel::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::{db::schema::parties, db::schema::topics};
+use crate::{db::schema::{parties, topics}, schema::{plenar_speech_links, proposal_documents}};
 
 use super::schema::{
     call_to_order, contacts, debates, delegates, legislative_initiatives, mandates, plenar_infos,
@@ -166,6 +166,15 @@ pub struct DbLegisDocument {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset)]
+#[diesel(table_name = proposal_documents)]
+#[diesel(belongs_to(DbProposal, foreign_key = proposal_id))]
+pub struct DbProposalDocument {
+    pub document_type: String,
+    pub document_url: String,
+    pub proposal_id: String,
+}
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Queryable, Selectable, Identifiable, PartialEq, Debug, Clone, Serialize, Deserialize)]
 #[diesel(table_name = contacts)]
 pub struct DbContactQuery {
@@ -265,6 +274,17 @@ pub struct DbPlenarSpeech {
     pub spoken_text: Option<String>,
     pub duration_in_seconds: i32,
     pub ty: String,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(
+    Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
+)]
+#[diesel(table_name = plenar_speech_links)]
+#[diesel(primary_key(id, delegate_id, debate_id))]
+pub struct DbPlenarSpeechLink {
+    pub plenar_speech_id: i32,
+    pub document_url: String
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

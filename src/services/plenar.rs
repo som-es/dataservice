@@ -1,6 +1,6 @@
 use crate::{
-    models::{DbCallToOrder, DbDebate, DbPlenar, DbPlenarSpeech},
-    schema::{call_to_order, debates, plenar_infos, plenar_speeches},
+    models::{DbCallToOrder, DbDebate, DbPlenar, DbPlenarSpeech, DbPlenarSpeechLink},
+    schema::{call_to_order, debates, plenar_infos, plenar_speech_links, plenar_speeches},
     services::scrape_untill_success,
     Shutdown,
 };
@@ -148,15 +148,24 @@ async fn insert_plenar_speech(
     };
     // Some(text_extractor.extract_text_from_url(&plenar_speech).await)
 
-    diesel::insert_into(plenar_speeches::table)
+    let plenar_speech_id = diesel::insert_into(plenar_speeches::table)
         .values(&db_plenar_speech)
         .on_conflict((plenar_speeches::debate_id, plenar_speeches::delegate_id))
         .do_update()
         .set(&db_plenar_speech)
-        .execute(conn)?;
+        .returning(plenar_speeches::id)
+        .get_result(conn)?;
 
     for url in &plenar_speech.spoken_text_html_urls {
-        
+        let psl = DbPlenarSpeechLink {
+            plenar_speech_id,
+            document_url: url.to_string()
+        };
+        diesel::insert_into(plenar_speech_links::table)
+            .values(&psl)
+            .on_conflict((plenar_speech_links::plenar_speech_id, plenar_speech_links::document_url))
+            .do_nothing()
+            .execute(conn)?;
     }
     {
         use crate::db::schema::plenar_speeches::dsl::plenar_speeches;

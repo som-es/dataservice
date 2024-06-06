@@ -16,6 +16,7 @@ scraper = {path = "../scraper"}
 serde = "1.0.160"
 serde_derive = "1.0.160"
 simple_logger = { version="4.1.0", optional = true}
+# sqlx = { version="0.7.4", features = ["postgres"] }
 tokio = { version = "1.26.0", features = ["tokio-macros", "macros", "rt", "rt-multi-thread", "signal"], optional=true }
 
 utoipa = { version = "4.2.0", optional = true }

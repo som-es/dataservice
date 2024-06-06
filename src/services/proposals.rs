@@ -6,8 +6,7 @@ use scraper::{
 };
 
 use crate::{
-    models::{DbProposal, ProposalDelegate},
-    today, Shutdown,
+    models::{DbProposal, DbProposalDocument, ProposalDelegate}, schema::proposal_documents, today, Shutdown
 };
 
 use super::scrape_untill_success;
@@ -72,6 +71,24 @@ fn update_proposals_in_db(new_proposals: &[Proposal]) {
         {
             log::error!("Error inserting proposal into database: '{e}'. The following proposal was not inserted: {proposal:?}");
             continue;
+        }
+
+        for document in &proposal.documents {
+            let legis_doc = DbProposalDocument {
+                proposal_id: proposal.id.clone(),
+                document_type: document.ftype.to_string(),
+                document_url: document.link.clone(),
+            };
+            
+            if let Err(e) = diesel::insert_into(proposal_documents::table)
+                .values(&legis_doc)
+                .on_conflict((proposal_documents::document_url, proposal_documents::proposal_id))
+                .do_update()
+                .set(&legis_doc)
+                .execute(&mut conn)
+            {
+                log::error!("(proposal) Error inserting document: '{e}'. The error occured for the following document: {document:?}")
+            }
         }
 
         for receiver_id in &proposal.receiver_ids {

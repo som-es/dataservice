@@ -9,7 +9,7 @@ create table plenar_speech_links(
 
 create table proposal_documents(
     id serial primary key,
-    proposal_id int not null,
+    proposal_id varchar(20),
     document_type varchar(100) not null,
     document_url varchar(500) not null,
     FOREIGN KEY (proposal_id) REFERENCES proposals(id),
