@@ -17,7 +17,7 @@ async fn scrape_new_proposals() -> crate::Result<Vec<Proposal>> {
     let today = chrono::Local::now().date_naive();
     // let date_start = today - chrono::Duration::days(365);
     let date_start = today;
-    let date_end = today + chrono::Duration::days(1);
+    let date_end = today + chrono::Duration::days(356 * 10);
 
     let proposal_payload = ProposalsPayload::new().with_date_range(date_start, date_end);
 
@@ -151,10 +151,10 @@ pub async fn run_shut(mut shutdown: Shutdown) {
     dotenv().ok();
 
     let proposal_sleep = std::env::var("PROPOSAL_SLEEP")
-        .unwrap_or_else(|_| "100".to_string())
+        .unwrap_or_else(|_| "1000".to_string())
         .parse()
         .unwrap_or_else(|e| {
-            log::error!("Error parsing PROPOSAL_SLEEP: {e}. Using default value of 10 seconds.");
+            log::error!("Error parsing PROPOSAL_SLEEP: {e}. Using default value of 1000 seconds.");
             100
         });
 
