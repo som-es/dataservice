@@ -14,7 +14,7 @@ use utoipa::ToSchema;
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    Queryable, Selectable, Identifiable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize,
+    Queryable, Selectable, Identifiable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset
 )]
 #[diesel(table_name = proposals)]
 pub struct DbProposal {

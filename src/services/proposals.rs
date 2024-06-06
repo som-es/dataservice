@@ -2,7 +2,7 @@ use diesel::RunQueryDsl;
 use dotenvy::dotenv;
 use scraper::{
     proposals::{Proposal, ProposalScraper, ProposalsPayload},
-    AustriaScraper,
+    AustriaScraper, Fetch,
 };
 
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
 
 use super::scrape_untill_success;
 
-async fn scrape_new_proposals(prev_proposals: &[Proposal]) -> crate::Result<Vec<Proposal>> {
+async fn scrape_new_proposals() -> crate::Result<Vec<Proposal>> {
     let scraper = AustriaScraper::default();
 
     let today = chrono::Local::now().date_naive();
@@ -32,9 +32,6 @@ async fn scrape_new_proposals(prev_proposals: &[Proposal]) -> crate::Result<Vec<
         let Ok(proposal) = scraper.get_proposal(&proposal_path).await else {
             continue;
         };
-        if prev_proposals.contains(&proposal) {
-            continue;
-        }
 
         let documents = proposal.documents.clone();
         tokio::task::spawn_blocking(|| {
@@ -69,7 +66,8 @@ fn update_proposals_in_db(new_proposals: &[Proposal]) {
         if let Err(e) = diesel::insert_into(proposals::table)
             .values(&db_proposal)
             .on_conflict(proposals::id)
-            .do_nothing()
+            .do_update()
+            .set(&db_proposal)
             .execute(&mut conn)
         {
             log::error!("Error inserting proposal into database: '{e}'. The following proposal was not inserted: {proposal:?}");
@@ -120,11 +118,11 @@ pub struct PropInit {}
 
 pub async fn proposals_once2() {}
 
-async fn proposals_once(prev_proposals: &[Proposal]) -> Vec<Proposal> {
+async fn proposals_once() -> Vec<Proposal> {
     log::info!("Scraping new proposals...");
 
     let new_proposals = scrape_untill_success::<Vec<Proposal>, _>(|| async {
-        scrape_new_proposals(&prev_proposals).await
+        scrape_new_proposals().await
     })
     .await;
     update_proposals_in_db(&new_proposals);
@@ -132,36 +130,16 @@ async fn proposals_once(prev_proposals: &[Proposal]) -> Vec<Proposal> {
     new_proposals
 }
 
-pub async fn run() {
-    let mut prev_proposals = Vec::new();
-
-    let start_date = today();
-
-    loop {
-        prev_proposals.extend(proposals_once(&prev_proposals).await);
-
-        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-
-        if today() > start_date {
-            prev_proposals.clear();
-        }
-    }
-}
-
 pub async fn run_shut(mut shutdown: Shutdown) {
     dotenv().ok();
 
     let proposal_sleep = std::env::var("PROPOSAL_SLEEP")
-        .unwrap_or_else(|_| "10".to_string())
+        .unwrap_or_else(|_| "100".to_string())
         .parse()
         .unwrap_or_else(|e| {
             log::error!("Error parsing PROPOSAL_SLEEP: {e}. Using default value of 10 seconds.");
-            10
+            100
         });
-
-    let mut prev_proposals = Vec::new();
-
-    let start_date = today();
 
     while !shutdown.is_shutdown() {
         tokio::select! {
@@ -171,13 +149,9 @@ pub async fn run_shut(mut shutdown: Shutdown) {
                 break;
             }
             _ = async {
-                prev_proposals.extend(proposals_once(&prev_proposals).await);
+                proposals_once().await;
                 log::info!("Sleeping for {proposal_sleep} seconds.");
                 tokio::time::sleep(tokio::time::Duration::from_secs(proposal_sleep)).await;
-
-                if today() > start_date {
-                    prev_proposals.clear();
-                }
             } => {}
         }
     }

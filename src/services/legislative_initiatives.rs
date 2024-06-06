@@ -8,7 +8,7 @@ use crate::{
     Shutdown,
 };
 
-async fn scrape_new_legis_inits(
+pub async fn scrape_new_legis_inits(
     scraper: &AustriaScraper,
 ) -> crate::Result<Vec<LegislativeInitiative>> {
     let legis_inits = scraper.post_legis_payload().await?;
@@ -32,7 +32,7 @@ async fn scrape_new_legis_inits(
     Ok(new_legis_inits)
 }
 
-async fn legis_init_once() -> Vec<LegislativeInitiative> {
+async fn legis_init_once(only_latest: bool) -> Vec<LegislativeInitiative> {
     log::info!("Try scraping legislative initiatives");
     let mut scraper = AustriaScraper::default();
 
@@ -46,6 +46,9 @@ async fn legis_init_once() -> Vec<LegislativeInitiative> {
         .await;
 
         update_legis_inits_in_db(&new_legis_inits);
+        if only_latest {
+            break
+        }
     }
 
     // new_legis_inits
@@ -167,13 +170,45 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
     }
 }
 
-pub async fn run_shut(mut shutdown: Shutdown) {
+pub async fn run_shut_latest_gp(mut shutdown: Shutdown) {
+    let legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP_LATEST")
+        .unwrap_or_else(|_| "50".to_string())
+        .parse()
+        .unwrap_or_else(|e| {
+            log::warn!(
+                "Could not parse LEGISLATIVE_INITIATIVE_SLEEP_LATEST env var: {e}. Using default value of 50 seconds"
+            );
+            50
+        });
+    while !shutdown.is_shutdown() {
+        tokio::select! {
+            _ = shutdown.recv() => {
+                println!("shutting down");
+                // return ok?
+                break;
+            }
+            _ = async {
+                if let Err(e) = tokio::task::spawn(async move {
+                    log::info!("Starting legislative initiative (latest) scraper");
+                    legis_init_once(true).await;
+                }).await {
+                    log::error!("Error in legislative initiative (latest) scraper: {:?}", e);
+                }
+                // legis_init_once().await;
+                log::info!("Legislative initiative (latest) scraper service sleeps for {legis_init_sleep} seconds...");
+                tokio::time::sleep(tokio::time::Duration::from_secs(legis_init_sleep)).await;
+            } => {}
+        }
+    }
+}
+
+pub async fn run_shut_every_gp(mut shutdown: Shutdown) {
     let legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP")
         .unwrap_or_else(|_| "1000".to_string())
         .parse()
         .unwrap_or_else(|e| {
             log::warn!(
-                "Could not parse PLENAR_SLEEP env var: {e}. Using default value of 1000 seconds"
+                "Could not parse LEGISLATIVE_INITIATIVE_SLEEP env var: {e}. Using default value of 1000 seconds"
             );
             1000
         });
@@ -188,7 +223,7 @@ pub async fn run_shut(mut shutdown: Shutdown) {
             _ = async {
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative scraper");
-                    legis_init_once().await;
+                    legis_init_once(false).await;
                 }).await {
                     log::error!("Error in legislative initiative scraper: {:?}", e);
                 }
@@ -203,10 +238,20 @@ pub async fn run_shut(mut shutdown: Shutdown) {
 #[cfg(test)]
 mod tests {
     use chrono::NaiveDateTime;
+    use scraper::AustriaScraper;
 
     #[test]
     fn test_date_time_parse() {
         let x = NaiveDateTime::parse_from_str("2014-5-17T12:34:56", "%Y-%m-%dT%H:%M:%S").unwrap();
         println!("x: {x:?}");
+    }
+
+    #[tokio::test]
+    async fn test_legis_init_empty_gp_scrape() {
+        let mut scraper: AustriaScraper = AustriaScraper::default();
+        // println!("s: {:?}", scraper.scrape_info.gp);
+
+        // let out = crate::legislative_initiatives::scrape_new_legis_inits(&scraper).await.unwrap();
+        // println!("out: {out:?}");
     }
 }

@@ -154,6 +154,10 @@ async fn insert_plenar_speech(
         .do_update()
         .set(&db_plenar_speech)
         .execute(conn)?;
+
+    for url in &plenar_speech.spoken_text_html_urls {
+        
+    }
     {
         use crate::db::schema::plenar_speeches::dsl::plenar_speeches;
         use crate::db::schema::plenar_speeches::{debate_id, delegate_id, spoken_text};

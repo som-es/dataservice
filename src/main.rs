@@ -25,7 +25,10 @@ pub async fn run_services(state: &State) {
     }
     tokio::join!(
         // services::proposals::run(),
-        services::legislative_initiatives::run_shut(Shutdown::new(
+        services::legislative_initiatives::run_shut_every_gp(Shutdown::new(
+            state.notify_shutdown.subscribe()
+        )),
+        services::legislative_initiatives::run_shut_latest_gp(Shutdown::new(
             state.notify_shutdown.subscribe()
         )),
         services::proposals::run_shut(Shutdown::new(state.notify_shutdown.subscribe())),
