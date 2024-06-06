@@ -114,7 +114,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    plenar_speeches (id, delegate_id, debate_id) {
+    plenar_speeches (id) {
         id -> Int4,
         delegate_id -> Int4,
         debate_id -> Int4,
