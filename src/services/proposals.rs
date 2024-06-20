@@ -1,5 +1,6 @@
 use diesel::RunQueryDsl;
 use dotenvy::dotenv;
+use log::error;
 use scraper::{
     proposals::{Proposal, ProposalScraper, ProposalsPayload},
     AustriaScraper, Fetch,
@@ -15,9 +16,9 @@ async fn scrape_new_proposals() -> crate::Result<Vec<Proposal>> {
     let scraper = AustriaScraper::default();
 
     let today = chrono::Local::now().date_naive();
-    // let date_start = today - chrono::Duration::days(365);
-    let date_start = today;
-    let date_end = today + chrono::Duration::days(356 * 10);
+    let date_start = today - chrono::Duration::days(365 * 10);
+    // let date_start = today;
+    let date_end = today;
 
     let proposal_payload = ProposalsPayload::new().with_date_range(date_start, date_end);
 
@@ -29,6 +30,7 @@ async fn scrape_new_proposals() -> crate::Result<Vec<Proposal>> {
     for proposal_path in &proposal_paths {
         // skipping proposals that can't be processed right now
         let Ok(proposal) = scraper.get_proposal(&proposal_path).await else {
+            error!("CANNOT PROCESS {proposal_path}");
             continue;
         };
 
