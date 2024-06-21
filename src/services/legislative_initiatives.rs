@@ -47,7 +47,7 @@ async fn legis_init_once(only_latest: bool) -> Vec<LegislativeInitiative> {
 
         update_legis_inits_in_db(&new_legis_inits);
         if only_latest {
-            break
+            break;
         }
     }
 
@@ -156,10 +156,13 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
                 document_type: document.ftype.to_string(),
                 document_url: document.link.clone(),
             };
-            
+
             if let Err(e) = diesel::insert_into(legislative_documents::table)
                 .values(&legis_doc)
-                .on_conflict((legislative_documents::document_url, legislative_documents::legislative_initiatives_id))
+                .on_conflict((
+                    legislative_documents::document_url,
+                    legislative_documents::legislative_initiatives_id,
+                ))
                 .do_update()
                 .set(&legis_doc)
                 .execute(conn)

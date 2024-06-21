@@ -159,11 +159,14 @@ async fn insert_plenar_speech(
     for url in &plenar_speech.spoken_text_html_urls {
         let psl = DbPlenarSpeechLink {
             plenar_speech_id,
-            document_url: url.to_string()
+            document_url: url.to_string(),
         };
         diesel::insert_into(plenar_speech_links::table)
             .values(&psl)
-            .on_conflict((plenar_speech_links::plenar_speech_id, plenar_speech_links::document_url))
+            .on_conflict((
+                plenar_speech_links::plenar_speech_id,
+                plenar_speech_links::document_url,
+            ))
             .do_nothing()
             .execute(conn)?;
     }

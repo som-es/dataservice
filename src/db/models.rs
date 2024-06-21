@@ -2,11 +2,14 @@ use chrono::{NaiveDate, NaiveDateTime};
 use diesel::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::{db::schema::{parties, topics}, schema::{plenar_speech_links, proposal_documents}};
+use crate::{
+    db::schema::{parties, topics},
+    schema::{plenar_speech_links, proposal_documents},
+};
 
 use super::schema::{
-    call_to_order, contacts, debates, delegates, legislative_initiatives, mandates, plenar_infos,
-    plenar_speeches, proposal_delegates, proposals, speeches, votes, legislative_documents
+    call_to_order, contacts, debates, delegates, legislative_documents, legislative_initiatives,
+    mandates, plenar_infos, plenar_speeches, proposal_delegates, proposals, speeches, votes,
 };
 
 #[cfg(feature = "utoipa")]
@@ -14,7 +17,16 @@ use utoipa::ToSchema;
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    Queryable, Selectable, Identifiable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset
+    Queryable,
+    Selectable,
+    Identifiable,
+    PartialEq,
+    Debug,
+    Clone,
+    Insertable,
+    Serialize,
+    Deserialize,
+    AsChangeset,
 )]
 #[diesel(table_name = proposals)]
 pub struct DbProposal {
@@ -121,7 +133,16 @@ pub struct DbLegislativeInitiativeQuery {
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    Queryable, Identifiable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset
+    Queryable,
+    Identifiable,
+    Selectable,
+    PartialEq,
+    Debug,
+    Clone,
+    Insertable,
+    Serialize,
+    Deserialize,
+    AsChangeset,
 )]
 #[diesel(table_name = votes)]
 #[diesel(primary_key(party, legislative_initiatives_id))]
@@ -134,7 +155,16 @@ pub struct DbVote {
 }
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    Queryable, Identifiable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset
+    Queryable,
+    Identifiable,
+    Selectable,
+    PartialEq,
+    Debug,
+    Clone,
+    Insertable,
+    Serialize,
+    Deserialize,
+    AsChangeset,
 )]
 #[diesel(table_name = speeches)]
 #[diesel(primary_key(delegate_id, legislative_initiatives_id))]
@@ -147,7 +177,9 @@ pub struct DbSpeech {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset)]
+#[derive(
+    Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
+)]
 #[diesel(table_name = topics)]
 #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
 pub struct DbTopic {
@@ -156,7 +188,9 @@ pub struct DbTopic {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset)]
+#[derive(
+    Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
+)]
 #[diesel(table_name = legislative_documents)]
 #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
 pub struct DbLegisDocument {
@@ -166,7 +200,9 @@ pub struct DbLegisDocument {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset)]
+#[derive(
+    Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
+)]
 #[diesel(table_name = proposal_documents)]
 #[diesel(belongs_to(DbProposal, foreign_key = proposal_id))]
 pub struct DbProposalDocument {
@@ -190,7 +226,9 @@ pub struct DbContactQuery {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(AsChangeset, Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize)]
+#[derive(
+    AsChangeset, Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize,
+)]
 #[diesel(table_name = contacts)]
 #[diesel(primary_key(id))]
 pub struct DbContact {
@@ -284,7 +322,7 @@ pub struct DbPlenarSpeech {
 #[diesel(primary_key(id, delegate_id, debate_id))]
 pub struct DbPlenarSpeechLink {
     pub plenar_speech_id: i32,
-    pub document_url: String
+    pub document_url: String,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

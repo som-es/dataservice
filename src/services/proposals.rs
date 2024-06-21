@@ -7,55 +7,40 @@ use scraper::{
 };
 
 use crate::{
-    models::{DbProposal, DbProposalDocument, ProposalDelegate}, schema::proposal_documents, today, Shutdown
+    models::{DbProposal, DbProposalDocument, ProposalDelegate},
+    schema::proposal_documents,
+    today, Shutdown,
 };
 
 use super::scrape_untill_success;
 
-async fn scrape_new_proposals() -> crate::Result<Vec<Proposal>> {
+async fn scrape_new_proposals() -> crate::Result<Vec<String>> {
     let scraper = AustriaScraper::default();
 
     let today = chrono::Local::now().date_naive();
-    let date_start = today - chrono::Duration::days(365 * 10);
+    let date_start = today - chrono::Duration::days(365 * 5);
     // let date_start = today;
     let date_end = today;
 
-    let proposal_payload = ProposalsPayload::new().with_date_range(date_start, date_end);
+    // let proposal_payload = ProposalsPayload::new().with_date_range(date_start, date_end);
+    let proposal_payload = ProposalsPayload::default();
 
     let proposals = scraper.post_proposals_payload(proposal_payload).await?;
     let proposal_paths = scraper.proposal_paths(proposals)?;
 
-    let mut new_proposals = Vec::new();
-
-    for proposal_path in &proposal_paths {
-        // skipping proposals that can't be processed right now
-        let Ok(proposal) = scraper.get_proposal(&proposal_path).await else {
-            error!("CANNOT PROCESS {proposal_path}");
-            continue;
-        };
-
-        let documents = proposal.documents.clone();
-        tokio::task::spawn_blocking(|| {
-            /*
-            for document in documents {
-                document
-                    .save(".", document.fetch(AustriaScraper::BASE_URL).unwrap())
-                    .unwrap();
-            }
-            */
-        })
-        .await?;
-
-        new_proposals.push(proposal);
-    }
-    Ok(new_proposals)
+    Ok(proposal_paths)
 }
 
-fn update_proposals_in_db(new_proposals: &[Proposal]) {
+async fn update_proposals_in_db(new_proposals_paths: &[String]) {
     let mut conn = crate::establish_connection();
     use crate::schema::proposals;
     log::info!("Updating proposals in database...");
-    for proposal in new_proposals {
+    let scraper = AustriaScraper::default();
+    for proposal_path in new_proposals_paths {
+        let Ok(proposal) = scraper.get_proposal(proposal_path).await else {
+            error!("CANNOT PROCESS {proposal_path}");
+            continue;
+        };
         let db_proposal = DbProposal {
             id: proposal.id.clone(),
             title: proposal.title.clone(),
@@ -81,10 +66,13 @@ fn update_proposals_in_db(new_proposals: &[Proposal]) {
                 document_type: document.ftype.to_string(),
                 document_url: document.link.clone(),
             };
-            
+
             if let Err(e) = diesel::insert_into(proposal_documents::table)
                 .values(&legis_doc)
-                .on_conflict((proposal_documents::document_url, proposal_documents::proposal_id))
+                .on_conflict((
+                    proposal_documents::document_url,
+                    proposal_documents::proposal_id,
+                ))
                 .do_update()
                 .set(&legis_doc)
                 .execute(&mut conn)
@@ -137,16 +125,12 @@ pub struct PropInit {}
 
 pub async fn proposals_once2() {}
 
-async fn proposals_once() -> Vec<Proposal> {
+async fn proposals_once() {
     log::info!("Scraping new proposals...");
 
-    let new_proposals = scrape_untill_success::<Vec<Proposal>, _>(|| async {
-        scrape_new_proposals().await
-    })
-    .await;
-    update_proposals_in_db(&new_proposals);
-
-    new_proposals
+    let new_proposals =
+        scrape_untill_success::<Vec<String>, _>(|| async { scrape_new_proposals().await }).await;
+    update_proposals_in_db(&new_proposals).await;
 }
 
 pub async fn run_shut(mut shutdown: Shutdown) {

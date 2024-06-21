@@ -64,8 +64,8 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
             .do_update()
             .set(&db_contact)
             .execute(&mut conn)
-            // .returning(contacts::id)
-            // .get_result::<i32>(&mut conn)
+        // .returning(contacts::id)
+        // .get_result::<i32>(&mut conn)
         {
             log::error!("Error inserting contact information for delegate {delegate:?}: {e}");
         };
