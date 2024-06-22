@@ -4,7 +4,7 @@ use serde_derive::{Deserialize, Serialize};
 
 use crate::{
     db::schema::{parties, topics},
-    schema::{plenar_speech_links, proposal_documents},
+    schema::{eurovoc_topics, other_keyword_topics, plenar_speech_links, proposal_documents},
 };
 
 use super::schema::{
@@ -183,6 +183,28 @@ pub struct DbSpeech {
 #[diesel(table_name = topics)]
 #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
 pub struct DbTopic {
+    pub topic: String,
+    pub legislative_initiatives_id: i32,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(
+    Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
+)]
+#[diesel(table_name = eurovoc_topics)]
+#[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
+pub struct DbEurovocTopic {
+    pub topic: String,
+    pub legislative_initiatives_id: i32,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(
+    Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
+)]
+#[diesel(table_name = other_keyword_topics)]
+#[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
+pub struct DbOtherKeywordTopic {
     pub topic: String,
     pub legislative_initiatives_id: i32,
 }

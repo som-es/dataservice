@@ -2,8 +2,8 @@ use diesel::{ExpressionMethods, RunQueryDsl};
 use scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative, Opinion};
 
 use crate::{
-    models::{DbLegisDocument, DbLegislativeInitiative, DbSpeech, DbTopic, DbVote},
-    schema::{legislative_documents, legislative_initiatives, speeches, topics, votes},
+    models::{DbEurovocTopic, DbLegisDocument, DbLegislativeInitiative, DbOtherKeywordTopic, DbSpeech, DbTopic, DbVote},
+    schema::{eurovoc_topics, legislative_documents, legislative_initiatives, other_keyword_topics, speeches, topics, votes},
     services::scrape_untill_success,
     Shutdown,
 };
@@ -150,6 +150,41 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
                 log::error!("Error inserting topic: '{e}'. The error occured for the following topic: {topic:?}")
             }
         }
+        
+        for topic in legis_init.eurovoc_topics.clone() {
+            let topic = DbEurovocTopic {
+                topic,
+                legislative_initiatives_id: legis_init_id,
+            };
+
+            if let Err(e) = diesel::insert_into(eurovoc_topics::table)
+                .values(&topic)
+                .on_conflict((eurovoc_topics::legislative_initiatives_id, eurovoc_topics::topic))
+                .do_update()
+                .set(&topic)
+                .execute(conn)
+            {
+                log::error!("Error inserting topic: '{e}'. The error occured for the following eurovoc topic: {topic:?}")
+            }
+        }
+
+        for topic in legis_init.other_keyword_topics.clone() {
+            let topic = DbOtherKeywordTopic {
+                topic,
+                legislative_initiatives_id: legis_init_id,
+            };
+
+            if let Err(e) = diesel::insert_into(other_keyword_topics::table)
+                .values(&topic)
+                .on_conflict((other_keyword_topics::legislative_initiatives_id, other_keyword_topics::topic))
+                .do_update()
+                .set(&topic)
+                .execute(conn)
+            {
+                log::error!("Error inserting topic: '{e}'. The error occured for the following other keyword topic: {topic:?}")
+            }
+        }
+
         for document in &legis_init.documents {
             let legis_doc = DbLegisDocument {
                 legislative_initiatives_id: legis_init_id,

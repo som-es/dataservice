@@ -61,6 +61,23 @@ diesel::table! {
 }
 
 diesel::table! {
+    emphasis_dataset (id) {
+        id -> Int4,
+        instruction -> Varchar,
+        input -> Text,
+        output -> Text,
+    }
+}
+
+diesel::table! {
+    eurovoc_topics (id) {
+        id -> Int4,
+        topic -> Varchar,
+        legislative_initiatives_id -> Int4,
+    }
+}
+
+diesel::table! {
     legislative_documents (id) {
         id -> Int4,
         legislative_initiatives_id -> Int4,
@@ -91,6 +108,14 @@ diesel::table! {
         party -> Nullable<Varchar>,
         start_date -> Date,
         end_date -> Nullable<Date>,
+    }
+}
+
+diesel::table! {
+    other_keyword_topics (id) {
+        id -> Int4,
+        topic -> Varchar,
+        legislative_initiatives_id -> Int4,
     }
 }
 
@@ -215,8 +240,10 @@ diesel::joinable!(call_to_order -> delegates (receiver_id));
 diesel::joinable!(call_to_order -> plenar_infos (plenar_id));
 diesel::joinable!(debates -> plenar_infos (plenar_id));
 diesel::joinable!(delegates -> contacts (id));
+diesel::joinable!(eurovoc_topics -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(legislative_documents -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(mandates -> delegates (delegate_id));
+diesel::joinable!(other_keyword_topics -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(plenar_speech_links -> plenar_speeches (plenar_speech_id));
 diesel::joinable!(plenar_speeches -> debates (debate_id));
 diesel::joinable!(plenar_speeches -> delegates (delegate_id));
@@ -236,9 +263,12 @@ diesel::allow_tables_to_appear_in_same_query!(
     contacts,
     debates,
     delegates,
+    emphasis_dataset,
+    eurovoc_topics,
     legislative_documents,
     legislative_initiatives,
     mandates,
+    other_keyword_topics,
     parties,
     plenar_infos,
     plenar_speech_links,
