@@ -2,14 +2,10 @@ use chrono::{NaiveDate, NaiveDateTime};
 use diesel::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::{
-    db::schema::{parties, topics},
-    schema::{eurovoc_topics, other_keyword_topics, plenar_speech_links, proposal_documents},
-};
-
 use super::schema::{
     call_to_order, contacts, debates, delegates, legislative_documents, legislative_initiatives,
     mandates, plenar_infos, plenar_speeches, proposal_delegates, proposals, speeches, votes,
+    eurovoc_topics, other_keyword_topics, plenar_speech_links, proposal_documents, parties, topics
 };
 
 #[cfg(feature = "utoipa")]
