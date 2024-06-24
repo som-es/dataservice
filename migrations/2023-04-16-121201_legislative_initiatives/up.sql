@@ -10,5 +10,6 @@ create table legislative_initiatives (
     description text not null,
     accepted boolean,
     created_at date not null default now(),
+    created_at timestamptz,
     UNIQUE (inr, ityp, gp)
 );
