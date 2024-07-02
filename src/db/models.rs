@@ -44,6 +44,7 @@ pub struct DbProposalQuery {
     pub title: String,
     pub description: String,
     pub created_at: NaiveDateTime,
+    pub updated_at: Option<NaiveDateTime>,
 }
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
@@ -129,6 +130,8 @@ pub struct DbLegislativeInitiativeQuery {
     pub description: String,
     pub accepted: Option<bool>,
     pub created_at: NaiveDate,
+    pub appeared_at: Option<NaiveDateTime>,
+    pub updated_at: Option<NaiveDateTime>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

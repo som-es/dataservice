@@ -187,7 +187,7 @@ diesel::table! {
         title -> Text,
         description -> Text,
         created_at -> Timestamptz,
-        updated_at -> Timestamptz,
+        updated_at -> Nullable<Timestamptz>,
     }
 }
 
