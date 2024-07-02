@@ -6,5 +6,5 @@ create table proposals (
     title text not null,
     description text not null,
     created_at timestamptz not null,
-    updated_at timestamptz,
+    updated_at timestamptz
 );

@@ -7,5 +7,5 @@ create table mandates (
     start_date date not null,
     end_date date,
     FOREIGN KEY (delegate_id) REFERENCES delegates(id),
-    UNIQUE (delegate_id, name, start_date, party)
+    UNIQUE (delegate_id, name, start_date)
 );

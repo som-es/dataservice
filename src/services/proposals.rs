@@ -31,6 +31,21 @@ async fn scrape_new_proposals() -> crate::Result<Vec<String>> {
     Ok(proposal_paths)
 }
 
+async fn scrape_new_proposals_last_5_days() -> crate::Result<Vec<String>> {
+    let scraper = AustriaScraper::default();
+
+    let today = chrono::Local::now().date_naive();
+    let date_start = today - chrono::Duration::days(5);
+    let date_end = today;
+
+    let proposal_payload = ProposalsPayload::new().with_date_range(date_start, date_end);
+
+    let proposals = scraper.post_proposals_payload(proposal_payload).await?;
+    let proposal_paths = scraper.proposal_paths(proposals)?;
+
+    Ok(proposal_paths)
+}
+
 async fn update_proposals_in_db(new_proposals_paths: &[String]) {
     let mut conn = crate::establish_connection();
     use crate::schema::proposals;
@@ -136,7 +151,15 @@ async fn proposals_once() {
     update_proposals_in_db(&new_proposals).await;
 }
 
-pub async fn run_shut(mut shutdown: Shutdown) {
+async fn proposals_once_last_5_days() {
+    log::info!("Scraping new last 5 days proposals...");
+
+    let new_proposals =
+        scrape_untill_success::<Vec<String>, _>(|| async { scrape_new_proposals_last_5_days().await }).await;
+    update_proposals_in_db(&new_proposals).await;
+}
+
+pub async fn run_shut_last_5_days(mut shutdown: Shutdown) {
     dotenv().ok();
 
     let proposal_sleep = std::env::var("PROPOSAL_SLEEP")
@@ -147,6 +170,33 @@ pub async fn run_shut(mut shutdown: Shutdown) {
             100
         });
 
+    while !shutdown.is_shutdown() {
+        tokio::select! {
+            _ = shutdown.recv() => {
+                println!("shutting down");
+                // return ok?
+                break;
+            }
+            _ = async {
+                proposals_once_last_5_days().await;
+                log::info!("Sleeping for {proposal_sleep} seconds (last 5 days).");
+                tokio::time::sleep(tokio::time::Duration::from_secs(proposal_sleep)).await;
+            } => {}
+        }
+    }
+}
+
+pub async fn run_shut(mut shutdown: Shutdown) {
+    dotenv().ok();
+
+    let proposal_sleep_days = std::env::var("FULL_PROPOSAL_SLEEP")
+        .unwrap_or_else(|_| "7".to_string())
+        .parse()
+        .unwrap_or_else(|e| {
+            log::error!("Error parsing FULL_PROPOSAL_SLEEP: {e}. Using default value of 7 days.");
+            7
+        });
+    let proposal_sleep = proposal_sleep_days * 24 * 60 * 60;
     while !shutdown.is_shutdown() {
         tokio::select! {
             _ = shutdown.recv() => {
