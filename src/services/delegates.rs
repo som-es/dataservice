@@ -123,7 +123,6 @@ pub fn insert_mandate(
             mandates::delegate_id,
             mandates::name,
             mandates::start_date,
-            mandates::party,
         ))
         .do_update()
         .set(&db_mandate)

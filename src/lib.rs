@@ -6,6 +6,7 @@ pub mod services;
 #[cfg(feature = "runner")]
 pub mod shutdown;
 
+use dotenv_codegen::dotenv;
 #[cfg(feature = "runner")]
 pub use services::*;
 
@@ -15,6 +16,10 @@ use chrono::NaiveDate;
 pub use db::*;
 #[cfg(feature = "runner")]
 pub use shutdown::*;
+
+pub mod with_data;
+
+pub const DATABASE_URL: &str = dotenv!("DATABASE_URL");
 
 #[cfg(feature = "runner")]
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
