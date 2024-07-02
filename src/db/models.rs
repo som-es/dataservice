@@ -31,6 +31,8 @@ pub struct DbProposal {
     pub gp: String,
     pub title: String,
     pub description: String,
+    pub created_at: NaiveDateTime,
+    pub updated_at: Option<NaiveDateTime>,
 }
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Queryable, Selectable, Identifiable, PartialEq, Debug, Clone, Serialize, Deserialize)]
@@ -108,6 +110,8 @@ pub struct DbLegislativeInitiative {
     pub description: String,
     pub accepted: Option<bool>,
     pub created_at: NaiveDate,
+    pub appeared_at: Option<NaiveDateTime>,
+    pub updated_at: Option<NaiveDateTime>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
@@ -212,6 +216,7 @@ pub struct DbOtherKeywordTopic {
 #[diesel(table_name = legislative_documents)]
 #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
 pub struct DbLegisDocument {
+    pub title: String,
     pub document_type: String,
     pub document_url: String,
     pub legislative_initiatives_id: i32,
@@ -224,6 +229,7 @@ pub struct DbLegisDocument {
 #[diesel(table_name = proposal_documents)]
 #[diesel(belongs_to(DbProposal, foreign_key = proposal_id))]
 pub struct DbProposalDocument {
+    pub title: String,
     pub document_type: String,
     pub document_url: String,
     pub proposal_id: String,

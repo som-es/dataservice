@@ -47,6 +47,8 @@ async fn update_proposals_in_db(new_proposals_paths: &[String]) {
             description: proposal.description.clone(),
             ityp: proposal.ityp.clone(),
             gp: proposal.gp.clone(),
+            created_at: proposal.created_at,
+            updated_at: proposal.updated_at
         };
 
         if let Err(e) = diesel::insert_into(proposals::table)
@@ -63,6 +65,7 @@ async fn update_proposals_in_db(new_proposals_paths: &[String]) {
         for document in &proposal.documents {
             let legis_doc = DbProposalDocument {
                 proposal_id: proposal.id.clone(),
+                title: document.title.clone(),
                 document_type: document.ftype.to_string(),
                 document_url: document.link.clone(),
             };

@@ -80,6 +80,7 @@ diesel::table! {
 diesel::table! {
     legislative_documents (id) {
         id -> Int4,
+        title -> Varchar,
         legislative_initiatives_id -> Int4,
         document_type -> Varchar,
         document_url -> Varchar,
@@ -97,6 +98,8 @@ diesel::table! {
         description -> Text,
         accepted -> Nullable<Bool>,
         created_at -> Date,
+        appeared_at -> Nullable<Timestamptz>,
+        updated_at -> Nullable<Timestamptz>,
     }
 }
 
@@ -169,6 +172,7 @@ diesel::table! {
 diesel::table! {
     proposal_documents (id) {
         id -> Int4,
+        title -> Varchar,
         proposal_id -> Nullable<Varchar>,
         document_type -> Varchar,
         document_url -> Varchar,
@@ -183,6 +187,7 @@ diesel::table! {
         title -> Text,
         description -> Text,
         created_at -> Timestamptz,
+        updated_at -> Timestamptz,
     }
 }
 

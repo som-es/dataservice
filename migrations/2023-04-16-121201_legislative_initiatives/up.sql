@@ -11,7 +11,7 @@ create table legislative_initiatives (
     accepted boolean,
     -- rename this to handled_at
     created_at date not null default now(),
-    -- created_at timestamptz not null,
+    appeared_at timestamptz,
     updated_at timestamptz,
     UNIQUE (inr, ityp, gp)
 );

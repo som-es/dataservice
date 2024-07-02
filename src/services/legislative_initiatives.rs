@@ -69,6 +69,8 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
             gp: legis_init.gp.clone(),
             accepted: legis_init.accepted,
             created_at: legis_init.date,
+            appeared_at: Some(legis_init.created_at),
+            updated_at: legis_init.updated_at,
         };
 
         let legis_init_id = match diesel::insert_into(legislative_initiatives::table)
@@ -188,6 +190,7 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
         for document in &legis_init.documents {
             let legis_doc = DbLegisDocument {
                 legislative_initiatives_id: legis_init_id,
+                title: document.title.clone(),
                 document_type: document.ftype.to_string(),
                 document_url: document.link.clone(),
             };
