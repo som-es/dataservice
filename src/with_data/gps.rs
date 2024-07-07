@@ -2,8 +2,8 @@ use chrono::NaiveDate;
 use sqlx::PgPool;
 
 pub struct LegislativePeriod {
-    pub gp: String, 
-    pub start_date: NaiveDate
+    pub gp: String,
+    pub start_date: NaiveDate,
 }
 
 pub async fn gps(pg: &PgPool) -> Result<Vec<LegislativePeriod>, Box<dyn std::error::Error>> {
@@ -13,13 +13,16 @@ pub async fn gps(pg: &PgPool) -> Result<Vec<LegislativePeriod>, Box<dyn std::err
             GROUP BY gp 
             HAVING COUNT(*) > 1
             ORDER BY start_date desc
-        " 
-    ).fetch_all(pg).await?.into_iter().map(|gp| {
-        LegislativePeriod {
-            gp: gp.gp,
-            start_date: gp.start_date.unwrap().naive_utc().date()
-        }
-    }).collect())
+        "
+    )
+    .fetch_all(pg)
+    .await?
+    .into_iter()
+    .map(|gp| LegislativePeriod {
+        gp: gp.gp,
+        start_date: gp.start_date.unwrap().naive_utc().date(),
+    })
+    .collect())
 }
 
 #[cfg(test)]

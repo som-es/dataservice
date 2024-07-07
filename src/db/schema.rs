@@ -61,16 +61,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    emphasis_dataset (id) {
-        id -> Int4,
-        instruction -> Varchar,
-        input -> Text,
-        output -> Text,
-    }
-}
-
-diesel::table! {
-    eurovoc_topics (id) {
+    eurovoc_topics_legis_init (id) {
         id -> Int4,
         topic -> Varchar,
         legislative_initiatives_id -> Int4,
@@ -78,10 +69,26 @@ diesel::table! {
 }
 
 diesel::table! {
+    eurovoc_topics_ministrial_proposals (id) {
+        id -> Int4,
+        topic -> Varchar,
+        ministrial_proposal_id -> Int4,
+    }
+}
+
+diesel::table! {
+    eurovoc_topics_proposals (id) {
+        id -> Int4,
+        topic -> Varchar,
+        proposals_id -> Varchar,
+    }
+}
+
+diesel::table! {
     legislative_documents (id) {
         id -> Int4,
-        title -> Varchar,
         legislative_initiatives_id -> Int4,
+        title -> Nullable<Varchar>,
         document_type -> Varchar,
         document_url -> Varchar,
     }
@@ -115,10 +122,56 @@ diesel::table! {
 }
 
 diesel::table! {
-    other_keyword_topics (id) {
+    ministrial_proposals (id) {
+        id -> Int4,
+        ityp -> Varchar,
+        gp -> Varchar,
+        inr -> Int4,
+        emphasis -> Nullable<Varchar>,
+        title -> Text,
+        description -> Text,
+        created_at -> Date,
+        updated_at -> Nullable<Timestamptz>,
+        due_to -> Date,
+        ressort -> Nullable<Varchar>,
+        ressort_shortform -> Nullable<Varchar>,
+        legis_init_gp -> Nullable<Varchar>,
+        legis_init_inr -> Nullable<Int4>,
+        legis_init_ityp -> Nullable<Varchar>,
+    }
+}
+
+diesel::table! {
+    ministrial_proposals_documents (id) {
+        id -> Int4,
+        ministrial_proposal_id -> Int4,
+        title -> Nullable<Varchar>,
+        document_type -> Varchar,
+        document_url -> Varchar,
+    }
+}
+
+diesel::table! {
+    other_keyword_topics_legis_init (id) {
         id -> Int4,
         topic -> Varchar,
         legislative_initiatives_id -> Int4,
+    }
+}
+
+diesel::table! {
+    other_keyword_topics_ministrial_proposals (id) {
+        id -> Int4,
+        topic -> Varchar,
+        ministrial_proposal_id -> Int4,
+    }
+}
+
+diesel::table! {
+    other_keyword_topics_proposals (id) {
+        id -> Int4,
+        topic -> Varchar,
+        proposals_id -> Varchar,
     }
 }
 
@@ -172,8 +225,8 @@ diesel::table! {
 diesel::table! {
     proposal_documents (id) {
         id -> Int4,
-        title -> Varchar,
         proposal_id -> Nullable<Varchar>,
+        title -> Nullable<Varchar>,
         document_type -> Varchar,
         document_url -> Varchar,
     }
@@ -215,10 +268,26 @@ diesel::table! {
 }
 
 diesel::table! {
-    topics (id) {
+    topics_legis_init (id) {
         id -> Int4,
         topic -> Varchar,
         legislative_initiatives_id -> Int4,
+    }
+}
+
+diesel::table! {
+    topics_ministrial_proposals (id) {
+        id -> Int4,
+        topic -> Varchar,
+        ministrial_proposal_id -> Int4,
+    }
+}
+
+diesel::table! {
+    topics_proposals (id) {
+        id -> Int4,
+        topic -> Varchar,
+        proposals_id -> Varchar,
     }
 }
 
@@ -245,10 +314,15 @@ diesel::joinable!(call_to_order -> delegates (receiver_id));
 diesel::joinable!(call_to_order -> plenar_infos (plenar_id));
 diesel::joinable!(debates -> plenar_infos (plenar_id));
 diesel::joinable!(delegates -> contacts (id));
-diesel::joinable!(eurovoc_topics -> legislative_initiatives (legislative_initiatives_id));
+diesel::joinable!(eurovoc_topics_legis_init -> legislative_initiatives (legislative_initiatives_id));
+diesel::joinable!(eurovoc_topics_ministrial_proposals -> ministrial_proposals (ministrial_proposal_id));
+diesel::joinable!(eurovoc_topics_proposals -> proposals (proposals_id));
 diesel::joinable!(legislative_documents -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(mandates -> delegates (delegate_id));
-diesel::joinable!(other_keyword_topics -> legislative_initiatives (legislative_initiatives_id));
+diesel::joinable!(ministrial_proposals_documents -> ministrial_proposals (ministrial_proposal_id));
+diesel::joinable!(other_keyword_topics_legis_init -> legislative_initiatives (legislative_initiatives_id));
+diesel::joinable!(other_keyword_topics_ministrial_proposals -> ministrial_proposals (ministrial_proposal_id));
+diesel::joinable!(other_keyword_topics_proposals -> proposals (proposals_id));
 diesel::joinable!(plenar_speech_links -> plenar_speeches (plenar_speech_id));
 diesel::joinable!(plenar_speeches -> debates (debate_id));
 diesel::joinable!(plenar_speeches -> delegates (delegate_id));
@@ -259,7 +333,9 @@ diesel::joinable!(questions -> delegates (delegate_id));
 diesel::joinable!(questions -> users (issuer_id));
 diesel::joinable!(speeches -> delegates (delegate_id));
 diesel::joinable!(speeches -> legislative_initiatives (legislative_initiatives_id));
-diesel::joinable!(topics -> legislative_initiatives (legislative_initiatives_id));
+diesel::joinable!(topics_legis_init -> legislative_initiatives (legislative_initiatives_id));
+diesel::joinable!(topics_ministrial_proposals -> ministrial_proposals (ministrial_proposal_id));
+diesel::joinable!(topics_proposals -> proposals (proposals_id));
 diesel::joinable!(votes -> legislative_initiatives (legislative_initiatives_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
@@ -268,12 +344,17 @@ diesel::allow_tables_to_appear_in_same_query!(
     contacts,
     debates,
     delegates,
-    emphasis_dataset,
-    eurovoc_topics,
+    eurovoc_topics_legis_init,
+    eurovoc_topics_ministrial_proposals,
+    eurovoc_topics_proposals,
     legislative_documents,
     legislative_initiatives,
     mandates,
-    other_keyword_topics,
+    ministrial_proposals,
+    ministrial_proposals_documents,
+    other_keyword_topics_legis_init,
+    other_keyword_topics_ministrial_proposals,
+    other_keyword_topics_proposals,
     parties,
     plenar_infos,
     plenar_speech_links,
@@ -283,7 +364,9 @@ diesel::allow_tables_to_appear_in_same_query!(
     proposals,
     questions,
     speeches,
-    topics,
+    topics_legis_init,
+    topics_ministrial_proposals,
+    topics_proposals,
     users,
     votes,
 );

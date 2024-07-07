@@ -2,7 +2,7 @@
 --  table other_keyword_topics;
 --  table eurovoc_topics;
 
-create table other_keyword_topics(
+create table other_keyword_topics_legis_init(
     id serial primary key,
     topic varchar(255) not null,
     legislative_initiatives_id int not null,
@@ -10,7 +10,7 @@ create table other_keyword_topics(
     UNIQUE (legislative_initiatives_id, topic)
 );
 
-create table eurovoc_topics(
+create table eurovoc_topics_legis_init(
     id serial primary key,
     topic varchar(255) not null,
     legislative_initiatives_id int not null,

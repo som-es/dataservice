@@ -1,4 +1,4 @@
-use diesel::RunQueryDsl;
+use diesel::{PgConnection, RunQueryDsl};
 use dotenvy::dotenv;
 use log::error;
 use scraper::{
@@ -7,8 +7,11 @@ use scraper::{
 };
 
 use crate::{
-    models::{DbProposal, DbProposalDocument, ProposalDelegate},
-    schema::proposal_documents,
+    models::{
+        DbEurovocTopicProposals, DbOtherKeywordTopicProposals, DbProposal, DbProposalDocument,
+        DbTopicProposals, ProposalDelegate,
+    },
+    schema::{eurovoc_topics_proposals, other_keyword_topics_proposals, proposal_documents, topics_proposals},
     today, Shutdown,
 };
 
@@ -63,7 +66,7 @@ async fn update_proposals_in_db(new_proposals_paths: &[String]) {
             ityp: proposal.ityp.clone(),
             gp: proposal.gp.clone(),
             created_at: proposal.created_at,
-            updated_at: proposal.updated_at
+            updated_at: proposal.updated_at,
         };
 
         if let Err(e) = diesel::insert_into(proposals::table)
@@ -112,6 +115,69 @@ async fn update_proposals_in_db(new_proposals_paths: &[String]) {
                 continue;
             }
         }
+        insert_topics(&mut conn, proposal);
+    }
+}
+
+fn insert_topics(conn: &mut PgConnection, proposal: Proposal) {
+    for topic in proposal.topics.clone() {
+        let topic = DbTopicProposals {
+            topic,
+            proposals_id: proposal.id.clone(),
+        };
+
+        if let Err(e) = diesel::insert_into(topics_proposals::table)
+            .values(&topic)
+            .on_conflict((
+                topics_proposals::proposals_id,
+                topics_proposals::topic,
+            ))
+            .do_update()
+            .set(&topic)
+            .execute(conn)
+        {
+            log::error!("Error inserting topic: '{e}'. The error occured for the following topic: {topic:?}")
+        }
+    }
+
+    for topic in proposal.eurovoc_topics.clone() {
+        let topic = DbEurovocTopicProposals {
+            topic,
+            proposals_id: proposal.id.clone(),
+        };
+
+        if let Err(e) = diesel::insert_into(eurovoc_topics_proposals::table)
+            .values(&topic)
+            .on_conflict((
+                eurovoc_topics_proposals::proposals_id,
+                eurovoc_topics_proposals::topic,
+            ))
+            .do_update()
+            .set(&topic)
+            .execute(conn)
+        {
+            log::error!("Error inserting topic: '{e}'. The error occured for the following eurovoc topic: {topic:?}")
+        }
+    }
+
+    for topic in proposal.other_keyword_topics.clone() {
+        let topic = DbOtherKeywordTopicProposals {
+            topic,
+            proposals_id: proposal.id.clone(),
+        };
+
+        if let Err(e) = diesel::insert_into(other_keyword_topics_proposals::table)
+            .values(&topic)
+            .on_conflict((
+                other_keyword_topics_proposals::proposals_id,
+                other_keyword_topics_proposals::topic,
+            ))
+            .do_update()
+            .set(&topic)
+            .execute(conn)
+        {
+            log::error!("Error inserting topic: '{e}'. The error occured for the following other keyword topic: {topic:?}")
+        }
     }
 }
 
@@ -154,8 +220,10 @@ async fn proposals_once() {
 async fn proposals_once_last_5_days() {
     log::info!("Scraping new last 5 days proposals...");
 
-    let new_proposals =
-        scrape_untill_success::<Vec<String>, _>(|| async { scrape_new_proposals_last_5_days().await }).await;
+    let new_proposals = scrape_untill_success::<Vec<String>, _>(|| async {
+        scrape_new_proposals_last_5_days().await
+    })
+    .await;
     update_proposals_in_db(&new_proposals).await;
 }
 

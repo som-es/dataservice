@@ -2,8 +2,14 @@ use diesel::{ExpressionMethods, RunQueryDsl};
 use scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative, Opinion};
 
 use crate::{
-    models::{DbEurovocTopic, DbLegisDocument, DbLegislativeInitiative, DbOtherKeywordTopic, DbSpeech, DbTopic, DbVote},
-    schema::{eurovoc_topics, legislative_documents, legislative_initiatives, other_keyword_topics, speeches, topics, votes},
+    models::{
+        DbEurovocTopicLegisInit, DbLegisDocument, DbLegislativeInitiative,
+        DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote,
+    },
+    schema::{
+        eurovoc_topics_legis_init, legislative_documents, legislative_initiatives,
+        other_keyword_topics_legis_init, speeches, topics_legis_init, votes,
+    },
     services::scrape_untill_success,
     Shutdown,
 };
@@ -137,14 +143,17 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
         }
 
         for topic in legis_init.topics.clone() {
-            let topic = DbTopic {
+            let topic = DbTopicLegisInit {
                 topic,
                 legislative_initiatives_id: legis_init_id,
             };
 
-            if let Err(e) = diesel::insert_into(topics::table)
+            if let Err(e) = diesel::insert_into(topics_legis_init::table)
                 .values(&topic)
-                .on_conflict((topics::legislative_initiatives_id, topics::topic))
+                .on_conflict((
+                    topics_legis_init::legislative_initiatives_id,
+                    topics_legis_init::topic,
+                ))
                 .do_update()
                 .set(&topic)
                 .execute(conn)
@@ -152,16 +161,19 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
                 log::error!("Error inserting topic: '{e}'. The error occured for the following topic: {topic:?}")
             }
         }
-        
+
         for topic in legis_init.eurovoc_topics.clone() {
-            let topic = DbEurovocTopic {
+            let topic = DbEurovocTopicLegisInit {
                 topic,
                 legislative_initiatives_id: legis_init_id,
             };
 
-            if let Err(e) = diesel::insert_into(eurovoc_topics::table)
+            if let Err(e) = diesel::insert_into(eurovoc_topics_legis_init::table)
                 .values(&topic)
-                .on_conflict((eurovoc_topics::legislative_initiatives_id, eurovoc_topics::topic))
+                .on_conflict((
+                    eurovoc_topics_legis_init::legislative_initiatives_id,
+                    eurovoc_topics_legis_init::topic,
+                ))
                 .do_update()
                 .set(&topic)
                 .execute(conn)
@@ -171,14 +183,17 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
         }
 
         for topic in legis_init.other_keyword_topics.clone() {
-            let topic = DbOtherKeywordTopic {
+            let topic = DbOtherKeywordTopicLegisInit {
                 topic,
                 legislative_initiatives_id: legis_init_id,
             };
 
-            if let Err(e) = diesel::insert_into(other_keyword_topics::table)
+            if let Err(e) = diesel::insert_into(other_keyword_topics_legis_init::table)
                 .values(&topic)
-                .on_conflict((other_keyword_topics::legislative_initiatives_id, other_keyword_topics::topic))
+                .on_conflict((
+                    other_keyword_topics_legis_init::legislative_initiatives_id,
+                    other_keyword_topics_legis_init::topic,
+                ))
                 .do_update()
                 .set(&topic)
                 .execute(conn)

@@ -5,7 +5,7 @@ create table legislative_initiatives (
     ityp varchar(7) not null,
     gp varchar(7) not null,
     inr int not null,
-    emphasis varchar(4000),
+    emphasis varchar(6000),
     title text not null,
     description text not null,
     accepted boolean,

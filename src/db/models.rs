@@ -3,9 +3,12 @@ use diesel::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 
 use super::schema::{
-    call_to_order, contacts, debates, delegates, legislative_documents, legislative_initiatives,
-    mandates, plenar_infos, plenar_speeches, proposal_delegates, proposals, speeches, votes,
-    eurovoc_topics, other_keyword_topics, plenar_speech_links, proposal_documents, parties, topics
+    call_to_order, contacts, debates, delegates, eurovoc_topics_legis_init,
+    eurovoc_topics_proposals, legislative_documents, legislative_initiatives, mandates,
+    other_keyword_topics_legis_init, other_keyword_topics_ministrial_proposals,
+    other_keyword_topics_proposals, parties, plenar_infos, plenar_speech_links, plenar_speeches,
+    proposal_delegates, proposal_documents, proposals, speeches, topics_legis_init,
+    topics_ministrial_proposals, topics_proposals, votes,
 };
 
 #[cfg(feature = "utoipa")]
@@ -183,9 +186,9 @@ pub struct DbSpeech {
 #[derive(
     Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
 )]
-#[diesel(table_name = topics)]
+#[diesel(table_name = topics_legis_init)]
 #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
-pub struct DbTopic {
+pub struct DbTopicLegisInit {
     pub topic: String,
     pub legislative_initiatives_id: i32,
 }
@@ -194,9 +197,9 @@ pub struct DbTopic {
 #[derive(
     Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
 )]
-#[diesel(table_name = eurovoc_topics)]
+#[diesel(table_name = eurovoc_topics_legis_init)]
 #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
-pub struct DbEurovocTopic {
+pub struct DbEurovocTopicLegisInit {
     pub topic: String,
     pub legislative_initiatives_id: i32,
 }
@@ -205,11 +208,44 @@ pub struct DbEurovocTopic {
 #[derive(
     Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
 )]
-#[diesel(table_name = other_keyword_topics)]
+#[diesel(table_name = other_keyword_topics_legis_init)]
 #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
-pub struct DbOtherKeywordTopic {
+pub struct DbOtherKeywordTopicLegisInit {
     pub topic: String,
     pub legislative_initiatives_id: i32,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(
+    Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
+)]
+#[diesel(table_name = topics_proposals)]
+#[diesel(belongs_to(DbProposal, foreign_key = proposal_id))]
+pub struct DbTopicProposals {
+    pub topic: String,
+    pub proposals_id: String,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(
+    Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
+)]
+#[diesel(table_name = eurovoc_topics_proposals)]
+#[diesel(belongs_to(DbProposal, foreign_key = proposal_id))]
+pub struct DbEurovocTopicProposals {
+    pub topic: String,
+    pub proposals_id: String,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(
+    Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
+)]
+#[diesel(table_name = other_keyword_topics_proposals)]
+#[diesel(belongs_to(DbProposal, foreign_key = proposal_id))]
+pub struct DbOtherKeywordTopicProposals {
+    pub topic: String,
+    pub proposals_id: String,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

@@ -1,6 +1,5 @@
 use sqlx::PgPool;
 
-
 pub fn calculate_activity(pg: &PgPool) {
     let sql = "
    SELECT 

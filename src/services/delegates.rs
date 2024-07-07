@@ -119,11 +119,7 @@ pub fn insert_mandate(
 
     diesel::insert_into(mandates::table)
         .values(&db_mandate)
-        .on_conflict((
-            mandates::delegate_id,
-            mandates::name,
-            mandates::start_date,
-        ))
+        .on_conflict((mandates::delegate_id, mandates::name, mandates::start_date))
         .do_update()
         .set(&db_mandate)
         .execute(conn)
