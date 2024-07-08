@@ -11,7 +11,10 @@ use crate::{
         DbEurovocTopicProposals, DbOtherKeywordTopicProposals, DbProposal, DbProposalDocument,
         DbTopicProposals, ProposalDelegate,
     },
-    schema::{eurovoc_topics_proposals, other_keyword_topics_proposals, proposal_documents, topics_proposals},
+    schema::{
+        eurovoc_topics_proposals, other_keyword_topics_proposals, proposal_documents,
+        topics_proposals,
+    },
     today, Shutdown,
 };
 
@@ -128,10 +131,7 @@ fn insert_topics(conn: &mut PgConnection, proposal: Proposal) {
 
         if let Err(e) = diesel::insert_into(topics_proposals::table)
             .values(&topic)
-            .on_conflict((
-                topics_proposals::proposals_id,
-                topics_proposals::topic,
-            ))
+            .on_conflict((topics_proposals::proposals_id, topics_proposals::topic))
             .do_update()
             .set(&topic)
             .execute(conn)

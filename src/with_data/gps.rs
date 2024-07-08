@@ -1,6 +1,8 @@
 use chrono::NaiveDate;
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LegislativePeriod {
     pub gp: String,
     pub start_date: NaiveDate,
@@ -39,6 +41,7 @@ mod tests {
             .await
             .unwrap();
         let res = gps(&pg).await.unwrap();
+        println!("res: {res:?}");
         let res = res.iter().find(|x| x.gp == "XXVII").unwrap();
         assert_eq!(res.start_date.to_string(), "2019-10-23");
     }

@@ -1,4 +1,4 @@
-use diesel::{ExpressionMethods, RunQueryDsl};
+use diesel::RunQueryDsl;
 use scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative, Opinion};
 
 use crate::{

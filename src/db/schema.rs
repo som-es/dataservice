@@ -130,7 +130,7 @@ diesel::table! {
         emphasis -> Nullable<Varchar>,
         title -> Text,
         description -> Text,
-        created_at -> Date,
+        created_at -> Timestamptz,
         updated_at -> Nullable<Timestamptz>,
         due_to -> Date,
         ressort -> Nullable<Varchar>,
@@ -148,6 +148,14 @@ diesel::table! {
         title -> Nullable<Varchar>,
         document_type -> Varchar,
         document_url -> Varchar,
+    }
+}
+
+diesel::table! {
+    other_keyword_topics (id) {
+        id -> Int4,
+        topic -> Varchar,
+        legislative_initiatives_id -> Int4,
     }
 }
 
@@ -320,6 +328,7 @@ diesel::joinable!(eurovoc_topics_proposals -> proposals (proposals_id));
 diesel::joinable!(legislative_documents -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(mandates -> delegates (delegate_id));
 diesel::joinable!(ministrial_proposals_documents -> ministrial_proposals (ministrial_proposal_id));
+diesel::joinable!(other_keyword_topics -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(other_keyword_topics_legis_init -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(other_keyword_topics_ministrial_proposals -> ministrial_proposals (ministrial_proposal_id));
 diesel::joinable!(other_keyword_topics_proposals -> proposals (proposals_id));
@@ -352,6 +361,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     mandates,
     ministrial_proposals,
     ministrial_proposals_documents,
+    other_keyword_topics,
     other_keyword_topics_legis_init,
     other_keyword_topics_ministrial_proposals,
     other_keyword_topics_proposals,
