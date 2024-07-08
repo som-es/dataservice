@@ -4,7 +4,7 @@ create table proposals (
     ityp varchar(7) not null,
     gp varchar(7) not null,
     title text not null,
-    description text not null,
+    description text,
     created_at timestamptz not null,
     updated_at timestamptz
 );

@@ -246,7 +246,7 @@ diesel::table! {
         ityp -> Varchar,
         gp -> Varchar,
         title -> Text,
-        description -> Text,
+        description -> Nullable<Text>,
         created_at -> Timestamptz,
         updated_at -> Nullable<Timestamptz>,
     }
