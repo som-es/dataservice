@@ -20,7 +20,7 @@ create table ministrial_proposals(
     legis_init_gp varchar(14),
     legis_init_inr int,
     legis_init_ityp varchar(7),
-    FOREIGN KEY (legis_init_gp, legis_init_inr, legis_init_ityp) REFERENCES legislative_initiatives(gp, inr, ityp),
+    -- FOREIGN KEY (legis_init_gp, legis_init_inr, legis_init_ityp) REFERENCES legislative_initiatives(gp, inr, ityp),
     UNIQUE (inr, ityp, gp)
 );
 
