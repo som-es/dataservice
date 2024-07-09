@@ -46,7 +46,7 @@ pub struct DbProposalQuery {
     pub ityp: String,
     pub gp: String,
     pub title: String,
-    pub description: String,
+    pub description: Option<String>,
     pub created_at: NaiveDateTime,
     pub updated_at: Option<NaiveDateTime>,
 }
