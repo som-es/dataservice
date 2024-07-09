@@ -1,9 +1,10 @@
-use diesel::RunQueryDsl;
+use diesel::{connection::SimpleConnection, RunQueryDsl};
 use scraper::{
     ministrial_proposals::{MinistrialProposal, MinistrialProposalScraper},
     proposals::ProposalsPayload,
     AustriaScraper,
 };
+use tokio::time::Instant;
 
 use crate::{
     models::{
@@ -88,7 +89,6 @@ fn update_ministrial_proposals_in_db(ministrial_props: &[MinistrialProposal]) {
             legis_init_inr: ministiral_prop.legis_init_inr.map(|x| x as i32),
             legis_init_ityp: ministiral_prop.legis_init_ityp.clone(),
         };
-
         let ministrial_prop_id = match diesel::insert_into(ministrial_proposals::table)
             .values(&db_ministrial_prop)
             .on_conflict((

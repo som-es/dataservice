@@ -23,26 +23,27 @@ pub async fn run_services(state: &State) {
             let _res = services::delegates::delegates_once(&hs).await;
         }
     }
+
     tokio::join!(
         // services::proposals::run(),
-        services::legislative_initiatives::run_shut_every_gp(Shutdown::new(
+        tokio::spawn(services::legislative_initiatives::run_shut_every_gp(Shutdown::new(
             state.notify_shutdown.subscribe()
-        )),
-        services::legislative_initiatives::run_shut_latest_gp(Shutdown::new(
+        ))),
+        tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(Shutdown::new(
             state.notify_shutdown.subscribe()
-        )),
-        services::ministrial_proposals::run_shut_every_gp(Shutdown::new(
+        ))),
+        tokio::spawn(services::ministrial_proposals::run_shut_every_gp(Shutdown::new(
             state.notify_shutdown.subscribe()
-        )),
-        services::ministrial_proposals::run_shut_latest_gp(Shutdown::new(
+        ))),
+        tokio::spawn(services::ministrial_proposals::run_shut_latest_gp(Shutdown::new(
             state.notify_shutdown.subscribe()
-        )),
-        services::proposals::run_shut(Shutdown::new(state.notify_shutdown.subscribe())),
-        services::proposals::run_shut_last_5_days(Shutdown::new(state.notify_shutdown.subscribe())),
-        services::plenar::run_shut(Shutdown::new(state.notify_shutdown.subscribe())),
-        services::delegates::run_shut(Shutdown::new(state.notify_shutdown.subscribe())),
-        services::parties::run_shut(Shutdown::new(state.notify_shutdown.subscribe())),
-    );
+        ))),
+        tokio::spawn(services::proposals::run_shut(Shutdown::new(state.notify_shutdown.subscribe()))),
+        tokio::spawn(services::proposals::run_shut_last_5_days(Shutdown::new(state.notify_shutdown.subscribe()))),
+        tokio::spawn(services::plenar::run_shut(Shutdown::new(state.notify_shutdown.subscribe()))),
+        tokio::spawn(services::delegates::run_shut(Shutdown::new(state.notify_shutdown.subscribe()))),
+        tokio::spawn(services::parties::run_shut(Shutdown::new(state.notify_shutdown.subscribe()))),
+    ).0.unwrap();
 }
 
 pub struct State {
