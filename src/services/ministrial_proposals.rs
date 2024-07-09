@@ -73,6 +73,7 @@ fn update_ministrial_proposals_in_db(ministrial_props: &[MinistrialProposal]) {
 
     let conn = &mut crate::establish_connection();
     for ministiral_prop in ministrial_props {
+        log::info!("inserting single ministrial prop");
         let db_ministrial_prop = DbMinistrialProposal {
             title: ministiral_prop.title.clone(),
             inr: ministiral_prop.inr as i32,
@@ -89,6 +90,7 @@ fn update_ministrial_proposals_in_db(ministrial_props: &[MinistrialProposal]) {
             legis_init_inr: ministiral_prop.legis_init_inr.map(|x| x as i32),
             legis_init_ityp: ministiral_prop.legis_init_ityp.clone(),
         };
+        let start = Instant::now();
         let ministrial_prop_id = match diesel::insert_into(ministrial_proposals::table)
             .values(&db_ministrial_prop)
             .on_conflict((
@@ -108,6 +110,7 @@ fn update_ministrial_proposals_in_db(ministrial_props: &[MinistrialProposal]) {
                 continue;
             }
         };
+        log::info!("insertion dur: {:?}", start.elapsed());
         for topic in ministiral_prop.topics.clone() {
             let topic = DbTopicMinistrialProposals {
                 topic,
