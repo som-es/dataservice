@@ -11,8 +11,11 @@ where
 {
     let mut new_proposals = f().await;
     while let Err(e) = new_proposals {
-        log::warn!("Could not scrape data: {e}, INFO for me: {:?}", e.downcast_ref::<reqwest::Error>());
-        
+        log::warn!(
+            "Could not scrape data: {e}, INFO for me: {:?}",
+            e.downcast_ref::<reqwest::Error>()
+        );
+
         new_proposals = f().await;
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }

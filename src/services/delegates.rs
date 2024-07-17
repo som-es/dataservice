@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
-use diesel::{PgConnection, QueryDsl, QueryResult, RunQueryDsl};
+use diesel::{
+    debug_query, expression::AsExpression, query_builder::AsQuery, sql_query, PgConnection,
+    QueryDsl, QueryResult, RunQueryDsl,
+};
 use scraper::{delegates::DelegateScraper, AustriaScraper, Delegate, Mandate};
 
 use crate::{
@@ -83,6 +86,7 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
             is_active: Some(delegate.is_active),
             birthdate: delegate.birthdate.clone(),
         };
+        println!("db delegate: {db_delegate:?}");
 
         if let Err(e) = diesel::insert_into(delegates::table)
             .values(&db_delegate)
@@ -95,6 +99,11 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
                 "Error adding/updating delegate in database: {e}, for delegate {delegate:?}"
             );
         }
+
+
+        // let debug_query = debug_query::<diesel::pg::Pg, _>(&insert_statement);
+
+        // println!("SQL: {}", debug_query.to_string());
 
         for mandate in &delegate.mandates {
             if let Err(e) = insert_mandate(mandate, delegate.id as i32, &mut conn) {
@@ -139,6 +148,11 @@ pub async fn delegates_once(prev_delegates: &HashSet<Delegate>) -> Vec<Delegate>
 }
 
 pub async fn run_shut(mut shutdown: Shutdown) {
+    let scraper = AustriaScraper::default();
+    let delegate = scraper.get_delegate("/person/6407").await.unwrap();
+    println!("delegate: {delegate:?}");
+    update_delegates_in_db(&[delegate]);
+
     let prev_delegates = HashSet::new();
 
     while !shutdown.is_shutdown() {
