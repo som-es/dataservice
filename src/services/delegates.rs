@@ -138,6 +138,7 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &PgPool) {
                     constituency = EXCLUDED.constituency,
                     council = EXCLUDED.council,
                     seat_row = EXCLUDED.seat_row,
+                    -- seat_row = 3,
                     seat_col = EXCLUDED.seat_col,
                     gender = EXCLUDED.gender,
                     is_active = EXCLUDED.is_active,
@@ -247,11 +248,6 @@ pub async fn delegates_once(prev_delegates: &HashSet<Delegate>) -> Vec<Delegate>
 }
 
 pub async fn run_shut(mut shutdown: Shutdown) {
-    // let scraper = AustriaScraper::default();
-    // let delegate = scraper.get_delegate("/person/6407").await.unwrap();
-    // println!("delegate: {delegate:?}");
-    // update_delegates_in_db(&[delegate], &pg_pool).await;
-
     let prev_delegates = HashSet::new();
 
     while !shutdown.is_shutdown() {
