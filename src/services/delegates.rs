@@ -1,17 +1,15 @@
 use std::collections::HashSet;
 
-use diesel::{
-    PgConnection,
-    QueryDsl, QueryResult, RunQueryDsl,
-};
+use diesel::{PgConnection, QueryDsl, QueryResult, RunQueryDsl};
 use scraper::{delegates::DelegateScraper, AustriaScraper, Delegate, Mandate};
-use sqlx::{
-    postgres::PgQueryResult,
-    PgPool,
-};
+use sqlx::{postgres::PgQueryResult, PgPool};
 
 use crate::{
-    connect_pg, models::{DbContact, DbDelegate, DbMandate}, schema::delegates, services::scrape_untill_success, Shutdown
+    connect_pg,
+    models::{DbContact, DbDelegate, DbMandate},
+    schema::delegates,
+    services::scrape_untill_success,
+    Shutdown,
 };
 
 async fn scrape_new_delegates(prev_delegates: &HashSet<Delegate>) -> crate::Result<Vec<Delegate>> {
@@ -249,7 +247,6 @@ pub async fn delegates_once(prev_delegates: &HashSet<Delegate>) -> Vec<Delegate>
 }
 
 pub async fn run_shut(mut shutdown: Shutdown) {
-
     // let scraper = AustriaScraper::default();
     // let delegate = scraper.get_delegate("/person/6407").await.unwrap();
     // println!("delegate: {delegate:?}");

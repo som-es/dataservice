@@ -1,4 +1,3 @@
-use diesel::RunQueryDsl;
 use scraper::{
     ministrial_proposals::{MinistrialProposal, MinistrialProposalScraper},
     proposals::ProposalsPayload,
@@ -6,15 +5,7 @@ use scraper::{
 };
 use tokio::time::Instant;
 
-use crate::{
-    connect_pg, models::{
-        DbEurovocTopicMinsistrialProposals, DbMinistrialProposal, DbMinistrialProposalDocument,
-        DbOtherKeywordTopicMinistrialProposals, DbTopicMinistrialProposals,
-    }, schema::{
-        eurovoc_topics_ministrial_proposals, ministrial_proposals, ministrial_proposals_documents,
-        other_keyword_topics_ministrial_proposals, topics_ministrial_proposals,
-    }, services::scrape_untill_success, Shutdown
-};
+use crate::{connect_pg, services::scrape_untill_success, Shutdown};
 
 pub async fn scrape_new_ministrial_props(
     scraper: &AustriaScraper,
@@ -55,7 +46,9 @@ async fn ministrial_proposal_once(only_latest: bool, pg_pool: &PgPool) -> Vec<Mi
         })
         .await;
 
-        update_ministrial_proposals_in_db2(pg_pool, &new_ministrial_props).await.unwrap();
+        update_ministrial_proposals_in_db2(pg_pool, &new_ministrial_props)
+            .await
+            .unwrap();
         if only_latest {
             break;
         }
@@ -69,13 +62,13 @@ use sqlx::postgres::PgPool;
 
 pub async fn update_ministrial_proposals_in_db2(
     pool: &PgPool,
-    ministrial_props: &[MinistrialProposal]
+    ministrial_props: &[MinistrialProposal],
 ) -> Result<(), sqlx::Error> {
     log::info!("Updating ministrial proposal in database...");
 
     for ministrial_prop in ministrial_props {
         log::info!("inserting single ministrial prop");
-        
+
         let start = Instant::now();
         // Insert or update the ministrial proposal
         let ministrial_prop_id = sqlx::query!(
@@ -192,133 +185,6 @@ pub async fn update_ministrial_proposals_in_db2(
     }
 
     Ok(())
-}
-
-fn update_ministrial_proposals_in_db(ministrial_props: &[MinistrialProposal]) {
-    log::info!("Updating ministiral proposal in database...");
-
-    let conn = &mut crate::establish_connection();
-    for ministiral_prop in ministrial_props {
-        log::info!("inserting single ministrial prop");
-        let db_ministrial_prop = DbMinistrialProposal {
-            title: ministiral_prop.title.clone(),
-            inr: ministiral_prop.inr as i32,
-            emphasis: ministiral_prop.emphasis.clone(),
-            description: ministiral_prop.description.clone(),
-            ityp: ministiral_prop.ityp.clone(),
-            gp: ministiral_prop.gp.clone(),
-            created_at: ministiral_prop.created_at,
-            updated_at: ministiral_prop.updated_at,
-            due_to: ministiral_prop.gegenstand_info.due_to,
-            ressort: ministiral_prop.gegenstand_info.ressort.clone(),
-            ressort_shortform: ministiral_prop.gegenstand_info.ressort_shortform.clone(),
-            legis_init_gp: ministiral_prop.legis_gp.clone(),
-            legis_init_inr: ministiral_prop.legis_init_inr.map(|x| x as i32),
-            legis_init_ityp: ministiral_prop.legis_init_ityp.clone(),
-        };
-        let start = Instant::now();
-        let ministrial_prop_id = match diesel::insert_into(ministrial_proposals::table)
-            .values(&db_ministrial_prop)
-            .on_conflict((
-                ministrial_proposals::inr,
-                ministrial_proposals::ityp,
-                ministrial_proposals::gp,
-            ))
-            .do_update()
-            // .set((ministrial_proposals::created_at.eq(db_legis_init.created_at),))
-            .set(&db_ministrial_prop)
-            .returning(ministrial_proposals::id)
-            .get_result(conn)
-        {
-            Ok(id) => id,
-            Err(e) => {
-                log::error!("Error inserting ministiral proposal: '{e}'. Error occured for ministiral proposal: {ministiral_prop:?}");
-                continue;
-            }
-        };
-        log::info!("insertion dur: {:?}", start.elapsed());
-        for topic in ministiral_prop.topics.clone() {
-            let topic = DbTopicMinistrialProposals {
-                topic,
-                ministrial_proposal_id: ministrial_prop_id,
-            };
-
-            if let Err(e) = diesel::insert_into(topics_ministrial_proposals::table)
-                .values(&topic)
-                .on_conflict((
-                    topics_ministrial_proposals::ministrial_proposal_id,
-                    topics_ministrial_proposals::topic,
-                ))
-                .do_update()
-                .set(&topic)
-                .execute(conn)
-            {
-                log::error!("Error inserting topic: '{e}'. The error occured for the following topic: {topic:?}")
-            }
-        }
-
-        for topic in ministiral_prop.eurovoc_topics.clone() {
-            let topic = DbEurovocTopicMinsistrialProposals {
-                topic,
-                ministrial_proposal_id: ministrial_prop_id,
-            };
-
-            if let Err(e) = diesel::insert_into(eurovoc_topics_ministrial_proposals::table)
-                .values(&topic)
-                .on_conflict((
-                    eurovoc_topics_ministrial_proposals::ministrial_proposal_id,
-                    eurovoc_topics_ministrial_proposals::topic,
-                ))
-                .do_update()
-                .set(&topic)
-                .execute(conn)
-            {
-                log::error!("Error inserting topic: '{e}'. The error occured for the following eurovoc topic: {topic:?}")
-            }
-        }
-
-        for topic in ministiral_prop.other_keyword_topics.clone() {
-            let topic = DbOtherKeywordTopicMinistrialProposals {
-                topic,
-                ministrial_proposal_id: ministrial_prop_id,
-            };
-
-            if let Err(e) = diesel::insert_into(other_keyword_topics_ministrial_proposals::table)
-                .values(&topic)
-                .on_conflict((
-                    other_keyword_topics_ministrial_proposals::ministrial_proposal_id,
-                    other_keyword_topics_ministrial_proposals::topic,
-                ))
-                .do_update()
-                .set(&topic)
-                .execute(conn)
-            {
-                log::error!("Error inserting topic: '{e}'. The error occured for the following other keyword topic: {topic:?}")
-            }
-        }
-
-        for document in &ministiral_prop.documents {
-            let legis_doc = DbMinistrialProposalDocument {
-                ministrial_proposal_id: ministrial_prop_id,
-                title: document.title.clone(),
-                document_type: document.ftype.to_string(),
-                document_url: document.link.clone(),
-            };
-
-            if let Err(e) = diesel::insert_into(ministrial_proposals_documents::table)
-                .values(&legis_doc)
-                .on_conflict((
-                    ministrial_proposals_documents::document_url,
-                    ministrial_proposals_documents::ministrial_proposal_id,
-                ))
-                .do_update()
-                .set(&legis_doc)
-                .execute(conn)
-            {
-                log::error!("Error inserting document: '{e}'. The error occured for the following document: {document:?}")
-            }
-        }
-    }
 }
 
 pub async fn run_shut_latest_gp(mut shutdown: Shutdown) {

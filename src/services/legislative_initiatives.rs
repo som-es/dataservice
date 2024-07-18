@@ -2,10 +2,13 @@ use scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeIni
 use sqlx::PgPool;
 
 use crate::{
-    connect_pg, models::{
+    connect_pg,
+    models::{
         DbEurovocTopicLegisInit, DbLegisDocument, DbLegislativeInitiative,
         DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote,
-    }, services::scrape_untill_success, Shutdown
+    },
+    services::scrape_untill_success,
+    Shutdown,
 };
 
 pub async fn scrape_new_legis_inits(
@@ -137,7 +140,11 @@ async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[LegislativeI
             .execute(pool)
             .await
             {
-                log::warn!("Error inserting vote: '{:?}'. The error occurred for the following vote: {:?}", e, vote);
+                log::warn!(
+                    "Error inserting vote: '{:?}'. The error occurred for the following vote: {:?}",
+                    e,
+                    vote
+                );
             }
         }
 
