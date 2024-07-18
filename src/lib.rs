@@ -16,6 +16,7 @@ use chrono::NaiveDate;
 pub use db::*;
 #[cfg(feature = "runner")]
 pub use shutdown::*;
+use sqlx::{postgres::PgPoolOptions, PgPool};
 
 pub mod with_data;
 
@@ -34,4 +35,13 @@ pub fn today() -> NaiveDate {
 #[inline]
 pub fn today_and_time() -> chrono::NaiveDateTime {
     chrono::Local::now().naive_local()
+}
+
+pub async fn connect_pg() -> PgPool {
+    PgPoolOptions::new()
+        // pool sizes
+        .max_connections(10)
+        .connect(DATABASE_URL)
+        .await
+        .unwrap()
 }

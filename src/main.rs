@@ -1,4 +1,5 @@
 use dataservice::{delegates::delegate_count, establish_connection, services, Shutdown};
+use sqlx::PgPool;
 use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
 

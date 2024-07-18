@@ -1,16 +1,17 @@
 use std::collections::HashSet;
 
 use diesel::{
-    debug_query, expression::AsExpression, query_builder::AsQuery, sql_query, PgConnection,
+    PgConnection,
     QueryDsl, QueryResult, RunQueryDsl,
 };
 use scraper::{delegates::DelegateScraper, AustriaScraper, Delegate, Mandate};
+use sqlx::{
+    postgres::PgQueryResult,
+    PgPool,
+};
 
 use crate::{
-    models::{DbContact, DbDelegate, DbMandate},
-    schema::{contacts, delegates, mandates},
-    services::scrape_untill_success,
-    Shutdown,
+    connect_pg, models::{DbContact, DbDelegate, DbMandate}, schema::delegates, services::scrape_untill_success, Shutdown
 };
 
 async fn scrape_new_delegates(prev_delegates: &HashSet<Delegate>) -> crate::Result<Vec<Delegate>> {
@@ -44,9 +45,7 @@ pub fn delegate_count(conn: &mut PgConnection) -> QueryResult<i64> {
     delegates::table.count().get_result(conn)
 }
 
-fn update_delegates_in_db(new_delegates: &[Delegate]) {
-    let mut conn = crate::establish_connection();
-
+async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &PgPool) {
     log::info!("Updating delegates in database...");
     for delegate in new_delegates {
         let db_contact = DbContact {
@@ -61,17 +60,47 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
             youtube_url: delegate.contact.social_media.youtube.clone(),
         };
 
-        if let Err(e) = diesel::insert_into(contacts::table)
-            .values(&db_contact)
-            .on_conflict(contacts::id)
-            .do_update()
-            .set(&db_contact)
-            .execute(&mut conn)
-        // .returning(contacts::id)
-        // .get_result::<i32>(&mut conn)
+        if let Err(e) = sqlx::query!(
+            "
+            insert into contacts values ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+                on conflict (id)
+                DO UPDATE SET 
+                    mail = EXCLUDED.mail,
+                    phone_number = EXCLUDED.phone_number,
+                    twitter_url = EXCLUDED.twitter_url,
+                    facebook_url = EXCLUDED.facebook_url,
+                    website_url = EXCLUDED.website_url,
+                    tiktok_url = EXCLUDED.tiktok_url,
+                    instagram_url = EXCLUDED.instagram_url,
+                    youtube_url = EXCLUDED.youtube_url
+        ",
+            db_contact.id,
+            db_contact.mail,
+            db_contact.phone_number,
+            db_contact.twitter_url,
+            db_contact.facebook_url,
+            db_contact.website_url,
+            db_contact.tiktok_url,
+            db_contact.instagram_url,
+            db_contact.youtube_url
+        )
+        .execute(pg_pool)
+        .await
         {
             log::error!("Error inserting contact information for delegate {delegate:?}: {e}");
-        };
+        }
+
+        // if let Err(e) = diesel::insert_into(contacts::table)
+        //     .values(&db_contact)
+        //     .on_conflict(contacts::id)
+        //     .do_update()
+        //     .set(&db_contact)
+        //     .execute(&mut conn)
+        // // .returning(contacts::id)
+        // // .get_result::<i32>(&mut conn)
+        // {
+        //     log::error!("Error inserting contact information for delegate {delegate:?}: {e}");
+        // };
 
         let db_delegate = DbDelegate {
             id: delegate.id as i32,
@@ -86,38 +115,84 @@ fn update_delegates_in_db(new_delegates: &[Delegate]) {
             is_active: Some(delegate.is_active),
             birthdate: delegate.birthdate.clone(),
         };
-        println!("db delegate: {db_delegate:?}");
 
-        if let Err(e) = diesel::insert_into(delegates::table)
-            .values(&db_delegate)
-            .on_conflict(delegates::id)
-            .do_update()
-            .set(&db_delegate)
-            .execute(&mut conn)
+        if let Err(e) = sqlx::query!(
+            "
+                INSERT INTO delegates (
+                    id, 
+                    name, 
+                    party, 
+                    image_url, 
+                    constituency, 
+                    council, 
+                    seat_row, 
+                    seat_col, 
+                    gender, 
+                    is_active, 
+                    birthdate
+                ) VALUES (
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+                ) ON CONFLICT (id) 
+                DO UPDATE SET 
+                    name = EXCLUDED.name,
+                    party = EXCLUDED.party,
+                    image_url = EXCLUDED.image_url,
+                    constituency = EXCLUDED.constituency,
+                    council = EXCLUDED.council,
+                    seat_row = EXCLUDED.seat_row,
+                    seat_col = EXCLUDED.seat_col,
+                    gender = EXCLUDED.gender,
+                    is_active = EXCLUDED.is_active,
+                    birthdate = EXCLUDED.birthdate
+            ",
+            db_delegate.id,
+            db_delegate.name,
+            db_delegate.party,
+            db_delegate.image_url,
+            db_delegate.constituency,
+            db_delegate.council,
+            db_delegate.seat_row,
+            db_delegate.seat_col,
+            db_delegate.gender,
+            db_delegate.is_active,
+            db_delegate.birthdate
+        )
+        .execute(pg_pool)
+        .await
         {
-            log::error!(
-                "Error adding/updating delegate in database: {e}, for delegate {delegate:?}"
-            );
+            log::error!("Error inserting delegate information: {:?}", e);
         }
 
+        // if let Err(e) = diesel::insert_into(delegates::table)
+        //     .values(&db_delegate)
+        //     .on_conflict(delegates::id)
+        //     .do_update()
+        //     .set(&db_delegate)
+        //     .execute(&mut conn)
+        // {
+        //     log::error!(
+        //         "Error adding/updating delegate in database: {e}, for delegate {delegate:?}"
+        //     );
+        // }
 
         // let debug_query = debug_query::<diesel::pg::Pg, _>(&insert_statement);
 
         // println!("SQL: {}", debug_query.to_string());
 
         for mandate in &delegate.mandates {
-            if let Err(e) = insert_mandate(mandate, delegate.id as i32, &mut conn) {
+            if let Err(e) = insert_mandate(mandate, delegate.id as i32, pg_pool).await {
                 log::error!("Error adding mandate ({mandate:?}) for delegate {delegate:?}: {e}",);
             }
         }
     }
+    // Ok(())
 }
 
-pub fn insert_mandate(
+pub async fn insert_mandate(
     mandate: &Mandate,
     delegate_id: i32,
-    conn: &mut PgConnection,
-) -> QueryResult<usize> {
+    conn: &PgPool,
+) -> sqlx::Result<PgQueryResult> {
     let db_mandate = DbMandate {
         delegate_id,
         name: mandate.name.clone(),
@@ -126,15 +201,41 @@ pub fn insert_mandate(
         end_date: mandate.end,
     };
 
-    diesel::insert_into(mandates::table)
-        .values(&db_mandate)
-        .on_conflict((mandates::delegate_id, mandates::name, mandates::start_date))
-        .do_update()
-        .set(&db_mandate)
-        .execute(conn)
+    sqlx::query!(
+        "
+            INSERT INTO mandates (
+                delegate_id, 
+                name, 
+                party, 
+                start_date, 
+                end_date
+            ) VALUES (
+                $1, $2, $3, $4, $5
+            ) ON CONFLICT (delegate_id, name, start_date) 
+            DO UPDATE SET 
+                party = EXCLUDED.party,
+                end_date = EXCLUDED.end_date
+        ",
+        db_mandate.delegate_id,
+        db_mandate.name,
+        db_mandate.party,
+        db_mandate.start_date,
+        db_mandate.end_date
+    )
+    .execute(conn)
+    .await
+
+    // diesel::insert_into(mandates::table)
+    //     .values(&db_mandate)
+    //     .on_conflict((mandates::delegate_id, mandates::name, mandates::start_date))
+    //     .do_update()
+    //     .set(&db_mandate)
+    //     .execute(conn)
 }
 
 pub async fn delegates_once(prev_delegates: &HashSet<Delegate>) -> Vec<Delegate> {
+    let pg_pool = connect_pg().await;
+
     log::info!("Scraping all delegates...");
 
     let new_delegates = scrape_untill_success::<Vec<Delegate>, _>(|| async {
@@ -142,16 +243,17 @@ pub async fn delegates_once(prev_delegates: &HashSet<Delegate>) -> Vec<Delegate>
     })
     .await;
 
-    update_delegates_in_db(&new_delegates);
+    update_delegates_in_db(&new_delegates, &pg_pool).await;
 
     new_delegates
 }
 
 pub async fn run_shut(mut shutdown: Shutdown) {
-    let scraper = AustriaScraper::default();
-    let delegate = scraper.get_delegate("/person/6407").await.unwrap();
-    println!("delegate: {delegate:?}");
-    update_delegates_in_db(&[delegate]);
+
+    // let scraper = AustriaScraper::default();
+    // let delegate = scraper.get_delegate("/person/6407").await.unwrap();
+    // println!("delegate: {delegate:?}");
+    // update_delegates_in_db(&[delegate], &pg_pool).await;
 
     let prev_delegates = HashSet::new();
 
