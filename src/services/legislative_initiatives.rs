@@ -1,17 +1,11 @@
-use diesel::RunQueryDsl;
 use scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative, Opinion};
+use sqlx::PgPool;
 
 use crate::{
-    models::{
+    connect_pg, models::{
         DbEurovocTopicLegisInit, DbLegisDocument, DbLegislativeInitiative,
         DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote,
-    },
-    schema::{
-        eurovoc_topics_legis_init, legislative_documents, legislative_initiatives,
-        other_keyword_topics_legis_init, speeches, topics_legis_init, votes,
-    },
-    services::scrape_untill_success,
-    Shutdown,
+    }, services::scrape_untill_success, Shutdown
 };
 
 pub async fn scrape_new_legis_inits(
@@ -38,7 +32,7 @@ pub async fn scrape_new_legis_inits(
     Ok(new_legis_inits)
 }
 
-async fn legis_init_once(only_latest: bool) -> Vec<LegislativeInitiative> {
+async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<LegislativeInitiative> {
     log::info!("Try scraping legislative initiatives");
     let mut scraper = AustriaScraper::default();
 
@@ -51,7 +45,7 @@ async fn legis_init_once(only_latest: bool) -> Vec<LegislativeInitiative> {
         })
         .await;
 
-        update_legis_inits_in_db(&new_legis_inits);
+        update_legis_inits_in_db(pg_pool, &new_legis_inits).await;
         if only_latest {
             break;
         }
@@ -61,10 +55,9 @@ async fn legis_init_once(only_latest: bool) -> Vec<LegislativeInitiative> {
     vec![]
 }
 
-fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
-    log::info!("Updating legislative initiative in database...");
+async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[LegislativeInitiative]) {
+    log::info!("Updating legislative initiatives in database...");
 
-    let conn = &mut crate::establish_connection();
     for legis_init in new_legis_inits {
         let db_legis_init = DbLegislativeInitiative {
             title: legis_init.title.clone(),
@@ -79,22 +72,40 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
             updated_at: legis_init.updated_at,
         };
 
-        let legis_init_id = match diesel::insert_into(legislative_initiatives::table)
-            .values(&db_legis_init)
-            .on_conflict((
-                legislative_initiatives::inr,
-                legislative_initiatives::ityp,
-                legislative_initiatives::gp,
-            ))
-            .do_update()
-            // .set((legislative_initiatives::created_at.eq(db_legis_init.created_at),))
-            .set(&db_legis_init)
-            .returning(legislative_initiatives::id)
-            .get_result(conn)
+        let legis_init_id = match sqlx::query!(
+            "
+                INSERT INTO legislative_initiatives (
+                    title, inr, emphasis, description, ityp, gp, accepted, created_at, appeared_at, updated_at
+                ) VALUES (
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+                ) ON CONFLICT (inr, ityp, gp) 
+                DO UPDATE SET 
+                    title = EXCLUDED.title,
+                    emphasis = EXCLUDED.emphasis,
+                    description = EXCLUDED.description,
+                    accepted = EXCLUDED.accepted,
+                    created_at = EXCLUDED.created_at,
+                    appeared_at = EXCLUDED.appeared_at,
+                    updated_at = EXCLUDED.updated_at
+                RETURNING id
+            ",
+            db_legis_init.title,
+            db_legis_init.inr,
+            db_legis_init.emphasis,
+            db_legis_init.description,
+            db_legis_init.ityp,
+            db_legis_init.gp,
+            db_legis_init.accepted,
+            db_legis_init.created_at,
+            db_legis_init.appeared_at.map(|x| x.and_utc()),
+            db_legis_init.updated_at.map(|x| x.and_utc())
+        )
+        .fetch_one(pool)
+        .await
         {
-            Ok(id) => id,
+            Ok(record) => record.id,
             Err(e) => {
-                log::error!("Error inserting legislative initiative: '{e}'. Error occured for legislative initiative: {legis_init:?}");
+                log::error!("Error inserting legislative initiative: '{:?}'. Error occurred for legislative initiative: {:?}", e, legis_init);
                 continue;
             }
         };
@@ -107,22 +118,32 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
                 legislative_initiatives_id: legis_init_id,
             };
 
-            if let Err(e) = diesel::insert_into(votes::table)
-                .values(&db_vote)
-                .on_conflict((votes::legislative_initiatives_id, votes::party))
-                .do_update()
-                .set(&db_vote)
-                .execute(conn)
+            if let Err(e) = sqlx::query!(
+                "
+                    INSERT INTO votes (
+                        party, fraction, infavor, legislative_initiatives_id
+                    ) VALUES (
+                        $1, $2, $3, $4
+                    ) ON CONFLICT (legislative_initiatives_id, party) 
+                    DO UPDATE SET 
+                        fraction = EXCLUDED.fraction,
+                        infavor = EXCLUDED.infavor
+                ",
+                db_vote.party,
+                db_vote.fraction,
+                db_vote.infavor,
+                db_vote.legislative_initiatives_id
+            )
+            .execute(pool)
+            .await
             {
-                log::warn!("Error inserting vote: '{e}'. The error occured for the following vote: {vote:?}")
+                log::warn!("Error inserting vote: '{:?}'. The error occurred for the following vote: {:?}", e, vote);
             }
         }
 
         for speech in &legis_init.speeches {
             let db_speech = DbSpeech {
                 delegate_id: speech.delegate_id as i32,
-
-                // TODO: get opinion even if none is given
                 infavor: match speech.opinion {
                     Opinion::Infavor => Some(true),
                     Opinion::Against => Some(false),
@@ -131,96 +152,134 @@ fn update_legis_inits_in_db(new_legis_inits: &[LegislativeInitiative]) {
                 legislative_initiatives_id: legis_init_id,
             };
 
-            if let Err(e) = diesel::insert_into(speeches::table)
-                .values(&db_speech)
-                .on_conflict((speeches::legislative_initiatives_id, speeches::delegate_id))
-                .do_update()
-                .set(&db_speech)
-                .execute(conn)
+            if let Err(e) = sqlx::query!(
+                "
+                    INSERT INTO speeches (
+                        delegate_id, infavor, legislative_initiatives_id
+                    ) VALUES (
+                        $1, $2, $3
+                    ) ON CONFLICT (legislative_initiatives_id, delegate_id) 
+                    DO UPDATE SET 
+                        infavor = EXCLUDED.infavor
+                ",
+                db_speech.delegate_id,
+                db_speech.infavor,
+                db_speech.legislative_initiatives_id
+            )
+            .execute(pool)
+            .await
             {
-                log::warn!("Error inserting speech, probably delegate does not exist in database and has got inactive recently: {e}, for speech: {speech:?}")
+                log::warn!("Error inserting speech, probably delegate does not exist in database and has got inactive recently: {:?}, for speech: {:?}", e, speech);
             }
         }
 
         for topic in legis_init.topics.clone() {
-            let topic = DbTopicLegisInit {
+            let db_topic = DbTopicLegisInit {
                 topic,
                 legislative_initiatives_id: legis_init_id,
             };
 
-            if let Err(e) = diesel::insert_into(topics_legis_init::table)
-                .values(&topic)
-                .on_conflict((
-                    topics_legis_init::legislative_initiatives_id,
-                    topics_legis_init::topic,
-                ))
-                .do_update()
-                .set(&topic)
-                .execute(conn)
+            if let Err(e) = sqlx::query!(
+                "
+                    INSERT INTO topics_legis_init (
+                        topic, legislative_initiatives_id
+                    ) VALUES (
+                        $1, $2
+                    ) ON CONFLICT (legislative_initiatives_id, topic) 
+                    DO UPDATE SET 
+                        topic = EXCLUDED.topic
+                ",
+                db_topic.topic,
+                db_topic.legislative_initiatives_id
+            )
+            .execute(pool)
+            .await
             {
-                log::error!("Error inserting topic: '{e}'. The error occured for the following topic: {topic:?}")
+                log::error!("Error inserting topic: '{:?}'. The error occurred for the following topic: {:?}", e, db_topic);
             }
         }
 
         for topic in legis_init.eurovoc_topics.clone() {
-            let topic = DbEurovocTopicLegisInit {
+            let db_eurovoc_topic = DbEurovocTopicLegisInit {
                 topic,
                 legislative_initiatives_id: legis_init_id,
             };
 
-            if let Err(e) = diesel::insert_into(eurovoc_topics_legis_init::table)
-                .values(&topic)
-                .on_conflict((
-                    eurovoc_topics_legis_init::legislative_initiatives_id,
-                    eurovoc_topics_legis_init::topic,
-                ))
-                .do_update()
-                .set(&topic)
-                .execute(conn)
+            if let Err(e) = sqlx::query!(
+                "
+                    INSERT INTO eurovoc_topics_legis_init (
+                        topic, legislative_initiatives_id
+                    ) VALUES (
+                        $1, $2
+                    ) ON CONFLICT (legislative_initiatives_id, topic) 
+                    DO UPDATE SET 
+                        topic = EXCLUDED.topic
+                ",
+                db_eurovoc_topic.topic,
+                db_eurovoc_topic.legislative_initiatives_id
+            )
+            .execute(pool)
+            .await
             {
-                log::error!("Error inserting topic: '{e}'. The error occured for the following eurovoc topic: {topic:?}")
+                log::error!("Error inserting eurovoc topic: '{:?}'. The error occurred for the following eurovoc topic: {:?}", e, db_eurovoc_topic);
             }
         }
 
         for topic in legis_init.other_keyword_topics.clone() {
-            let topic = DbOtherKeywordTopicLegisInit {
+            let db_other_keyword_topic = DbOtherKeywordTopicLegisInit {
                 topic,
                 legislative_initiatives_id: legis_init_id,
             };
 
-            if let Err(e) = diesel::insert_into(other_keyword_topics_legis_init::table)
-                .values(&topic)
-                .on_conflict((
-                    other_keyword_topics_legis_init::legislative_initiatives_id,
-                    other_keyword_topics_legis_init::topic,
-                ))
-                .do_update()
-                .set(&topic)
-                .execute(conn)
+            if let Err(e) = sqlx::query!(
+                "
+                    INSERT INTO other_keyword_topics_legis_init (
+                        topic, legislative_initiatives_id
+                    ) VALUES (
+                        $1, $2
+                    ) ON CONFLICT (legislative_initiatives_id, topic) 
+                    DO UPDATE SET 
+                        topic = EXCLUDED.topic
+                ",
+                db_other_keyword_topic.topic,
+                db_other_keyword_topic.legislative_initiatives_id
+            )
+            .execute(pool)
+            .await
             {
-                log::error!("Error inserting topic: '{e}'. The error occured for the following other keyword topic: {topic:?}")
+                log::error!("Error inserting other keyword topic: '{:?}'. The error occurred for the following other keyword topic: {:?}", e, db_other_keyword_topic);
             }
         }
 
         for document in &legis_init.documents {
-            let legis_doc = DbLegisDocument {
+            let db_legis_doc = DbLegisDocument {
                 legislative_initiatives_id: legis_init_id,
                 title: document.title.clone(),
                 document_type: document.ftype.to_string(),
                 document_url: document.link.clone(),
             };
 
-            if let Err(e) = diesel::insert_into(legislative_documents::table)
-                .values(&legis_doc)
-                .on_conflict((
-                    legislative_documents::document_url,
-                    legislative_documents::legislative_initiatives_id,
-                ))
-                .do_update()
-                .set(&legis_doc)
-                .execute(conn)
+            if let Err(e) = sqlx::query!(
+                "
+                    INSERT INTO legislative_documents (
+                        legislative_initiatives_id, title, document_type, document_url
+                    ) VALUES (
+                        $1, $2, $3, $4
+                    ) ON CONFLICT (document_url, legislative_initiatives_id) 
+                    DO UPDATE SET 
+                        title = EXCLUDED.title,
+                        document_type = EXCLUDED.document_type,
+                        document_url = EXCLUDED.document_url
+                ",
+                db_legis_doc.legislative_initiatives_id,
+                db_legis_doc.title,
+                db_legis_doc.document_type,
+                db_legis_doc.document_url
+            )
+            .execute(pool)
+            .await
             {
-                log::error!("Error inserting document: '{e}'. The error occured for the following document: {document:?}")
+                log::error!("Error inserting document: '{:?}'. The error occurred for the following document: {:?}", e, document);
             }
         }
     }
@@ -236,6 +295,7 @@ pub async fn run_shut_latest_gp(mut shutdown: Shutdown) {
             );
             50
         });
+
     while !shutdown.is_shutdown() {
         tokio::select! {
             _ = shutdown.recv() => {
@@ -246,7 +306,9 @@ pub async fn run_shut_latest_gp(mut shutdown: Shutdown) {
             _ = async {
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative (latest) scraper");
-                    legis_init_once(true).await;
+
+                    let pg_pool = connect_pg().await;
+                    legis_init_once(true, &pg_pool).await;
                 }).await {
                     log::error!("Error in legislative initiative (latest) scraper: {:?}", e);
                 }
@@ -279,7 +341,9 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown) {
             _ = async {
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative scraper");
-                    legis_init_once(false).await;
+
+                    let pg_pool = connect_pg().await;
+                    legis_init_once(false, &pg_pool).await;
                 }).await {
                     log::error!("Error in legislative initiative scraper: {:?}", e);
                 }
