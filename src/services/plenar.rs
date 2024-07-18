@@ -1,10 +1,6 @@
 use crate::{
-    models::{DbCallToOrder, DbDebate, DbPlenar, DbPlenarSpeech, DbPlenarSpeechLink},
-    schema::{call_to_order, debates, plenar_infos, plenar_speech_links, plenar_speeches},
-    services::scrape_untill_success,
-    Shutdown,
+    connect_pg, services::scrape_untill_success, Shutdown
 };
-use diesel::{ExpressionMethods, PgConnection, QueryDsl, QueryResult, RunQueryDsl};
 use scraper::{
     call_to_order::CallToOrderInfo,
     plenar::{Debate, Plenar, PlenarInfo},
@@ -29,7 +25,7 @@ async fn scrape_new_plenar_infos(scraper: &AustriaScraper) -> crate::Result<Vec<
     Ok(new_plenar_infos)
 }
 
-async fn plenar_info_once() -> Vec<PlenarInfo> {
+async fn plenar_info_once(pg_pool: &PgPool) -> Vec<PlenarInfo> {
     log::info!("Try scraping plenar info");
 
     let mut scraper = AustriaScraper::default();
@@ -48,14 +44,12 @@ async fn plenar_info_once() -> Vec<PlenarInfo> {
         );
     }
 
-    update_plenar_infos_in_db(&new_plenar_infos).await;
+    update_plenar_infos_in_db(&new_plenar_infos, pg_pool).await;
     new_plenar_infos
 }
 
-async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo]) {
+async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &PgPool) {
     log::info!("Updating plenar infos in database...");
-
-    let mut conn = crate::establish_connection();
 
     // disable with setting
     let mut text_extractor = scraper::TextExtractor::new(AustriaScraper::BASE_URL);
@@ -63,7 +57,7 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo]) {
     for plenar_info in new_plenar_infos {
         // let plenar_id = format!("{}/{}/{}", plenar_info.legislative_period, plenar_info.ityp, plenar_info.inr);
 
-        let plenar_id = match insert_plenar_info(plenar_info, &mut conn) {
+        let plenar_id = match insert_plenar_info(pg_pool, plenar_info).await {
             Ok(id) => id,
             Err(e) => {
                 log::error!(
@@ -74,7 +68,7 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo]) {
         };
 
         for call_to_order_entry in &plenar_info.call_to_orders {
-            if let Err(e) = insert_call_to_order(call_to_order_entry, plenar_id, &mut conn) {
+            if let Err(e) = insert_call_to_order(pg_pool, call_to_order_entry, plenar_id).await {
                 log::warn!("Error inserting call to order: '{e}'. Error occured for call to order: {call_to_order_entry:?}");
             }
         }
@@ -82,7 +76,7 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo]) {
         for debate in &plenar_info.debates {
             // get id from here, log here
 
-            let debate_id = match insert_debate(debate, plenar_id, &mut conn) {
+            let debate_id = match insert_debate(pg_pool, debate, plenar_id).await {
                 Ok(debate_id) => debate_id,
                 Err(e) => {
                     log::warn!(
@@ -94,7 +88,7 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo]) {
 
             for plenar_speech in &debate.speeches {
                 if let Err(e) =
-                    insert_plenar_speech(plenar_speech, debate_id, &mut conn, &mut text_extractor)
+                    insert_plenar_speech(pg_pool, plenar_speech, debate_id, &mut text_extractor)
                         .await
                 {
                     log::warn!(
@@ -106,156 +100,186 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo]) {
     }
 }
 
+use sqlx::PgPool;
+use log::{info, warn};
+
 static mut NO_OPINION_COUNT: usize = 0;
 
 async fn insert_plenar_speech(
+    pool: &PgPool,
     plenar_speech: &PlenarSpeech,
     val_debate_id: i32,
-    conn: &mut PgConnection,
     text_extractor: &mut TextExtractor,
-) -> QueryResult<()> {
-    let disable_speech_text = std::env::var("DISABLE_SPEECH_TEXT").unwrap_or("true".into());
-    let disable_speech_text = disable_speech_text == "true";
+) -> Result<(), sqlx::Error> {
+    let disable_speech_text = std::env::var("DISABLE_SPEECH_TEXT").unwrap_or_else(|_| "true".into()) == "true";
 
-    let db_plenar_speech = DbPlenarSpeech {
-        delegate_id: plenar_speech.delegate_id as i32,
-        debate_id: val_debate_id,
-        opinion: match &plenar_speech.opinion {
-            scraper::Opinion::Infavor => Some("Pro".into()),
-            scraper::Opinion::Against => Some("Contra".into()),
-            scraper::Opinion::Other(text) => {
-                unsafe { NO_OPINION_COUNT += 1 };
-                log::info!(
-                    "No opinion for speech: {:?}. 'Opinion': {text}, no opinion count: {}",
-                    plenar_speech.spoken_text_html_urls,
-                    unsafe { NO_OPINION_COUNT }
-                );
-                Some(text.clone())
-            }
-            scraper::Opinion::None => {
-                unsafe { NO_OPINION_COUNT += 1 };
-                log::info!(
-                    "No opinion for speech: {:?}, no opinion_count: {}",
-                    plenar_speech.spoken_text_html_urls,
-                    unsafe { NO_OPINION_COUNT }
-                );
-                None
-            }
-        },
-        spoken_text: None,
-        duration_in_seconds: plenar_speech.duration_in_seconds as i32,
-        ty: plenar_speech.ty.clone(),
+    let opinion = match &plenar_speech.opinion {
+        scraper::Opinion::Infavor => Some("Pro".to_string()),
+        scraper::Opinion::Against => Some("Contra".to_string()),
+        scraper::Opinion::Other(text) => {
+            unsafe { NO_OPINION_COUNT += 1 };
+            info!(
+                "No opinion for speech: {:?}. 'Opinion': {text}, no opinion count: {}",
+                plenar_speech.spoken_text_html_urls,
+                unsafe { NO_OPINION_COUNT }
+            );
+            Some(text.clone())
+        }
+        scraper::Opinion::None => {
+            unsafe { NO_OPINION_COUNT += 1 };
+            info!(
+                "No opinion for speech: {:?}, no opinion_count: {}",
+                plenar_speech.spoken_text_html_urls,
+                unsafe { NO_OPINION_COUNT }
+            );
+            None
+        }
     };
-    // Some(text_extractor.extract_text_from_url(&plenar_speech).await)
 
-    let plenar_speech_id = diesel::insert_into(plenar_speeches::table)
-        .values(&db_plenar_speech)
-        .on_conflict((plenar_speeches::debate_id, plenar_speeches::delegate_id))
-        .do_update()
-        .set(&db_plenar_speech)
-        .returning(plenar_speeches::id)
-        .get_result(conn)?;
+    let plenar_speech_id = sqlx::query!(
+        r#"
+        INSERT INTO plenar_speeches (delegate_id, debate_id, opinion, spoken_text, duration_in_seconds, ty)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (debate_id, delegate_id)
+        DO UPDATE SET
+            opinion = EXCLUDED.opinion,
+            spoken_text = EXCLUDED.spoken_text,
+            duration_in_seconds = EXCLUDED.duration_in_seconds,
+            ty = EXCLUDED.ty
+        RETURNING id
+        "#,
+        plenar_speech.delegate_id as i32,
+        val_debate_id,
+        opinion,
+        None::<String>, // spoken_text is initially None
+        plenar_speech.duration_in_seconds as i32,
+        plenar_speech.ty
+    )
+    .fetch_one(pool)
+    .await?
+    .id;
 
     for url in &plenar_speech.spoken_text_html_urls {
-        let psl = DbPlenarSpeechLink {
+        sqlx::query!(
+            r#"
+            INSERT INTO plenar_speech_links (plenar_speech_id, document_url)
+            VALUES ($1, $2)
+            ON CONFLICT (plenar_speech_id, document_url) DO NOTHING
+            "#,
             plenar_speech_id,
-            document_url: url.to_string(),
-        };
-        diesel::insert_into(plenar_speech_links::table)
-            .values(&psl)
-            .on_conflict((
-                plenar_speech_links::plenar_speech_id,
-                plenar_speech_links::document_url,
-            ))
-            .do_nothing()
-            .execute(conn)?;
+            url.to_string()
+        )
+        .execute(pool)
+        .await?;
     }
-    {
-        use crate::db::schema::plenar_speeches::dsl::plenar_speeches;
-        use crate::db::schema::plenar_speeches::{debate_id, delegate_id, spoken_text};
 
-        let has_spoken_text: Vec<Option<String>> = plenar_speeches
-            .select(spoken_text)
-            .filter(debate_id.eq(db_plenar_speech.debate_id))
-            .filter(delegate_id.eq(db_plenar_speech.delegate_id))
-            .load::<Option<String>>(conn)?;
-        if has_spoken_text.len() == 1 && has_spoken_text[0].is_none() {
-            let Some(text_html_url) = plenar_speech.spoken_text_html_urls.first() else {
-                log::warn!(
-                    "DEBATE_ID: {val_debate_id}, No spoken text html urls for plenar speech: {:?}",
-                    plenar_speech
-                );
-                return Ok(());
-            };
+    let existing_spoken_text = sqlx::query!(
+        r#"
+        SELECT spoken_text FROM plenar_speeches
+        WHERE debate_id = $1 AND delegate_id = $2
+        "#,
+        val_debate_id,
+        plenar_speech.delegate_id as i32
+    )
+    .fetch_optional(pool)
+    .await?;
 
-            let updated_spoken_text = if disable_speech_text {
-                None
+    if let Some(record) = existing_spoken_text {
+        if record.spoken_text.is_none() {
+            if let Some(text_html_url) = plenar_speech.spoken_text_html_urls.first() {
+                let updated_spoken_text = if disable_speech_text {
+                    None
+                } else {
+                    Some(text_extractor.extract_text_from_url(text_html_url).await)
+                };
+
+                sqlx::query!(
+                    r#"
+                    UPDATE plenar_speeches
+                    SET spoken_text = $1
+                    WHERE debate_id = $2 AND delegate_id = $3
+                    "#,
+                    updated_spoken_text,
+                    val_debate_id,
+                    plenar_speech.delegate_id as i32
+                )
+                .execute(pool)
+                .await?;
             } else {
-                Some(text_extractor.extract_text_from_url(text_html_url).await)
-            };
-
-            diesel::update(plenar_speeches)
-                .filter(debate_id.eq(db_plenar_speech.debate_id))
-                .filter(delegate_id.eq(db_plenar_speech.delegate_id))
-                .set(spoken_text.eq(updated_spoken_text))
-                .execute(conn)?;
+                warn!(
+                    "DEBATE_ID: {}, No spoken text html urls for plenar speech: {:?}",
+                    val_debate_id, plenar_speech
+                );
+            }
         }
     }
+
     Ok(())
 }
 
-fn insert_debate(debate: &Debate, plenar_id: i32, conn: &mut PgConnection) -> QueryResult<i32> {
-    let db_debate = DbDebate {
+async fn insert_debate(pool: &PgPool, debate: &Debate, plenar_id: i32) -> Result<i32, sqlx::Error> {
+    let result = sqlx::query!(
+        r#"
+        INSERT INTO debates (plenar_id, about)
+        VALUES ($1, $2)
+        ON CONFLICT (plenar_id, about)
+        DO UPDATE SET about = EXCLUDED.about
+        RETURNING id
+        "#,
         plenar_id,
-        about: debate.about.clone(),
-    };
-    diesel::insert_into(debates::table)
-        .values(&db_debate)
-        .on_conflict((debates::plenar_id, debates::about))
-        .do_update()
-        .set(&db_debate)
-        .returning(debates::id)
-        .get_result(conn)
+        debate.about
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok(result.id)
 }
 
-pub fn insert_plenar_info(plenar_info: &PlenarInfo, conn: &mut PgConnection) -> QueryResult<i32> {
-    let db_plenar_info = DbPlenar {
-        inr: plenar_info.inr as i32,
-        title: plenar_info.title.clone(),
-        description: plenar_info.description.clone(),
-        add_date: plenar_info.date.clone(),
-        legislative_period: plenar_info.legislative_period.clone(),
-    };
-    diesel::insert_into(plenar_infos::table)
-        .values(&db_plenar_info)
-        .on_conflict((
-            plenar_infos::inr,
-            plenar_infos::add_date,
-            plenar_infos::legislative_period,
-        ))
-        .do_update()
-        .set(&db_plenar_info)
-        .returning(plenar_infos::id)
-        .get_result::<i32>(conn)
+pub async fn insert_plenar_info(pool: &PgPool, plenar_info: &PlenarInfo) -> Result<i32, sqlx::Error> {
+    let result = sqlx::query!(
+        r#"
+        INSERT INTO plenar_infos (inr, title, description, add_date, legislative_period)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (inr, add_date, legislative_period)
+        DO UPDATE SET
+            title = EXCLUDED.title,
+            description = EXCLUDED.description
+        RETURNING id
+        "#,
+        plenar_info.inr as i32,
+        plenar_info.title,
+        plenar_info.description,
+        plenar_info.date.and_utc(),
+        plenar_info.legislative_period
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok(result.id)
 }
 
-pub fn insert_call_to_order(
+pub async fn insert_call_to_order(
+    pool: &PgPool,
     call_to_order: &CallToOrderInfo,
     plenar_id: i32,
-    conn: &mut PgConnection,
-) -> QueryResult<usize> {
-    let db_call_to_order = DbCallToOrder {
-        id: format!("{}/{}", call_to_order.ityp, call_to_order.inr),
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        r#"
+        INSERT INTO call_to_order (id, plenar_id, inr, receiver_id)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (id) DO NOTHING
+        "#,
+        format!("{}/{}", call_to_order.ityp, call_to_order.inr),
         plenar_id,
-        inr: call_to_order.inr as i32,
-        receiver_id: call_to_order.receiver_id.clone() as i32,
-    };
-    diesel::insert_into(call_to_order::table)
-        .values(&db_call_to_order)
-        .on_conflict(call_to_order::id)
-        .do_nothing()
-        .execute(conn)
+        call_to_order.inr as i32,
+        call_to_order.receiver_id as i32
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
 }
+
 
 pub async fn run_shut(mut shutdown: Shutdown) {
     let plenar_sleep = std::env::var("PLENAR_SLEEP")
@@ -278,7 +302,8 @@ pub async fn run_shut(mut shutdown: Shutdown) {
             _ = async {
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting plenar info scraper");
-                    plenar_info_once().await;
+                    let pg_pool = connect_pg().await;
+                    plenar_info_once(&pg_pool).await;
                 }).await {
                     log::error!("Error in plenar info scraper: {:?}", e);
                 }
