@@ -1,27 +1,29 @@
-use diesel::RunQueryDsl;
 use scraper::{parties::Parties, AustriaScraper, Party};
 
-use crate::{models::DbParty, schema::parties, scrape_untill_success, Shutdown};
+use crate::{connect_pg, scrape_untill_success, Shutdown};
 
-pub fn update_parties_in_db(parties: &[Party]) {
-    let conn = &mut crate::establish_connection();
+use sqlx::PgPool;
 
+pub async fn update_parties_in_db2(pool: &PgPool, parties: &[Party]) -> Result<(), sqlx::Error> {
     for party in parties {
-        let db_party = DbParty {
-            name: party.name.clone(),
-            fraction: party.fraction as i32,
-            color: party.color.clone(),
-        };
-        diesel::insert_into(parties::table)
-            .values(&db_party)
-            .on_conflict(parties::name)
-            .do_nothing()
-            .execute(conn)
-            .expect("Error saving new party");
+        sqlx::query!(
+            r#"
+            INSERT INTO parties (name, fraction, color)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (name) DO NOTHING
+            "#,
+            party.name,
+            party.fraction as i32,
+            party.color
+        )
+        .execute(pool)
+        .await?;
     }
+
+    Ok(())
 }
 
-pub async fn parties_once() {
+pub async fn parties_once(pg_pool: &PgPool) {
     let mut scraper = AustriaScraper::default();
     for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
         scraper.scrape_info.gp = vec![gp.into()];
@@ -31,7 +33,7 @@ pub async fn parties_once() {
         })
         .await;
 
-        update_parties_in_db(&parties);
+        update_parties_in_db2(pg_pool, &parties).await.unwrap();
     }
 }
 
@@ -59,7 +61,8 @@ pub async fn run_shut(mut shutdown: Shutdown) {
                 }).await {
                     log::error!("Error in party scraper: {:?}", e);
                 }
-                parties_once().await;
+                let pg_pool = connect_pg().await;
+                parties_once(&pg_pool).await;
                 log::info!("Party scraper service sleeps for {party_sleep} seconds...");
                 tokio::time::sleep(tokio::time::Duration::from_secs(party_sleep)).await;
             } => {}

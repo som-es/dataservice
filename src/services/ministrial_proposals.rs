@@ -1,4 +1,4 @@
-use diesel::{connection::SimpleConnection, RunQueryDsl};
+use diesel::RunQueryDsl;
 use scraper::{
     ministrial_proposals::{MinistrialProposal, MinistrialProposalScraper},
     proposals::ProposalsPayload,
@@ -7,16 +7,13 @@ use scraper::{
 use tokio::time::Instant;
 
 use crate::{
-    models::{
+    connect_pg, models::{
         DbEurovocTopicMinsistrialProposals, DbMinistrialProposal, DbMinistrialProposalDocument,
         DbOtherKeywordTopicMinistrialProposals, DbTopicMinistrialProposals,
-    },
-    schema::{
+    }, schema::{
         eurovoc_topics_ministrial_proposals, ministrial_proposals, ministrial_proposals_documents,
         other_keyword_topics_ministrial_proposals, topics_ministrial_proposals,
-    },
-    services::scrape_untill_success,
-    Shutdown,
+    }, services::scrape_untill_success, Shutdown
 };
 
 pub async fn scrape_new_ministrial_props(
@@ -45,7 +42,7 @@ pub async fn scrape_new_ministrial_props(
     Ok(new_ministrial_props)
 }
 
-async fn ministrial_proposal_once(only_latest: bool) -> Vec<MinistrialProposal> {
+async fn ministrial_proposal_once(only_latest: bool, pg_pool: &PgPool) -> Vec<MinistrialProposal> {
     log::info!("Try scraping ministiral proposals");
     let mut scraper = AustriaScraper::default();
 
@@ -58,7 +55,7 @@ async fn ministrial_proposal_once(only_latest: bool) -> Vec<MinistrialProposal> 
         })
         .await;
 
-        update_ministrial_proposals_in_db(&new_ministrial_props);
+        update_ministrial_proposals_in_db2(pg_pool, &new_ministrial_props).await.unwrap();
         if only_latest {
             break;
         }
@@ -66,6 +63,135 @@ async fn ministrial_proposal_once(only_latest: bool) -> Vec<MinistrialProposal> 
 
     // new_legis_inits
     vec![]
+}
+
+use sqlx::postgres::PgPool;
+
+pub async fn update_ministrial_proposals_in_db2(
+    pool: &PgPool,
+    ministrial_props: &[MinistrialProposal]
+) -> Result<(), sqlx::Error> {
+    log::info!("Updating ministrial proposal in database...");
+
+    for ministrial_prop in ministrial_props {
+        log::info!("inserting single ministrial prop");
+        
+        let start = Instant::now();
+        // Insert or update the ministrial proposal
+        let ministrial_prop_id = sqlx::query!(
+            r#"
+            INSERT INTO ministrial_proposals (
+                title, inr, emphasis, description, ityp, gp, created_at, updated_at,
+                due_to, ressort, ressort_shortform, legis_init_gp, legis_init_inr, legis_init_ityp
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            ON CONFLICT (inr, ityp, gp)
+            DO UPDATE SET
+                title = EXCLUDED.title,
+                emphasis = EXCLUDED.emphasis,
+                description = EXCLUDED.description,
+                created_at = EXCLUDED.created_at,
+                updated_at = EXCLUDED.updated_at,
+                due_to = EXCLUDED.due_to,
+                ressort = EXCLUDED.ressort,
+                ressort_shortform = EXCLUDED.ressort_shortform,
+                legis_init_gp = EXCLUDED.legis_init_gp,
+                legis_init_inr = EXCLUDED.legis_init_inr,
+                legis_init_ityp = EXCLUDED.legis_init_ityp
+            RETURNING id
+            "#,
+            ministrial_prop.title,
+            ministrial_prop.inr as i32,
+            ministrial_prop.emphasis,
+            ministrial_prop.description,
+            ministrial_prop.ityp,
+            ministrial_prop.gp,
+            ministrial_prop.created_at.and_utc(),
+            ministrial_prop.updated_at.map(|x| x.and_utc()),
+            ministrial_prop.gegenstand_info.due_to,
+            ministrial_prop.gegenstand_info.ressort,
+            ministrial_prop.gegenstand_info.ressort_shortform,
+            ministrial_prop.legis_gp,
+            ministrial_prop.legis_init_inr.map(|x| x as i32),
+            ministrial_prop.legis_init_ityp
+        )
+        .fetch_one(pool)
+        .await?
+        .id;
+        log::info!("insertion dur: {:?}", start.elapsed());
+
+        // Insert or update topics
+        for topic in &ministrial_prop.topics {
+            sqlx::query!(
+                r#"
+                INSERT INTO topics_ministrial_proposals (topic, ministrial_proposal_id)
+                VALUES ($1, $2)
+                ON CONFLICT (ministrial_proposal_id, topic)
+                DO UPDATE SET topic = EXCLUDED.topic
+                "#,
+                topic,
+                ministrial_prop_id
+            )
+            .execute(pool)
+            .await?;
+        }
+
+        // Insert or update eurovoc topics
+        for topic in &ministrial_prop.eurovoc_topics {
+            sqlx::query!(
+                r#"
+                INSERT INTO eurovoc_topics_ministrial_proposals (topic, ministrial_proposal_id)
+                VALUES ($1, $2)
+                ON CONFLICT (ministrial_proposal_id, topic)
+                DO UPDATE SET topic = EXCLUDED.topic
+                "#,
+                topic,
+                ministrial_prop_id
+            )
+            .execute(pool)
+            .await?;
+        }
+
+        // Insert or update other keyword topics
+        for topic in &ministrial_prop.other_keyword_topics {
+            sqlx::query!(
+                r#"
+                INSERT INTO other_keyword_topics_ministrial_proposals (topic, ministrial_proposal_id)
+                VALUES ($1, $2)
+                ON CONFLICT (ministrial_proposal_id, topic)
+                DO UPDATE SET topic = EXCLUDED.topic
+                "#,
+                topic,
+                ministrial_prop_id
+            )
+            .execute(pool)
+            .await?;
+        }
+
+        // Insert or update documents
+        for document in &ministrial_prop.documents {
+            sqlx::query!(
+                r#"
+                INSERT INTO ministrial_proposals_documents (
+                    ministrial_proposal_id, title, document_type, document_url
+                )
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT (document_url, ministrial_proposal_id)
+                DO UPDATE SET
+                    title = EXCLUDED.title,
+                    document_type = EXCLUDED.document_type
+                "#,
+                ministrial_prop_id,
+                document.title,
+                document.ftype.to_string(),
+                document.link
+            )
+            .execute(pool)
+            .await?;
+        }
+    }
+
+    Ok(())
 }
 
 fn update_ministrial_proposals_in_db(ministrial_props: &[MinistrialProposal]) {
@@ -215,7 +341,8 @@ pub async fn run_shut_latest_gp(mut shutdown: Shutdown) {
             _ = async {
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting ministrial proposal (latest) scraper");
-                    ministrial_proposal_once(true).await;
+                    let pg_pool = connect_pg().await;
+                    ministrial_proposal_once(true, &pg_pool).await;
                 }).await {
                     log::error!("Error in ministrial proposal (latest) scraper: {:?}", e);
                 }
@@ -248,7 +375,9 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown) {
             _ = async {
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting ministrial proposal scraper");
-                    ministrial_proposal_once(false).await;
+
+                    let pg_pool = connect_pg().await;
+                    ministrial_proposal_once(false, &pg_pool).await;
                 }).await {
                     log::error!("Error in ministrial proposal scraper: {:?}", e);
                 }
