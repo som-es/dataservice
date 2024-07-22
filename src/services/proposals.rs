@@ -1,8 +1,8 @@
 use dotenvy::dotenv;
 use log::error;
 use scraper::{
-    proposals::{Proposal, ProposalScraper, ProposalsPayload},
-    AustriaScraper,
+    proposals::{ProposalScraper, ProposalsPayload},
+    AustriaScraper, Proposal,
 };
 
 use crate::{connect_pg, Shutdown};

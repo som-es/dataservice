@@ -20,7 +20,7 @@ async fn scrape_new_delegates(prev_delegates: &HashSet<Delegate>) -> crate::Resu
     let persons = scraper.post_persons_payload().await?;
     for person_path in scraper.person_paths(persons).unwrap_or_default() {
         // println!("person_path: {person_path}");
-        let Ok(delegate) = scraper.get_delegate(&person_path).await else {
+        let Ok(delegate) = scraper.get_delegate(person_path).await else {
             continue;
         };
 

@@ -58,7 +58,7 @@ async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<Legislative
     vec![]
 }
 
-async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[LegislativeInitiative]) {
+pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[LegislativeInitiative]) {
     log::info!("Updating legislative initiatives in database...");
 
     for legis_init in new_legis_inits {
@@ -74,6 +74,7 @@ async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[LegislativeI
             appeared_at: Some(legis_init.created_at),
             updated_at: legis_init.updated_at,
         };
+        println!("db_legis_init: {db_legis_init:?}");
 
         let legis_init_id = match sqlx::query!(
             "
@@ -365,7 +366,9 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown) {
 #[cfg(test)]
 mod tests {
     use chrono::NaiveDateTime;
-    use scraper::AustriaScraper;
+    use scraper::{legis_init::LegislativeInitiatives, AustriaScraper};
+
+    use crate::connect_pg;
 
     #[test]
     fn test_date_time_parse() {
@@ -376,6 +379,14 @@ mod tests {
     #[tokio::test]
     async fn test_legis_init_empty_gp_scrape() {
         let mut scraper: AustriaScraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/I/2269")
+            .await
+            .unwrap();
+
+        let pool = connect_pg().await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res]).await;
+
         // println!("s: {:?}", scraper.scrape_info.gp);
 
         // let out = crate::legislative_initiatives::scrape_new_legis_inits(&scraper).await.unwrap();
