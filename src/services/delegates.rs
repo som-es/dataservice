@@ -12,6 +12,22 @@ use crate::{
     Shutdown,
 };
 
+async fn scrape_new_delegates_bs() -> crate::Result<Vec<Delegate>> {
+    let scraper = AustriaScraper::default();
+
+    let persons = scraper.post_persons_payload_bs().await?;
+    let mut delegates = vec![];
+
+    let persons = scraper.post_persons_payload().await?;
+    for person_path in scraper.person_paths(persons).unwrap_or_default() {
+        let Ok(delegate) = scraper.get_delegate(person_path).await else {
+            continue;
+        };
+        delegates.push(delegate);
+    }
+    Ok(delegates)
+}
+
 async fn scrape_new_delegates(prev_delegates: &HashSet<Delegate>) -> crate::Result<Vec<Delegate>> {
     let scraper = AustriaScraper::default();
 
@@ -183,8 +199,54 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &PgPool) {
                 log::error!("Error adding mandate ({mandate:?}) for delegate {delegate:?}: {e}",);
             }
         }
+
+        if let Err(e) = delete_all_delegate_divisions(delegate.id as i32, pg_pool).await {
+            log::error!("could not delete  divisions for {delegate:?}: {e}");
+        }
+        if let Some(divisions) = &delegate.divisions {
+            for division in divisions {
+                if let Err(e) = insert_delegate_division(division, delegate.id as i32, pg_pool).await {
+                    log::error!(
+                        "Error adding division ({division:?}) for delegate {delegate:?}: {e}",
+                    );
+                }
+            }
+        }
     }
     // Ok(())
+}
+
+pub async fn delete_all_delegate_divisions(
+    delegate_id: i32,
+    pg: &PgPool,
+) -> sqlx::Result<PgQueryResult> {
+    sqlx::query!(
+        "delete from delegates_divisions where delegate_id = $1",
+        delegate_id
+    )
+    .execute(pg)
+    .await
+}
+
+pub async fn insert_delegate_division(
+    division: &str,
+    delegate_id: i32,
+    pg: &PgPool,
+) -> sqlx::Result<PgQueryResult> {
+    // mind that if a delegate looses this stuff it will still be active inside it
+    sqlx::query!(
+        "
+        insert into delegates_divisions(delegate_id, division) values ($1, $2)
+        ON CONFLICT (delegate_id, division) 
+            DO UPDATE SET 
+                delegate_id = EXCLUDED.delegate_id,
+                division = EXCLUDED.division
+        ",
+        delegate_id,
+        division
+    )
+    .execute(pg)
+    .await
 }
 
 pub async fn insert_mandate(
@@ -237,10 +299,22 @@ pub async fn delegates_once(prev_delegates: &HashSet<Delegate>) -> Vec<Delegate>
 
     log::info!("Scraping all delegates...");
 
-    let new_delegates = scrape_untill_success::<Vec<Delegate>, _>(|| async {
+    let mut new_delegates = scrape_untill_success::<Vec<Delegate>, _>(|| async {
         scrape_new_delegates(&prev_delegates).await
     })
     .await;
+
+    let new_delegates_bs =
+        scrape_untill_success::<Vec<Delegate>, _>(|| async { scrape_new_delegates_bs().await })
+            .await;
+
+    for new_delegate in &mut new_delegates {
+        for new_delegate_bs in &new_delegates_bs {
+            if new_delegate_bs.id == new_delegate.id {
+                new_delegate.divisions = new_delegate_bs.divisions.clone();
+            }
+        }
+    }
 
     update_delegates_in_db(&new_delegates, &pg_pool).await;
 

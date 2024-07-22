@@ -202,7 +202,9 @@ async fn proposals_once(pg_pool: &PgPool) {
 
     let new_proposals =
         scrape_untill_success::<Vec<String>, _>(|| async { scrape_new_proposals().await }).await;
-    update_proposals_in_db2(pg_pool, &new_proposals).await.unwrap();
+    update_proposals_in_db2(pg_pool, &new_proposals)
+        .await
+        .unwrap();
 }
 
 async fn proposals_once_last_5_days(pg_pool: &PgPool) {

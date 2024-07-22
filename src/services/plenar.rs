@@ -1,6 +1,4 @@
-use crate::{
-    connect_pg, services::scrape_untill_success, Shutdown
-};
+use crate::{connect_pg, services::scrape_untill_success, Shutdown};
 use scraper::{
     call_to_order::CallToOrderInfo,
     plenar::{Debate, Plenar, PlenarInfo},
@@ -100,8 +98,8 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
     }
 }
 
-use sqlx::PgPool;
 use log::{info, warn};
+use sqlx::PgPool;
 
 static mut NO_OPINION_COUNT: usize = 0;
 
@@ -111,7 +109,8 @@ async fn insert_plenar_speech(
     val_debate_id: i32,
     text_extractor: &mut TextExtractor,
 ) -> Result<(), sqlx::Error> {
-    let disable_speech_text = std::env::var("DISABLE_SPEECH_TEXT").unwrap_or_else(|_| "true".into()) == "true";
+    let disable_speech_text =
+        std::env::var("DISABLE_SPEECH_TEXT").unwrap_or_else(|_| "true".into()) == "true";
 
     let opinion = match &plenar_speech.opinion {
         scraper::Opinion::Infavor => Some("Pro".to_string()),
@@ -235,7 +234,10 @@ async fn insert_debate(pool: &PgPool, debate: &Debate, plenar_id: i32) -> Result
     Ok(result.id)
 }
 
-pub async fn insert_plenar_info(pool: &PgPool, plenar_info: &PlenarInfo) -> Result<i32, sqlx::Error> {
+pub async fn insert_plenar_info(
+    pool: &PgPool,
+    plenar_info: &PlenarInfo,
+) -> Result<i32, sqlx::Error> {
     let result = sqlx::query!(
         r#"
         INSERT INTO plenar_infos (inr, title, description, add_date, legislative_period)
@@ -279,7 +281,6 @@ pub async fn insert_call_to_order(
 
     Ok(())
 }
-
 
 pub async fn run_shut(mut shutdown: Shutdown) {
     let plenar_sleep = std::env::var("PLENAR_SLEEP")

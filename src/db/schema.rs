@@ -61,6 +61,23 @@ diesel::table! {
 }
 
 diesel::table! {
+    delegates_divisions (id) {
+        id -> Int4,
+        delegate_id -> Int4,
+        division -> Nullable<Varchar>,
+    }
+}
+
+diesel::table! {
+    emphasis_dataset (id) {
+        id -> Int4,
+        instruction -> Varchar,
+        input -> Text,
+        output -> Text,
+    }
+}
+
+diesel::table! {
     eurovoc_topics_legis_init (id) {
         id -> Int4,
         topic -> Varchar,
@@ -148,6 +165,14 @@ diesel::table! {
         title -> Nullable<Varchar>,
         document_type -> Varchar,
         document_url -> Varchar,
+    }
+}
+
+diesel::table! {
+    other_keyword_topics (id) {
+        id -> Int4,
+        topic -> Varchar,
+        legislative_initiatives_id -> Int4,
     }
 }
 
@@ -314,12 +339,14 @@ diesel::joinable!(call_to_order -> delegates (receiver_id));
 diesel::joinable!(call_to_order -> plenar_infos (plenar_id));
 diesel::joinable!(debates -> plenar_infos (plenar_id));
 diesel::joinable!(delegates -> contacts (id));
+diesel::joinable!(delegates_divisions -> delegates (delegate_id));
 diesel::joinable!(eurovoc_topics_legis_init -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(eurovoc_topics_ministrial_proposals -> ministrial_proposals (ministrial_proposal_id));
 diesel::joinable!(eurovoc_topics_proposals -> proposals (proposals_id));
 diesel::joinable!(legislative_documents -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(mandates -> delegates (delegate_id));
 diesel::joinable!(ministrial_proposals_documents -> ministrial_proposals (ministrial_proposal_id));
+diesel::joinable!(other_keyword_topics -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(other_keyword_topics_legis_init -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(other_keyword_topics_ministrial_proposals -> ministrial_proposals (ministrial_proposal_id));
 diesel::joinable!(other_keyword_topics_proposals -> proposals (proposals_id));
@@ -344,6 +371,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     contacts,
     debates,
     delegates,
+    delegates_divisions,
+    emphasis_dataset,
     eurovoc_topics_legis_init,
     eurovoc_topics_ministrial_proposals,
     eurovoc_topics_proposals,
@@ -352,6 +381,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     mandates,
     ministrial_proposals,
     ministrial_proposals_documents,
+    other_keyword_topics,
     other_keyword_topics_legis_init,
     other_keyword_topics_ministrial_proposals,
     other_keyword_topics_proposals,
