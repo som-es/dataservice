@@ -15,12 +15,11 @@ use crate::{
 async fn scrape_new_delegates_bs() -> crate::Result<Vec<Delegate>> {
     let scraper = AustriaScraper::default();
 
-    let persons = scraper.post_persons_payload_bs().await?;
     let mut delegates = vec![];
 
-    let persons = scraper.post_persons_payload().await?;
-    for person_path in scraper.person_paths(persons).unwrap_or_default() {
-        let Ok(delegate) = scraper.get_delegate(person_path).await else {
+    let persons = scraper.post_persons_payload_bs().await?;
+    for person_path in scraper.person_paths_bs(persons).unwrap_or_default() {
+        let Ok(delegate) = scraper.get_delegate_bs(person_path).await else {
             continue;
         };
         delegates.push(delegate);
@@ -299,14 +298,14 @@ pub async fn delegates_once(prev_delegates: &HashSet<Delegate>) -> Vec<Delegate>
 
     log::info!("Scraping all delegates...");
 
+    let new_delegates_bs =
+        scrape_untill_success::<Vec<Delegate>, _>(|| async { scrape_new_delegates_bs().await })
+            .await;
+
     let mut new_delegates = scrape_untill_success::<Vec<Delegate>, _>(|| async {
         scrape_new_delegates(&prev_delegates).await
     })
     .await;
-
-    let new_delegates_bs =
-        scrape_untill_success::<Vec<Delegate>, _>(|| async { scrape_new_delegates_bs().await })
-            .await;
 
     for new_delegate in &mut new_delegates {
         for new_delegate_bs in &new_delegates_bs {
