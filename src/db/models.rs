@@ -117,6 +117,8 @@ pub struct DbLegislativeInitiative {
     pub created_at: NaiveDate,
     pub appeared_at: Option<NaiveDateTime>,
     pub updated_at: Option<NaiveDateTime>,
+    pub requires_simple_majority: bool,
+    pub was_invisibly_declined: bool,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

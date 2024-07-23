@@ -13,5 +13,7 @@ create table legislative_initiatives (
     created_at date not null default now(),
     appeared_at timestamptz,
     updated_at timestamptz,
+    requires_simple_majority boolean default false,
+    was_invisibly_declined boolean default false,
     UNIQUE (inr, ityp, gp)
 );
