@@ -76,7 +76,7 @@ pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[Legislat
             requires_simple_majority: legis_init.requires_simple_majority,
             was_invisibly_declined: legis_init.was_invisibly_declined,
         };
-        println!("db_legis_init: {db_legis_init:?}");
+        // println!("db_legis_init: {db_legis_init:?}");
 
         let legis_init_id = match sqlx::query!(
             "
@@ -93,7 +93,9 @@ pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[Legislat
                     accepted = EXCLUDED.accepted,
                     created_at = EXCLUDED.created_at,
                     appeared_at = EXCLUDED.appeared_at,
-                    updated_at = EXCLUDED.updated_at
+                    updated_at = EXCLUDED.updated_at,
+                    requires_simple_majority = EXCLUDED.requires_simple_majority,
+                    was_invisibly_declined = EXCLUDED.was_invisibly_declined
                 RETURNING id
             ",
             db_legis_init.title,
