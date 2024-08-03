@@ -106,8 +106,8 @@ pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[Legislat
             db_legis_init.gp,
             db_legis_init.accepted,
             db_legis_init.created_at,
-            db_legis_init.appeared_at.map(|x| x.and_utc()),
-            db_legis_init.updated_at.map(|x| x.and_utc()),
+            db_legis_init.appeared_at,
+            db_legis_init.updated_at,
             db_legis_init.requires_simple_majority,
             db_legis_init.was_invisibly_declined,
         )

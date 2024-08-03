@@ -78,8 +78,8 @@ pub async fn update_proposals_in_db2(
             proposal.description,
             proposal.ityp,
             proposal.gp,
-            proposal.created_at.and_utc(),
-            proposal.updated_at.map(|x| x.and_utc())
+            proposal.created_at,
+            proposal.updated_at
         )
         .execute(pool)
         .await?;

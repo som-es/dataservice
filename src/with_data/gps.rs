@@ -22,7 +22,7 @@ pub async fn gps(pg: &PgPool) -> Result<Vec<LegislativePeriod>, Box<dyn std::err
     .into_iter()
     .map(|gp| LegislativePeriod {
         gp: gp.gp,
-        start_date: gp.start_date.unwrap().naive_utc().date(),
+        start_date: gp.start_date.unwrap().date(),
     })
     .collect())
 }

@@ -11,8 +11,8 @@ create table legislative_initiatives (
     accepted boolean,
     -- rename this to handled_at
     created_at date not null default now(),
-    appeared_at timestamptz,
-    updated_at timestamptz,
+    appeared_at timestamp,
+    updated_at timestamp,
     requires_simple_majority boolean default true,
     was_invisibly_declined boolean default false,
     UNIQUE (inr, ityp, gp)

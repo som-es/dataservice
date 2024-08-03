@@ -2,7 +2,7 @@
 CREATE TABLE plenar_infos (
     -- use serial id -> add inr, and UNIQUE of (inr, ityp, gp)
     id serial primary key,
-    add_date timestamptz not null,
+    add_date timestamp not null,
     inr int not null,
     title varchar(255) not null,
     description varchar(255) not null,

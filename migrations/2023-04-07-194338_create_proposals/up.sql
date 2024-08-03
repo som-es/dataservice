@@ -5,6 +5,6 @@ create table proposals (
     gp varchar(7) not null,
     title text not null,
     description text,
-    created_at timestamptz not null,
-    updated_at timestamptz
+    created_at timestamp not null,
+    updated_at timestamp
 );

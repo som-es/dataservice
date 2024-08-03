@@ -165,10 +165,12 @@ pub struct DbMinistrialProposalQuery {
     pub legis_init_inr: i32,
     pub legis_init_ityp: String,
 }
+use sqlx::FromRow;
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
+    FromRow
 )]
 #[diesel(table_name = legislative_initiatives)]
 pub struct DbLegislativeInitiativeQuery {

@@ -251,7 +251,7 @@ pub async fn insert_plenar_info(
         plenar_info.inr as i32,
         plenar_info.title,
         plenar_info.description,
-        plenar_info.date.and_utc(),
+        plenar_info.date,
         plenar_info.legislative_period
     )
     .fetch_one(pool)
