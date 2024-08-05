@@ -10,7 +10,7 @@ use crate::{
     connect_pg, models::{
         DbEurovocTopicLegisInit, DbLegisDocument, DbLegislativeInitiative,
         DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote,
-    }, services::scrape_untill_success, with_data::all_parties_latest_gp, Shutdown
+    }, services::scrape_untill_success, with_data::all_parties_at_gp, Shutdown
 };
 
 pub async fn scrape_new_legis_inits(
@@ -50,7 +50,7 @@ async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<Legislative
         })
         .await;
 
-        update_legis_inits_in_db(pg_pool, &new_legis_inits).await;
+        update_legis_inits_in_db(pg_pool, &new_legis_inits, gp).await;
         if only_latest {
             break;
         }
@@ -60,10 +60,10 @@ async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<Legislative
     vec![]
 }
 
-pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[LegislativeInitiative]) {
+pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[LegislativeInitiative], gp: &str) {
     log::info!("Updating legislative initiatives in database...");
 
-    let code_to_parties = all_parties_latest_gp(pool)
+    let code_to_parties = all_parties_at_gp(pool, gp)
         .await
         .unwrap_or_default()
         .into_iter()
@@ -451,7 +451,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res]).await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], "XXVII").await;
 
         // println!("s: {:?}", scraper.scrape_info.gp);
 
