@@ -111,12 +111,11 @@ diesel::table! {
         emphasis -> Nullable<Varchar>,
         title -> Text,
         description -> Text,
-        accepted -> Nullable<Bool>,
+        accepted -> Nullable<Varchar>,
         created_at -> Date,
-        appeared_at -> Nullable<Timestamptz>,
-        updated_at -> Nullable<Timestamptz>,
+        appeared_at -> Nullable<Timestamp>,
+        updated_at -> Nullable<Timestamp>,
         requires_simple_majority -> Nullable<Bool>,
-        was_invisibly_declined -> Nullable<Bool>,
     }
 }
 
@@ -140,8 +139,8 @@ diesel::table! {
         emphasis -> Nullable<Varchar>,
         title -> Text,
         description -> Text,
-        created_at -> Timestamptz,
-        updated_at -> Nullable<Timestamptz>,
+        created_at -> Timestamp,
+        updated_at -> Nullable<Timestamp>,
         due_to -> Date,
         ressort -> Nullable<Varchar>,
         ressort_shortform -> Nullable<Varchar>,
@@ -196,7 +195,7 @@ diesel::table! {
 diesel::table! {
     plenar_infos (id) {
         id -> Int4,
-        add_date -> Timestamptz,
+        add_date -> Timestamp,
         inr -> Int4,
         title -> Varchar,
         description -> Varchar,
@@ -249,8 +248,8 @@ diesel::table! {
         gp -> Varchar,
         title -> Text,
         description -> Nullable<Text>,
-        created_at -> Timestamptz,
-        updated_at -> Nullable<Timestamptz>,
+        created_at -> Timestamp,
+        updated_at -> Nullable<Timestamp>,
     }
 }
 

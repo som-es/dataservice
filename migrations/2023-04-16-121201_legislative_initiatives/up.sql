@@ -8,12 +8,12 @@ create table legislative_initiatives (
     emphasis varchar(6000),
     title text not null,
     description text not null,
-    accepted boolean,
+    accepted varchar(2),
     -- rename this to handled_at
     created_at date not null default now(),
     appeared_at timestamp,
     updated_at timestamp,
     requires_simple_majority boolean default true,
-    was_invisibly_declined boolean default false,
+    -- was_invisibly_declined boolean default false,
     UNIQUE (inr, ityp, gp)
 );

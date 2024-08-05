@@ -222,7 +222,7 @@ pub async fn run_shut_latest_gp(mut shutdown: Shutdown) {
 
 pub async fn run_shut_every_gp(mut shutdown: Shutdown) {
     let legis_init_sleep = std::env::var("MINISTRIAL_PROPOSAL_SLEEP")
-        .unwrap_or_else(|_| "300".to_string())
+        .unwrap_or_else(|_| "900".to_string())
         .parse()
         .unwrap_or_else(|e| {
             log::warn!(

@@ -69,12 +69,11 @@ pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[Legislat
             description: legis_init.description.clone(),
             ityp: legis_init.ityp.clone(),
             gp: legis_init.gp.clone(),
-            accepted: legis_init.accepted,
+            accepted: legis_init.accepted.map(|a| a.to_string()),
             created_at: legis_init.date,
             appeared_at: Some(legis_init.created_at),
             updated_at: legis_init.updated_at,
             requires_simple_majority: legis_init.requires_simple_majority,
-            was_invisibly_declined: legis_init.was_invisibly_declined,
         };
         // println!("db_legis_init: {db_legis_init:?}");
 
@@ -82,9 +81,9 @@ pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[Legislat
             "
                 INSERT INTO legislative_initiatives (
                     title, inr, emphasis, description, ityp, gp, accepted, created_at, appeared_at, updated_at,
-                    requires_simple_majority, was_invisibly_declined
+                    requires_simple_majority
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
                 ) ON CONFLICT (inr, ityp, gp) 
                 DO UPDATE SET 
                     title = EXCLUDED.title,
@@ -94,8 +93,7 @@ pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[Legislat
                     created_at = EXCLUDED.created_at,
                     appeared_at = EXCLUDED.appeared_at,
                     updated_at = EXCLUDED.updated_at,
-                    requires_simple_majority = EXCLUDED.requires_simple_majority,
-                    was_invisibly_declined = EXCLUDED.was_invisibly_declined
+                    requires_simple_majority = EXCLUDED.requires_simple_majority
                 RETURNING id
             ",
             db_legis_init.title,
@@ -109,7 +107,6 @@ pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[Legislat
             db_legis_init.appeared_at,
             db_legis_init.updated_at,
             db_legis_init.requires_simple_majority,
-            db_legis_init.was_invisibly_declined,
         )
         .fetch_one(pool)
         .await
