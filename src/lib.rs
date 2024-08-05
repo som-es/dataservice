@@ -21,6 +21,7 @@ use sqlx::{postgres::PgPoolOptions, PgPool};
 pub mod with_data;
 
 pub const DATABASE_URL: &str = dotenv!("DATABASE_URL");
+pub const LATEST_GP: &str = dotenv!("LATEST_GP");
 
 #[cfg(feature = "runner")]
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;

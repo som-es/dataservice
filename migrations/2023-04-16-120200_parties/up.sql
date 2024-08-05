@@ -1,8 +1,10 @@
 -- Your SQL goes here
 create table parties (
-    name varchar(8) primary key not null,
+    id serial primary key,
+    name varchar(8) not null,
+    gp varchar(14) not null,
     code varchar(8) not null,
     fraction int not null,
     color varchar(7) not null,
-    unique (code)
+    unique (code, gp, name)
 );

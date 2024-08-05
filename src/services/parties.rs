@@ -4,22 +4,7 @@ use crate::{connect_pg, scrape_untill_success, Shutdown};
 
 use sqlx::PgPool;
 
-pub async fn all_parties(pg: &PgPool) -> sqlx::Result<Vec<Party>> {
-    let parties = sqlx::query!("select code, fraction, name, color from parties")
-        .fetch_all(pg)
-        .await?;
-    Ok(parties
-        .into_iter()
-        .map(|party| Party {
-            name: party.name,
-            code: party.code,
-            color: party.color,
-            fraction: party.fraction as u32,
-        })
-        .collect())
-}
-
-pub async fn update_parties_in_db2(pool: &PgPool, parties: &[Party]) {
+pub async fn update_parties_in_db2(pool: &PgPool, parties: &[Party], gp: &str) {
     for party in parties {
         let mut name = party.name.clone();
         // extra code only for the FPÖ (back then, name was F apparently )
@@ -28,9 +13,9 @@ pub async fn update_parties_in_db2(pool: &PgPool, parties: &[Party]) {
         }
         if let Err(e) = sqlx::query!(
             r#"
-            INSERT INTO parties (name, fraction, color, code)
-            VALUES ($1, $2, $3, $4)
-            ON CONFLICT (name) 
+            INSERT INTO parties (name, fraction, color, code, gp)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (code, gp, name) 
             DO UPDATE SET
                 fraction = EXCLUDED.fraction,
                 code = EXCLUDED.code,
@@ -39,7 +24,8 @@ pub async fn update_parties_in_db2(pool: &PgPool, parties: &[Party]) {
             name,
             party.fraction as i32,
             party.color,
-            party.code
+            party.code,
+            gp
         )
         .execute(pool)
         .await {
@@ -58,7 +44,7 @@ pub async fn parties_once(pg_pool: &PgPool) {
         })
         .await;
 
-        update_parties_in_db2(pg_pool, &parties).await;
+        update_parties_in_db2(pg_pool, &parties, gp).await;
     }
 }
 
