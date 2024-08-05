@@ -6,11 +6,6 @@ use sqlx::PgPool;
 
 pub async fn update_parties_in_db2(pool: &PgPool, parties: &[Party], gp: &str) {
     for party in parties {
-        let mut name = party.name.clone();
-        // extra code only for the FPÖ (back then, name was F apparently )
-        if party.code == "F" && party.name == "F" {
-            name = "FPÖ".to_string();
-        }
         if let Err(e) = sqlx::query!(
             r#"
             INSERT INTO parties (name, fraction, color, code, gp)
@@ -21,7 +16,7 @@ pub async fn update_parties_in_db2(pool: &PgPool, parties: &[Party], gp: &str) {
                 code = EXCLUDED.code,
                 color = EXCLUDED.color
             "#,
-            name,
+            party.name,
             party.fraction as i32,
             party.color,
             party.code,
