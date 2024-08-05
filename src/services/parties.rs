@@ -53,7 +53,9 @@ pub async fn parties_once(pg_pool: &PgPool) {
         })
         .await;
 
-        update_parties_in_db2(pg_pool, &parties).await.unwrap();
+        if let Err(e) = update_parties_in_db2(pg_pool, &parties).await {
+            log::error!("could not update parties({parties:?}) in db: {e:?}")
+        }
     }
 }
 
