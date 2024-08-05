@@ -1,4 +1,9 @@
-use scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative, Opinion};
+use std::collections::HashMap;
+
+use scraper::{
+    legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative, Opinion, Party,
+    ProContra,
+};
 use sqlx::PgPool;
 
 use crate::{
@@ -7,6 +12,7 @@ use crate::{
         DbEurovocTopicLegisInit, DbLegisDocument, DbLegislativeInitiative,
         DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote,
     },
+    parties::all_parties,
     services::scrape_untill_success,
     Shutdown,
 };
@@ -61,6 +67,13 @@ async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<Legislative
 pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[LegislativeInitiative]) {
     log::info!("Updating legislative initiatives in database...");
 
+    let code_to_parties = all_parties(pool)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .map(|party| (party.code.clone(), party))
+        .collect::<HashMap<String, Party>>();
+
     for legis_init in new_legis_inits {
         let db_legis_init = DbLegislativeInitiative {
             title: legis_init.title.clone(),
@@ -74,6 +87,8 @@ pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[Legislat
             appeared_at: Some(legis_init.created_at),
             updated_at: legis_init.updated_at,
             requires_simple_majority: legis_init.requires_simple_majority,
+            pre_declined_type: legis_init.pre_declined_type.map(|pre| pre.to_string()),
+            voted_by_name: legis_init.voted_by_name,
         };
         // println!("db_legis_init: {db_legis_init:?}");
 
@@ -81,9 +96,9 @@ pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[Legislat
             "
                 INSERT INTO legislative_initiatives (
                     title, inr, emphasis, description, ityp, gp, accepted, created_at, appeared_at, updated_at,
-                    requires_simple_majority
+                    requires_simple_majority, pre_declined_type, voted_by_name
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
                 ) ON CONFLICT (inr, ityp, gp) 
                 DO UPDATE SET 
                     title = EXCLUDED.title,
@@ -93,7 +108,9 @@ pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[Legislat
                     created_at = EXCLUDED.created_at,
                     appeared_at = EXCLUDED.appeared_at,
                     updated_at = EXCLUDED.updated_at,
-                    requires_simple_majority = EXCLUDED.requires_simple_majority
+                    requires_simple_majority = EXCLUDED.requires_simple_majority,
+                    pre_declined_type = EXCLUDED.pre_declined_type,
+                    voted_by_name = EXCLUDED.voted_by_name
                 RETURNING id
             ",
             db_legis_init.title,
@@ -107,6 +124,8 @@ pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[Legislat
             db_legis_init.appeared_at,
             db_legis_init.updated_at,
             db_legis_init.requires_simple_majority,
+            db_legis_init.pre_declined_type,
+            db_legis_init.voted_by_name,
         )
         .fetch_one(pool)
         .await
@@ -125,31 +144,19 @@ pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[Legislat
                 infavor: vote.infavor,
                 legislative_initiatives_id: legis_init_id,
             };
+            insert_vote(pool, db_vote);
+        }
 
-            if let Err(e) = sqlx::query!(
-                "
-                    INSERT INTO votes (
-                        party, fraction, infavor, legislative_initiatives_id
-                    ) VALUES (
-                        $1, $2, $3, $4
-                    ) ON CONFLICT (legislative_initiatives_id, party) 
-                    DO UPDATE SET 
-                        fraction = EXCLUDED.fraction,
-                        infavor = EXCLUDED.infavor
-                ",
-                db_vote.party,
-                db_vote.fraction,
-                db_vote.infavor,
-                db_vote.legislative_initiatives_id
-            )
-            .execute(pool)
-            .await
-            {
-                log::warn!(
-                    "Error inserting vote: '{:?}'. The error occurred for the following vote: {:?}",
-                    e,
-                    vote
-                );
+        if legis_init.votes.is_empty()
+            && legis_init.accepted == Some(scraper::AcceptedState::PreDeclined)
+            && legis_init.hidden_votes_untranslated.is_some()
+        {
+            for db_vote in translate_votes(
+                &code_to_parties,
+                legis_init_id,
+                legis_init.hidden_votes_untranslated.as_ref().unwrap(),
+            ).await {
+                insert_vote(pool, db_vote).await;
             }
         }
 
@@ -295,6 +302,65 @@ pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[Legislat
             }
         }
     }
+}
+
+pub async fn insert_vote(pool: &PgPool, db_vote: DbVote) {
+    if let Err(e) = sqlx::query!(
+        "
+            INSERT INTO votes (
+                party, fraction, infavor, legislative_initiatives_id
+            ) VALUES (
+                $1, $2, $3, $4
+            ) ON CONFLICT (legislative_initiatives_id, party) 
+            DO UPDATE SET 
+                fraction = EXCLUDED.fraction,
+                infavor = EXCLUDED.infavor
+        ",
+        db_vote.party,
+        db_vote.fraction,
+        db_vote.infavor,
+        db_vote.legislative_initiatives_id
+    )
+    .execute(pool)
+    .await
+    {
+        log::warn!(
+            "Error inserting vote: '{:?}'. The error occurred for the following vote: {:?}",
+            e,
+            db_vote
+        );
+    }
+}
+
+pub async fn translate_votes(
+    parties: &HashMap<String, Party>,
+    legislative_initiatives_id: i32,
+    pro_contra: &ProContra,
+) -> Vec<DbVote> {
+    let convert_to_vote = |code, infavor| {
+        let party = parties.get(code).unwrap().clone();
+
+        DbVote {
+            party: party.name,
+            fraction: party.fraction as i32,
+            infavor,
+            legislative_initiatives_id,
+        }
+    };
+    let mut votes = vec![];
+    votes.extend(
+        pro_contra
+            .contra
+            .iter()
+            .map(|code| convert_to_vote(code, false)),
+    );
+    votes.extend(
+        pro_contra
+            .pro
+            .iter()
+            .map(|code| convert_to_vote(code, true)),
+    );
+    votes
 }
 
 pub async fn run_shut_latest_gp(mut shutdown: Shutdown) {

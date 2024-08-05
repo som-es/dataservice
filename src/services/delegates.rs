@@ -204,7 +204,9 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &PgPool) {
         }
         if let Some(divisions) = &delegate.divisions {
             for division in divisions {
-                if let Err(e) = insert_delegate_division(division, delegate.id as i32, pg_pool).await {
+                if let Err(e) =
+                    insert_delegate_division(division, delegate.id as i32, pg_pool).await
+                {
                     log::error!(
                         "Error adding division ({division:?}) for delegate {delegate:?}: {e}",
                     );

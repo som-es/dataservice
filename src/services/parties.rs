@@ -4,17 +4,37 @@ use crate::{connect_pg, scrape_untill_success, Shutdown};
 
 use sqlx::PgPool;
 
+pub async fn all_parties(pg: &PgPool) -> sqlx::Result<Vec<Party>> {
+    let parties = sqlx::query!("select code, fraction, name, color from parties")
+        .fetch_all(pg)
+        .await?;
+    Ok(parties
+        .into_iter()
+        .map(|party| Party {
+            name: party.name,
+            code: party.code,
+            color: party.color,
+            fraction: party.fraction as u32,
+        })
+        .collect())
+}
+
 pub async fn update_parties_in_db2(pool: &PgPool, parties: &[Party]) -> Result<(), sqlx::Error> {
     for party in parties {
         sqlx::query!(
             r#"
-            INSERT INTO parties (name, fraction, color)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (name) DO NOTHING
+            INSERT INTO parties (name, fraction, color, code)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (name) 
+            DO UPDATE SET
+                fraction = EXCLUDED.fraction,
+                code = EXCLUDED.code,
+                color = EXCLUDED.color
             "#,
             party.name,
             party.fraction as i32,
-            party.color
+            party.color,
+            party.code
         )
         .execute(pool)
         .await?;

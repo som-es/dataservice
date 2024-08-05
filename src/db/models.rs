@@ -102,10 +102,8 @@ pub struct ProposalDelegate {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(
-    Queryable, Selectable, PartialEq, Debug, Clone, Serialize, Deserialize
-)]
-#[diesel(table_name = legislative_initiatives)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+// #[diesel(table_name = legislative_initiatives)]
 pub struct DbLegislativeInitiative {
     pub ityp: String,
     pub gp: String,
@@ -118,6 +116,8 @@ pub struct DbLegislativeInitiative {
     pub appeared_at: Option<NaiveDateTime>,
     pub updated_at: Option<NaiveDateTime>,
     pub requires_simple_majority: bool,
+    pub pre_declined_type: Option<String>,
+    pub voted_by_name: bool,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
@@ -167,11 +167,8 @@ pub struct DbMinistrialProposalQuery {
 use sqlx::FromRow;
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(
-    Queryable, Selectable, PartialEq, Debug, Clone, Serialize, Deserialize,
-    FromRow
-)]
-#[diesel(table_name = legislative_initiatives)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, FromRow)]
+// #[diesel(table_name = legislative_initiatives)]
 pub struct DbLegislativeInitiativeQuery {
     pub id: i32,
     pub ityp: String,
@@ -185,6 +182,8 @@ pub struct DbLegislativeInitiativeQuery {
     pub appeared_at: Option<NaiveDateTime>,
     pub updated_at: Option<NaiveDateTime>,
     pub requires_simple_majority: Option<bool>,
+    pub pre_declined_type: Option<String>,
+    pub voted_by_name: bool,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

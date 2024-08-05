@@ -7,6 +7,8 @@ create table legislative_initiatives (
     inr int not null,
     emphasis varchar(6000),
     title text not null,
+    pre_declined_type varchar(2),
+    voted_by_name boolean not null default false,
     description text not null,
     accepted varchar(2),
     -- rename this to handled_at
