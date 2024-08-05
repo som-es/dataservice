@@ -19,9 +19,14 @@ pub async fn all_parties(pg: &PgPool) -> sqlx::Result<Vec<Party>> {
         .collect())
 }
 
-pub async fn update_parties_in_db2(pool: &PgPool, parties: &[Party]) -> Result<(), sqlx::Error> {
+pub async fn update_parties_in_db2(pool: &PgPool, parties: &[Party]) {
     for party in parties {
-        sqlx::query!(
+        let mut name = party.name.clone();
+        // extra code only for the FPÖ (back then, name was F apparently )
+        if party.code == "F" && party.name == "F" {
+            name = "FPÖ".to_string();
+        }
+        if let Err(e) = sqlx::query!(
             r#"
             INSERT INTO parties (name, fraction, color, code)
             VALUES ($1, $2, $3, $4)
@@ -31,16 +36,16 @@ pub async fn update_parties_in_db2(pool: &PgPool, parties: &[Party]) -> Result<(
                 code = EXCLUDED.code,
                 color = EXCLUDED.color
             "#,
-            party.name,
+            name,
             party.fraction as i32,
             party.color,
             party.code
         )
         .execute(pool)
-        .await?;
+        .await {
+            log::error!("could not update parties({party:?}) in db: {e:?}")
+        }
     }
-
-    Ok(())
 }
 
 pub async fn parties_once(pg_pool: &PgPool) {
@@ -53,9 +58,7 @@ pub async fn parties_once(pg_pool: &PgPool) {
         })
         .await;
 
-        if let Err(e) = update_parties_in_db2(pg_pool, &parties).await {
-            log::error!("could not update parties({parties:?}) in db: {e:?}")
-        }
+        update_parties_in_db2(pg_pool, &parties).await;
     }
 }
 
