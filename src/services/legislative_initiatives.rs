@@ -63,12 +63,14 @@ async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<Legislative
 pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[LegislativeInitiative], gp: &str) {
     log::info!("Updating legislative initiatives in database...");
 
-    let code_to_parties = all_parties_at_gp(pool, gp)
+    let mut code_to_parties = all_parties_at_gp(pool, gp)
         .await
         .unwrap_or_default()
         .into_iter()
         .map(|party| (party.code.clone(), party))
         .collect::<HashMap<String, Party>>();
+
+    code_to_parties.insert("P".to_string(), code_to_parties.get("J").unwrap().clone());
 
     for legis_init in new_legis_inits {
         let db_legis_init = DbLegislativeInitiative {
@@ -452,6 +454,23 @@ mod tests {
 
         let pool = connect_pg().await;
         crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], "XXVII").await;
+
+        // println!("s: {:?}", scraper.scrape_info.gp);
+
+        // let out = crate::legislative_initiatives::scrape_new_legis_inits(&scraper).await.unwrap();
+        // println!("out: {out:?}");
+    }
+    
+    #[tokio::test]
+    async fn test_legis_init_empty_gp_scrape_xxvi_a_110() {
+        let mut scraper: AustriaScraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVI/A/110")
+            .await
+            .unwrap();
+
+        let pool = connect_pg().await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], "XXVI").await;
 
         // println!("s: {:?}", scraper.scrape_info.gp);
 
