@@ -189,8 +189,13 @@ async fn insert_plenar_speech(
                 let updated_spoken_text = if disable_speech_text {
                     None
                 } else {
-                    Some(text_extractor.extract_text_from_url(text_html_url, None).await)
-                }.flatten();
+                    Some(
+                        text_extractor
+                            .extract_text_from_url(text_html_url, None)
+                            .await,
+                    )
+                }
+                .flatten();
 
                 sqlx::query!(
                     r#"

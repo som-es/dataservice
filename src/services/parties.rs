@@ -23,7 +23,8 @@ pub async fn update_parties_in_db2(pool: &PgPool, parties: &[Party], gp: &str) {
             gp
         )
         .execute(pool)
-        .await {
+        .await
+        {
             log::error!("could not update parties({party:?}) in db: {e:?}")
         }
     }

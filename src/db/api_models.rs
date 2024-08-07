@@ -1,15 +1,13 @@
-use diesel::{prelude::QueryableByName, AsChangeset, Insertable, Queryable, Selectable};
+// use diesel::{prelude::QueryableByName,    Selectable};
 use serde_derive::{Deserialize, Serialize};
 
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(
-    Queryable, Selectable, PartialEq, Debug, Clone, Insertable, Serialize, Deserialize, AsChangeset,
-)]
-#[diesel(table_name = crate::db::schema::questions)]
-#[diesel(primary_key(id))]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+// #[diesel(table_name = crate::db::schema::questions)]
+// #[diesel(primary_key(id))]
 pub struct DbQuestion {
     pub issuer_id: i32,
     pub delegate_id: i32,
@@ -18,20 +16,9 @@ pub struct DbQuestion {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(
-    Queryable,
-    Selectable,
-    PartialEq,
-    Debug,
-    Clone,
-    Insertable,
-    Serialize,
-    Deserialize,
-    AsChangeset,
-    QueryableByName,
-)]
-#[diesel(table_name = crate::db::schema::questions)]
-#[diesel(primary_key(id))]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+// #[diesel(table_name = crate::db::schema::questions)]
+// #[diesel(primary_key(id))]
 pub struct DbQuestionQuery {
     pub id: i32,
     pub issuer_id: i32,

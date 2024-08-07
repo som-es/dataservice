@@ -1,3 +1,5 @@
+mod match_delegates_with_name;
+
 use std::collections::HashMap;
 
 use scraper::{
@@ -7,10 +9,14 @@ use scraper::{
 use sqlx::PgPool;
 
 use crate::{
-    connect_pg, models::{
+    connect_pg,
+    models::{
         DbEurovocTopicLegisInit, DbLegisDocument, DbLegislativeInitiative,
         DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote,
-    }, services::scrape_untill_success, with_data::all_parties_at_gp, Shutdown
+    },
+    services::scrape_untill_success,
+    with_data::all_parties_at_gp,
+    Shutdown,
 };
 
 pub async fn scrape_new_legis_inits(
@@ -60,7 +66,11 @@ async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<Legislative
     vec![]
 }
 
-pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[LegislativeInitiative], gp: &str) {
+pub async fn update_legis_inits_in_db(
+    pool: &PgPool,
+    new_legis_inits: &[LegislativeInitiative],
+    gp: &str,
+) {
     log::info!("Updating legislative initiatives in database...");
 
     let mut code_to_parties = all_parties_at_gp(pool, gp)
@@ -85,7 +95,10 @@ pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[Legislat
             appeared_at: Some(legis_init.created_at),
             updated_at: legis_init.updated_at,
             requires_simple_majority: legis_init.requires_simple_majority,
-            pre_declined_type: legis_init.hidden_votes_info.vote_type.map(|pre| pre.to_string()),
+            pre_declined_type: legis_init
+                .hidden_votes_info
+                .vote_type
+                .map(|pre| pre.to_string()),
             voted_by_name: legis_init.hidden_votes_info.voted_by_name,
         };
         // println!("db_legis_init: {db_legis_init:?}");
@@ -152,8 +165,14 @@ pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[Legislat
             for db_vote in translate_votes(
                 &code_to_parties,
                 legis_init_id,
-                legis_init.hidden_votes_info.pro_contra_parties.as_ref().unwrap(),
-            ).await {
+                legis_init
+                    .hidden_votes_info
+                    .pro_contra_parties
+                    .as_ref()
+                    .unwrap(),
+            )
+            .await
+            {
                 insert_vote(pool, db_vote).await;
             }
         }
@@ -460,7 +479,7 @@ mod tests {
         // let out = crate::legislative_initiatives::scrape_new_legis_inits(&scraper).await.unwrap();
         // println!("out: {out:?}");
     }
-    
+
     #[tokio::test]
     async fn test_legis_init_empty_gp_scrape_xxvi_a_110() {
         let mut scraper: AustriaScraper = AustriaScraper::default();
