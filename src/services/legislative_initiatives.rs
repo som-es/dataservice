@@ -83,8 +83,8 @@ pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[Legislat
             appeared_at: Some(legis_init.created_at),
             updated_at: legis_init.updated_at,
             requires_simple_majority: legis_init.requires_simple_majority,
-            pre_declined_type: legis_init.pre_declined_type.map(|pre| pre.to_string()),
-            voted_by_name: legis_init.voted_by_name,
+            pre_declined_type: legis_init.hidden_votes_info.vote_type.map(|pre| pre.to_string()),
+            voted_by_name: legis_init.hidden_votes_info.voted_by_name,
         };
         // println!("db_legis_init: {db_legis_init:?}");
 
@@ -140,17 +140,17 @@ pub async fn update_legis_inits_in_db(pool: &PgPool, new_legis_inits: &[Legislat
                 infavor: vote.infavor,
                 legislative_initiatives_id: legis_init_id,
             };
-            insert_vote(pool, db_vote);
+            insert_vote(pool, db_vote).await;
         }
 
         if legis_init.votes.is_empty()
             && legis_init.accepted == Some(scraper::AcceptedState::PreDeclined)
-            && legis_init.hidden_votes_untranslated.is_some()
+            && legis_init.hidden_votes_info.pro_contra_parties.is_some()
         {
             for db_vote in translate_votes(
                 &code_to_parties,
                 legis_init_id,
-                legis_init.hidden_votes_untranslated.as_ref().unwrap(),
+                legis_init.hidden_votes_info.pro_contra_parties.as_ref().unwrap(),
             ).await {
                 insert_vote(pool, db_vote).await;
             }
