@@ -52,11 +52,12 @@ async fn scrape_new_delegates(prev_delegates: &HashSet<Delegate>) -> crate::Resu
     Ok(delegates)
 }
 
-pub async fn delegate_count(conn: &PgPool) -> sqlx::Result<i64> {
+pub async fn delegate_count(conn: &PgPool) -> Option<i64> {
     query!("select COUNT(*) from delegates")
         .fetch_one(conn)
         .await
         .map(|x| x.count.unwrap())
+        .ok()
 }
 
 async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &PgPool) {

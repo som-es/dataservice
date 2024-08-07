@@ -1,4 +1,4 @@
-use dataservice::{connect_pg, delegates::delegate_count, establish_connection, services, Shutdown};
+use dataservice::{connect_pg, delegates::delegate_count, services, Shutdown};
 use sqlx::PgPool;
 use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
@@ -18,7 +18,7 @@ async fn main() {
 pub async fn run_services(state: &State) {
     {
         let pool = connect_pg().await;
-        if delegate_count(&pool).await == Ok(0) {
+        if delegate_count(&pool).await == Some(0) {
             log::info!("Delegates are 0, start scraping ...");
             let hs = std::collections::HashSet::new();
             let _res = services::delegates::delegates_once(&hs).await;
