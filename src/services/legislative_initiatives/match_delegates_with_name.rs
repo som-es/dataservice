@@ -6,7 +6,7 @@ use sqlx::{query_as, PgPool};
 use crate::with_data::activity::active_delegates_at_date;
 
 // const MAX_STEPS: usize = 50000000;
-const MAX_STEPS: usize = 500000;
+const MAX_STEPS: usize = 100000;
 
 pub fn levenshtein_distance(lhs: &str, rhs: &str) -> usize {
     let mut steps = 0;
@@ -95,11 +95,11 @@ pub fn match_delegate_name_with_delegate_id<'a, I: Iterator<Item = &'a (String, 
                             break;
                         }
                     }
-                } else {
-                    if !name_split.contains(delegate_name_split) {
-                        names_are_the_same = false;
-                    }
+                } 
+                if !name_split.contains(delegate_name_split) {
+                    names_are_the_same = false;
                 }
+            
             }
 
             // println!("name: {name:?}");
@@ -159,12 +159,12 @@ pub async fn match_delegate_names_with_delegate_ids(
         .filter_map(|(del_name, x)| {
             let res = x[0].clone();
             if res.lev == 0 {
-                println!("removed");
+                // println!("removed");
                 prot_delegate_names_not_sure_if_matched_correctly.remove(del_name);
                 assert!(find_not_sure_if_matched_correctly.remove(&(res.name.clone(), res.delegate_id)));
                 Some(res)
             } else {
-                println!("not removed");
+                // println!("not removed");
                 None
             }
         })
@@ -181,7 +181,7 @@ pub async fn match_delegate_names_with_delegate_ids(
         .map(|delegate_name| (delegate_name.clone(), match_delegate_name_with_delegate_id(find_not_sure_if_matched_correctly.clone().iter(), &delegate_name, true)))
         .map(|(del_name, x)| {
             let res = x[0].clone();
-            println!("del_name: {del_name}, res: {res:?}");
+            // println!("del_name: {del_name}, res: {res:?}");
             prot_delegate_names_not_sure_if_matched_correctly.remove(&del_name);
             assert!(find_not_sure_if_matched_correctly_final.remove(&(res.name.clone(), res.delegate_id)));
             res
