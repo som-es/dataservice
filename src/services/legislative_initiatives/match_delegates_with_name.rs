@@ -5,10 +5,11 @@ use sqlx::{query_as, PgPool};
 
 use crate::with_data::activity::active_delegates_at_date;
 
-// const MAX_STEPS: usize = 50000000;
-const MAX_STEPS: usize = 100000;
+const MAX_STEPS: usize = 50000000;
+// const MAX_STEPS: usize = 100000;
 
 pub fn levenshtein_distance(lhs: &str, rhs: &str) -> usize {
+    println!("called: {lhs}, rhs: {rhs}");
     let mut steps = 0;
     fn levenshtein_distance_inner_inner(
         lhs: &[char],
@@ -71,7 +72,7 @@ pub fn match_delegate_name_with_delegate_id<'a, I: Iterator<Item = &'a (String, 
     // delegates: &[(String, usize)],
     delegates: I,
     delegate_name: &str,
-    deep_split_search: bool
+    deep_search: bool
 ) -> Vec<LevResult> {
     let delegate_split = delegate_name.split(' ').collect::<Vec<_>>();
     let mut levenshtein_scores = delegates.into_iter()
@@ -88,7 +89,7 @@ pub fn match_delegate_name_with_delegate_id<'a, I: Iterator<Item = &'a (String, 
             let mut deep_split_matched = false;
             let mut names_are_the_same = true;
             for delegate_name_split in &delegate_split {
-                if deep_split_search {
+                if deep_search {
                     for name in &name_split {
                         if name.contains(delegate_name_split) {
                             deep_split_matched = true;
@@ -109,10 +110,12 @@ pub fn match_delegate_name_with_delegate_id<'a, I: Iterator<Item = &'a (String, 
             let lev = if deep_split_matched || names_are_the_same || delegate_name == surname || delegate_name == fullname
             {
                 0
-            } else if delegate_split.len() > 1 {
+            } else if delegate_split.len() > 1 && deep_search {
                 levenshtein_distance(&fullname, delegate_name)
-            } else {
+            } else if deep_search {
                 levenshtein_distance(&surname, delegate_name)
+            } else {
+                usize::MAX
             };
             LevResult {
                 deep_split_matched,
@@ -124,7 +127,17 @@ pub fn match_delegate_name_with_delegate_id<'a, I: Iterator<Item = &'a (String, 
         })
         .collect::<Vec<_>>();
 
-    levenshtein_scores.sort_by(|a, b| a.lev.cmp(&b.lev));
+    levenshtein_scores.sort_by(|a, b| {
+        let mut a_lev = a.lev;
+        let mut b_lev = b.lev;
+        if a.deep_split_matched {
+            a_lev = 2
+        }
+        if b.deep_split_matched {
+            b_lev = 2
+        }
+        a_lev.cmp(&b_lev)}
+    );
     levenshtein_scores
 }
 
