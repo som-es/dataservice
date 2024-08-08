@@ -1,10 +1,22 @@
-use sqlx::PgPool;
+use std::{cell::RefCell, collections::HashSet};
 
-const MAX_STEPS: usize = 10000000;
+use chrono::NaiveDate;
+use sqlx::{query_as, PgPool};
+
+use crate::with_data::activity::active_delegates_at_date;
+
+// const MAX_STEPS: usize = 50000000;
+const MAX_STEPS: usize = 500000;
 
 pub fn levenshtein_distance(lhs: &str, rhs: &str) -> usize {
     let mut steps = 0;
-    fn levenshtein_distance_inner_inner(lhs: &[char], rhs: &[char], m: usize, n: usize, steps: &mut usize) -> usize {
+    fn levenshtein_distance_inner_inner(
+        lhs: &[char],
+        rhs: &[char],
+        m: usize,
+        n: usize,
+        steps: &mut usize,
+    ) -> usize {
         if lhs == rhs {
             return 0;
         }
@@ -27,12 +39,18 @@ pub fn levenshtein_distance(lhs: &str, rhs: &str) -> usize {
             .unwrap()
         }
     }
-    fn levenshtein_distance_inner(lhs: &[char], rhs: &[char], m: usize, n: usize, steps: &mut usize) -> usize {
+    fn levenshtein_distance_inner(
+        lhs: &[char],
+        rhs: &[char],
+        m: usize,
+        n: usize,
+        steps: &mut usize,
+    ) -> usize {
         if *steps >= MAX_STEPS {
             return usize::MAX;
         }
         let dist = levenshtein_distance_inner_inner(lhs, rhs, m, n, steps);
-        *steps+=1;
+        *steps += 1;
         dist
     }
     let lhs = lhs.chars().collect::<Vec<_>>();
@@ -40,47 +58,182 @@ pub fn levenshtein_distance(lhs: &str, rhs: &str) -> usize {
     levenshtein_distance_inner(&lhs, &rhs, lhs.len(), rhs.len(), &mut steps)
 }
 
-pub fn match_delegate_name_with_delegate_id(
-    delegates: &[(String, String, usize)],
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct LevResult {
+    pub deep_split_matched: bool,
+    pub lev: usize,
+    pub delegate_id: usize,
+    pub name: String,
+    pub searched_with: String,
+}
+
+pub fn match_delegate_name_with_delegate_id<'a, I: Iterator<Item = &'a (String, usize)>>(
+    // delegates: &[(String, usize)],
+    delegates: I,
     delegate_name: &str,
-) -> Vec<(usize, usize, String, String)> {
+    deep_split_search: bool
+) -> Vec<LevResult> {
     let delegate_split = delegate_name.split(' ').collect::<Vec<_>>();
-    let mut levenshtein_scores = delegates
-        .iter()
+    let mut levenshtein_scores = delegates.into_iter()
         .cloned()
-        .map(|(firstname, surname, delegate_id)| {
-            if delegate_name == surname {
-                return (0, delegate_id, firstname, surname);
+        .map(|(mut name, delegate_id)| {
+            let orig_name = name.clone();
+            // this removes "Dr.", "BA", etc "name, <>"
+            if let Some(has_title_idx) = name.find(',') {
+                name = name[..has_title_idx].to_string()
             }
 
-            let fullname = format!("{surname} {firstname}");
-            if delegate_split.len() > 1 {
-                (
-                    levenshtein_distance(&fullname, delegate_name),
-                    delegate_id,
-                    firstname,
-                    surname,
-                )
+            let name_split = name.split(' ').collect::<Vec<_>>();
+
+            let mut deep_split_matched = false;
+            let mut names_are_the_same = true;
+            for delegate_name_split in &delegate_split {
+                if deep_split_search {
+                    for name in &name_split {
+                        if name.contains(delegate_name_split) {
+                            deep_split_matched = true;
+                            break;
+                        }
+                    }
+                } else {
+                    if !name_split.contains(delegate_name_split) {
+                        names_are_the_same = false;
+                    }
+                }
+            }
+
+            // println!("name: {name:?}");
+            let surname = name_split[0].to_string();
+            let fullname = name;
+
+            let lev = if deep_split_matched || names_are_the_same || delegate_name == surname || delegate_name == fullname
+            {
+                0
+            } else if delegate_split.len() > 1 {
+                levenshtein_distance(&fullname, delegate_name)
             } else {
-                (
-                    levenshtein_distance(&surname, delegate_name),
-                    delegate_id,
-                    firstname,
-                    surname,
-                )
+                levenshtein_distance(&surname, delegate_name)
+            };
+            LevResult {
+                deep_split_matched,
+                lev,
+                delegate_id,
+                name: orig_name,
+                searched_with: delegate_name.to_string(),
             }
         })
         .collect::<Vec<_>>();
 
-    levenshtein_scores.sort_by(|a, b| a.0.cmp(&b.0));
+    levenshtein_scores.sort_by(|a, b| a.lev.cmp(&b.lev));
     levenshtein_scores
 }
 
-pub fn match_delegate_names_with_delegate_ids(pg: &PgPool, delegate_names: &[String]) {}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MatchResult {
+    correctly_matched: Vec<LevResult>,
+    lev_or_deep_split_matched: Vec<LevResult>,
+    not_matchable: HashSet<(String, usize)>
+}
+
+pub async fn match_delegate_names_with_delegate_ids(
+    pg: &PgPool,
+    delegate_names: &[String],
+    voted_on_at: NaiveDate,
+) -> sqlx::Result<MatchResult> {
+    let delegates = active_delegates_at_date(pg, voted_on_at)
+        .await?
+        .into_iter()
+        .map(|delegate| {
+            // println!("name: {}", delegate.name);
+            (delegate.name, delegate.id as usize)
+        })
+        .collect::<HashSet<_>>();
+
+    let mut find_not_sure_if_matched_correctly = delegates.clone();
+    let mut prot_delegate_names_not_sure_if_matched_correctly = delegate_names.iter().cloned().collect::<HashSet<_>>();
+
+    let matched_delegates = delegate_names
+        .iter()
+        .map(|delegate_name| (delegate_name, match_delegate_name_with_delegate_id(delegates.iter(), delegate_name, false)))
+        // .inspect(|x| println!("done"))
+        .filter_map(|(del_name, x)| {
+            let res = x[0].clone();
+            if res.lev == 0 {
+                println!("removed");
+                prot_delegate_names_not_sure_if_matched_correctly.remove(del_name);
+                assert!(find_not_sure_if_matched_correctly.remove(&(res.name.clone(), res.delegate_id)));
+                Some(res)
+            } else {
+                println!("not removed");
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    // println!("find not: {find_not_sure_if_matched_correctly:?}");
+    
+    let mut find_not_sure_if_matched_correctly_final = find_not_sure_if_matched_correctly.clone();
+
+    // e.g. Holzinger-Vogtenhuber Daniela, BA back then was "Holzinger" 
+    // (name changes etc)
+    let other_matched_delegates = prot_delegate_names_not_sure_if_matched_correctly.clone()
+        .iter()
+        .map(|delegate_name| (delegate_name.clone(), match_delegate_name_with_delegate_id(find_not_sure_if_matched_correctly.clone().iter(), &delegate_name, true)))
+        .map(|(del_name, x)| {
+            let res = x[0].clone();
+            println!("del_name: {del_name}, res: {res:?}");
+            prot_delegate_names_not_sure_if_matched_correctly.remove(&del_name);
+            assert!(find_not_sure_if_matched_correctly_final.remove(&(res.name.clone(), res.delegate_id)));
+            res
+        })
+
+        // .inspect(|x| println!("done"))
+        .collect::<Vec<_>>();
+
+    // println!("other_matched: {other_matched_delegates:?}");
+
+    assert!(prot_delegate_names_not_sure_if_matched_correctly.is_empty());
+    let not_matchable = find_not_sure_if_matched_correctly_final;
+
+    Ok(MatchResult {
+        correctly_matched: matched_delegates,
+        lev_or_deep_split_matched: other_matched_delegates,
+        not_matchable,
+    })
+}
 
 #[cfg(test)]
 mod tests {
-    use super::{levenshtein_distance, match_delegate_name_with_delegate_id};
+    use scraper::{legis_init::LegislativeInitiatives, AustriaScraper};
+
+    use crate::connect_pg;
+
+    use super::{
+        levenshtein_distance, match_delegate_name_with_delegate_id,
+        match_delegate_names_with_delegate_ids,
+    };
+
+    #[tokio::test]
+    async fn test_namentlich_name_matching() {
+        let scraper = AustriaScraper::default();
+        let init = scraper.get_legis_init("/gegenstand/XXV/I/1").await.unwrap();
+        println!("date: {:?}", init.date);
+        assert!(init.hidden_votes_info.voted_by_name);
+        let pro_contra = init
+            .hidden_votes_info
+            .voted_by_name_data
+            .unwrap()
+            .delegates_pro_contra
+            .unwrap();
+
+        let pg = connect_pg().await;
+        let res = match_delegate_names_with_delegate_ids(&pg, &pro_contra.pro, init.date)
+            .await
+            .unwrap();
+
+        // let res = res.correctly_matched.into_iter().filter(|x| x.lev > 0).collect::<Vec<_>>();
+        println!("res: {:?}", res.lev_or_deep_split_matched);
+    }
 
     #[test]
     fn test_distance_delegate_match() {
@@ -93,16 +246,19 @@ mod tests {
             ("Becher Ruth", 5),
             ("Duzdar Muna", 6),
         ]
-        .iter()
-        .map(|(name, id)| {
-            let name = name.split(' ').collect::<Vec<_>>();
-            let firstname = name[1].to_string();
-            let surname = name[0].to_string();
-            (firstname, surname, *id)
-        })
+        .into_iter()
+        .map(|(a, b)| (a.to_string(), b))
         .collect::<Vec<_>>();
+        // .iter()
+        // .map(|(name, id)| {
+        //     let name = name.split(' ').collect::<Vec<_>>();
+        //     let firstname = name[1].to_string();
+        //     let surname = name[0].to_string();
+        //     (firstname, surname, *id)
+        // })
+        // .collect::<Vec<_>>();
         let delegate_name = "Bacher Stefono";
-        let scores = match_delegate_name_with_delegate_id(&delegates, delegate_name);
+        let scores = match_delegate_name_with_delegate_id(delegates.iter(), delegate_name, false);
         print!("scores: {scores:?}");
     }
 
