@@ -8,11 +8,12 @@ use scraper::{
     ProContra,
 };
 use sqlx::PgPool;
+use voted_by_name_result::{insert_named_vote_info, insert_named_votes};
 
 use crate::{
     connect_pg,
     models::{
-        DbEurovocTopicLegisInit, DbLegisDocument, DbLegislativeInitiative,
+        DbEurovocTopicLegisInit, DbLegisDocument, DbLegislativeInitiative, DbNamedVoteInfo,
         DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote,
     },
     services::scrape_untill_success,
@@ -210,6 +211,34 @@ pub async fn update_legis_inits_in_db(
             insert_vote(pool, db_vote).await;
         }
 
+        if let Some(voted_by_name_data) = &legis_init.hidden_votes_info.voted_by_name_data {
+            if let Ok(named_vote_info_id) = insert_named_vote_info(
+                pool,
+                &DbNamedVoteInfo {
+                    id: 0,
+                    legis_init_id,
+                    pro_count: voted_by_name_data.pro_count as i32,
+                    contra_count: voted_by_name_data.contra_count as i32,
+                    given_vote_sum: voted_by_name_data.vote_sum as i32,
+                    invalid_count: voted_by_name_data.invalid_count as i32,
+                },
+            ).await {
+                if let Some(pro_contra) = &voted_by_name_data.delegates_pro_contra {
+                    if let Err(e) = insert_named_votes(
+                        pool,
+                        &pro_contra,
+                        legis_init.date,
+                        &legis_init.gp,
+                        named_vote_info_id,
+                    )
+                    .await
+                    {
+                        log::error!("Could not insert any named votes for legis init: {legis_init:?}, error: {e:?}")
+                    }
+                }
+            }
+        }
+
         if legis_init.votes.is_empty()
             && legis_init.accepted == Some(scraper::AcceptedState::PreDeclined)
             && legis_init.hidden_votes_info.pro_contra_parties.is_some()
@@ -222,6 +251,7 @@ pub async fn update_legis_inits_in_db(
                     .pro_contra_parties
                     .as_ref()
                     .unwrap(),
+                &legis_init.gp,
             )
             .await
             {
@@ -405,10 +435,11 @@ pub async fn translate_votes(
     parties: &HashMap<String, Party>,
     legislative_initiatives_id: i32,
     pro_contra: &ProContra,
+    gp: &str,
 ) -> Vec<DbVote> {
     let convert_to_vote = |code, infavor| {
         let Some(party) = parties.get(code).cloned() else {
-            log::warn!("Party with code {code} not found in parties map: {parties:?}");
+            log::error!("Party with code {code} not found in {gp} parties map: {parties:?}");
             return None;
         };
 
@@ -443,7 +474,7 @@ pub async fn run_shut_latest_gp(mut shutdown: Shutdown) {
             log::warn!(
                 "Could not parse LEGISLATIVE_INITIATIVE_SLEEP_LATEST env var: {e}. Using default value of 300 seconds"
             );
-            300 
+            300
         });
 
     while !shutdown.is_shutdown() {

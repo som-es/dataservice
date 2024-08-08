@@ -64,7 +64,8 @@ pub struct LevResult {
     pub similiarity_score: usize,
     pub lev: usize,
     pub delegate_id: usize,
-    pub name: String,
+    pub manually_matched: bool,
+    pub matched_with: String,
     pub searched_with: String,
 }
 
@@ -139,8 +140,9 @@ pub fn match_delegate_name_with_delegate_id<'a, I: Iterator<Item = &'a (String, 
                 deep_split_matched,
                 lev,
                 delegate_id,
-                name: orig_name,
+                matched_with: orig_name,
                 searched_with: delegate_name.to_string(),
+                manually_matched: false,
                 similiarity_score: similiarity_ranking,
             }
         })
@@ -160,6 +162,7 @@ pub struct MatchResult {
 pub fn match_delegate_names_with_delegate_ids(
     active_delegates: &HashSet<(String, usize)>,
     delegate_names: &[String],
+    gp: &str,
 ) -> MatchResult {
     let mut find_not_sure_if_matched_correctly = active_delegates.clone();
     let mut prot_delegate_names_not_sure_if_matched_correctly =
@@ -168,6 +171,20 @@ pub fn match_delegate_names_with_delegate_ids(
     let matched_delegates = delegate_names
         .iter()
         .map(|delegate_name| {
+            if gp == "XXVII" && delegate_name == "Strache" {
+                return (
+                    delegate_name,
+                    vec![LevResult {
+                        deep_split_matched: false,
+                        similiarity_score: 0,
+                        lev: 0,
+                        delegate_id: 44127,
+                        matched_with: "Beck Pia Philippa".into(),
+                        searched_with: delegate_name.clone(),
+                        manually_matched: true,
+                    }],
+                );
+            }
             (
                 delegate_name,
                 match_delegate_name_with_delegate_id(active_delegates.iter(), delegate_name, false),
@@ -180,9 +197,8 @@ pub fn match_delegate_names_with_delegate_ids(
             if res.lev == 0 {
                 // println!("removed");
                 prot_delegate_names_not_sure_if_matched_correctly.remove(del_name);
-                assert!(
-                    find_not_sure_if_matched_correctly.remove(&(res.name.clone(), res.delegate_id))
-                );
+                assert!(find_not_sure_if_matched_correctly
+                    .remove(&(res.matched_with.clone(), res.delegate_id)));
                 Some(res)
             } else {
                 // println!("not removed");
@@ -215,7 +231,7 @@ pub fn match_delegate_names_with_delegate_ids(
             // println!("del_name: {del_name}, res: {res:?}");
             prot_delegate_names_not_sure_if_matched_correctly.remove(&del_name);
             assert!(find_not_sure_if_matched_correctly_final
-                .remove(&(res.name.clone(), res.delegate_id)));
+                .remove(&(res.matched_with.clone(), res.delegate_id)));
             res
         })
         // .inspect(|x| println!("done"))
@@ -267,7 +283,8 @@ mod tests {
             .map(|delegate| (delegate.name, delegate.id as usize))
             .collect::<HashSet<_>>();
 
-        let res = match_delegate_names_with_delegate_ids(&active_delegates, &pro_contra.pro);
+        let res =
+            match_delegate_names_with_delegate_ids(&active_delegates, &pro_contra.pro, &init.gp);
 
         // let res = res.correctly_matched.into_iter().filter(|x| x.lev > 0).collect::<Vec<_>>();
         println!("res: {:?}", res.lev_or_deep_split_matched);
@@ -299,7 +316,8 @@ mod tests {
             .map(|delegate| (delegate.name, delegate.id as usize))
             .collect::<HashSet<_>>();
 
-        let res = match_delegate_names_with_delegate_ids(&active_delegates, &pro_contra.pro);
+        let res =
+            match_delegate_names_with_delegate_ids(&active_delegates, &pro_contra.pro, &init.gp);
 
         // let res = res.correctly_matched.into_iter().filter(|x| x.lev > 0).collect::<Vec<_>>();
         // println!("res: {:?}", res.lev_or_deep_split_matched);

@@ -1,15 +1,145 @@
 use std::collections::HashSet;
 
 use chrono::NaiveDate;
-use scraper::ProContra;
+use scraper::{LegislativeInitiative, ProContra};
 use sqlx::PgPool;
 
 use crate::{
     legislative_initiatives::match_delegates_with_name::match_delegate_names_with_delegate_ids,
+    models::{DbNamedVote, DbNamedVoteInfo},
     with_data::activity::active_delegates_at_date,
 };
 
 use super::match_delegates_with_name::LevResult;
+
+pub async fn insert_named_vote_info(
+    pg: &sqlx::PgPool,
+    named_vote_info: &DbNamedVoteInfo,
+) -> Result<i32, sqlx::Error> {
+    let result = sqlx::query!(
+        "
+            INSERT INTO named_vote_info (
+                legis_init_id, pro_count, contra_count, given_vote_sum, invalid_count
+            ) VALUES (
+                $1, $2, $3, $4, $5
+            ) ON CONFLICT (legis_init_id) 
+            DO UPDATE SET 
+                pro_count = EXCLUDED.pro_count,
+                contra_count = EXCLUDED.contra_count,
+                given_vote_sum = EXCLUDED.given_vote_sum,
+                invalid_count = EXCLUDED.invalid_count
+            RETURNING id
+        ",
+        named_vote_info.legis_init_id,
+        named_vote_info.pro_count,
+        named_vote_info.contra_count,
+        named_vote_info.given_vote_sum,
+        named_vote_info.invalid_count
+    )
+    .fetch_one(pg)
+    .await;
+
+    match result {
+        Ok(record) => Ok(record.id),
+        Err(e) => {
+            log::warn!(
+                "Error inserting named vote info: '{:?}'. The error occurred for the following named vote info: {:?}",
+                e,
+                named_vote_info
+            );
+            Err(e)
+        }
+    }
+}
+
+pub async fn insert_named_votes(
+    pg: &PgPool,
+    votes: &ProContra,
+    voted_on: NaiveDate,
+    gp: &str,
+    named_vote_info_id: i32,
+) -> sqlx::Result<()> {
+    let named_votes_compact = match_all_named_votes(pg, votes, voted_on, gp).await?;
+
+    let pro_iter = named_votes_compact.pro.iter().map(|v| DbNamedVote {
+        id: 0,
+        infavor: Some(true),
+        was_absent: false,
+        lev: v.lev as i64,
+        similiarity_score: v.similiarity_score as i64,
+        searched_with: Some(v.searched_with.clone()),
+        matched_with: v.matched_with.clone(),
+        delegate_id: v.delegate_id as i32,
+        named_vote_info_id,
+        manually_matched: v.manually_matched,
+    });
+    let contra_iter = named_votes_compact.contra.iter().map(|v| DbNamedVote {
+        id: 0,
+        infavor: Some(false),
+        was_absent: false,
+        lev: v.lev as i64,
+        similiarity_score: v.similiarity_score as i64,
+        searched_with: Some(v.searched_with.clone()),
+        matched_with: v.matched_with.clone(),
+        delegate_id: v.delegate_id as i32,
+        named_vote_info_id,
+        manually_matched: v.manually_matched,
+    });
+
+    let absent_iter = named_votes_compact.absent.into_iter().map(|v| DbNamedVote {
+        id: 0,
+        infavor: None,
+        was_absent: true,
+        lev: 0,
+        similiarity_score: 0,
+        searched_with: None,
+        matched_with: v.0,
+        delegate_id: v.1 as i32,
+        named_vote_info_id,
+        manually_matched: false,
+    });
+
+    for named_vote in pro_iter.chain(contra_iter).chain(absent_iter) {
+        if let Err(e) = sqlx::query!(
+            "
+                INSERT INTO named_votes (
+                    infavor, was_absent, lev, similiarity_score,
+                    searched_with, matched_with, delegate_id, named_vote_info_id, manually_matched
+                ) VALUES (
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9
+                ) ON CONFLICT (delegate_id, named_vote_info_id) 
+                DO UPDATE SET 
+                    infavor = EXCLUDED.infavor,
+                    was_absent = EXCLUDED.was_absent,
+                    lev = EXCLUDED.lev,
+                    similiarity_score = EXCLUDED.similiarity_score,
+                    searched_with = EXCLUDED.searched_with,
+                    matched_with = EXCLUDED.matched_with,
+                    manually_matched = EXCLUDED.manually_matched
+            ",
+            named_vote.infavor,
+            named_vote.was_absent,
+            named_vote.lev,
+            named_vote.similiarity_score,
+            named_vote.searched_with,
+            named_vote.matched_with,
+            named_vote.delegate_id,
+            named_vote.named_vote_info_id,
+            named_vote.manually_matched
+        )
+        .execute(pg)
+        .await
+        {
+            log::warn!(
+                "Error inserting named vote: '{:?}'. The error occurred for the following named vote: {:?}",
+                e,
+                named_vote
+            );
+        }
+    }
+
+    Ok(())
+}
 
 pub struct VotedByNameResult {
     pro: Vec<LevResult>,
@@ -21,6 +151,7 @@ pub async fn match_all_named_votes(
     pg: &PgPool,
     votes: &ProContra,
     voted_on: NaiveDate,
+    gp: &str,
 ) -> sqlx::Result<VotedByNameResult> {
     let active_delegates = active_delegates_at_date(pg, voted_on)
         .await
@@ -30,12 +161,12 @@ pub async fn match_all_named_votes(
         // .inspect(|x| println!("{x:?}"))
         .collect::<HashSet<_>>();
 
-    let pro_res = match_delegate_names_with_delegate_ids(&active_delegates, &votes.pro);
+    let pro_res = match_delegate_names_with_delegate_ids(&active_delegates, &votes.pro, gp);
     let mut pro = pro_res.correctly_matched;
     pro.extend_from_slice(&pro_res.lev_or_deep_split_matched);
     println!("lev_or_deep_pro: {:?}", pro_res.lev_or_deep_split_matched);
 
-    let contra_res = match_delegate_names_with_delegate_ids(&active_delegates, &votes.contra);
+    let contra_res = match_delegate_names_with_delegate_ids(&active_delegates, &votes.contra, gp);
     let mut contra = contra_res.correctly_matched;
     contra.extend_from_slice(&contra_res.lev_or_deep_split_matched);
 
@@ -92,6 +223,7 @@ mod tests {
                             .delegates_pro_contra
                             .unwrap(),
                         init.date,
+                        &init.gp,
                     )
                     .await
                     .unwrap();
@@ -123,6 +255,7 @@ mod tests {
                 .delegates_pro_contra
                 .unwrap(),
             init.date,
+            &init.gp,
         )
         .await
         .unwrap();
@@ -146,6 +279,7 @@ mod tests {
                 .delegates_pro_contra
                 .unwrap(),
             init.date,
+            &init.gp,
         )
         .await
         .unwrap();
@@ -183,6 +317,7 @@ mod tests {
                 .delegates_pro_contra
                 .unwrap(),
             init.date,
+            &init.gp,
         )
         .await
         .unwrap();
@@ -220,6 +355,7 @@ mod tests {
                 .delegates_pro_contra
                 .unwrap(),
             init.date,
+            &init.gp,
         )
         .await
         .unwrap();

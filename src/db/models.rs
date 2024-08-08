@@ -404,3 +404,29 @@ pub struct DbParty {
     pub fraction: i32,
     pub color: String,
 }
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+pub struct DbNamedVote {
+    pub id: i32,
+    pub infavor: Option<bool>,
+    pub was_absent: bool,
+    pub lev: i64,
+    pub similiarity_score: i64,
+    pub searched_with: Option<String>,
+    pub matched_with: String,
+    pub delegate_id: i32,
+    pub named_vote_info_id: i32,
+    pub manually_matched: bool,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+pub struct DbNamedVoteInfo {
+    pub id: i32,
+    pub legis_init_id: i32,
+    pub pro_count: i32,
+    pub contra_count: i32,
+    pub given_vote_sum: i32,
+    pub invalid_count: i32,
+}
