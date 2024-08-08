@@ -39,7 +39,10 @@ pub async fn match_all_named_votes(
     let mut contra = contra_res.correctly_matched;
     contra.extend_from_slice(&contra_res.lev_or_deep_split_matched);
 
-    println!("lev_or_deep_contra: {:?}", contra_res.lev_or_deep_split_matched);
+    println!(
+        "lev_or_deep_contra: {:?}",
+        contra_res.lev_or_deep_split_matched
+    );
 
     let absent = pro_res
         .not_matchable
@@ -100,7 +103,7 @@ mod tests {
             println!("elapsed: {:?}", start.elapsed());
         }
     }
-    
+
     // /gegenstand/XXVII/A/3945
     #[tokio::test]
     async fn test_namentlich_name_matching_xxvii_a_3945() {
@@ -125,7 +128,6 @@ mod tests {
         .unwrap();
     }
 
-
     #[tokio::test]
     async fn test_namentlich_name_matching_xxvii_a_2068() {
         let scraper = AustriaScraper::default();
@@ -133,7 +135,6 @@ mod tests {
             .get_legis_init("/gegenstand/XXVII/A/2068")
             .await
             .unwrap();
-
 
         let pg = connect_pg().await;
         let res = match_all_named_votes(
@@ -161,7 +162,15 @@ mod tests {
             .await
             .unwrap();
 
-        let x = init.hidden_votes_info.voted_by_name_data.as_ref().unwrap().delegates_pro_contra.as_ref().unwrap().clone();
+        let x = init
+            .hidden_votes_info
+            .voted_by_name_data
+            .as_ref()
+            .unwrap()
+            .delegates_pro_contra
+            .as_ref()
+            .unwrap()
+            .clone();
         println!("x: {x:?}");
 
         let pg = connect_pg().await;
@@ -178,7 +187,7 @@ mod tests {
         .await
         .unwrap();
 
-        // println!("Ares: {:?}", res.)  
+        // println!("Ares: {:?}", res.)
     }
 
     // /gegenstand/XXV/A/2254
@@ -190,7 +199,15 @@ mod tests {
             .await
             .unwrap();
 
-        let x = init.hidden_votes_info.voted_by_name_data.as_ref().unwrap().delegates_pro_contra.as_ref().unwrap().clone();
+        let x = init
+            .hidden_votes_info
+            .voted_by_name_data
+            .as_ref()
+            .unwrap()
+            .delegates_pro_contra
+            .as_ref()
+            .unwrap()
+            .clone();
         println!("x: {x:?}");
 
         let pg = connect_pg().await;
@@ -207,6 +224,6 @@ mod tests {
         .await
         .unwrap();
 
-        // println!("Ares: {:?}", res.)  
+        // println!("Ares: {:?}", res.)
     }
 }

@@ -90,7 +90,7 @@ pub fn match_delegate_name_with_delegate_id<'a, I: Iterator<Item = &'a (String, 
             let mut deep_split_matched = false;
             // let mut names_are_the_same = true;
             let mut split_names_are_the_same = true;
-            
+
             let mut deep_search_mismatch = 0;
 
             for delegate_name_split in &delegate_split {
@@ -122,7 +122,7 @@ pub fn match_delegate_name_with_delegate_id<'a, I: Iterator<Item = &'a (String, 
             } else if deep_search {
                 levenshtein_distance(&surname, delegate_name)
             } else {
-                usize::MAX-10
+                usize::MAX - 10
             };
 
             let similiarity_ranking = if def_the_same {

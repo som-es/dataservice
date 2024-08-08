@@ -46,22 +46,60 @@ pub async fn scrape_new_legis_inits(
 
 async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<LegislativeInitiative> {
     log::info!("Try scraping legislative initiatives");
-    let mut scraper = AustriaScraper::default();
 
     for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
-        if !only_latest {
+        if !only_latest && gp == "XXVII" {
             continue;
         }
-        
-        log::info!("LEGIS INIT once GP: {gp}");
-        scraper.scrape_info.gp = vec![gp.into()];
+        let pg_pool = pg_pool.clone();
+        tokio::spawn(async move {
+            let mut scraper = AustriaScraper::default();
+            log::info!("LEGIS INIT once GP: {gp}");
+            scraper.scrape_info.gp = vec![gp.into()];
 
-        let new_legis_inits = scrape_untill_success::<Vec<LegislativeInitiative>, _>(|| async {
-            scrape_new_legis_inits(&scraper).await
-        })
-        .await;
+            let new_legis_inits =
+                scrape_untill_success::<Vec<LegislativeInitiative>, _>(|| async {
+                    scrape_new_legis_inits(&scraper).await
+                })
+                .await;
 
-        update_legis_inits_in_db(pg_pool, &new_legis_inits, gp).await;
+            log::info!("finished scraping LEGIS INIT once GP: {gp}");
+
+            let work_size = new_legis_inits.len() / 4;
+
+            if new_legis_inits.len() >= 16 {
+                let mut handles = vec![];
+
+                let batch1 = new_legis_inits[0..work_size].to_vec();
+                let pg_pool1 = pg_pool.clone();
+                handles.push(tokio::spawn(async move {
+                    log::info!("Updating batch1");
+                    update_legis_inits_in_db(&pg_pool1, &batch1, gp).await;
+                }));
+
+                let batch2 = new_legis_inits[work_size..work_size * 2].to_vec();
+                let pg_pool2 = pg_pool.clone();
+                handles.push(tokio::spawn(async move {
+                    log::info!("Updating batch2");
+                    update_legis_inits_in_db(&pg_pool2, &batch2, gp).await;
+                }));
+
+                let batch3 = new_legis_inits[work_size * 2..work_size * 3].to_vec();
+                let pg_pool3 = pg_pool.clone();
+                handles.push(tokio::spawn(async move {
+                    log::info!("Updating batch3");
+                    update_legis_inits_in_db(&pg_pool3, &batch3, gp).await;
+                }));
+
+                let batch4 = new_legis_inits[work_size * 3..].to_vec();
+                let pg_pool4 = pg_pool.clone();
+
+                log::info!("Updating batch4");
+                update_legis_inits_in_db(&pg_pool4, &batch4, gp).await;
+            } else {
+                update_legis_inits_in_db(&pg_pool, &new_legis_inits, gp).await;
+            }
+        });
         if only_latest {
             break;
         }
@@ -76,7 +114,7 @@ pub async fn update_legis_inits_in_db(
     new_legis_inits: &[LegislativeInitiative],
     gp: &str,
 ) {
-    log::info!("Updating legislative initiatives in database...");
+    log::info!("Updating legislative initiatives {gp} in database...");
 
     let mut code_to_parties = all_parties_at_gp(pool, gp)
         .await
@@ -85,9 +123,18 @@ pub async fn update_legis_inits_in_db(
         .map(|party| (party.code.clone(), party))
         .collect::<HashMap<String, Party>>();
 
-    code_to_parties.insert("P".to_string(), code_to_parties.get("J").unwrap().clone());
+    if let Some(jetzt_party_info) = code_to_parties.get("J").cloned() {
+        code_to_parties.insert("P".to_string(), jetzt_party_info);
+    }
 
-    for legis_init in new_legis_inits {
+    for (i, legis_init) in new_legis_inits.iter().enumerate() {
+        if i % 10 == 0 {
+            log::info!(
+                "{i} inserting legis init {}{}",
+                legis_init.inr,
+                legis_init.ityp
+            );
+        }
         let db_legis_init = DbLegislativeInitiative {
             title: legis_init.title.clone(),
             inr: legis_init.inr as i32,
@@ -360,40 +407,43 @@ pub async fn translate_votes(
     pro_contra: &ProContra,
 ) -> Vec<DbVote> {
     let convert_to_vote = |code, infavor| {
-        let party = parties.get(code).unwrap().clone();
+        let Some(party) = parties.get(code).cloned() else {
+            log::warn!("Party with code {code} not found in parties map: {parties:?}");
+            return None;
+        };
 
-        DbVote {
+        Some(DbVote {
             party: party.name,
             fraction: party.fraction as i32,
             infavor,
             legislative_initiatives_id,
-        }
+        })
     };
     let mut votes = vec![];
     votes.extend(
         pro_contra
             .contra
             .iter()
-            .map(|code| convert_to_vote(code, false)),
+            .flat_map(|code| convert_to_vote(code, false)),
     );
     votes.extend(
         pro_contra
             .pro
             .iter()
-            .map(|code| convert_to_vote(code, true)),
+            .flat_map(|code| convert_to_vote(code, true)),
     );
     votes
 }
 
 pub async fn run_shut_latest_gp(mut shutdown: Shutdown) {
     let legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP_LATEST")
-        .unwrap_or_else(|_| "50".to_string())
+        .unwrap_or_else(|_| "300".to_string())
         .parse()
         .unwrap_or_else(|e| {
             log::warn!(
-                "Could not parse LEGISLATIVE_INITIATIVE_SLEEP_LATEST env var: {e}. Using default value of 50 seconds"
+                "Could not parse LEGISLATIVE_INITIATIVE_SLEEP_LATEST env var: {e}. Using default value of 300 seconds"
             );
-            50
+            300 
         });
 
     while !shutdown.is_shutdown() {
@@ -444,6 +494,7 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown) {
 
                     let pg_pool = connect_pg().await;
                     legis_init_once(false, &pg_pool).await;
+                    log::info!("lol");
                 }).await {
                     log::error!("Error in legislative initiative scraper: {:?}", e);
                 }

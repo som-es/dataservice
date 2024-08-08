@@ -66,8 +66,8 @@ pub async fn update_ministrial_proposals_in_db2(
 ) -> Result<(), sqlx::Error> {
     log::info!("Updating ministrial proposal in database...");
 
-    for ministrial_prop in ministrial_props {
-        log::info!("inserting single ministrial prop");
+    for (i, ministrial_prop) in ministrial_props.iter().enumerate() {
+        // log::info!("inserting single ministrial prop");
 
         let start = Instant::now();
         // Insert or update the ministrial proposal
@@ -111,7 +111,9 @@ pub async fn update_ministrial_proposals_in_db2(
         .fetch_one(pool)
         .await?
         .id;
-        log::info!("insertion dur: {:?}", start.elapsed());
+        if i % 10 == 0 {
+            log::info!("{i} insertion dur: {:?}", start.elapsed());
+        }
 
         // Insert or update topics
         for topic in &ministrial_prop.topics {
@@ -189,13 +191,13 @@ pub async fn update_ministrial_proposals_in_db2(
 
 pub async fn run_shut_latest_gp(mut shutdown: Shutdown) {
     let legis_init_sleep = std::env::var("MINISTRIAL_PROPOSAL_LATEST_SLEEP")
-        .unwrap_or_else(|_| "50".to_string())
+        .unwrap_or_else(|_| "400".to_string())
         .parse()
         .unwrap_or_else(|e| {
             log::warn!(
-                "Could not parse MINISTRIAL_PROPOSAL_LATEST_SLEEP env var: {e}. Using default value of 50 seconds"
+                "Could not parse MINISTRIAL_PROPOSAL_LATEST_SLEEP env var: {e}. Using default value of 400 seconds"
             );
-            50
+            400
         });
     while !shutdown.is_shutdown() {
         tokio::select! {
