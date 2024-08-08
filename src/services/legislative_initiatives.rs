@@ -1,4 +1,5 @@
 mod match_delegates_with_name;
+mod voted_by_name_result;
 
 use std::collections::HashMap;
 
@@ -48,6 +49,10 @@ async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<Legislative
     let mut scraper = AustriaScraper::default();
 
     for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
+        if !only_latest {
+            continue;
+        }
+        
         log::info!("LEGIS INIT once GP: {gp}");
         scraper.scrape_info.gp = vec![gp.into()];
 
@@ -484,7 +489,7 @@ mod tests {
     async fn test_legis_init_empty_gp_scrape_xxvi_a_110() {
         let mut scraper: AustriaScraper = AustriaScraper::default();
         let res = scraper
-            .get_legis_init("/gegenstand/XXVI/A/110")
+            .get_legis_init("/gegenstand/XXVI/A/238")
             .await
             .unwrap();
 

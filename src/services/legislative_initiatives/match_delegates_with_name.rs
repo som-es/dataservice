@@ -5,11 +5,10 @@ use sqlx::{query_as, PgPool};
 
 use crate::with_data::activity::active_delegates_at_date;
 
-const MAX_STEPS: usize = 50000000;
+const MAX_STEPS: usize = 10000000;
 // const MAX_STEPS: usize = 100000;
 
 pub fn levenshtein_distance(lhs: &str, rhs: &str) -> usize {
-    println!("called: {lhs}, rhs: {rhs}");
     let mut steps = 0;
     fn levenshtein_distance_inner_inner(
         lhs: &[char],
@@ -62,6 +61,7 @@ pub fn levenshtein_distance(lhs: &str, rhs: &str) -> usize {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LevResult {
     pub deep_split_matched: bool,
+    pub similiarity_score: usize,
     pub lev: usize,
     pub delegate_id: usize,
     pub name: String,
@@ -72,10 +72,11 @@ pub fn match_delegate_name_with_delegate_id<'a, I: Iterator<Item = &'a (String, 
     // delegates: &[(String, usize)],
     delegates: I,
     delegate_name: &str,
-    deep_search: bool
+    deep_search: bool,
 ) -> Vec<LevResult> {
     let delegate_split = delegate_name.split(' ').collect::<Vec<_>>();
-    let mut levenshtein_scores = delegates.into_iter()
+    let mut levenshtein_scores = delegates
+        .into_iter()
         .cloned()
         .map(|(mut name, delegate_id)| {
             let orig_name = name.clone();
@@ -87,94 +88,101 @@ pub fn match_delegate_name_with_delegate_id<'a, I: Iterator<Item = &'a (String, 
             let name_split = name.split(' ').collect::<Vec<_>>();
 
             let mut deep_split_matched = false;
-            let mut names_are_the_same = true;
+            // let mut names_are_the_same = true;
+            let mut split_names_are_the_same = true;
+            
+            let mut deep_search_mismatch = 0;
+
             for delegate_name_split in &delegate_split {
                 if deep_search {
                     for name in &name_split {
-                        if name.contains(delegate_name_split) {
+                        if !name.contains(delegate_name_split) {
+                            deep_search_mismatch += 1;
+                        } else {
                             deep_split_matched = true;
-                            break;
                         }
                     }
-                } 
-                if !name_split.contains(delegate_name_split) {
-                    names_are_the_same = false;
                 }
-            
+
+                if !name_split.contains(delegate_name_split) {
+                    split_names_are_the_same = false;
+                }
             }
 
             // println!("name: {name:?}");
             let surname = name_split[0].to_string();
             let fullname = name;
 
-            let lev = if deep_split_matched || names_are_the_same || delegate_name == surname || delegate_name == fullname
-            {
+            let def_the_same = delegate_name == surname || delegate_name == fullname;
+
+            let lev = if deep_split_matched || split_names_are_the_same || def_the_same {
                 0
             } else if delegate_split.len() > 1 && deep_search {
                 levenshtein_distance(&fullname, delegate_name)
             } else if deep_search {
                 levenshtein_distance(&surname, delegate_name)
             } else {
-                usize::MAX
+                usize::MAX-10
             };
+
+            let similiarity_ranking = if def_the_same {
+                0
+            } else if split_names_are_the_same {
+                1
+            } else if deep_split_matched {
+                1 + deep_search_mismatch
+            } else {
+                lev + 3
+            };
+
             LevResult {
                 deep_split_matched,
                 lev,
                 delegate_id,
                 name: orig_name,
                 searched_with: delegate_name.to_string(),
+                similiarity_score: similiarity_ranking,
             }
         })
         .collect::<Vec<_>>();
 
-    levenshtein_scores.sort_by(|a, b| {
-        let mut a_lev = a.lev;
-        let mut b_lev = b.lev;
-        if a.deep_split_matched {
-            a_lev = 2
-        }
-        if b.deep_split_matched {
-            b_lev = 2
-        }
-        a_lev.cmp(&b_lev)}
-    );
+    levenshtein_scores.sort_by(|a, b| a.similiarity_score.cmp(&b.similiarity_score));
     levenshtein_scores
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MatchResult {
-    correctly_matched: Vec<LevResult>,
-    lev_or_deep_split_matched: Vec<LevResult>,
-    not_matchable: HashSet<(String, usize)>
+    pub correctly_matched: Vec<LevResult>,
+    pub lev_or_deep_split_matched: Vec<LevResult>,
+    pub not_matchable: HashSet<(String, usize)>,
 }
 
-pub async fn match_delegate_names_with_delegate_ids(
-    pg: &PgPool,
+pub fn match_delegate_names_with_delegate_ids(
+    active_delegates: &HashSet<(String, usize)>,
     delegate_names: &[String],
-    voted_on_at: NaiveDate,
-) -> sqlx::Result<MatchResult> {
-    let delegates = active_delegates_at_date(pg, voted_on_at)
-        .await?
-        .into_iter()
-        .map(|delegate| {
-            // println!("name: {}", delegate.name);
-            (delegate.name, delegate.id as usize)
-        })
-        .collect::<HashSet<_>>();
-
-    let mut find_not_sure_if_matched_correctly = delegates.clone();
-    let mut prot_delegate_names_not_sure_if_matched_correctly = delegate_names.iter().cloned().collect::<HashSet<_>>();
+) -> MatchResult {
+    let mut find_not_sure_if_matched_correctly = active_delegates.clone();
+    let mut prot_delegate_names_not_sure_if_matched_correctly =
+        delegate_names.iter().cloned().collect::<HashSet<_>>();
 
     let matched_delegates = delegate_names
         .iter()
-        .map(|delegate_name| (delegate_name, match_delegate_name_with_delegate_id(delegates.iter(), delegate_name, false)))
+        .map(|delegate_name| {
+            (
+                delegate_name,
+                match_delegate_name_with_delegate_id(active_delegates.iter(), delegate_name, false),
+            )
+        })
         // .inspect(|x| println!("done"))
         .filter_map(|(del_name, x)| {
             let res = x[0].clone();
+            // println!("res: {res:?}");
             if res.lev == 0 {
                 // println!("removed");
                 prot_delegate_names_not_sure_if_matched_correctly.remove(del_name);
-                assert!(find_not_sure_if_matched_correctly.remove(&(res.name.clone(), res.delegate_id)));
+                assert!(
+                    find_not_sure_if_matched_correctly.remove(&(res.name.clone(), res.delegate_id))
+                );
                 Some(res)
             } else {
                 // println!("not removed");
@@ -184,22 +192,32 @@ pub async fn match_delegate_names_with_delegate_ids(
         .collect::<Vec<_>>();
 
     // println!("find not: {find_not_sure_if_matched_correctly:?}");
-    
+
     let mut find_not_sure_if_matched_correctly_final = find_not_sure_if_matched_correctly.clone();
 
-    // e.g. Holzinger-Vogtenhuber Daniela, BA back then was "Holzinger" 
+    // e.g. Holzinger-Vogtenhuber Daniela, BA back then was "Holzinger"
     // (name changes etc)
-    let other_matched_delegates = prot_delegate_names_not_sure_if_matched_correctly.clone()
+    let other_matched_delegates = prot_delegate_names_not_sure_if_matched_correctly
+        .clone()
         .iter()
-        .map(|delegate_name| (delegate_name.clone(), match_delegate_name_with_delegate_id(find_not_sure_if_matched_correctly.clone().iter(), &delegate_name, true)))
+        .map(|delegate_name| {
+            (
+                delegate_name.clone(),
+                match_delegate_name_with_delegate_id(
+                    find_not_sure_if_matched_correctly.clone().iter(),
+                    &delegate_name,
+                    true,
+                ),
+            )
+        })
         .map(|(del_name, x)| {
             let res = x[0].clone();
             // println!("del_name: {del_name}, res: {res:?}");
             prot_delegate_names_not_sure_if_matched_correctly.remove(&del_name);
-            assert!(find_not_sure_if_matched_correctly_final.remove(&(res.name.clone(), res.delegate_id)));
+            assert!(find_not_sure_if_matched_correctly_final
+                .remove(&(res.name.clone(), res.delegate_id)));
             res
         })
-
         // .inspect(|x| println!("done"))
         .collect::<Vec<_>>();
 
@@ -208,18 +226,20 @@ pub async fn match_delegate_names_with_delegate_ids(
     assert!(prot_delegate_names_not_sure_if_matched_correctly.is_empty());
     let not_matchable = find_not_sure_if_matched_correctly_final;
 
-    Ok(MatchResult {
+    MatchResult {
         correctly_matched: matched_delegates,
         lev_or_deep_split_matched: other_matched_delegates,
         not_matchable,
-    })
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use scraper::{legis_init::LegislativeInitiatives, AustriaScraper};
 
-    use crate::connect_pg;
+    use crate::{connect_pg, with_data::activity::active_delegates_at_date};
 
     use super::{
         levenshtein_distance, match_delegate_name_with_delegate_id,
@@ -227,7 +247,7 @@ mod tests {
     };
 
     #[tokio::test]
-    async fn test_namentlich_name_matching() {
+    async fn test_namentlich_name_matching_xxv_i_1() {
         let scraper = AustriaScraper::default();
         let init = scraper.get_legis_init("/gegenstand/XXV/I/1").await.unwrap();
         println!("date: {:?}", init.date);
@@ -240,12 +260,49 @@ mod tests {
             .unwrap();
 
         let pg = connect_pg().await;
-        let res = match_delegate_names_with_delegate_ids(&pg, &pro_contra.pro, init.date)
+        let active_delegates = active_delegates_at_date(&pg, init.date)
             .await
-            .unwrap();
+            .unwrap()
+            .into_iter()
+            .map(|delegate| (delegate.name, delegate.id as usize))
+            .collect::<HashSet<_>>();
+
+        let res = match_delegate_names_with_delegate_ids(&active_delegates, &pro_contra.pro);
 
         // let res = res.correctly_matched.into_iter().filter(|x| x.lev > 0).collect::<Vec<_>>();
         println!("res: {:?}", res.lev_or_deep_split_matched);
+    }
+
+    #[tokio::test]
+    async fn test_namentlich_name_matching_xxvi_i_514() {
+        // /gegenstand/XXVI/I/514
+        let scraper = AustriaScraper::default();
+        let init = scraper
+            .get_legis_init("/gegenstand/XXVI/I/514")
+            .await
+            .unwrap();
+        println!("date: {:?}", init.date);
+        assert!(init.hidden_votes_info.voted_by_name);
+        println!("hidden_vot_infos: {:?}", init.hidden_votes_info);
+        let pro_contra = init
+            .hidden_votes_info
+            .voted_by_name_data
+            .unwrap()
+            .delegates_pro_contra
+            .unwrap();
+
+        let pg = connect_pg().await;
+        let active_delegates = active_delegates_at_date(&pg, init.date)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|delegate| (delegate.name, delegate.id as usize))
+            .collect::<HashSet<_>>();
+
+        let res = match_delegate_names_with_delegate_ids(&active_delegates, &pro_contra.pro);
+
+        // let res = res.correctly_matched.into_iter().filter(|x| x.lev > 0).collect::<Vec<_>>();
+        // println!("res: {:?}", res.lev_or_deep_split_matched);
     }
 
     #[test]

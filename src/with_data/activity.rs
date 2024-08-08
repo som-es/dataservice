@@ -1,7 +1,7 @@
 use chrono::NaiveDate;
 use sqlx::{query, query_as, PgPool};
 
-use crate::models::DbDelegate;
+use crate::db::models::DbDelegate;
 
 pub async fn active_delegates_at_date(pg: &PgPool, at: NaiveDate) -> sqlx::Result<Vec<DbDelegate>> {
     query_as!(
