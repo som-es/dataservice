@@ -3,6 +3,7 @@ mod voted_by_name_result;
 
 use std::collections::HashMap;
 
+use log::log;
 use scraper::{
     legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative, Opinion, Party,
     ProContra,
@@ -48,12 +49,13 @@ pub async fn scrape_new_legis_inits(
 async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<LegislativeInitiative> {
     log::info!("Try scraping legislative initiatives");
 
+    let mut handles = vec![];
     for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
         if !only_latest && gp == "XXVII" {
             continue;
         }
         let pg_pool = pg_pool.clone();
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             let mut scraper = AustriaScraper::default();
             log::info!("LEGIS INIT once GP: {gp}");
             scraper.scrape_info.gp = vec![gp.into()];
@@ -97,15 +99,26 @@ async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<Legislative
 
                 log::info!("Updating batch4");
                 update_legis_inits_in_db(&pg_pool4, &batch4, gp).await;
+                for handle in handles {
+                    if let Err(e) = handle.await {
+                        log::error!("join error batching: {e:?}");
+                    }
+                }
             } else {
                 update_legis_inits_in_db(&pg_pool, &new_legis_inits, gp).await;
             }
         });
+        handles.push(handle);
         if only_latest {
             break;
         }
     }
 
+    for handle in handles {
+        if let Err(e) = handle.await {
+            log::error!("join error: {e:?}");
+        }
+    }
     // new_legis_inits
     vec![]
 }
