@@ -30,7 +30,7 @@ pub async fn scrape_new_legis_inits(
     let legis_inits = scraper.post_legis_payload().await?;
     let legis_init_paths = scraper.legis_paths(legis_inits)?;
 
-    const MAX_TASKS: usize = 5;
+    const MAX_TASKS: usize = 2;
     let mut handles: Vec<tokio::task::JoinHandle<()>> = vec![];
 
     let code_to_parties = Arc::new(
