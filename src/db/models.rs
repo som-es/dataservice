@@ -405,19 +405,25 @@ pub struct DbParty {
     pub color: String,
 }
 
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct DbNamedVote {
     pub id: i32,
     pub infavor: Option<bool>,
-    pub was_absent: bool,
+    pub was_absent: Option<bool>,
     pub lev: i64,
     pub similiarity_score: i64,
     pub searched_with: Option<String>,
     pub matched_with: String,
     pub delegate_id: i32,
     pub named_vote_info_id: i32,
-    pub manually_matched: bool,
+    pub manually_matched: Option<bool>,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+pub struct DbNamedVotes {
+    pub named_vote_info: DbNamedVoteInfo,
+    pub named_votes: Vec<DbNamedVote>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

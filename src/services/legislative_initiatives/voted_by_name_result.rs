@@ -64,39 +64,39 @@ pub async fn insert_named_votes(
     let pro_iter = named_votes_compact.pro.iter().map(|v| DbNamedVote {
         id: 0,
         infavor: Some(true),
-        was_absent: false,
+        was_absent: Some(false),
         lev: v.lev as i64,
         similiarity_score: v.similiarity_score as i64,
         searched_with: Some(v.searched_with.clone()),
         matched_with: v.matched_with.clone(),
         delegate_id: v.delegate_id as i32,
         named_vote_info_id,
-        manually_matched: v.manually_matched,
+        manually_matched: Some(v.manually_matched),
     });
     let contra_iter = named_votes_compact.contra.iter().map(|v| DbNamedVote {
         id: 0,
         infavor: Some(false),
-        was_absent: false,
+        was_absent: Some(false),
         lev: v.lev as i64,
         similiarity_score: v.similiarity_score as i64,
         searched_with: Some(v.searched_with.clone()),
         matched_with: v.matched_with.clone(),
         delegate_id: v.delegate_id as i32,
         named_vote_info_id,
-        manually_matched: v.manually_matched,
+        manually_matched: Some(v.manually_matched),
     });
 
     let absent_iter = named_votes_compact.absent.into_iter().map(|v| DbNamedVote {
         id: 0,
         infavor: None,
-        was_absent: true,
+        was_absent: Some(true),
         lev: 0,
         similiarity_score: 0,
         searched_with: None,
         matched_with: v.0,
         delegate_id: v.1 as i32,
         named_vote_info_id,
-        manually_matched: false,
+        manually_matched: Some(false),
     });
 
     for named_vote in pro_iter.chain(contra_iter).chain(absent_iter) {
