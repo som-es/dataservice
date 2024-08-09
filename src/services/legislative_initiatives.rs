@@ -117,16 +117,20 @@ pub async fn update_legis_inits_in_db(
 ) {
     log::info!("Updating legislative initiatives {gp} in database...");
 
-    let mut code_to_parties = all_parties_at_gp(pool, gp)
+    let code_to_parties = all_parties_at_gp(pool, gp)
         .await
+        .map_err(|e| {
+            log::error!("all parties for gp error in legis init: {e:?}");
+            e
+        })
         .unwrap_or_default()
         .into_iter()
         .map(|party| (party.code.clone(), party))
         .collect::<HashMap<String, Party>>();
 
-    if let Some(jetzt_party_info) = code_to_parties.get("J").cloned() {
-        code_to_parties.insert("P".to_string(), jetzt_party_info);
-    }
+    // if let Some(jetzt_party_info) = code_to_parties.get("J").cloned() {
+    //     code_to_parties.insert("P".to_string(), jetzt_party_info);
+    // }
 
     for (i, legis_init) in new_legis_inits.iter().enumerate() {
         if i % 10 == 0 {

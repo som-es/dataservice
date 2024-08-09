@@ -41,7 +41,7 @@ pub fn today_and_time() -> chrono::NaiveDateTime {
 pub async fn connect_pg() -> PgPool {
     PgPoolOptions::new()
         // pool sizes
-        .max_connections(10)
+        .max_connections(8)
         .connect(DATABASE_URL)
         .await
         .unwrap()
