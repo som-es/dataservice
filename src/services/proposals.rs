@@ -1,9 +1,12 @@
+use std::{sync::Arc, thread::JoinHandle};
+
 use dotenvy::dotenv;
 use log::error;
 use scraper::{
     proposals::{ProposalScraper, ProposalsPayload},
     AustriaScraper, Proposal,
 };
+use tokio::{sync::RwLock, time::Instant};
 
 use crate::{connect_pg, Shutdown};
 
@@ -48,21 +51,44 @@ pub async fn update_proposals_in_db2(
     pool: &PgPool,
     new_proposals_paths: &[String],
 ) -> Result<(), sqlx::Error> {
-    info!("Updating proposals in database...");
-    let scraper = AustriaScraper::default();
+    info!(
+        "Updating proposals in database... amount: {}",
+        new_proposals_paths.len()
+    );
+
+    let scraper = Arc::new(AustriaScraper::default());
+    let mut handles: Vec<tokio::task::JoinHandle<()>> = vec![];
+
+    const MAX_TASKS: usize = 5;
+
+    let start = Instant::now();
 
     for proposal_path in new_proposals_paths {
-        let proposal = match scraper.get_proposal(proposal_path).await {
-            Ok(prop) => prop,
-            Err(_) => {
-                error!("CANNOT PROCESS {proposal_path}");
-                continue;
-            }
-        };
+        let pool = pool.clone();
+        let proposal_path = proposal_path.clone();
+        let scraper = scraper.clone();
 
-        // Insert or update proposal
-        sqlx::query!(
-            r#"
+        if handles.len() > MAX_TASKS {
+            for handle in handles.drain(..MAX_TASKS) {
+                handle.await.unwrap()
+            }
+        }
+
+        handles.push(tokio::spawn(async move {
+            let pool = pool;
+            let pool = &pool;
+            let proposal = match scraper.get_proposal(&proposal_path).await {
+                Ok(prop) => prop,
+                Err(e) => {
+                    error!("CANNOT PROCESS {proposal_path}, e: {e:?}");
+                    return;
+                    // continue;
+                }
+            };
+
+            // Insert or update proposal
+            if let Err(e) = sqlx::query!(
+                r#"
             INSERT INTO proposals (id, title, description, ityp, gp, created_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT (id) DO UPDATE SET
@@ -73,53 +99,75 @@ pub async fn update_proposals_in_db2(
                 created_at = EXCLUDED.created_at,
                 updated_at = EXCLUDED.updated_at
             "#,
-            proposal.id,
-            proposal.title,
-            proposal.description,
-            proposal.ityp,
-            proposal.gp,
-            proposal.created_at,
-            proposal.updated_at
-        )
-        .execute(pool)
-        .await?;
+                proposal.id,
+                proposal.title,
+                proposal.description,
+                proposal.ityp,
+                proposal.gp,
+                proposal.created_at,
+                proposal.updated_at
+            )
+            .execute(pool)
+            .await
+            {
+                log::error!("cannot insert proposal {proposal:?} into database: {e:?}");
+                return;
+            }
 
-        // Insert or update documents
-        for document in &proposal.documents {
-            sqlx::query!(
-                r#"
+            // Insert or update documents
+            for document in &proposal.documents {
+                if let Err(e) = sqlx::query!(
+                    r#"
                 INSERT INTO proposal_documents (proposal_id, title, document_type, document_url)
                 VALUES ($1, $2, $3, $4)
                 ON CONFLICT (document_url, proposal_id) DO UPDATE SET
                     title = EXCLUDED.title,
                     document_type = EXCLUDED.document_type
                 "#,
-                proposal.id,
-                document.title,
-                document.ftype.to_string(),
-                document.link
-            )
-            .execute(pool)
-            .await?;
-        }
-
-        // Insert receivers
-        for receiver_id in &proposal.receiver_ids {
-            if let Err(e) = insert_prop_del2(pool, &proposal.id, *receiver_id as i32, true).await {
-                error!("Error inserting receiver of proposal into database: '{e}'. The following proposal receiver was not inserted: {receiver_id:?}, for proposal: {proposal:?}");
+                    proposal.id,
+                    document.title,
+                    document.ftype.to_string(),
+                    document.link
+                )
+                .execute(pool)
+                .await
+                {
+                    log::error!("cannot insert document {document:?} into database: {e:?}")
+                }
             }
-        }
 
-        // Insert issuers
-        for issuer_id in &proposal.issuer_ids {
-            if let Err(e) = insert_prop_del2(pool, &proposal.id, *issuer_id as i32, false).await {
-                error!("Error inserting issuer of proposal into database: '{e}'. The following proposal issuer was not inserted: {issuer_id:?}, for proposal: {proposal:?}");
+            // Insert receivers
+            for receiver_id in &proposal.receiver_ids {
+                if let Err(e) =
+                    insert_prop_del2(pool, &proposal.id, *receiver_id as i32, true).await
+                {
+                    error!("Error inserting receiver of proposal into database: '{e}'. The following proposal receiver was not inserted: {receiver_id:?}, for proposal: {proposal:?}");
+                }
             }
-        }
 
-        // Insert topics
-        insert_topics2(pool, &proposal).await?;
+            // Insert issuers
+            for issuer_id in &proposal.issuer_ids {
+                if let Err(e) = insert_prop_del2(pool, &proposal.id, *issuer_id as i32, false).await
+                {
+                    error!("Error inserting issuer of proposal into database: '{e}'. The following proposal issuer was not inserted: {issuer_id:?}, for proposal: {proposal:?}");
+                }
+            }
+
+            // Insert topics
+            if let Err(e) = insert_topics2(pool, &proposal).await {
+                error!("cannot insert topics into db: {e:?}")
+            }
+        }));
     }
+
+    for handle in handles {
+        handle.await.unwrap();
+    }
+
+    log::info!(
+        "---------- !!!!! complete proposal insertion took: {:?}",
+        start.elapsed()
+    );
 
     Ok(())
 }

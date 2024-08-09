@@ -1,7 +1,7 @@
 mod match_delegates_with_name;
 mod voted_by_name_result;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use log::log;
 use scraper::{
@@ -23,27 +23,63 @@ use crate::{
 };
 
 pub async fn scrape_new_legis_inits(
-    scraper: &AustriaScraper,
+    pool: &PgPool,
+    scraper: Arc<AustriaScraper>,
+    gp: &str,
 ) -> crate::Result<Vec<LegislativeInitiative>> {
     let legis_inits = scraper.post_legis_payload().await?;
     let legis_init_paths = scraper.legis_paths(legis_inits)?;
 
-    let mut new_legis_inits = Vec::new();
+    const MAX_TASKS: usize = 5;
+    let mut handles: Vec<tokio::task::JoinHandle<()>> = vec![];
 
+    let code_to_parties = Arc::new(
+        all_parties_at_gp(pool, gp)
+            .await
+            .map_err(|e| {
+                log::error!("all parties for gp error in legis init: {e:?}");
+                e
+            })
+            .unwrap_or_default()
+            .into_iter()
+            .map(|party| (party.code.clone(), party))
+            .collect::<HashMap<String, Party>>(),
+    );
+
+    log::info!("Fetching and inserting ({gp}) now.");
+    let mut info_print_counter = 0;
     for legis_init_path in &legis_init_paths {
-        // skipping legis inits that can't be processed right now
-        // mainly many I and A
-        // https://www.parlament.gv.at/gegenstand/XXVII/I/1494
-        // https://www.parlament.gv.at/gegenstand/XXVII/A/2686
-        let Ok(legis_init) = scraper.get_legis_init(&legis_init_path).await else {
-            log::debug!("Cannot process legislative initiative: '{legis_init_path}'");
-            continue;
-        };
+        let legis_init_path = legis_init_path.clone();
+        let scraper = scraper.clone();
+        let pool = pool.clone();
+        let code_to_parties = code_to_parties.clone();
 
-        new_legis_inits.push(legis_init);
+        if handles.len() > MAX_TASKS {
+            if info_print_counter % 16 == 0 {
+                log::info!("Awaiting handles ({gp}) now.");
+            }
+            for handle in handles.drain(..MAX_TASKS) {
+                handle.await.unwrap()
+            }
+            info_print_counter += 1;
+        }
+
+        handles.push(tokio::spawn(async move {
+            // skipping legis inits that can't be processed right now
+            // mainly many I and A
+            // https://www.parlament.gv.at/gegenstand/XXVII/I/1494
+            // https://www.parlament.gv.at/gegenstand/XXVII/A/2686
+            let Ok(legis_init) = scraper.get_legis_init(&legis_init_path).await else {
+                log::debug!("Cannot process legislative initiative: '{legis_init_path}'");
+                return;
+            };
+
+            update_legis_inits_in_db(&pool, code_to_parties, &[legis_init]).await;
+            // new_legis_inits.push(legis_init);
+        }));
     }
 
-    Ok(new_legis_inits)
+    Ok(vec![])
 }
 
 async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<LegislativeInitiative> {
@@ -59,54 +95,55 @@ async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<Legislative
             let mut scraper = AustriaScraper::default();
             log::info!("LEGIS INIT once GP: {gp}");
             scraper.scrape_info.gp = vec![gp.into()];
+            let scraper = Arc::new(scraper);
 
-            let new_legis_inits =
-                scrape_untill_success::<Vec<LegislativeInitiative>, _>(|| async {
-                    scrape_new_legis_inits(&scraper).await
-                })
-                .await;
+            // scrape_new_legis_inits(&pg_pool, scraper.clone(), gp).await
+            scrape_untill_success::<Vec<LegislativeInitiative>, _>(|| async {
+                scrape_new_legis_inits(&pg_pool, scraper.clone(), gp).await
+            })
+            .await;
 
             log::info!("finished scraping LEGIS INIT once GP: {gp}");
 
-            let work_size = new_legis_inits.len() / 4;
+            // let work_size = new_legis_inits.len() / 4;
 
-            if new_legis_inits.len() >= 16 {
-                let mut handles = vec![];
+            // if new_legis_inits.len() >= 16 {
+            //     let mut handles = vec![];
 
-                let batch1 = new_legis_inits[0..work_size].to_vec();
-                let pg_pool1 = pg_pool.clone();
-                handles.push(tokio::spawn(async move {
-                    log::info!("Updating batch1");
-                    update_legis_inits_in_db(&pg_pool1, &batch1, gp).await;
-                }));
+            //     let batch1 = new_legis_inits[0..work_size].to_vec();
+            //     let pg_pool1 = pg_pool.clone();
+            //     handles.push(tokio::spawn(async move {
+            //         log::info!("Updating batch1");
+            //         update_legis_inits_in_db(&pg_pool1, &batch1, gp).await;
+            //     }));
 
-                let batch2 = new_legis_inits[work_size..work_size * 2].to_vec();
-                let pg_pool2 = pg_pool.clone();
-                handles.push(tokio::spawn(async move {
-                    log::info!("Updating batch2");
-                    update_legis_inits_in_db(&pg_pool2, &batch2, gp).await;
-                }));
+            //     let batch2 = new_legis_inits[work_size..work_size * 2].to_vec();
+            //     let pg_pool2 = pg_pool.clone();
+            //     handles.push(tokio::spawn(async move {
+            //         log::info!("Updating batch2");
+            //         update_legis_inits_in_db(&pg_pool2, &batch2, gp).await;
+            //     }));
 
-                let batch3 = new_legis_inits[work_size * 2..work_size * 3].to_vec();
-                let pg_pool3 = pg_pool.clone();
-                handles.push(tokio::spawn(async move {
-                    log::info!("Updating batch3");
-                    update_legis_inits_in_db(&pg_pool3, &batch3, gp).await;
-                }));
+            //     let batch3 = new_legis_inits[work_size * 2..work_size * 3].to_vec();
+            //     let pg_pool3 = pg_pool.clone();
+            //     handles.push(tokio::spawn(async move {
+            //         log::info!("Updating batch3");
+            //         update_legis_inits_in_db(&pg_pool3, &batch3, gp).await;
+            //     }));
 
-                let batch4 = new_legis_inits[work_size * 3..].to_vec();
-                let pg_pool4 = pg_pool.clone();
+            //     let batch4 = new_legis_inits[work_size * 3..].to_vec();
+            //     let pg_pool4 = pg_pool.clone();
 
-                log::info!("Updating batch4");
-                update_legis_inits_in_db(&pg_pool4, &batch4, gp).await;
-                for handle in handles {
-                    if let Err(e) = handle.await {
-                        log::error!("join error batching: {e:?}");
-                    }
-                }
-            } else {
-                update_legis_inits_in_db(&pg_pool, &new_legis_inits, gp).await;
-            }
+            //     log::info!("Updating batch4");
+            //     update_legis_inits_in_db(&pg_pool4, &batch4, gp).await;
+            //     for handle in handles {
+            //         if let Err(e) = handle.await {
+            //             log::error!("join error batching: {e:?}");
+            //         }
+            //     }
+            // } else {
+            //     update_legis_inits_in_db(&pg_pool, &new_legis_inits, gp).await;
+            // }
         });
         handles.push(handle);
         if only_latest {
@@ -125,34 +162,22 @@ async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<Legislative
 
 pub async fn update_legis_inits_in_db(
     pool: &PgPool,
+    code_to_parties: Arc<HashMap<String, Party>>,
     new_legis_inits: &[LegislativeInitiative],
-    gp: &str,
 ) {
-    log::info!("Updating legislative initiatives {gp} in database...");
-
-    let code_to_parties = all_parties_at_gp(pool, gp)
-        .await
-        .map_err(|e| {
-            log::error!("all parties for gp error in legis init: {e:?}");
-            e
-        })
-        .unwrap_or_default()
-        .into_iter()
-        .map(|party| (party.code.clone(), party))
-        .collect::<HashMap<String, Party>>();
 
     // if let Some(jetzt_party_info) = code_to_parties.get("J").cloned() {
     //     code_to_parties.insert("P".to_string(), jetzt_party_info);
     // }
 
     for (i, legis_init) in new_legis_inits.iter().enumerate() {
-        if i % 10 == 0 {
-            log::info!(
-                "{i} inserting legis init {}{}",
-                legis_init.inr,
-                legis_init.ityp
-            );
-        }
+        // if i % 10 == 0 {
+        //     log::info!(
+        //         "{i} inserting legis init {}{}",
+        //         legis_init.inr,
+        //         legis_init.ityp
+        //     );
+        // }
         let db_legis_init = DbLegislativeInitiative {
             title: legis_init.title.clone(),
             inr: legis_init.inr as i32,
@@ -239,7 +264,9 @@ pub async fn update_legis_inits_in_db(
                     given_vote_sum: voted_by_name_data.vote_sum as i32,
                     invalid_count: voted_by_name_data.invalid_count as i32,
                 },
-            ).await {
+            )
+            .await
+            {
                 if let Some(pro_contra) = &voted_by_name_data.delegates_pro_contra {
                     if let Err(e) = insert_named_votes(
                         pool,
@@ -576,7 +603,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], "XXVII").await;
+        // crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], "XXVII").await;
 
         // println!("s: {:?}", scraper.scrape_info.gp);
 
@@ -593,7 +620,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], "XXVI").await;
+        // crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], "XXVI").await;
 
         // println!("s: {:?}", scraper.scrape_info.gp);
 

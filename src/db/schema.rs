@@ -110,6 +110,8 @@ diesel::table! {
         inr -> Int4,
         emphasis -> Nullable<Varchar>,
         title -> Text,
+        pre_declined_type -> Nullable<Varchar>,
+        voted_by_name -> Bool,
         description -> Text,
         accepted -> Nullable<Varchar>,
         created_at -> Date,
@@ -161,6 +163,32 @@ diesel::table! {
 }
 
 diesel::table! {
+    named_vote_info (id) {
+        id -> Int4,
+        legis_init_id -> Int4,
+        pro_count -> Int4,
+        contra_count -> Int4,
+        given_vote_sum -> Int4,
+        invalid_count -> Int4,
+    }
+}
+
+diesel::table! {
+    named_votes (id) {
+        id -> Int4,
+        infavor -> Nullable<Bool>,
+        was_absent -> Nullable<Bool>,
+        lev -> Int8,
+        similiarity_score -> Int8,
+        searched_with -> Nullable<Varchar>,
+        matched_with -> Varchar,
+        delegate_id -> Int4,
+        named_vote_info_id -> Int4,
+        manually_matched -> Nullable<Bool>,
+    }
+}
+
+diesel::table! {
     other_keyword_topics_legis_init (id) {
         id -> Int4,
         topic -> Varchar,
@@ -185,8 +213,11 @@ diesel::table! {
 }
 
 diesel::table! {
-    parties (name) {
+    parties (id) {
+        id -> Int4,
         name -> Varchar,
+        gp -> Varchar,
+        code -> Varchar,
         fraction -> Int4,
         color -> Varchar,
     }
@@ -269,6 +300,17 @@ diesel::table! {
 }
 
 diesel::table! {
+    speech_complexity (id) {
+        id -> Int4,
+        speech_id -> Int4,
+        flesch_kincaid -> Nullable<Float4>,
+        smog -> Nullable<Float4>,
+        gunning_fog -> Nullable<Float4>,
+        coleman_liau -> Nullable<Float4>,
+    }
+}
+
+diesel::table! {
     speeches (delegate_id, legislative_initiatives_id) {
         delegate_id -> Int4,
         infavor -> Nullable<Bool>,
@@ -330,6 +372,9 @@ diesel::joinable!(eurovoc_topics_proposals -> proposals (proposals_id));
 diesel::joinable!(legislative_documents -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(mandates -> delegates (delegate_id));
 diesel::joinable!(ministrial_proposals_documents -> ministrial_proposals (ministrial_proposal_id));
+diesel::joinable!(named_vote_info -> legislative_initiatives (legis_init_id));
+diesel::joinable!(named_votes -> delegates (delegate_id));
+diesel::joinable!(named_votes -> named_vote_info (named_vote_info_id));
 diesel::joinable!(other_keyword_topics_legis_init -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(other_keyword_topics_ministrial_proposals -> ministrial_proposals (ministrial_proposal_id));
 diesel::joinable!(other_keyword_topics_proposals -> proposals (proposals_id));
@@ -341,6 +386,7 @@ diesel::joinable!(proposal_delegates -> proposals (proposal_id));
 diesel::joinable!(proposal_documents -> proposals (proposal_id));
 diesel::joinable!(questions -> delegates (delegate_id));
 diesel::joinable!(questions -> users (issuer_id));
+diesel::joinable!(speech_complexity -> plenar_speeches (speech_id));
 diesel::joinable!(speeches -> delegates (delegate_id));
 diesel::joinable!(speeches -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(topics_legis_init -> legislative_initiatives (legislative_initiatives_id));
@@ -363,6 +409,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     mandates,
     ministrial_proposals,
     ministrial_proposals_documents,
+    named_vote_info,
+    named_votes,
     other_keyword_topics_legis_init,
     other_keyword_topics_ministrial_proposals,
     other_keyword_topics_proposals,
@@ -374,6 +422,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     proposal_documents,
     proposals,
     questions,
+    speech_complexity,
     speeches,
     topics_legis_init,
     topics_ministrial_proposals,
