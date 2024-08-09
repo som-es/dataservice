@@ -59,7 +59,7 @@ pub async fn update_proposals_in_db2(
     let scraper = Arc::new(AustriaScraper::default());
     let mut handles: Vec<tokio::task::JoinHandle<()>> = vec![];
 
-    const MAX_TASKS: usize = 5;
+    const MAX_TASKS: usize = 2;
 
     let start = Instant::now();
 
