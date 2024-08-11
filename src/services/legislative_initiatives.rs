@@ -22,6 +22,19 @@ use crate::{
     Shutdown,
 };
 
+pub async fn gen_code_to_parties(pool: &PgPool, gp: &str) -> HashMap<String, Party> {
+    all_parties_at_gp(pool, gp)
+        .await
+        .map_err(|e| {
+            log::error!("all parties for gp error in legis init: {e:?}");
+            e
+        })
+        .unwrap_or_default()
+        .into_iter()
+        .map(|party| (party.code.clone(), party))
+        .collect::<HashMap<String, Party>>()
+}
+
 pub async fn scrape_new_legis_inits(
     pool: &PgPool,
     scraper: Arc<AustriaScraper>,
@@ -33,18 +46,7 @@ pub async fn scrape_new_legis_inits(
     const MAX_TASKS: usize = 2;
     let mut handles: Vec<tokio::task::JoinHandle<()>> = vec![];
 
-    let code_to_parties = Arc::new(
-        all_parties_at_gp(pool, gp)
-            .await
-            .map_err(|e| {
-                log::error!("all parties for gp error in legis init: {e:?}");
-                e
-            })
-            .unwrap_or_default()
-            .into_iter()
-            .map(|party| (party.code.clone(), party))
-            .collect::<HashMap<String, Party>>(),
-    );
+    let code_to_parties = Arc::new(gen_code_to_parties(pool, gp).await);
 
     log::info!("Fetching and inserting ({gp}) now.");
     let mut info_print_counter = 0;
@@ -583,10 +585,12 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown) {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use chrono::NaiveDateTime;
     use scraper::{legis_init::LegislativeInitiatives, AustriaScraper};
 
-    use crate::connect_pg;
+    use crate::{connect_pg, legislative_initiatives::gen_code_to_parties};
 
     #[test]
     fn test_date_time_parse() {
@@ -621,6 +625,24 @@ mod tests {
 
         let pool = connect_pg().await;
         // crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], "XXVI").await;
+
+        // println!("s: {:?}", scraper.scrape_info.gp);
+
+        // let out = crate::legislative_initiatives::scrape_new_legis_inits(&scraper).await.unwrap();
+        // println!("out: {out:?}");
+    }
+    
+    #[tokio::test]
+    async fn test_legis_init_empty_gp_scrape_xxvii_a_3945() {
+        let mut scraper: AustriaScraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/A/3945")
+            .await
+            .unwrap();
+
+        let pool = connect_pg().await;
+        let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, code_to_parties, &[res]).await;
 
         // println!("s: {:?}", scraper.scrape_info.gp);
 
