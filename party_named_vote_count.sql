@@ -21,4 +21,4 @@ inner join
 where
     named_vote_info.legis_init_id = $1
 group by
-    DelegateParty.party
+    DelegateParty.party;
