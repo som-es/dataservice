@@ -1,7 +1,7 @@
 use chrono::NaiveDate;
 use sqlx::{query_as, PgPool};
 
-use crate::models::{DbParty, DbPartyNamedVoteProCount};
+use crate::db::models::DbPartyNamedVoteCount;
 
 /*
 with DelegateParty as (
@@ -31,9 +31,9 @@ group by
 
 */
 
-pub async fn named_vote_pro_count_by_party(pg: &PgPool, legis_init_id: i32, at: NaiveDate) -> sqlx::Result<Vec<DbPartyNamedVoteProCount>> {
+pub async fn named_vote_pro_count_by_party(pg: &PgPool, legis_init_id: i32, at: NaiveDate) -> sqlx::Result<Vec<DbPartyNamedVoteCount>> {
     query_as!(
-        DbPartyNamedVoteProCount,
+        DbPartyNamedVoteCount,
         "
         with DelegateParty as (
     select 
@@ -48,7 +48,7 @@ pub async fn named_vote_pro_count_by_party(pg: &PgPool, legis_init_id: i32, at: 
         and (case when end_date is null then $2::date else end_date end) >= $2::date
 )
 select 
-    DelegateParty.party, COUNT(*) as pro_count
+    DelegateParty.party, named_votes.infavor, COUNT(*) as count
 from 
     named_vote_info 
 inner join 
@@ -58,12 +58,16 @@ inner join
 where
     named_vote_info.legis_init_id = $1
 and
-    named_votes.infavor = true
+    (named_votes.infavor = true or named_votes.infavor = false)
+
 and
     DelegateParty.party is not null
 
 group by
-    DelegateParty.party;
+    DelegateParty.party,
+    named_votes.infavor
+order by
+    count desc
     ",
         legis_init_id,
         at

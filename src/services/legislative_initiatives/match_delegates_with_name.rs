@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashSet};
 use chrono::NaiveDate;
 use sqlx::{query_as, PgPool};
 
-use crate::with_data::activity::active_delegates_at_date;
+// use crate::with_data::activity::active_delegates_at_date;
 
 const MAX_STEPS: usize = 10000000;
 // const MAX_STEPS: usize = 100000;
@@ -255,7 +255,7 @@ mod tests {
 
     use scraper::{legis_init::LegislativeInitiatives, AustriaScraper};
 
-    use crate::{connect_pg, with_data::activity::active_delegates_at_date};
+    use crate::{connect_pg, with_data::active_delegates_at_date, };
 
     use super::{
         levenshtein_distance, match_delegate_name_with_delegate_id,

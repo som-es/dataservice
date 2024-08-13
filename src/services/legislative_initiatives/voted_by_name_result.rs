@@ -7,7 +7,7 @@ use sqlx::PgPool;
 use crate::{
     legislative_initiatives::match_delegates_with_name::match_delegate_names_with_delegate_ids,
     models::{DbNamedVote, DbNamedVoteInfo},
-    with_data::activity::active_delegates_at_date,
+    with_data::active_delegates_at_date,
 };
 
 use super::match_delegates_with_name::LevResult;

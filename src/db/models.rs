@@ -439,7 +439,8 @@ pub struct DbNamedVoteInfo {
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-pub struct DbPartyNamedVoteProCount {
+pub struct DbPartyNamedVoteCount {
     pub party: Option<String>,
-    pub pro_count: Option<i64>
+    pub infavor: Option<bool>,
+    pub count: Option<i64>
 }
