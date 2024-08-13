@@ -255,7 +255,7 @@ mod tests {
 
     use scraper::{legis_init::LegislativeInitiatives, AustriaScraper};
 
-    use crate::{connect_pg, with_data::active_delegates_at_date, };
+    use crate::{connect_pg, with_data::active_delegates_at_date};
 
     use super::{
         levenshtein_distance, match_delegate_name_with_delegate_id,

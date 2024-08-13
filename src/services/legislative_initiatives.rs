@@ -167,7 +167,6 @@ pub async fn update_legis_inits_in_db(
     code_to_parties: Arc<HashMap<String, Party>>,
     new_legis_inits: &[LegislativeInitiative],
 ) {
-
     // if let Some(jetzt_party_info) = code_to_parties.get("J").cloned() {
     //     code_to_parties.insert("P".to_string(), jetzt_party_info);
     // }
@@ -306,6 +305,12 @@ pub async fn update_legis_inits_in_db(
         }
 
         for speech in &legis_init.speeches {
+            let opinion = match &speech.opinion {
+                scraper::Opinion::Infavor => Some("Pro".to_string()),
+                scraper::Opinion::Against => Some("Contra".to_string()),
+                scraper::Opinion::Other(text) => Some(text.clone()),
+                scraper::Opinion::None => None,
+            };
             let db_speech = DbSpeech {
                 delegate_id: speech.delegate_id as i32,
                 infavor: match speech.opinion {
@@ -313,22 +318,24 @@ pub async fn update_legis_inits_in_db(
                     Opinion::Against => Some(false),
                     _ => None,
                 },
+                opinion,
                 legislative_initiatives_id: legis_init_id,
             };
 
             if let Err(e) = sqlx::query!(
                 "
                     INSERT INTO speeches (
-                        delegate_id, infavor, legislative_initiatives_id
+                        delegate_id, infavor, legislative_initiatives_id, opinion
                     ) VALUES (
-                        $1, $2, $3
+                        $1, $2, $3, $4
                     ) ON CONFLICT (legislative_initiatives_id, delegate_id) 
                     DO UPDATE SET 
                         infavor = EXCLUDED.infavor
                 ",
                 db_speech.delegate_id,
                 db_speech.infavor,
-                db_speech.legislative_initiatives_id
+                db_speech.legislative_initiatives_id,
+                db_speech.opinion,
             )
             .execute(pool)
             .await
@@ -631,7 +638,7 @@ mod tests {
         // let out = crate::legislative_initiatives::scrape_new_legis_inits(&scraper).await.unwrap();
         // println!("out: {out:?}");
     }
-    
+
     #[tokio::test]
     async fn test_legis_init_empty_gp_scrape_xxvii_a_3945() {
         let mut scraper: AustriaScraper = AustriaScraper::default();
@@ -642,7 +649,8 @@ mod tests {
 
         let pool = connect_pg().await;
         let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
-        crate::legislative_initiatives::update_legis_inits_in_db(&pool, code_to_parties, &[res]).await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, code_to_parties, &[res])
+            .await;
 
         // println!("s: {:?}", scraper.scrape_info.gp);
 

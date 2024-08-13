@@ -169,6 +169,7 @@ pub struct DbVote {
 pub struct DbSpeech {
     pub delegate_id: i32,
     pub infavor: Option<bool>,
+    pub opinion: Option<String>,
     pub legislative_initiatives_id: i32,
 }
 
@@ -442,5 +443,5 @@ pub struct DbNamedVoteInfo {
 pub struct DbPartyNamedVoteCount {
     pub party: Option<String>,
     pub infavor: Option<bool>,
-    pub count: Option<i64>
+    pub count: Option<i64>,
 }
