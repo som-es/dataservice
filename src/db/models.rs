@@ -383,6 +383,8 @@ pub struct DbPlenarSpeechLink {
 // #[diesel(primary_key(id))]
 pub struct DbMandate {
     pub delegate_id: i32,
+    pub is_nr: bool,
+    pub is_gov_official: bool,
     pub name: String,
     pub party: Option<String>,
     pub start_date: NaiveDate,

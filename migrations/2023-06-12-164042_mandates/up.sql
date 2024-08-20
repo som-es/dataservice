@@ -2,6 +2,8 @@
 create table mandates (
     id serial primary key,
     delegate_id int not null,
+    is_nr boolean default false,
+    is_gov_official boolean default false,
     name varchar(312) not null,
     party varchar(100),
     start_date date not null,

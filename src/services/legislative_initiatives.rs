@@ -330,7 +330,8 @@ pub async fn update_legis_inits_in_db(
                         $1, $2, $3, $4
                     ) ON CONFLICT (legislative_initiatives_id, delegate_id) 
                     DO UPDATE SET 
-                        infavor = EXCLUDED.infavor
+                        infavor = EXCLUDED.infavor,
+                        opinion = EXCLUDED.opinion
                 ",
                 db_speech.delegate_id,
                 db_speech.infavor,

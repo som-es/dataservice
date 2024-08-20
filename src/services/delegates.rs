@@ -257,12 +257,16 @@ pub async fn insert_mandate(
     delegate_id: i32,
     conn: &PgPool,
 ) -> sqlx::Result<PgQueryResult> {
+    let name_lowercase = mandate.name.to_lowercase();
+
     let db_mandate = DbMandate {
         delegate_id,
         name: mandate.name.clone(),
         party: mandate.party.clone(),
         start_date: mandate.start,
         end_date: mandate.end,
+        is_nr: name_lowercase.contains("abgeordnete"),
+        is_gov_official: name_lowercase.contains("minister"),
     };
 
     sqlx::query!(
@@ -272,11 +276,15 @@ pub async fn insert_mandate(
                 name, 
                 party, 
                 start_date, 
-                end_date
+                end_date,
+                is_nr,
+                is_gov_official
             ) VALUES (
-                $1, $2, $3, $4, $5
+                $1, $2, $3, $4, $5, $6, $7
             ) ON CONFLICT (delegate_id, name, start_date) 
             DO UPDATE SET 
+                is_nr = EXCLUDED.is_nr,
+                is_gov_official = EXCLUDED.is_gov_official,
                 party = EXCLUDED.party,
                 end_date = EXCLUDED.end_date
         ",
@@ -284,7 +292,9 @@ pub async fn insert_mandate(
         db_mandate.name,
         db_mandate.party,
         db_mandate.start_date,
-        db_mandate.end_date
+        db_mandate.end_date,
+        db_mandate.is_nr,
+        db_mandate.is_gov_official,
     )
     .execute(conn)
     .await
