@@ -175,6 +175,15 @@ pub struct DbSpeech {
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+pub struct DbSpeechWithLink {
+    pub delegate_id: i32,
+    pub infavor: Option<bool>,
+    pub opinion: Option<String>,
+    pub document_url: Option<String>,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 // #[diesel(table_name = topics_legis_init)]
 // #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
 pub struct DbTopicLegisInit {
