@@ -270,7 +270,16 @@ pub struct DbLegisDocument {
     pub title: String,
     pub document_type: String,
     pub document_url: String,
-    pub legislative_initiatives_id: i32,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+// #[diesel(table_name = legislative_documents)]
+// #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
+pub struct DbLegisDocumentOptional {
+    pub title: Option<String>,
+    pub document_type: Option<String>,
+    pub document_url: Option<String>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
