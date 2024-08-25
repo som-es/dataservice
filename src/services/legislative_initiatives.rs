@@ -447,7 +447,7 @@ pub async fn update_legis_inits_in_db(
 
         for document in &legis_init.documents {
             let db_legis_doc = DbLegisDocument {
-                legislative_initiatives_id: legis_init_id,
+                // legislative_initiatives_id: legis_init_id,
                 title: document.title.clone(),
                 document_type: document.ftype.to_string(),
                 document_url: document.link.clone(),
@@ -465,7 +465,7 @@ pub async fn update_legis_inits_in_db(
                         document_type = EXCLUDED.document_type,
                         document_url = EXCLUDED.document_url
                 ",
-                db_legis_doc.legislative_initiatives_id,
+                legis_init_id,
                 db_legis_doc.title,
                 db_legis_doc.document_type,
                 db_legis_doc.document_url
