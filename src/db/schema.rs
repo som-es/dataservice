@@ -125,6 +125,8 @@ diesel::table! {
     mandates (id) {
         id -> Int4,
         delegate_id -> Int4,
+        is_nr -> Nullable<Bool>,
+        is_gov_official -> Nullable<Bool>,
         name -> Varchar,
         party -> Nullable<Varchar>,
         start_date -> Date,
@@ -311,10 +313,20 @@ diesel::table! {
 }
 
 diesel::table! {
-    speeches (delegate_id, legislative_initiatives_id) {
+    speeches (id) {
+        id -> Int4,
         delegate_id -> Int4,
         infavor -> Nullable<Bool>,
+        opinion -> Nullable<Varchar>,
         legislative_initiatives_id -> Int4,
+    }
+}
+
+diesel::table! {
+    speeches_html_urls (id) {
+        id -> Int4,
+        speech_id -> Int4,
+        document_url -> Varchar,
     }
 }
 
@@ -389,6 +401,7 @@ diesel::joinable!(questions -> users (issuer_id));
 diesel::joinable!(speech_complexity -> plenar_speeches (speech_id));
 diesel::joinable!(speeches -> delegates (delegate_id));
 diesel::joinable!(speeches -> legislative_initiatives (legislative_initiatives_id));
+diesel::joinable!(speeches_html_urls -> speeches (speech_id));
 diesel::joinable!(topics_legis_init -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(topics_ministrial_proposals -> ministrial_proposals (ministrial_proposal_id));
 diesel::joinable!(topics_proposals -> proposals (proposals_id));
@@ -424,6 +437,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     questions,
     speech_complexity,
     speeches,
+    speeches_html_urls,
     topics_legis_init,
     topics_ministrial_proposals,
     topics_proposals,

@@ -164,6 +164,7 @@ pub fn match_delegate_names_with_delegate_ids(
     delegate_names: &[String],
     gp: &str,
 ) -> MatchResult {
+    println!("delegate_names: {delegate_names:?}");
     let mut find_not_sure_if_matched_correctly = active_delegates.clone();
     let mut prot_delegate_names_not_sure_if_matched_correctly =
         delegate_names.iter().cloned().collect::<HashSet<_>>();
@@ -192,6 +193,7 @@ pub fn match_delegate_names_with_delegate_ids(
         })
         // .inspect(|x| println!("done"))
         .filter_map(|(del_name, x)| {
+            println!("del_name: {del_name}");
             let res = x[0].clone();
             // println!("res: {res:?}");
             if res.lev == 0 {
@@ -253,7 +255,7 @@ pub fn match_delegate_names_with_delegate_ids(
 mod tests {
     use std::collections::HashSet;
 
-    use scraper::{legis_init::LegislativeInitiatives, AustriaScraper};
+    use scraper::{legis_init::LegislativeInitiatives, plenar::Plenar, AustriaScraper};
 
     use crate::{connect_pg, with_data::active_delegates_at_date};
 
@@ -321,6 +323,55 @@ mod tests {
 
         // let res = res.correctly_matched.into_iter().filter(|x| x.lev > 0).collect::<Vec<_>>();
         // println!("res: {:?}", res.lev_or_deep_split_matched);
+    }
+
+    #[tokio::test]
+    async fn test_plenar_absences_matching() {
+        let scraper = AustriaScraper::default();
+
+        let plenar_info = scraper
+            .get_plenar("/gegenstand/XXVII/NRSITZ/151")
+            .await
+            .unwrap();
+        println!("plenar_info: {plenar_info:?}");
+
+        let pg = connect_pg().await;
+        let active_delegates = active_delegates_at_date(&pg, plenar_info.date.date())
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|delegate| (delegate.name, delegate.id as usize))
+            .collect::<HashSet<_>>();
+
+        let res = match_delegate_names_with_delegate_ids(
+            &active_delegates,
+            &plenar_info
+                .absences
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|x| {
+                    let x = x.split_inclusive(' ').collect::<Vec<_>>();
+                    if x.len() > 1 {
+                        format!(
+                            "{} {}",
+                            x.last().unwrap(),
+                            x[..x.len() - 1]
+                                .iter()
+                                .fold(String::new(), |acc, x| format!("{acc}{x}"))
+                        )
+                        .trim_matches(char::is_whitespace)
+                        .to_string()
+                    } else {
+                        x[0].to_string()
+                    }
+                })
+                .collect::<Vec<_>>(),
+            &plenar_info.gp,
+        );
+        
+        println!("res: {:?}", res.correctly_matched);
+        println!("res: {:?}", res.lev_or_deep_split_matched);
     }
 
     #[test]

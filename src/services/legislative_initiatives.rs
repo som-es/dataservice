@@ -323,7 +323,7 @@ pub async fn update_legis_inits_in_db(
             };
 
             let speech_id = match sqlx::query!(
-                            "
+                "
                     INSERT INTO speeches (
                         delegate_id, infavor, legislative_initiatives_id, opinion
                     ) VALUES (
@@ -334,14 +334,14 @@ pub async fn update_legis_inits_in_db(
                         opinion = EXCLUDED.opinion
                     RETURNING id
                 ",
-                            db_speech.delegate_id,
-                            db_speech.infavor,
-                            db_speech.legislative_initiatives_id,
-                            db_speech.opinion,
-                        )
-                        .fetch_one(pool)
-
-                        .await {
+                db_speech.delegate_id,
+                db_speech.infavor,
+                db_speech.legislative_initiatives_id,
+                db_speech.opinion,
+            )
+            .fetch_one(pool)
+            .await
+            {
                 Err(e) => {
                     log::warn!("Error inserting speech, probably delegate does not exist in database and has got inactive recently: {:?}, for speech: {:?}", e, speech);
                     continue;
@@ -350,17 +350,23 @@ pub async fn update_legis_inits_in_db(
             };
 
             for html_url in &speech.spoken_text_html_urls {
-                if let Err(e) = sqlx::query!("
+                if let Err(e) = sqlx::query!(
+                    "
                     insert into speeches_html_urls(
                         speech_id, document_url
                     ) values (
                         $1, $2 
                     ) on conflict (speech_id, document_url)
                     do nothing;
-                ", speech_id, html_url).execute(pool).await {
+                ",
+                    speech_id,
+                    html_url.document_url
+                )
+                .execute(pool)
+                .await
+                {
                     log::warn!("could not insert speech html url: {e:?}")
                 }
-
             }
         }
 
@@ -423,7 +429,7 @@ pub async fn update_legis_inits_in_db(
             };
 
             let speech_id = match sqlx::query!(
-                            "
+                "
                     INSERT INTO other_keyword_topics_legis_init (
                         topic, legislative_initiatives_id
                     ) VALUES (
@@ -432,11 +438,12 @@ pub async fn update_legis_inits_in_db(
                     DO UPDATE SET 
                         topic = EXCLUDED.topic
                 ",
-                            db_other_keyword_topic.topic,
-                            db_other_keyword_topic.legislative_initiatives_id
-                        )
-                        .execute(pool)
-                        .await {
+                db_other_keyword_topic.topic,
+                db_other_keyword_topic.legislative_initiatives_id
+            )
+            .execute(pool)
+            .await
+            {
                 Err(e) => {
                     log::error!("Error inserting other keyword topic: '{:?}'. The error occurred for the following other keyword topic: {:?}", e, db_other_keyword_topic);
                     continue;

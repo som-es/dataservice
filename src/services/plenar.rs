@@ -166,7 +166,7 @@ async fn insert_plenar_speech(
             ON CONFLICT (plenar_speech_id, document_url) DO NOTHING
             "#,
             plenar_speech_id,
-            url.to_string()
+            url.document_url.to_string()
         )
         .execute(pool)
         .await?;
@@ -191,7 +191,7 @@ async fn insert_plenar_speech(
                 } else {
                     Some(
                         text_extractor
-                            .extract_text_from_url(text_html_url, None)
+                            .extract_text_from_url(&text_html_url.document_url, None, true)
                             .await,
                     )
                 }
@@ -257,7 +257,7 @@ pub async fn insert_plenar_info(
         plenar_info.title,
         plenar_info.description,
         plenar_info.date,
-        plenar_info.legislative_period
+        plenar_info.gp
     )
     .fetch_one(pool)
     .await?;
