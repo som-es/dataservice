@@ -257,7 +257,10 @@ mod tests {
 
     use scraper::{legis_init::LegislativeInitiatives, plenar::Plenar, AustriaScraper};
 
-    use crate::{connect_pg, legislative_initiatives::absence_matching::reverse_name, with_data::active_delegates_at_date};
+    use crate::{
+        connect_pg, legislative_initiatives::absence_matching::reverse_name,
+        with_data::active_delegates_at_date,
+    };
 
     use super::{
         levenshtein_distance, match_delegate_name_with_delegate_id,
@@ -358,22 +361,8 @@ mod tests {
                         .as_ref()
                         .unwrap()
                         .iter()
-                        .map(|x| {
-                            let x = x.split_inclusive(' ').collect::<Vec<_>>();
-                            if x.len() > 1 {
-                                format!(
-                                    "{} {}",
-                                    x.last().unwrap(),
-                                    x[..x.len() - 1]
-                                        .iter()
-                                        .fold(String::new(), |acc, x| format!("{acc}{x}"))
-                                )
-                                .trim_matches(char::is_whitespace)
-                                .to_string()
-                            } else {
-                                x[0].to_string()
-                            }
-                        })
+                        .map(|x| x.as_str())
+                        .map(reverse_name)
                         .collect::<Vec<_>>(),
                     &plenar_info.gp,
                 );

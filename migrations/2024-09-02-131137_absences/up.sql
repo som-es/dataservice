@@ -11,6 +11,6 @@ create table absences(
 
     plenary_session_id int not null,
     unique(delegate_id, plenary_session_id),
-    foreign key (planery_session_id) references plenar_infos(id),
+    foreign key (plenary_session_id) references plenar_infos(id),
     foreign key (delegate_id) references delegates(id)
 );
