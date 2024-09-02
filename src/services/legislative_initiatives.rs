@@ -1,4 +1,5 @@
 mod absence_matching;
+pub use absence_matching::*;
 mod match_delegates_with_name;
 mod voted_by_name_result;
 

@@ -1,4 +1,7 @@
-use crate::{connect_pg, services::scrape_untill_success, Shutdown};
+use crate::{
+    connect_pg, legislative_initiatives::absence_matching, services::scrape_untill_success,
+    Shutdown,
+};
 use scraper::{
     call_to_order::CallToOrderInfo,
     plenar::{Debate, Plenar, PlenarInfo},
@@ -92,6 +95,37 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
                     log::warn!(
                         "Error inserting plenar speech: '{e}'. Error occured for plenar speech: {plenar_speech:?}"
                     );
+                }
+            }
+        }
+
+        if let Some(absences) = &plenar_info.absences {
+            let matching = absence_matching(
+                pg_pool,
+                absences,
+                plenar_info.date.date(),
+                plenar_info.gp.clone(),
+            )
+            .await;
+            for match_res in matching
+                .correctly_matched
+                .iter()
+                .chain(matching.lev_or_deep_split_matched.iter())
+            {
+                if let Err(e) = sqlx::query!(
+                    "
+                    INSERT INTO absences (lev, similiarity_score, searched_with, matched_with, delegate_id, manually_matched, plenary_session_id)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    ON CONFLICT (delegate_id, plenary_session_id)
+                    DO UPDATE SET
+                        lev = EXCLUDED.lev,
+                        similiarity_score = EXCLUDED.similiarity_score,
+                        searched_with = EXCLUDED.searched_with,
+                        matched_with = EXCLUDED.matched_with,
+                        manually_matched = EXCLUDED.manually_matched
+                    ", match_res.lev as i64, match_res.similiarity_score as i64, match_res.searched_with, match_res.matched_with, match_res.delegate_id as i32, match_res.manually_matched, plenar_id
+                ).execute(pg_pool).await {
+                    log::warn!("Error inserting absene {e:?} for absence {match_res:?}");
                 }
             }
         }

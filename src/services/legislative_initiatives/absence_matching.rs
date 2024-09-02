@@ -36,7 +36,7 @@ pub async fn absence_matching(
         .into_iter()
         .map(|delegate| (delegate.name, delegate.id as usize))
         .collect::<HashSet<_>>();
-    
+
     match_delegate_names_with_delegate_ids(
         &active_delegates,
         &absences_names
