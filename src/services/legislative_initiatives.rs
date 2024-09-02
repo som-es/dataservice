@@ -179,6 +179,19 @@ pub async fn update_legis_inits_in_db(
         //         legis_init.ityp
         //     );
         // }
+
+        let plenary_session_id = match legis_init.plenary_session {
+            Some(session) => 
+                sqlx::query!(
+                    "select id from plenar_infos where inr = $1 and legislative_period = $2",
+                    session as i32,
+                    legis_init.gp
+                )
+                .fetch_one(pool)
+                .await.ok().map(|id| id.id),
+            None => None,
+        };
+
         let db_legis_init = DbLegislativeInitiative {
             title: legis_init.title.clone(),
             inr: legis_init.inr as i32,
@@ -203,9 +216,9 @@ pub async fn update_legis_inits_in_db(
             "
                 INSERT INTO legislative_initiatives (
                     title, inr, emphasis, description, ityp, gp, accepted, created_at, appeared_at, updated_at,
-                    requires_simple_majority, pre_declined_type, voted_by_name
+                    requires_simple_majority, pre_declined_type, voted_by_name, plenary_session_id
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
                 ) ON CONFLICT (inr, ityp, gp) 
                 DO UPDATE SET 
                     title = EXCLUDED.title,
@@ -217,7 +230,8 @@ pub async fn update_legis_inits_in_db(
                     updated_at = EXCLUDED.updated_at,
                     requires_simple_majority = EXCLUDED.requires_simple_majority,
                     pre_declined_type = EXCLUDED.pre_declined_type,
-                    voted_by_name = EXCLUDED.voted_by_name
+                    voted_by_name = EXCLUDED.voted_by_name,
+                    plenary_session_id = EXCLUDED.plenary_session_id
                 RETURNING id
             ",
             db_legis_init.title,
@@ -233,6 +247,7 @@ pub async fn update_legis_inits_in_db(
             db_legis_init.requires_simple_majority,
             db_legis_init.pre_declined_type,
             db_legis_init.voted_by_name,
+            plenary_session_id, 
         )
         .fetch_one(pool)
         .await

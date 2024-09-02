@@ -369,7 +369,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             &plenar_info.gp,
         );
-        
+
         println!("res: {:?}", res.correctly_matched);
         println!("res: {:?}", res.lev_or_deep_split_matched);
     }
