@@ -193,7 +193,7 @@ pub fn match_delegate_names_with_delegate_ids(
         })
         // .inspect(|x| println!("done"))
         .filter_map(|(del_name, x)| {
-            println!("del_name: {del_name}");
+            // println!("del_name: {del_name}");
             let res = x[0].clone();
             // println!("res: {res:?}");
             if res.lev == 0 {
@@ -257,7 +257,7 @@ mod tests {
 
     use scraper::{legis_init::LegislativeInitiatives, plenar::Plenar, AustriaScraper};
 
-    use crate::{connect_pg, with_data::active_delegates_at_date};
+    use crate::{connect_pg, legislative_initiatives::absence_matching::reverse_name, with_data::active_delegates_at_date};
 
     use super::{
         levenshtein_distance, match_delegate_name_with_delegate_id,
@@ -326,6 +326,77 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_all_plenar_absences_matching() {
+        let mut scraper = AustriaScraper::default();
+
+        for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
+            scraper.scrape_info.gp = vec![gp.to_string()];
+
+            let raw_plenar = scraper.post_plenar_payload().await.unwrap();
+            for path in scraper.plenar_paths(raw_plenar).unwrap() {
+                let plenar_info = scraper.get_plenar(&path).await.unwrap();
+
+                if plenar_info.absences.is_none() {
+                    println!("skip {path}");
+                    continue;
+                }
+
+                // println!("plenar_info: {plenar_info:?}");
+
+                let pg = connect_pg().await;
+                let active_delegates = active_delegates_at_date(&pg, plenar_info.date.date())
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|delegate| (delegate.name, delegate.id as usize))
+                    .collect::<HashSet<_>>();
+
+                let res = match_delegate_names_with_delegate_ids(
+                    &active_delegates,
+                    &plenar_info
+                        .absences
+                        .as_ref()
+                        .unwrap()
+                        .iter()
+                        .map(|x| {
+                            let x = x.split_inclusive(' ').collect::<Vec<_>>();
+                            if x.len() > 1 {
+                                format!(
+                                    "{} {}",
+                                    x.last().unwrap(),
+                                    x[..x.len() - 1]
+                                        .iter()
+                                        .fold(String::new(), |acc, x| format!("{acc}{x}"))
+                                )
+                                .trim_matches(char::is_whitespace)
+                                .to_string()
+                            } else {
+                                x[0].to_string()
+                            }
+                        })
+                        .collect::<Vec<_>>(),
+                    &plenar_info.gp,
+                );
+
+                println!(
+                    "res correctly matched: {:?}",
+                    res.correctly_matched
+                        .iter()
+                        .map(|x| x.matched_with.clone())
+                        .collect::<Vec<_>>()
+                );
+                println!(
+                    "res deep split matched: {:?}",
+                    res.lev_or_deep_split_matched
+                        .iter()
+                        .map(|x| (x.lev, x.searched_with.clone(), x.matched_with.clone()))
+                        .collect::<Vec<_>>()
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn test_plenar_absences_matching() {
         let scraper = AustriaScraper::default();
 
@@ -350,22 +421,8 @@ mod tests {
                 .as_ref()
                 .unwrap()
                 .iter()
-                .map(|x| {
-                    let x = x.split_inclusive(' ').collect::<Vec<_>>();
-                    if x.len() > 1 {
-                        format!(
-                            "{} {}",
-                            x.last().unwrap(),
-                            x[..x.len() - 1]
-                                .iter()
-                                .fold(String::new(), |acc, x| format!("{acc}{x}"))
-                        )
-                        .trim_matches(char::is_whitespace)
-                        .to_string()
-                    } else {
-                        x[0].to_string()
-                    }
-                })
+                .map(|x| x.as_str())
+                .map(reverse_name)
                 .collect::<Vec<_>>(),
             &plenar_info.gp,
         );

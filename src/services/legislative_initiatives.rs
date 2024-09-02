@@ -1,3 +1,4 @@
+mod absence_matching;
 mod match_delegates_with_name;
 mod voted_by_name_result;
 
@@ -181,14 +182,15 @@ pub async fn update_legis_inits_in_db(
         // }
 
         let plenary_session_id = match legis_init.plenary_session {
-            Some(session) => 
-                sqlx::query!(
-                    "select id from plenar_infos where inr = $1 and legislative_period = $2",
-                    session as i32,
-                    legis_init.gp
-                )
-                .fetch_one(pool)
-                .await.ok().map(|id| id.id),
+            Some(session) => sqlx::query!(
+                "select id from plenar_infos where inr = $1 and legislative_period = $2",
+                session as i32,
+                legis_init.gp
+            )
+            .fetch_one(pool)
+            .await
+            .ok()
+            .map(|id| id.id),
             None => None,
         };
 
@@ -247,7 +249,7 @@ pub async fn update_legis_inits_in_db(
             db_legis_init.requires_simple_majority,
             db_legis_init.pre_declined_type,
             db_legis_init.voted_by_name,
-            plenary_session_id, 
+            plenary_session_id,
         )
         .fetch_one(pool)
         .await
