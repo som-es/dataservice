@@ -112,7 +112,7 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
                 .iter()
                 .chain(matching.lev_or_deep_split_matched.iter())
             {
-                log::info!("----------------------------------------------------- INSERTING MATCH RES !!!!!!!!!!!!!!");
+                log::info!("----------------------------------------------------- INSERTING MATCH RES {} -------- !!!!!!!!!!!!!!", plenar_info.gp);
                 if let Err(e) = sqlx::query!(
                     "
                     INSERT INTO absences (lev, similiarity_score, searched_with, matched_with, delegate_id, manually_matched, plenary_session_id)
