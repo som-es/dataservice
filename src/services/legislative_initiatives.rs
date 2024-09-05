@@ -306,19 +306,27 @@ pub async fn update_legis_inits_in_db(
             && legis_init.accepted == Some(scraper::AcceptedState::PreDeclined)
             && legis_init.hidden_votes_info.pro_contra_parties.is_some()
         {
-            for db_vote in translate_votes(
-                &code_to_parties,
-                legis_init_id,
-                legis_init
-                    .hidden_votes_info
-                    .pro_contra_parties
-                    .as_ref()
-                    .unwrap(),
-                &legis_init.gp,
-            )
-            .await
-            {
-                insert_vote(pool, db_vote).await;
+            match &legis_init.hidden_votes_info.pro_contra_parties {
+                Some(pro_contra_parties) => {
+                    for db_vote in translate_votes(
+                        &code_to_parties,
+                        legis_init_id,
+                        pro_contra_parties,
+                        &legis_init.gp,
+                    )
+                    .await
+                    {
+                        insert_vote(pool, db_vote).await;
+                    }
+                }
+                None => {
+                    log::warn!(
+                        "Pro Contra is empty despite hidden vote info for legis init: {}, {}, {}",
+                        legis_init.gp,
+                        legis_init.ityp,
+                        legis_init.inr
+                    )
+                }
             }
         }
 
