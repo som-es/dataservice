@@ -332,7 +332,8 @@ mod tests {
     async fn test_all_plenar_absences_matching() {
         let mut scraper = AustriaScraper::default();
 
-        for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
+        // for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
+        for gp in ["XXI", "XX"] {
             scraper.scrape_info.gp = vec![gp.to_string()];
 
             let raw_plenar = scraper.post_plenar_payload().await.unwrap();

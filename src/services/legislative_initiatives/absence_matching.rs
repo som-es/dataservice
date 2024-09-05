@@ -54,7 +54,13 @@ mod tests {
 
     use scraper::{plenar::Plenar, AustriaScraper};
 
-    use crate::{connect_pg, legislative_initiatives::{match_delegates_with_name::match_delegate_names_with_delegate_ids, reverse_name}, with_data::active_delegates_at_date};
+    use crate::{
+        connect_pg,
+        legislative_initiatives::{
+            match_delegates_with_name::match_delegate_names_with_delegate_ids, reverse_name,
+        },
+        with_data::active_delegates_at_date,
+    };
 
     #[tokio::test]
     async fn test_absence_extraction_xxiv_29() {

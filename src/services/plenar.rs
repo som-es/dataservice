@@ -26,27 +26,26 @@ async fn scrape_new_plenar_infos(scraper: &AustriaScraper) -> crate::Result<Vec<
     Ok(new_plenar_infos)
 }
 
-async fn plenar_info_once(pg_pool: &PgPool) -> Vec<PlenarInfo> {
+async fn plenar_info_once(pg_pool: &PgPool) {
     log::info!("Try scraping plenar info");
 
-    let mut scraper = AustriaScraper::default();
-
-    let mut new_plenar_infos = vec![];
+    let mut handles = vec![];
 
     for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
-        log::info!("PLENAR info once GP: {gp}");
-        scraper.scrape_info.gp = vec![gp.into()];
+        let pg_pool = pg_pool.clone();
+        handles.push(tokio::task::spawn(async move {
+            let mut scraper = AustriaScraper::default();
+            log::info!("PLENAR info once GP: {gp}");
+            scraper.scrape_info.gp = vec![gp.into()];
 
-        new_plenar_infos.extend(
-            scrape_untill_success::<Vec<PlenarInfo>, _>(|| async {
+            let new_plenar_infos = scrape_untill_success::<Vec<PlenarInfo>, _>(|| async {
                 scrape_new_plenar_infos(&scraper).await
             })
-            .await,
-        );
-    }
+            .await;
 
-    update_plenar_infos_in_db(&new_plenar_infos, pg_pool).await;
-    new_plenar_infos
+            update_plenar_infos_in_db(&new_plenar_infos, &pg_pool).await;
+        }));
+    }
 }
 
 async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &PgPool) {
