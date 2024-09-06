@@ -63,7 +63,9 @@ pub async fn scrape_new_legis_inits(
                 log::info!("Awaiting handles ({gp}) now.");
             }
             for handle in handles.drain(..MAX_TASKS) {
-                handle.await.unwrap()
+                if let Err(e) = handle.await {
+                    log::warn!("join Error: {e:?}")
+                }
             }
             info_print_counter += 1;
         }
@@ -212,6 +214,7 @@ pub async fn update_legis_inits_in_db(
                 .vote_type
                 .map(|pre| pre.to_string()),
             voted_by_name: legis_init.hidden_votes_info.voted_by_name,
+            plenary_session_id
         };
         // println!("db_legis_init: {db_legis_init:?}");
 
@@ -250,7 +253,7 @@ pub async fn update_legis_inits_in_db(
             db_legis_init.requires_simple_majority,
             db_legis_init.pre_declined_type,
             db_legis_init.voted_by_name,
-            plenary_session_id,
+            db_legis_init.plenary_session_id,
         )
         .fetch_one(pool)
         .await

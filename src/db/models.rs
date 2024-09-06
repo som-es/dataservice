@@ -85,6 +85,7 @@ pub struct DbLegislativeInitiative {
     pub requires_simple_majority: bool,
     pub pre_declined_type: Option<String>,
     pub voted_by_name: bool,
+    pub plenary_session_id: Option<i32>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
@@ -147,6 +148,7 @@ pub struct DbLegislativeInitiativeQuery {
     pub requires_simple_majority: Option<bool>,
     pub pre_declined_type: Option<String>,
     pub voted_by_name: bool,
+    pub plenary_session_id: Option<i32>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
@@ -465,3 +467,4 @@ pub struct DbPartyNamedVoteCount {
     pub infavor: Option<bool>,
     pub count: Option<i64>,
 }
+
