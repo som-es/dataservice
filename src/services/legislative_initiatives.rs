@@ -103,11 +103,13 @@ async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<Legislative
             scraper.scrape_info.gp = vec![gp.into()];
             let scraper = Arc::new(scraper);
 
-            // scrape_new_legis_inits(&pg_pool, scraper.clone(), gp).await
-            scrape_untill_success::<Vec<LegislativeInitiative>, _>(|| async {
-                scrape_new_legis_inits(&pg_pool, scraper.clone(), gp).await
-            })
-            .await;
+            if let Err(e) = scrape_new_legis_inits(&pg_pool, scraper.clone(), gp).await {
+                log::error!("could not scrape and insert legis inits: {e}");
+            }
+            // scrape_untill_success::<Vec<LegislativeInitiative>, _>(|| async {
+            //     scrape_new_legis_inits(&pg_pool, scraper.clone(), gp).await
+            // })
+            // .await;
 
             log::info!("finished scraping LEGIS INIT once GP: {gp}");
 
@@ -176,6 +178,7 @@ pub async fn update_legis_inits_in_db(
     // }
 
     for (i, legis_init) in new_legis_inits.iter().enumerate() {
+        log::info!("Add legis init: {} {} {}", legis_init.gp, legis_init.ityp, legis_init.inr);
         // if i % 10 == 0 {
         //     log::info!(
         //         "{i} inserting legis init {}{}",
