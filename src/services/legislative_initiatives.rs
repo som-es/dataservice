@@ -697,6 +697,20 @@ mod tests {
         // let out = crate::legislative_initiatives::scrape_new_legis_inits(&scraper).await.unwrap();
         // println!("out: {out:?}");
     }
+    #[tokio::test]
+    async fn test_legis_init_empty_gp_scrape_xxvii_a_3431() {
+        let scraper: AustriaScraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVII/A/3431")
+            .await
+            .unwrap();
+
+        let pool = connect_pg().await;
+        let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, code_to_parties, &[res])
+            .await;
+    }
+
 
     #[tokio::test]
     async fn test_legis_init_empty_gp_scrape_xxvii_a_3945() {
