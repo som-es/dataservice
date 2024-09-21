@@ -278,6 +278,7 @@ pub async fn run_shut_last_5_days(mut shutdown: Shutdown) {
             100
         });
 
+    #[cfg(feature = "proposals_latest")]
     while !shutdown.is_shutdown() {
         tokio::select! {
             _ = shutdown.recv() => {
@@ -306,6 +307,7 @@ pub async fn run_shut(mut shutdown: Shutdown) {
             7
         });
     let proposal_sleep = proposal_sleep_days * 24 * 60 * 60;
+    #[cfg(feature = "proposals")]
     while !shutdown.is_shutdown() {
         tokio::select! {
             _ = shutdown.recv() => {

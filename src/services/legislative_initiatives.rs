@@ -52,7 +52,7 @@ pub async fn scrape_new_legis_inits(
 
     log::info!("Fetching and inserting ({gp}) now.");
     let mut info_print_counter = 0;
-    for legis_init_path in &legis_init_paths {
+    for legis_init_path in legis_init_paths.iter().rev() {
         let legis_init_path = legis_init_path.clone();
         let scraper = scraper.clone();
         let pool = pool.clone();
@@ -592,6 +592,7 @@ pub async fn run_shut_latest_gp(mut shutdown: Shutdown) {
             300
         });
 
+    #[cfg(feature = "legis_init_latest")]
     while !shutdown.is_shutdown() {
         tokio::select! {
             _ = shutdown.recv() => {
@@ -627,6 +628,7 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown) {
             1000
         });
 
+    #[cfg(feature = "legis_init")]
     while !shutdown.is_shutdown() {
         tokio::select! {
             _ = shutdown.recv() => {

@@ -199,6 +199,7 @@ pub async fn run_shut_latest_gp(mut shutdown: Shutdown) {
             );
             400
         });
+    #[cfg(feature = "ministerial_latest")]
     while !shutdown.is_shutdown() {
         tokio::select! {
             _ = shutdown.recv() => {
@@ -233,6 +234,7 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown) {
             1000
         });
 
+    #[cfg(feature = "ministerial")]
     while !shutdown.is_shutdown() {
         tokio::select! {
             _ = shutdown.recv() => {

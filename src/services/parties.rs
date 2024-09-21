@@ -55,6 +55,7 @@ pub async fn run_shut(mut shutdown: Shutdown) {
             10000
         });
 
+    #[cfg(feature = "parties")]
     while !shutdown.is_shutdown() {
         tokio::select! {
             _ = shutdown.recv() => {

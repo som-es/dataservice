@@ -332,6 +332,7 @@ pub async fn run_shut(mut shutdown: Shutdown) {
             400
         });
 
+    #[cfg(feature = "plenar")]
     while !shutdown.is_shutdown() {
         tokio::select! {
             _ = shutdown.recv() => {
