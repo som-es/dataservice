@@ -217,7 +217,8 @@ pub async fn update_legis_inits_in_db(
                 .vote_type
                 .map(|pre| pre.to_string()),
             voted_by_name: legis_init.hidden_votes_info.voted_by_name,
-            plenary_session_id
+            plenary_session_id,
+            doktyp: legis_init.doktyp.clone(),
         };
         // println!("db_legis_init: {db_legis_init:?}");
 
@@ -225,9 +226,9 @@ pub async fn update_legis_inits_in_db(
             "
                 INSERT INTO legislative_initiatives (
                     title, inr, emphasis, description, ityp, gp, accepted, created_at, appeared_at, updated_at,
-                    requires_simple_majority, pre_declined_type, voted_by_name, plenary_session_id
+                    requires_simple_majority, pre_declined_type, voted_by_name, plenary_session_id, doktyp
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
                 ) ON CONFLICT (inr, ityp, gp) 
                 DO UPDATE SET 
                     title = EXCLUDED.title,
@@ -240,7 +241,8 @@ pub async fn update_legis_inits_in_db(
                     requires_simple_majority = EXCLUDED.requires_simple_majority,
                     pre_declined_type = EXCLUDED.pre_declined_type,
                     voted_by_name = EXCLUDED.voted_by_name,
-                    plenary_session_id = EXCLUDED.plenary_session_id
+                    plenary_session_id = EXCLUDED.plenary_session_id,
+                    doktyp = EXCLUDED.doktyp
                 RETURNING id
             ",
             db_legis_init.title,
@@ -257,6 +259,7 @@ pub async fn update_legis_inits_in_db(
             db_legis_init.pre_declined_type,
             db_legis_init.voted_by_name,
             db_legis_init.plenary_session_id,
+            db_legis_init.doktyp,
         )
         .fetch_one(pool)
         .await

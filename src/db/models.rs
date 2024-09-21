@@ -73,6 +73,7 @@ pub struct ProposalDelegate {
 // #[diesel(table_name = legislative_initiatives)]
 pub struct DbLegislativeInitiative {
     pub ityp: String,
+    pub doktyp: String,
     pub gp: String,
     pub inr: i32,
     pub emphasis: Option<String>,
@@ -137,6 +138,7 @@ pub struct DbLegislativeInitiativeQuery {
     pub id: i32,
     pub ityp: String,
     pub gp: String,
+    pub doktyp: String,
     pub inr: i32,
     pub emphasis: Option<String>,
     pub title: String,

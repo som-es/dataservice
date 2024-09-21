@@ -3,6 +3,7 @@ create table legislative_initiatives (
     -- use serial id -> add inr, and UNIQUE of (inr, ityp, gp)
     id serial primary key,
     ityp varchar(7) not null,
+    doktyp varchar(20),
     gp varchar(7) not null,
     inr int not null,
     emphasis varchar(6000),
