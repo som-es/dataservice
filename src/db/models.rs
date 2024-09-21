@@ -469,4 +469,3 @@ pub struct DbPartyNamedVoteCount {
     pub infavor: Option<bool>,
     pub count: Option<i64>,
 }
-

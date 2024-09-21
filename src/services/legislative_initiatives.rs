@@ -178,7 +178,12 @@ pub async fn update_legis_inits_in_db(
     // }
 
     for (i, legis_init) in new_legis_inits.iter().enumerate() {
-        log::info!("Add legis init: {} {} {}", legis_init.gp, legis_init.ityp, legis_init.inr);
+        log::info!(
+            "Add legis init: {} {} {}",
+            legis_init.gp,
+            legis_init.ityp,
+            legis_init.inr
+        );
         // if i % 10 == 0 {
         //     log::info!(
         //         "{i} inserting legis init {}{}",
@@ -718,7 +723,6 @@ mod tests {
         crate::legislative_initiatives::update_legis_inits_in_db(&pool, code_to_parties, &[res])
             .await;
     }
-
 
     #[tokio::test]
     async fn test_legis_init_empty_gp_scrape_xxvii_a_3945() {
