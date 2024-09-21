@@ -1,6 +1,19 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    absences (id) {
+        id -> Int4,
+        lev -> Int8,
+        similiarity_score -> Int8,
+        searched_with -> Nullable<Varchar>,
+        matched_with -> Varchar,
+        delegate_id -> Int4,
+        manually_matched -> Nullable<Bool>,
+        plenary_session_id -> Int4,
+    }
+}
+
+diesel::table! {
     answers (id) {
         id -> Int4,
         question_id -> Int4,
@@ -106,6 +119,7 @@ diesel::table! {
     legislative_initiatives (id) {
         id -> Int4,
         ityp -> Varchar,
+        doktyp -> Nullable<Varchar>,
         gp -> Varchar,
         inr -> Int4,
         emphasis -> Nullable<Varchar>,
@@ -118,6 +132,7 @@ diesel::table! {
         appeared_at -> Nullable<Timestamp>,
         updated_at -> Nullable<Timestamp>,
         requires_simple_majority -> Nullable<Bool>,
+        plenary_session_id -> Nullable<Int4>,
     }
 }
 
@@ -372,6 +387,24 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    walo (id) {
+        id -> Int4,
+        question_statement -> Nullable<Text>,
+        new_keywords_topics -> Nullable<Text>,
+        spoe_justification -> Nullable<Text>,
+        gruene_justification -> Nullable<Text>,
+        neos_justification -> Nullable<Text>,
+        fpoe_justification -> Nullable<Text>,
+        oevp_justification -> Nullable<Text>,
+        somes_link -> Nullable<Text>,
+        law_link -> Nullable<Text>,
+        erklaerbaer -> Nullable<Text>,
+    }
+}
+
+diesel::joinable!(absences -> delegates (delegate_id));
+diesel::joinable!(absences -> plenar_infos (plenary_session_id));
 diesel::joinable!(answers -> questions (question_id));
 diesel::joinable!(call_to_order -> delegates (receiver_id));
 diesel::joinable!(call_to_order -> plenar_infos (plenar_id));
@@ -382,6 +415,7 @@ diesel::joinable!(eurovoc_topics_legis_init -> legislative_initiatives (legislat
 diesel::joinable!(eurovoc_topics_ministrial_proposals -> ministrial_proposals (ministrial_proposal_id));
 diesel::joinable!(eurovoc_topics_proposals -> proposals (proposals_id));
 diesel::joinable!(legislative_documents -> legislative_initiatives (legislative_initiatives_id));
+diesel::joinable!(legislative_initiatives -> plenar_infos (plenary_session_id));
 diesel::joinable!(mandates -> delegates (delegate_id));
 diesel::joinable!(ministrial_proposals_documents -> ministrial_proposals (ministrial_proposal_id));
 diesel::joinable!(named_vote_info -> legislative_initiatives (legis_init_id));
@@ -408,6 +442,7 @@ diesel::joinable!(topics_proposals -> proposals (proposals_id));
 diesel::joinable!(votes -> legislative_initiatives (legislative_initiatives_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
+    absences,
     answers,
     call_to_order,
     contacts,
@@ -443,4 +478,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     topics_proposals,
     users,
     votes,
+    walo,
 );
