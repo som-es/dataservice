@@ -161,14 +161,14 @@ async fn insert_plenar_speech(
     let disable_speech_text =
         std::env::var("DISABLE_SPEECH_TEXT").unwrap_or_else(|_| "true".into()) == "true";
 
-    let opinion = match &plenar_speech.opinion {
+    let opinion = match &plenar_speech.speech.opinion {
         scraper::Opinion::Infavor => Some("Pro".to_string()),
         scraper::Opinion::Against => Some("Contra".to_string()),
         scraper::Opinion::Other(text) => {
             unsafe { NO_OPINION_COUNT += 1 };
             info!(
                 "No opinion for speech: {:?}. 'Opinion': {text}, no opinion count: {}",
-                plenar_speech.spoken_text_html_urls,
+                plenar_speech.speech.spoken_text_html_urls,
                 unsafe { NO_OPINION_COUNT }
             );
             Some(text.clone())
@@ -177,7 +177,7 @@ async fn insert_plenar_speech(
             unsafe { NO_OPINION_COUNT += 1 };
             info!(
                 "No opinion for speech: {:?}, no opinion_count: {}",
-                plenar_speech.spoken_text_html_urls,
+                plenar_speech.speech.spoken_text_html_urls,
                 unsafe { NO_OPINION_COUNT }
             );
             None
@@ -196,7 +196,7 @@ async fn insert_plenar_speech(
             ty = EXCLUDED.ty
         RETURNING id
         "#,
-        plenar_speech.delegate_id as i32,
+        plenar_speech.speech.delegate_id as i32,
         val_debate_id,
         opinion,
         None::<String>, // spoken_text is initially None
@@ -207,7 +207,7 @@ async fn insert_plenar_speech(
     .await?
     .id;
 
-    for url in &plenar_speech.spoken_text_html_urls {
+    for url in &plenar_speech.speech.spoken_text_html_urls {
         sqlx::query!(
             r#"
             INSERT INTO plenar_speech_links (plenar_speech_id, document_url)
@@ -262,7 +262,7 @@ async fn insert_plenar_speech(
                     "#,
                     updated_spoken_text,
                     val_debate_id,
-                    plenar_speech.delegate_id as i32
+                    plenar_speech.speech.delegate_id as i32
                 )
                 .execute(pool)
                 .await?;
