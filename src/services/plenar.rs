@@ -34,8 +34,9 @@ async fn plenar_info_once(pg_pool: &PgPool) {
     for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
         let pg_pool = pg_pool.clone();
 
-        if handles.len() < 32 {
-            for handle in handles.drain(..32) {
+        if handles.len() > 32 {
+            log::info!("awaiting 32 plenar handles");
+            for handle in handles.drain(..) {
                 if let Err(e) = handle.await {
                     log::error!("could not await plenar info handle: {e:?}");
                 }
@@ -226,22 +227,30 @@ async fn insert_plenar_speech(
         WHERE debate_id = $1 AND delegate_id = $2
         "#,
         val_debate_id,
-        plenar_speech.delegate_id as i32
+        plenar_speech.speech.delegate_id as i32
     )
     .fetch_optional(pool)
     .await?;
 
     if let Some(record) = existing_spoken_text {
         if record.spoken_text.is_none() {
-            if let Some(text_html_url) = plenar_speech.spoken_text_html_urls.first() {
+            if let Some(text_html_url) = plenar_speech.speech.spoken_text_html_urls.first() {
                 let updated_spoken_text = if disable_speech_text {
                     None
                 } else {
                     Some(
                         text_extractor
-                            .extract_text_from_url(&text_html_url.document_url, None, true)
+                            .speech_extraction_with_fit(
+                                &text_html_url,
+                                &plenar_speech.speech.delegate_display_name,
+                            )
                             .await,
                     )
+                    // Some(
+                    //     text_extractor
+                    //         .extract_text_from_url(&text_html_url.document_url, None, true)
+                    //         .await,
+                    // )
                 }
                 .flatten();
 
