@@ -200,6 +200,7 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &PgPool) {
                 delegate.id as i32,
                 seat.row as i32,
                 seat.col as i32,
+                delegate.council.as_ref().map(|x| x.as_str()),
                 pg_pool,
             )
             .await
@@ -269,17 +270,19 @@ pub async fn insert_seat(
     delegate_id: i32,
     seat_row: i32,
     seat_col: i32,
+    council: Option<&str>,
     pg: &PgPool,
 ) -> sqlx::Result<PgQueryResult> {
     sqlx::query!(
         "
-        insert into seat_history(delegate_id, seat_row, seat_col) values ($1, $2, $3)
+        insert into seat_history(delegate_id, seat_row, seat_col, council) values ($1, $2, $3, $4)
         on conflict
         do nothing
         ",
         delegate_id,
         seat_row,
-        seat_col
+        seat_col,
+        council
     )
     .execute(pg)
     .await
