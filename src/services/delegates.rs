@@ -195,6 +195,19 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &PgPool) {
 
         // println!("SQL: {}", debug_query.to_string());
 
+        if let Some(seat) = &delegate.seat {
+            if let Err(e) = insert_seat(
+                delegate.id as i32,
+                seat.row as i32,
+                seat.col as i32,
+                pg_pool,
+            )
+            .await
+            {
+                log::error!("error adding seat: {e:?}",);
+            }
+        }
+
         for mandate in &delegate.mandates {
             if let Err(e) = insert_mandate(mandate, delegate.id as i32, pg_pool).await {
                 log::error!("Error adding mandate ({mandate:?}) for delegate {delegate:?}: {e}",);
@@ -247,6 +260,26 @@ pub async fn insert_delegate_division(
         ",
         delegate_id,
         division
+    )
+    .execute(pg)
+    .await
+}
+
+pub async fn insert_seat(
+    delegate_id: i32,
+    seat_row: i32,
+    seat_col: i32,
+    pg: &PgPool,
+) -> sqlx::Result<PgQueryResult> {
+    sqlx::query!(
+        "
+        insert into seat_history(delegate_id, seat_row, seat_col) values ($1, $2, $3)
+        on conflict
+        do nothing
+        ",
+        delegate_id,
+        seat_row,
+        seat_col
     )
     .execute(pg)
     .await
