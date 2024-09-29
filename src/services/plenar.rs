@@ -34,15 +34,6 @@ async fn plenar_info_once(pg_pool: &PgPool) {
     for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
         let pg_pool = pg_pool.clone();
 
-        if handles.len() > 32 {
-            log::info!("awaiting 32 plenar handles");
-            for handle in handles.drain(..) {
-                if let Err(e) = handle.await {
-                    log::error!("could not await plenar info handle: {e:?}");
-                }
-            }
-        }
-
         handles.push(tokio::task::spawn(async move {
             let mut scraper = AustriaScraper::default();
             log::info!("PLENAR info once GP: {gp}");
@@ -53,7 +44,22 @@ async fn plenar_info_once(pg_pool: &PgPool) {
             })
             .await;
 
-            update_plenar_infos_in_db(&new_plenar_infos, &pg_pool).await;
+            let mut handles = vec![];
+
+            for plenar_info in new_plenar_infos {
+                if handles.len() > 32 {
+                    log::info!("awaiting 32 plenar handles");
+                    for handle in handles.drain(..) {
+                        if let Err(e) = handle.await {
+                            log::error!("could not await plenar info handle: {e:?}");
+                        }
+                    }
+                }
+                let pg_pool = pg_pool.clone();
+                handles.push(tokio::task::spawn(async move {
+                    update_plenar_infos_in_db(&[plenar_info], &pg_pool).await;
+                }));
+            }
         }));
     }
     for handle in handles.drain(..) {
