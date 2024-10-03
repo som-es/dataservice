@@ -244,21 +244,18 @@ async fn insert_plenar_speech(
                 let updated_spoken_text = if disable_speech_text {
                     None
                 } else {
-                    Some(
-                        text_extractor
-                            .speech_extraction_with_fit(
-                                &text_html_url,
-                                &plenar_speech.speech.delegate_display_name,
-                            )
-                            .await,
-                    )
+                    text_extractor
+                        .speech_extraction_with_fit(
+                            &text_html_url,
+                            &plenar_speech.speech.delegate_display_name,
+                        )
+                        .await
                     // Some(
                     //     text_extractor
                     //         .extract_text_from_url(&text_html_url.document_url, None, true)
                     //         .await,
                     // )
-                }
-                .flatten();
+                };
 
                 sqlx::query!(
                     r#"
