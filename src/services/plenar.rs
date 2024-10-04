@@ -256,6 +256,12 @@ async fn insert_plenar_speech(
                     //         .await,
                     // )
                 };
+                if updated_spoken_text.is_none() {
+                    warn!(
+                        "DEBATE_ID: {}, Missing spoken text for plenar speech id: {plenar_speech_id}, and plenar info: {:?}",
+                        val_debate_id, plenar_speech
+                    );
+                }
 
                 sqlx::query!(
                     r#"
