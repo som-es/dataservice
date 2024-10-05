@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use scraper::{delegates::DelegateScraper, AustriaScraper, Delegate, Mandate};
+use somes_scraper::{delegates::DelegateScraper, AustriaScraper, Delegate, Mandate};
 use sqlx::{postgres::PgQueryResult, query, PgPool};
 
 use crate::{

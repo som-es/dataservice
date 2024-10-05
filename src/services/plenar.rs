@@ -2,7 +2,7 @@ use crate::{
     connect_pg, legislative_initiatives::absence_matching, services::scrape_untill_success,
     Shutdown,
 };
-use scraper::{
+use somes_scraper::{
     call_to_order::CallToOrderInfo,
     plenar::{Debate, Plenar, PlenarInfo},
     AustriaScraper, PlenarSpeech, Scraper, TextExtractor,
@@ -46,7 +46,7 @@ async fn plenar_info_once(pg_pool: &PgPool) {
 
             let mut handles = vec![];
 
-            for plenar_info in new_plenar_infos {
+            for plenar_info in new_plenar_infos.into_iter().rev() {
                 if handles.len() > 32 {
                     log::info!("awaiting 32 plenar handles");
                     for handle in handles.drain(..) {
@@ -73,7 +73,7 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
     log::info!("Updating plenar infos in database...");
 
     // disable with setting
-    let mut text_extractor = scraper::TextExtractor::new(AustriaScraper::BASE_URL);
+    let mut text_extractor = somes_scraper::TextExtractor::new(AustriaScraper::BASE_URL);
 
     for plenar_info in new_plenar_infos {
         // let plenar_id = format!("{}/{}/{}", plenar_info.legislative_period, plenar_info.ityp, plenar_info.inr);
@@ -168,9 +168,9 @@ async fn insert_plenar_speech(
         std::env::var("DISABLE_SPEECH_TEXT").unwrap_or_else(|_| "true".into()) == "true";
 
     let opinion = match &plenar_speech.speech.opinion {
-        scraper::Opinion::Infavor => Some("Pro".to_string()),
-        scraper::Opinion::Against => Some("Contra".to_string()),
-        scraper::Opinion::Other(text) => {
+        somes_scraper::Opinion::Infavor => Some("Pro".to_string()),
+        somes_scraper::Opinion::Against => Some("Contra".to_string()),
+        somes_scraper::Opinion::Other(text) => {
             unsafe { NO_OPINION_COUNT += 1 };
             info!(
                 "No opinion for speech: {:?}. 'Opinion': {text}, no opinion count: {}",
@@ -179,7 +179,7 @@ async fn insert_plenar_speech(
             );
             Some(text.clone())
         }
-        scraper::Opinion::None => {
+        somes_scraper::Opinion::None => {
             unsafe { NO_OPINION_COUNT += 1 };
             info!(
                 "No opinion for speech: {:?}, no opinion_count: {}",
@@ -393,6 +393,9 @@ pub async fn run_shut(mut shutdown: Shutdown) {
 #[cfg(test)]
 mod tests {
     use chrono::NaiveDateTime;
+    use somes_scraper::{AustriaScraper, TextExtractor};
+
+    use crate::connect_pg;
 
     #[test]
     fn test_date_time_parse() {

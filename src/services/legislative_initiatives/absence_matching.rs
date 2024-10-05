@@ -52,7 +52,7 @@ pub async fn absence_matching(
 mod tests {
     use std::collections::HashSet;
 
-    use scraper::{plenar::Plenar, AustriaScraper};
+    use somes_scraper::{plenar::Plenar, AustriaScraper};
 
     use crate::{
         connect_pg,

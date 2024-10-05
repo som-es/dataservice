@@ -6,7 +6,7 @@ mod voted_by_name_result;
 use std::{collections::HashMap, sync::Arc};
 
 use log::log;
-use scraper::{
+use somes_scraper::{
     legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative, Opinion, Party,
     ProContra,
 };
@@ -317,7 +317,7 @@ pub async fn update_legis_inits_in_db(
         }
 
         if legis_init.votes.is_empty()
-            && legis_init.accepted == Some(scraper::AcceptedState::PreDeclined)
+            && legis_init.accepted == Some(somes_scraper::AcceptedState::PreDeclined)
             && legis_init.hidden_votes_info.pro_contra_parties.is_some()
         {
             match &legis_init.hidden_votes_info.pro_contra_parties {
@@ -346,10 +346,10 @@ pub async fn update_legis_inits_in_db(
 
         for speech in &legis_init.speeches {
             let opinion = match &speech.opinion {
-                scraper::Opinion::Infavor => Some("Pro".to_string()),
-                scraper::Opinion::Against => Some("Contra".to_string()),
-                scraper::Opinion::Other(text) => Some(text.clone()),
-                scraper::Opinion::None => None,
+                somes_scraper::Opinion::Infavor => Some("Pro".to_string()),
+                somes_scraper::Opinion::Against => Some("Contra".to_string()),
+                somes_scraper::Opinion::Other(text) => Some(text.clone()),
+                somes_scraper::Opinion::None => None,
             };
             let db_speech = DbSpeech {
                 delegate_id: speech.delegate_id as i32,
@@ -667,7 +667,7 @@ mod tests {
     use std::sync::Arc;
 
     use chrono::NaiveDateTime;
-    use scraper::{legis_init::LegislativeInitiatives, AustriaScraper};
+    use somes_scraper::{legis_init::LegislativeInitiatives, AustriaScraper};
 
     use crate::{connect_pg, legislative_initiatives::gen_code_to_parties};
 

@@ -255,7 +255,7 @@ pub fn match_delegate_names_with_delegate_ids(
 mod tests {
     use std::collections::HashSet;
 
-    use scraper::{legis_init::LegislativeInitiatives, plenar::Plenar, AustriaScraper};
+    use somes_scraper::{legis_init::LegislativeInitiatives, plenar::Plenar, AustriaScraper};
 
     use crate::{
         connect_pg, legislative_initiatives::absence_matching::reverse_name,

@@ -1,4 +1,4 @@
-use scraper::{parties::Parties, AustriaScraper, Party};
+use somes_scraper::{parties::Parties, AustriaScraper, Party};
 
 use crate::{connect_pg, scrape_untill_success, Shutdown};
 

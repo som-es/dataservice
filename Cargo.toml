@@ -12,7 +12,7 @@ dotenvy = { version = "0.15.7", optional=true}
 log = {version = "0.4.17", optional=true}
 reqwest = { version = "0.12", features = ["blocking"], optional=true }
 
-scraper = {path = "../scraper"}
+somes-scraper = {path = "../scraper"}
 serde = "1.0"
 serde_derive = "1.0"
 simple_logger = { version="5", optional = true}

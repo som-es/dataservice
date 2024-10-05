@@ -1,4 +1,4 @@
-use scraper::Party;
+use somes_scraper::Party;
 use sqlx::PgPool;
 
 pub async fn all_parties_at_gp(pg: &PgPool, gp: &str) -> sqlx::Result<Vec<Party>> {

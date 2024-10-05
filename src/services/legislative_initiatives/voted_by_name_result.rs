@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use chrono::NaiveDate;
-use scraper::{LegislativeInitiative, ProContra};
+use somes_scraper::{LegislativeInitiative, ProContra};
 use sqlx::PgPool;
 
 use crate::{
@@ -194,7 +194,7 @@ pub async fn match_all_named_votes(
 mod tests {
     use super::match_all_named_votes;
     use crate::connect_pg;
-    use scraper::{legis_init::LegislativeInitiatives, AustriaScraper};
+    use somes_scraper::{legis_init::LegislativeInitiatives, AustriaScraper};
 
     #[tokio::test]
     async fn test_get_legis_init_was_voted_by_name_extraction() {

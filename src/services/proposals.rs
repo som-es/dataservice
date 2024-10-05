@@ -2,7 +2,7 @@ use std::{sync::Arc, thread::JoinHandle};
 
 use dotenvy::dotenv;
 use log::error;
-use scraper::{
+use somes_scraper::{
     proposals::{ProposalScraper, ProposalsPayload},
     AustriaScraper, Proposal,
 };

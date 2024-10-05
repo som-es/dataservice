@@ -1,4 +1,4 @@
-use scraper::{
+use somes_scraper::{
     ministrial_proposals::{MinistrialProposal, MinistrialProposalScraper},
     proposals::ProposalsPayload,
     AustriaScraper,
@@ -262,7 +262,7 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown) {
 #[cfg(test)]
 mod tests {
     use chrono::NaiveDateTime;
-    use scraper::AustriaScraper;
+    use somes_scraper::AustriaScraper;
 
     #[test]
     fn test_date_time_parse() {
