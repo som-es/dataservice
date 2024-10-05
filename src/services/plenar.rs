@@ -216,12 +216,14 @@ async fn insert_plenar_speech(
     for url in &plenar_speech.speech.spoken_text_html_urls {
         sqlx::query!(
             r#"
-            INSERT INTO plenar_speech_links (plenar_speech_id, document_url)
-            VALUES ($1, $2)
+            INSERT INTO plenar_speech_links (plenar_speech_id, document_url, site_start, site_end)
+            VALUES ($1, $2, $3, $4)
             ON CONFLICT (plenar_speech_id, document_url) DO NOTHING
             "#,
             plenar_speech_id,
-            url.document_url.to_string()
+            url.document_url.to_string(),
+            url.site_start.map(|i| i as i32),
+            url.site_end.map(|i| i as i32)
         )
         .execute(pool)
         .await?;

@@ -2,6 +2,8 @@
 create table plenar_speech_links(
     id serial primary key,
     plenar_speech_id int not null,
+    site_start int,
+    site_end int,
     document_url varchar(500),
     FOREIGN KEY (plenar_speech_id) REFERENCES plenar_speeches(id),
     UNIQUE (plenar_speech_id, document_url)
