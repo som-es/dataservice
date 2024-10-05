@@ -197,7 +197,7 @@ async fn insert_plenar_speech(
         ON CONFLICT (debate_id, delegate_id)
         DO UPDATE SET
             opinion = EXCLUDED.opinion,
-            spoken_text = EXCLUDED.spoken_text,
+            -- spoken_text = EXCLUDED.spoken_text, -- setting this to None on conflict results in fluctuating none counts etc
             duration_in_seconds = EXCLUDED.duration_in_seconds,
             ty = EXCLUDED.ty
         RETURNING id
@@ -229,62 +229,62 @@ async fn insert_plenar_speech(
         .await?;
     }
 
-    let existing_spoken_text = sqlx::query!(
-        r#"
-        SELECT spoken_text FROM plenar_speeches
-        WHERE debate_id = $1 AND delegate_id = $2
-        "#,
-        val_debate_id,
-        plenar_speech.speech.delegate_id as i32
-    )
-    .fetch_optional(pool)
-    .await?;
+    // let existing_spoken_text = sqlx::query!(
+    //     r#"
+    //     SELECT spoken_text FROM plenar_speeches
+    //     WHERE debate_id = $1 AND delegate_id = $2
+    //     "#,
+    //     val_debate_id,
+    //     plenar_speech.speech.delegate_id as i32
+    // )
+    // .fetch_optional(pool)
+    // .await?;
 
-    if let Some(record) = existing_spoken_text {
-        if record.spoken_text.is_none() {
-            if let Some(text_html_url) = plenar_speech.speech.spoken_text_html_urls.first() {
-                let updated_spoken_text = if disable_speech_text {
-                    None
-                } else {
-                    text_extractor
-                        .speech_extraction_with_fit(
-                            &text_html_url,
-                            &plenar_speech.speech.delegate_display_name,
-                        )
-                        .await
-                    // Some(
-                    //     text_extractor
-                    //         .extract_text_from_url(&text_html_url.document_url, None, true)
-                    //         .await,
-                    // )
-                };
-                if updated_spoken_text.is_none() {
-                    warn!(
+    // if let Some(record) = existing_spoken_text {
+    // if record.spoken_text.is_none() {
+    if let Some(text_html_url) = plenar_speech.speech.spoken_text_html_urls.first() {
+        let updated_spoken_text = if disable_speech_text {
+            None
+        } else {
+            text_extractor
+                .speech_extraction_with_fit(
+                    &text_html_url,
+                    &plenar_speech.speech.delegate_display_name,
+                )
+                .await
+            // Some(
+            //     text_extractor
+            //         .extract_text_from_url(&text_html_url.document_url, None, true)
+            //         .await,
+            // )
+        };
+        if updated_spoken_text.is_none() {
+            warn!(
                         "DEBATE_ID: {}, Missing spoken text for plenar speech id: {plenar_speech_id}, and plenar info: {:?}",
                         val_debate_id, plenar_speech
                     );
-                }
+        }
 
-                sqlx::query!(
-                    r#"
+        sqlx::query!(
+            r#"
                     UPDATE plenar_speeches
                     SET spoken_text = $1
                     WHERE debate_id = $2 AND delegate_id = $3
                     "#,
-                    updated_spoken_text,
-                    val_debate_id,
-                    plenar_speech.speech.delegate_id as i32
-                )
-                .execute(pool)
-                .await?;
-            } else {
-                warn!(
-                    "DEBATE_ID: {}, No spoken text html urls for plenar speech: {:?}",
-                    val_debate_id, plenar_speech
-                );
-            }
-        }
+            updated_spoken_text,
+            val_debate_id,
+            plenar_speech.speech.delegate_id as i32
+        )
+        .execute(pool)
+        .await?;
+    } else {
+        warn!(
+            "DEBATE_ID: {}, No spoken text html urls for plenar speech: {:?}",
+            val_debate_id, plenar_speech
+        );
     }
+    // }
+    // }
 
     Ok(())
 }
