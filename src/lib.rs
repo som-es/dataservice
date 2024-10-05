@@ -6,6 +6,11 @@ pub mod services;
 #[cfg(feature = "runner")]
 pub mod shutdown;
 
+use std::{
+    cell::{Cell, LazyCell, OnceCell},
+    future,
+};
+
 use dotenv_codegen::dotenv;
 #[cfg(feature = "runner")]
 pub use services::*;
@@ -38,7 +43,27 @@ pub fn today_and_time() -> chrono::NaiveDateTime {
     chrono::Local::now().naive_local()
 }
 
+// could use variable in main -> pass to services
+static mut PG_POOL: Option<PgPool> = None;
+
 pub async fn connect_pg() -> PgPool {
+    unsafe {
+        match PG_POOL.clone() {
+            Some(pg_pool) => pg_pool,
+            None => {
+                PG_POOL = PgPoolOptions::new()
+                    // pool sizes
+                    .max_connections(150)
+                    .connect(DATABASE_URL)
+                    .await
+                    .ok();
+                PG_POOL.clone().unwrap()
+            }
+        }
+    }
+}
+
+pub async fn connect_pg2() -> PgPool {
     PgPoolOptions::new()
         // pool sizes
         .max_connections(6)
