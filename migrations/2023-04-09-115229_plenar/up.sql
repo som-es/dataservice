@@ -33,7 +33,7 @@ CREATE TABLE plenar_speeches (
     id serial primary key,
     delegate_id int not null,
     debate_id int not null,
-    opinion varchar(40),
+    opinion varchar(255),
     spoken_text text unique,
     duration_in_seconds int,
     ty varchar(40),
@@ -45,3 +45,6 @@ CREATE TABLE plenar_speeches (
 
 -- index is too large for speech text
 alter table plenar_speeches drop constraint plenar_speeches_spoken_text_key;
+DROP INDEX IF EXISTS plenar_speeches_spoken_text_key;
+
+CREATE INDEX plenar_speeches_spoken_text_hash_idx ON plenar_speeches USING hash (spoken_text);
