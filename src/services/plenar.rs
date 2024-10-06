@@ -4,7 +4,7 @@ use crate::{
 };
 use somes_scraper::{
     call_to_order::CallToOrderInfo,
-    plenar::{Debate, Plenar, PlenarInfo},
+    plenar::{self, Debate, Plenar, PlenarInfo},
     AustriaScraper, PlenarSpeech, Scraper, TextExtractor,
 };
 
@@ -46,7 +46,7 @@ async fn plenar_info_once(pg_pool: &PgPool) {
 
             let mut handles = vec![];
 
-            for plenar_info in new_plenar_infos.into_iter().rev() {
+            for plenar_info in new_plenar_infos.into_iter() {
                 if handles.len() > 32 {
                     log::info!("awaiting 32 plenar handles");
                     for handle in handles.drain(..) {
@@ -199,7 +199,7 @@ async fn insert_plenar_speech(
         r#"
         INSERT INTO plenar_speeches (delegate_id, debate_id, opinion, spoken_text, duration_in_seconds, ty, delegate_display_name)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
-        ON CONFLICT (debate_id, delegate_id)
+        ON CONFLICT (debate_id, delegate_id, opinion, duration_in_seconds, ty)
         DO UPDATE SET
             opinion = EXCLUDED.opinion,
             -- spoken_text = EXCLUDED.spoken_text, -- setting this to None on conflict results in fluctuating none counts etc
@@ -362,6 +362,8 @@ pub async fn insert_call_to_order(
 }
 
 pub async fn run_shut(mut shutdown: Shutdown) {
+    // insert_all_serially().await;
+    // return;
     let plenar_sleep = std::env::var("PLENAR_SLEEP")
         .unwrap_or_else(|_| "400".to_string())
         .parse()
@@ -399,14 +401,17 @@ pub async fn run_shut(mut shutdown: Shutdown) {
 async fn insert_all_serially() {
     let mut scraper = AustriaScraper::default();
 
-    let extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+    let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
     let pg_pool = connect_pg().await;
+        
+    let mut yes = 0;
+    let mut no = 0;
 
     std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
     let mut all_speeches_count = 0;
     'outer: for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
-    // 'outer: for gp in ["XXI", "XX"] {
+        // 'outer: for gp in ["XXI", "XX"] {
         scraper.scrape_info.gp = vec![gp.to_string()];
 
         let plenar_infos = scraper.post_plenar_payload().await.unwrap();
@@ -414,7 +419,8 @@ async fn insert_all_serially() {
         let paths = scraper
             .plenar_paths(plenar_infos)
             .expect("Failed to get paths");
-        for path in paths {
+
+        for path in paths.iter().rev() {
             println!("path: {path}");
             // path with no content at 1: /gegenstand/XXVII/NRSITZ/216
 
@@ -425,9 +431,53 @@ async fn insert_all_serially() {
                 continue;
             };
 
-            update_plenar_infos_in_db(&[plenar_info], &pg_pool).await;
+            let plenar_id = match insert_plenar_info(&pg_pool, &plenar_info).await {
+                Ok(id) => id,
+                Err(e) => {
+                    log::error!(
+                                "Error inserting plenar info: '{e}'. Error occured for plenar info: {plenar_info:?}. Skipping adding call to orders and debates."
+                            );
+                    continue;
+                }
+            };
+
+            for debate in &plenar_info.debates {
+                // get id from here, log here
+
+                let debate_id = match insert_debate(&pg_pool, debate, plenar_id).await {
+                    Ok(debate_id) => debate_id,
+                    Err(e) => {
+                        log::warn!(
+                            "Error inserting debate: '{e}'. Error occured for debate: {debate:?}"
+                        );
+                        continue;
+                    }
+                };
+
+                for plenar_speech in &debate.speeches {
+                    if let Err(e) = insert_plenar_speech(
+                        &pg_pool,
+                        plenar_speech,
+                        debate_id,
+                        &mut text_extractor,
+                    )
+                    .await
+                    {
+                        no += 1;
+                        log::warn!(
+                        "Error inserting plenar speech: '{e}'. Error occured for plenar speech: {plenar_speech:?}"
+                    );
+                    } else {
+                        yes += 1;
+                    }
+                }
+            }
+
+            // update_plenar_infos_in_db(&[plenar_info], &pg_pool).await;
             /*for debate in plenar_info.debates {
+
                 for speech in debate.speeches {
+
                     if let Some(spoken_text_url) = speech.speech.spoken_text_html_urls.first() {
                         let text = extractor
                             .speech_extraction_with_fit(
@@ -444,6 +494,7 @@ async fn insert_all_serially() {
                     }
                 }
             }
+            */
             // if all_speeches_count % 100 == 0 {
             //     dbg!("all s c: {all_speeches_count}");
             //     break 'outer;
@@ -451,12 +502,12 @@ async fn insert_all_serially() {
             // let speeches_count: usize = plenar_info.debates.iter().map(|d| d.speeches.len()).sum();
             // all_speeches_count += speeches_count;
             // println!("plenar_info: {:?}", plenar_info.absences);
-            */
         }
     }
 
     // 20805
     println!("speeches: {all_speeches_count}");
+    println!("yes: {yes}, no: {no}");
 }
 
 #[cfg(test)]
