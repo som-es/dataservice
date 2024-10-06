@@ -192,8 +192,8 @@ async fn insert_plenar_speech(
 
     let plenar_speech_id = sqlx::query!(
         r#"
-        INSERT INTO plenar_speeches (delegate_id, debate_id, opinion, spoken_text, duration_in_seconds, ty)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO plenar_speeches (delegate_id, debate_id, opinion, spoken_text, duration_in_seconds, ty, delegate_display_name)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (debate_id, delegate_id)
         DO UPDATE SET
             opinion = EXCLUDED.opinion,
@@ -207,7 +207,8 @@ async fn insert_plenar_speech(
         opinion,
         None::<String>, // spoken_text is initially None
         plenar_speech.duration_in_seconds as i32,
-        plenar_speech.ty
+        plenar_speech.ty,
+        plenar_speech.speech.delegate_display_name,
     )
     .fetch_one(pool)
     .await?

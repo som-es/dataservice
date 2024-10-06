@@ -37,6 +37,7 @@ CREATE TABLE plenar_speeches (
     spoken_text text unique,
     duration_in_seconds int,
     ty varchar(40),
+    delegate_display_name varchar(255) not null,
     FOREIGN KEY (debate_id) REFERENCES debates(id),
     FOREIGN KEY (delegate_id) REFERENCES delegates(id),
     UNIQUE (delegate_id, debate_id)
