@@ -60,6 +60,11 @@ async fn plenar_info_once(pg_pool: &PgPool) {
                     update_plenar_infos_in_db(&[plenar_info], &pg_pool).await;
                 }));
             }
+            for handle in handles.drain(..) {
+                if let Err(e) = handle.await {
+                    log::error!("could not await plenar info handle: {e:?}");
+                }
+            }
         }));
     }
     for handle in handles.drain(..) {
