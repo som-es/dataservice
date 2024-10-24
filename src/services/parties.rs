@@ -1,6 +1,6 @@
 use somes_scraper::{parties::Parties, AustriaScraper, Party};
 
-use crate::{connect_pg, scrape_untill_success, Shutdown};
+use crate::{connect_pg, scrape_untill_success, Shutdown, GPS};
 
 use sqlx::PgPool;
 
@@ -32,7 +32,7 @@ pub async fn update_parties_in_db2(pool: &PgPool, parties: &[Party], gp: &str) {
 
 pub async fn parties_once(pg_pool: &PgPool) {
     let mut scraper = AustriaScraper::default();
-    for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
+    for gp in GPS {
         scraper.scrape_info.gp = vec![gp.into()];
 
         let parties = scrape_untill_success::<Vec<Party>, _>(|| async {

@@ -14,14 +14,10 @@ use sqlx::PgPool;
 use voted_by_name_result::{insert_named_vote_info, insert_named_votes};
 
 use crate::{
-    connect_pg,
-    models::{
+    connect_pg, models::{
         DbEurovocTopicLegisInit, DbLegisDocument, DbLegislativeInitiative, DbNamedVoteInfo,
         DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote,
-    },
-    services::scrape_untill_success,
-    with_data::all_parties_at_gp,
-    Shutdown,
+    }, services::scrape_untill_success, with_data::all_parties_at_gp, Shutdown, GPS, LATEST_GP
 };
 
 pub async fn gen_code_to_parties(pool: &PgPool, gp: &str) -> HashMap<String, Party> {
@@ -92,8 +88,8 @@ async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<Legislative
     log::info!("Try scraping legislative initiatives");
 
     let mut handles = vec![];
-    for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
-        if !only_latest && gp == "XXVII" {
+    for gp in GPS {
+        if !only_latest && gp == LATEST_GP {
             continue;
         }
         let pg_pool = pg_pool.clone();

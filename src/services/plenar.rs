@@ -1,6 +1,6 @@
 use crate::{
     connect_pg, legislative_initiatives::absence_matching, services::scrape_untill_success,
-    Shutdown,
+    Shutdown, GPS,
 };
 use somes_scraper::{
     call_to_order::CallToOrderInfo,
@@ -31,7 +31,7 @@ async fn plenar_info_once(pg_pool: &PgPool) {
 
     let mut handles = vec![];
 
-    for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
+    for gp in GPS {
         let pg_pool = pg_pool.clone();
 
         handles.push(tokio::task::spawn(async move {

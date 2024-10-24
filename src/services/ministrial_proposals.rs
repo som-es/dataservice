@@ -5,7 +5,7 @@ use somes_scraper::{
 };
 use tokio::time::Instant;
 
-use crate::{connect_pg, services::scrape_untill_success, Shutdown};
+use crate::{connect_pg, services::scrape_untill_success, Shutdown, GPS};
 
 pub async fn scrape_new_ministrial_props(
     scraper: &AustriaScraper,
@@ -37,7 +37,7 @@ async fn ministrial_proposal_once(only_latest: bool, pg_pool: &PgPool) -> Vec<Mi
     log::info!("Try scraping ministiral proposals");
     let mut scraper = AustriaScraper::default();
 
-    for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
+    for gp in GPS {
         log::info!("scrape ministrial proposals for GP: {gp}");
         scraper.scrape_info.gp = vec![gp.into()];
 
