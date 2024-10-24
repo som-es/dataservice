@@ -215,9 +215,9 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &PgPool) {
             }
         }
 
-        if let Err(e) = delete_all_delegate_divisions(delegate.id as i32, pg_pool).await {
-            log::error!("could not delete  divisions for {delegate:?}: {e}");
-        }
+        // if let Err(e) = delete_all_delegate_divisions(delegate.id as i32, pg_pool).await {
+        //     log::error!("could not delete  divisions for {delegate:?}: {e}");
+        // }
         if let Some(divisions) = &delegate.divisions {
             for division in divisions {
                 if let Err(e) =
@@ -255,9 +255,7 @@ pub async fn insert_delegate_division(
         "
         insert into delegates_divisions(delegate_id, division) values ($1, $2)
         ON CONFLICT (delegate_id, division) 
-            DO UPDATE SET 
-                delegate_id = EXCLUDED.delegate_id,
-                division = EXCLUDED.division
+        do nothing
         ",
         delegate_id,
         division

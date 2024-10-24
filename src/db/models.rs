@@ -128,6 +128,7 @@ pub struct DbMinistrialProposalQuery {
     pub legis_init_gp: String,
     pub legis_init_inr: i32,
     pub legis_init_ityp: String,
+    pub plenary_session_id: Option<i32>,
 }
 use sqlx::FromRow;
 
@@ -137,8 +138,8 @@ use sqlx::FromRow;
 pub struct DbLegislativeInitiativeQuery {
     pub id: i32,
     pub ityp: String,
+    pub doktyp:Option<String>,
     pub gp: String,
-    pub doktyp: String,
     pub inr: i32,
     pub emphasis: Option<String>,
     pub title: String,
