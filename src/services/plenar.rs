@@ -404,7 +404,7 @@ async fn insert_all_serially() {
     let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
 
     let pg_pool = connect_pg().await;
-        
+
     let mut yes = 0;
     let mut no = 0;
 

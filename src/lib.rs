@@ -27,8 +27,9 @@ pub mod with_data;
 
 pub const DATABASE_URL: &str = dotenv!("DATABASE_URL");
 pub const LATEST_GP: &str = dotenv!("LATEST_GP");
-pub const GPS: [&str; 9] = [LATEST_GP, "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"];
-
+pub const GPS: [&str; 9] = [
+    LATEST_GP, "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
+];
 
 #[cfg(feature = "runner")]
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;

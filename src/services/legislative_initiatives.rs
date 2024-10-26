@@ -14,10 +14,14 @@ use sqlx::PgPool;
 use voted_by_name_result::{insert_named_vote_info, insert_named_votes};
 
 use crate::{
-    connect_pg, models::{
+    connect_pg,
+    models::{
         DbEurovocTopicLegisInit, DbLegisDocument, DbLegislativeInitiative, DbNamedVoteInfo,
         DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote,
-    }, services::scrape_untill_success, with_data::all_parties_at_gp, Shutdown, GPS, LATEST_GP
+    },
+    services::scrape_untill_success,
+    with_data::all_parties_at_gp,
+    Shutdown, GPS, LATEST_GP,
 };
 
 pub async fn gen_code_to_parties(pool: &PgPool, gp: &str) -> HashMap<String, Party> {

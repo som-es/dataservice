@@ -273,14 +273,15 @@ pub async fn insert_seat(
 ) -> sqlx::Result<PgQueryResult> {
     sqlx::query!(
         "
-        insert into seat_history(delegate_id, seat_row, seat_col, council) values ($1, $2, $3, $4)
+        insert into seat_history(delegate_id, seat_row, seat_col, council, gp) values ($1, $2, $3, $4, $5)
         on conflict
         do nothing
         ",
         delegate_id,
         seat_row,
         seat_col,
-        council
+        council,
+        crate::LATEST_GP,
     )
     .execute(pg)
     .await

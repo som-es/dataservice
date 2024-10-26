@@ -138,7 +138,7 @@ use sqlx::FromRow;
 pub struct DbLegislativeInitiativeQuery {
     pub id: i32,
     pub ityp: String,
-    pub doktyp:Option<String>,
+    pub doktyp: Option<String>,
     pub gp: String,
     pub inr: i32,
     pub emphasis: Option<String>,
