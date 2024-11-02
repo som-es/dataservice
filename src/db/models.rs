@@ -152,6 +152,7 @@ pub struct DbLegislativeInitiativeQuery {
     pub pre_declined_type: Option<String>,
     pub voted_by_name: bool,
     pub plenary_session_id: Option<i32>,
+    pub is_emphasis_ai_generated: Option<bool>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

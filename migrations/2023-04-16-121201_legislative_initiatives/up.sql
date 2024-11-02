@@ -7,6 +7,7 @@ create table legislative_initiatives (
     gp varchar(7) not null,
     inr int not null,
     emphasis varchar(6000),
+    is_emphasis_ai_generated boolean default false,
     title text not null,
     pre_declined_type varchar(2),
     voted_by_name boolean not null default false,
