@@ -237,7 +237,7 @@ pub async fn update_legis_inits_in_db(
                 ) ON CONFLICT (inr, ityp, gp) 
                 DO UPDATE SET 
                     title = EXCLUDED.title,
-                    emphasis = EXCLUDED.emphasis,
+                    emphasis = COALESCE(legislative_initiatives.emphasis, EXCLUDED.emphasis),
                     description = EXCLUDED.description,
                     accepted = EXCLUDED.accepted,
                     created_at = EXCLUDED.created_at,
