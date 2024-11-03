@@ -274,7 +274,7 @@ pub async fn insert_seat(
     sqlx::query!(
         "
         insert into seat_history(delegate_id, seat_row, seat_col, council, gp) values ($1, $2, $3, $4, $5)
-        on conflict
+        on conflict (delegate_id, seat_row, seat_col, council, gp)
         do nothing
         ",
         delegate_id,

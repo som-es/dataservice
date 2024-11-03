@@ -7,5 +7,5 @@ create table seat_history(
     council varchar(255),
     gp varchar(255),
     insertion_date date default now(),
-    unique (delegate_id, seat_col, seat_row, council)
+    unique (delegate_id, seat_col, seat_row, council, gp)
 );
