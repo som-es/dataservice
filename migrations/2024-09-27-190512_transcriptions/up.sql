@@ -6,7 +6,7 @@ CREATE TABLE introduction_transcriptions(
 
 Create Table transcriptionsQA(
     id SERIAL PRIMARY KEY,
-    question TEXT,
-    answer TEXT,
-    transcription_id INT REFERENCES introduction_transcriptions(id)
+    question TEXT not null,
+    answer TEXT not null,
+    transcription_id INT not null REFERENCES introduction_transcriptions(id)
 );
