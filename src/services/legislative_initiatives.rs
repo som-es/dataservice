@@ -437,6 +437,23 @@ pub async fn update_legis_inits_in_db(
         }
 
         for topic in legis_init.eurovoc_topics.clone() {
+            if let Err(e) = sqlx::query!(
+                "
+                    INSERT INTO unique_topics (
+                        topic_name
+                    ) VALUES (
+                        $1
+                    ) ON CONFLICT (topic_name) 
+                    DO NOTHING 
+                ",
+                topic,
+            )
+            .execute(pool)
+            .await
+            {
+                log::error!("Error inserting UNIQUE (eurovoc) topic: '{:?}'. The error occurred for the following eurovoc topic: {:?}", e, topic);
+            }
+
             let db_eurovoc_topic = DbEurovocTopicLegisInit {
                 topic,
                 legislative_initiatives_id: legis_init_id,
