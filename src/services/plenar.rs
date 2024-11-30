@@ -321,7 +321,7 @@ pub async fn insert_plenar_info(
         r#"
         INSERT INTO plenar_infos (inr, title, description, add_date, legislative_period)
         VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT (inr, add_date, legislative_period)
+        ON CONFLICT (inr, legislative_period)
         DO UPDATE SET
             title = EXCLUDED.title,
             description = EXCLUDED.description

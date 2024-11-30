@@ -7,7 +7,7 @@ CREATE TABLE plenar_infos (
     title varchar(255) not null,
     description varchar(255) not null,
     legislative_period varchar(9) not null,
-    UNIQUE (inr, legislative_period, add_date)
+    UNIQUE (inr, legislative_period)
 );
 
 CREATE TABLE call_to_order (
