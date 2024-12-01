@@ -4,8 +4,8 @@ create table seat_history(
     delegate_id int references delegates(id),
     seat_col int not null,
     seat_row int not null,
-    council varchar(255),
-    gp varchar(255),
+    council varchar(255) not null,
+    gp varchar(255) not null,
     insertion_date date default now(),
     unique (delegate_id, seat_col, seat_row, council, gp)
 );

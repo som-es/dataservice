@@ -11,7 +11,7 @@ create table plenar_speech_links(
 
 create table proposal_documents(
     id serial primary key,
-    proposal_id varchar(20),
+    proposal_id varchar(20) not null,
     title varchar(1024),
     document_type varchar(100) not null,
     document_url varchar(500) not null,
