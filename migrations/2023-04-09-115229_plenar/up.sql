@@ -33,14 +33,15 @@ CREATE TABLE plenar_speeches (
     id serial primary key,
     delegate_id int not null,
     debate_id int not null,
-    opinion varchar(255),
+    opinion varchar(255) default 'none',
     spoken_text text,
-    duration_in_seconds int,
+    summarized_spoken_text text,
+    duration_in_seconds int not null,
     ty varchar(40),
     delegate_display_name varchar(255) not null,
     FOREIGN KEY (debate_id) REFERENCES debates(id),
     FOREIGN KEY (delegate_id) REFERENCES delegates(id),
-    UNIQUE (delegate_id, debate_id, opinion, duration_in_seconds, ty)
+    UNIQUE (delegate_id, debate_id, duration_in_seconds, ty)
 );
 
 -- index is too large for speech text

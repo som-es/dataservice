@@ -199,7 +199,7 @@ async fn insert_plenar_speech(
         r#"
         INSERT INTO plenar_speeches (delegate_id, debate_id, opinion, spoken_text, duration_in_seconds, ty, delegate_display_name)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
-        ON CONFLICT (debate_id, delegate_id, opinion, duration_in_seconds, ty)
+        ON CONFLICT (debate_id, delegate_id, duration_in_seconds, ty)
         DO UPDATE SET
             opinion = EXCLUDED.opinion,
             -- spoken_text = EXCLUDED.spoken_text, -- setting this to None on conflict results in fluctuating none counts etc
