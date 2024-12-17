@@ -275,11 +275,10 @@ async fn insert_plenar_speech(
             r#"
                     UPDATE plenar_speeches
                     SET spoken_text = $1
-                    WHERE debate_id = $2 AND delegate_id = $3
+                    WHERE id = $2 
                     "#,
             updated_spoken_text,
-            val_debate_id,
-            plenar_speech.speech.delegate_id as i32
+            plenar_speech_id,
         )
         .execute(pool)
         .await?;
