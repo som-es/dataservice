@@ -301,7 +301,7 @@ pub async fn insert_mandate(
         start_date: mandate.start,
         end_date: mandate.end,
         is_nr: name_lowercase.contains("abgeordnete"),
-        is_gov_official: name_lowercase.contains("minister"),
+        is_gov_official: name_lowercase.contains("minister") || name_lowercase.contains("kanzler"),
     };
 
     sqlx::query!(
