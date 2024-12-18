@@ -93,7 +93,7 @@ async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<Legislative
 
     let mut handles = vec![];
     for gp in GPS {
-        if !only_latest && gp == LATEST_GP {
+        if only_latest && gp != LATEST_GP {
             continue;
         }
         let pg_pool = pg_pool.clone();
