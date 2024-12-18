@@ -511,7 +511,10 @@ async fn insert_all_serially() {
 
 #[cfg(test)]
 mod tests {
+    use std::{collections::HashSet, io::Read};
+
     use chrono::NaiveDateTime;
+    use rand::Rng;
     use somes_scraper::{AustriaScraper, TextExtractor};
 
     use crate::connect_pg;
@@ -520,5 +523,40 @@ mod tests {
     fn test_date_time_parse() {
         let x = NaiveDateTime::parse_from_str("2014-5-17T12:34:56", "%Y-%m-%dT%H:%M:%S").unwrap();
         println!("x: {x:?}");
+    }
+
+    #[tokio::test]
+    async fn test_duplicate_speeches() {
+        let pool = connect_pg().await;
+
+        println!("stating selecting");
+        let speeches = sqlx::query!("select * from plenar_speeches").fetch_all(&pool).await.unwrap();
+        println!("finished selecting speeches");
+
+        let mut unique_speeches = HashSet::new();
+        for speech in &speeches {
+            if let Some(spoken_text) = &speech.spoken_text {
+                if !unique_speeches.insert(spoken_text) {
+                    // println!("speech: {speech:?}");
+                }
+            }
+        }
+
+        let mut rng = rand::thread_rng();
+        loop {
+            let idx = rng.gen_range(0..speeches.len());
+            let speech = &speeches[idx];
+            println!();
+            println!("speech: {}", speech.spoken_text.clone().unwrap_or("".to_string()));
+            println!("{:?}", speech);
+
+            println!();
+
+            let mut input = String::new();
+            std::io::stdin().read_to_string(&mut input).unwrap();
+            println!("input: {input}")
+        }
+        
+
     }
 }
