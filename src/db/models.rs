@@ -123,12 +123,11 @@ pub struct DbMinistrialProposalQuery {
     pub created_at: NaiveDateTime,
     pub updated_at: Option<NaiveDateTime>,
     pub due_to: NaiveDate,
-    pub ressort: String,
-    pub ressort_shortform: String,
-    pub legis_init_gp: String,
-    pub legis_init_inr: i32,
-    pub legis_init_ityp: String,
-    pub plenary_session_id: Option<i32>,
+    pub ressort: Option<String>,
+    pub ressort_shortform: Option<String>,
+    pub legis_init_gp: Option<String>,
+    pub legis_init_inr: Option<i32>,
+    pub legis_init_ityp: Option<String>,
 }
 use sqlx::FromRow;
 

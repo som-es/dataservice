@@ -8,7 +8,7 @@ create table ministrial_issuer (
     FOREIGN KEY (ministrial_proposal_id) REFERENCES ministrial_proposals(id)
 );
 
-CREATE TABLE delegate_scores (
+CREATE TABLE division_interest_score (
     id SERIAL PRIMARY KEY,
     timestamp TIMESTAMP DEFAULT NOW(), 
     score REAL NOT NULL,
