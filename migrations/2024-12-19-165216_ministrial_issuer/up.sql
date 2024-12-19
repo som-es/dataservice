@@ -2,10 +2,10 @@
 create table ministrial_issuer (
     id serial primary key,
     delegate_id int not null,
-    ministrial_proposal int not null,
-    unique (delegate_id, ministrial_proposal),
+    ministrial_proposal_id int not null,
+    unique (delegate_id, ministrial_proposal_id),
     FOREIGN KEY (delegate_id) REFERENCES delegates(id),
-    FOREIGN KEY (ministrial_proposal) REFERENCES ministrial_proposals(id)
+    FOREIGN KEY (ministrial_proposal_id) REFERENCES ministrial_proposals(id)
 );
 
 CREATE TABLE delegate_scores (

@@ -115,6 +115,21 @@ pub async fn update_ministrial_proposals_in_db2(
             log::info!("{i} insertion dur: {:?}", start.elapsed());
         }
 
+        for issuer_id in &ministrial_prop.delegate_ids {
+            sqlx::query!(
+                r#"
+                INSERT INTO ministrial_issuer (delegate_id, ministrial_proposal_id)
+                VALUES ($1, $2)
+                ON CONFLICT (ministrial_proposal_id, delegate_id)
+                DO NOTHING
+                "#,
+                *issuer_id as i32,
+                ministrial_prop_id
+            )
+            .execute(pool)
+            .await?;
+        }
+
         // Insert or update topics
         for topic in &ministrial_prop.topics {
             sqlx::query!(
