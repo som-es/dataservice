@@ -530,7 +530,10 @@ mod tests {
         let pool = connect_pg().await;
 
         println!("stating selecting");
-        let speeches = sqlx::query!("select * from plenar_speeches").fetch_all(&pool).await.unwrap();
+        let speeches = sqlx::query!("select * from plenar_speeches")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
         println!("finished selecting speeches");
 
         let mut unique_speeches = HashSet::new();
@@ -547,7 +550,10 @@ mod tests {
             let idx = rng.gen_range(0..speeches.len());
             let speech = &speeches[idx];
             println!();
-            println!("speech: {}", speech.spoken_text.clone().unwrap_or("".to_string()));
+            println!(
+                "speech: {}",
+                speech.spoken_text.clone().unwrap_or("".to_string())
+            );
             println!("{:?}", speech);
 
             println!();
@@ -556,7 +562,5 @@ mod tests {
             std::io::stdin().read_to_string(&mut input).unwrap();
             println!("input: {input}")
         }
-        
-
     }
 }
