@@ -8,7 +8,7 @@ pub mod shutdown;
 
 use std::{
     cell::{Cell, LazyCell, OnceCell},
-    future,
+    future, sync::Mutex,
 };
 
 use dotenv_codegen::dotenv;
@@ -47,23 +47,21 @@ pub fn today_and_time() -> chrono::NaiveDateTime {
 }
 
 // could use variable in main -> pass to services
-static mut PG_POOL: Option<PgPool> = None;
+static PG_POOL: Mutex<Option<PgPool>> = Mutex::new(None);
 
 pub async fn connect_pg() -> PgPool {
-    unsafe {
-        match PG_POOL.clone() {
-            Some(pg_pool) => pg_pool,
-            None => {
-                PG_POOL = PgPoolOptions::new()
-                    // pool sizes
-                    .max_connections(150)
-                    .connect(DATABASE_URL)
-                    .await
-                    .ok();
-                PG_POOL.clone().unwrap()
-            }
-        }
+    let mut pool = PG_POOL.lock().unwrap();
+    if let Some(pool) = (*pool).clone() {
+        return pool
     }
+
+    *pool = PgPoolOptions::new()
+        .max_connections(150)
+        .connect(DATABASE_URL)
+        .await
+        .ok();
+
+    (*pool).clone().unwrap()
 }
 
 pub async fn connect_pg2() -> PgPool {
