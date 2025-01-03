@@ -55,11 +55,12 @@ pub async fn connect_pg() -> PgPool {
         return pool
     }
 
-    *pool = PgPoolOptions::new()
+    *pool = pollster::block_on(PgPoolOptions::new()
         .max_connections(150)
-        .connect(DATABASE_URL)
-        .await
-        .ok();
+        .connect(DATABASE_URL)).ok();
+    // *pool = 
+    //     .await
+    //     .ok().clone();
 
     (*pool).clone().unwrap()
 }
