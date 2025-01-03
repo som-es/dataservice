@@ -27,8 +27,8 @@ rand = "0.8"
 
 [features]
 # default = ["runner", "parties"]
- default = ["runner", "legis_init_latest", "legis_init", "ministerial_latest", "ministerial", "proposals_latest", "proposals", "plenar", "parties"]
-# default = ["runner", "legis_init_latest"]
+#  default = ["runner", "legis_init_latest", "legis_init", "ministerial_latest", "ministerial", "proposals_latest", "proposals", "plenar", "parties"]
+default = ["runner", "plenar"]
 models = ["dotenvy", "chrono"]
 runner = ["models", "chrono", "reqwest", "simple_logger", "tokio", "log", "dotenvy"]
 utoipa = ["dep:utoipa"]
