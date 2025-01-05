@@ -11,6 +11,7 @@ create table political_answers(
     question_id int not null,
     delegate_id int not null,
     answer text not null,
+    stance_llm varchar(255) not null,
     FOREIGN KEY (delegate_id) REFERENCES delegates(id),
     FOREIGN KEY (question_id) REFERENCES political_questions(id)
 );
@@ -20,7 +21,8 @@ create table political_opinions(
     delegate_id int not null,
     question_id int not null,
     answer_id int not null,
-    opinion varchar(10) not null,
+    stance varchar(255) not null,
+    stance_acc float not null,
     strong_reference_score float not null,
     FOREIGN KEY (delegate_id) REFERENCES delegates(id),
     FOREIGN KEY (question_id) REFERENCES political_questions(id),
