@@ -1,5 +1,6 @@
 mod absence_matching;
 pub use absence_matching::*;
+use chrono::NaiveDate;
 mod match_delegates_with_name;
 mod voted_by_name_result;
 
@@ -20,9 +21,22 @@ use crate::{
         DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote,
     },
     services::scrape_untill_success,
-    with_data::all_parties_at_gp,
+    with_data::{all_parties_at_date, all_parties_at_gp},
     Shutdown, GPS, LATEST_GP,
 };
+
+pub async fn gen_code_to_parties_with_date(pool: &PgPool, date: &NaiveDate, gp: &str) -> HashMap<String, Party> {
+    all_parties_at_date(pool, date, gp)
+        .await
+        .map_err(|e| {
+            log::error!("all parties for gp error in legis init: {e:?}");
+            e
+        })
+        .unwrap_or_default()
+        .into_iter()
+        .map(|party| (party.code.clone(), party))
+        .collect::<HashMap<String, Party>>()
+}
 
 pub async fn gen_code_to_parties(pool: &PgPool, gp: &str) -> HashMap<String, Party> {
     all_parties_at_gp(pool, gp)
@@ -48,7 +62,7 @@ pub async fn scrape_new_legis_inits(
     const MAX_TASKS: usize = 2;
     let mut handles: Vec<tokio::task::JoinHandle<()>> = vec![];
 
-    let code_to_parties = Arc::new(gen_code_to_parties(pool, gp).await);
+    // let code_to_parties = Arc::new(gen_code_to_parties(pool, gp).await);
 
     log::info!("Fetching and inserting ({gp}) now.");
     let mut info_print_counter = 0;
@@ -56,7 +70,7 @@ pub async fn scrape_new_legis_inits(
         let legis_init_path = legis_init_path.clone();
         let scraper = scraper.clone();
         let pool = pool.clone();
-        let code_to_parties = code_to_parties.clone();
+        // let code_to_parties = code_to_parties.clone();
 
         if handles.len() > MAX_TASKS {
             if info_print_counter % 16 == 0 {
@@ -80,6 +94,7 @@ pub async fn scrape_new_legis_inits(
                 return;
             };
 
+            let code_to_parties = Arc::new(gen_code_to_parties_with_date(&pool, &legis_init.date, &legis_init.gp).await);
             update_legis_inits_in_db(&pool, code_to_parties, &[legis_init]).await;
             // new_legis_inits.push(legis_init);
         }));
@@ -683,10 +698,13 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown) {
 mod tests {
     use std::sync::Arc;
 
-    use chrono::NaiveDateTime;
+    use chrono::{NaiveDate, NaiveDateTime};
     use somes_scraper::{legis_init::LegislativeInitiatives, AustriaScraper};
+    use sqlx::postgres::PgPoolOptions;
 
-    use crate::{connect_pg, legislative_initiatives::gen_code_to_parties};
+    use crate::{connect_pg, legislative_initiatives::gen_code_to_parties, DATABASE_URL};
+
+    use super::gen_code_to_parties_with_date;
 
     #[test]
     fn test_date_time_parse() {
@@ -713,13 +731,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_legis_init_empty_gp_scrape_xxvi_a_110() {
-        let mut scraper: AustriaScraper = AustriaScraper::default();
-        let res = scraper
-            .get_legis_init("/gegenstand/XXVI/A/238")
-            .await
-            .unwrap();
+        // let mut scraper: AustriaScraper = AustriaScraper::default();
+        // let res = scraper
+        //     .get_legis_init("/gegenstand/XXVI/A/238")
+        //     .await
+        //     .unwrap();
 
-        let pool = connect_pg().await;
+        // let pool = pollster::block_on(connect_pg());
+        let pool = PgPoolOptions::new()
+        .max_connections(150)
+        .connect(DATABASE_URL).await.unwrap();
+        println!("ppoll");
+
+        // let date = "18.05.2016";
+        let date = NaiveDate::from_ymd_opt(2013, 11, 18).unwrap();
+        let parties = gen_code_to_parties_with_date(&pool, &date, "XXV").await;
+        println!("{parties:?}") ;
+
         // crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], "XXVI").await;
 
         // println!("s: {:?}", scraper.scrape_info.gp);
