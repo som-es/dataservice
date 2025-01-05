@@ -12,6 +12,7 @@ create table political_answers(
     delegate_id int not null,
     answer text not null,
     stance_llm varchar(255) not null,
+    is_strong_reference boolean,
     FOREIGN KEY (delegate_id) REFERENCES delegates(id),
     FOREIGN KEY (question_id) REFERENCES political_questions(id)
 );
