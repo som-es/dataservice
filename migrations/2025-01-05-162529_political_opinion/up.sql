@@ -2,8 +2,8 @@
 create table political_questions(
     id serial primary key,
     question text not null,
-    is_left boolean not null,
-    is_liberal boolean not null
+    is_left boolean,
+    is_liberal boolean
 );
 
 create table political_answers(
