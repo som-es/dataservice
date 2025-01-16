@@ -10,7 +10,7 @@ create table political_questions(
 create table political_answers(
     id serial primary key,
     question_id int not null,
-    delegate_id int not null,
+    delegate_id int,
     answer text not null,
     stance_llm varchar(255) not null,
     is_strong_reference boolean,
