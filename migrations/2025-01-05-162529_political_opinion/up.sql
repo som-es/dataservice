@@ -16,7 +16,8 @@ create table political_answers(
     is_strong_reference boolean,
     model_used varchar(255),
     FOREIGN KEY (delegate_id) REFERENCES delegates(id),
-    FOREIGN KEY (question_id) REFERENCES political_questions(id)
+    FOREIGN KEY (question_id) REFERENCES political_questions(id),
+    UNIQUE(is_strong_reference, question_id)
 );
 
 create table political_opinions(
