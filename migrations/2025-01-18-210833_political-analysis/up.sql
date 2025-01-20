@@ -7,5 +7,6 @@ create table political_positions(
     is_liberal float not null,
     is_not_liberal float not null,
     neutral_count int not null,
+    UNIQUE(delegate_id),
     FOREIGN KEY (delegate_id) REFERENCES delegates(id)
 )

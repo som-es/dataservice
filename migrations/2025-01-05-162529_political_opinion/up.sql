@@ -27,8 +27,11 @@ create table political_opinions(
     answer_id int not null,
     stance varchar(255) not null,
     stance_acc float not null,
-    strong_reference_score float not null,
+    pro_strong_ref_score float not null,
+    contra_strong_ref_score float not null,
+    ref_score float not null,
     FOREIGN KEY (delegate_id) REFERENCES delegates(id),
     FOREIGN KEY (question_id) REFERENCES political_questions(id),
-    FOREIGN KEY (answer_id) REFERENCES political_answers(id)
+    FOREIGN KEY (answer_id) REFERENCES political_answers(id),
+    unique(delegate_id, question_id, answer_id)
 );
