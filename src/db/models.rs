@@ -113,6 +113,7 @@ pub struct DbMinistrialProposal {
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 // #[diesel(table_name = ministrial_proposals)]
 pub struct DbMinistrialProposalQuery {
+    pub delegate_id: i32,
     pub id: i32,
     pub ityp: String,
     pub gp: String,
