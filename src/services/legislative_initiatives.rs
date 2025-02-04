@@ -25,7 +25,11 @@ use crate::{
     Shutdown, GPS, LATEST_GP,
 };
 
-pub async fn gen_code_to_parties_with_date(pool: &PgPool, date: &NaiveDate, gp: &str) -> HashMap<String, Party> {
+pub async fn gen_code_to_parties_with_date(
+    pool: &PgPool,
+    date: &NaiveDate,
+    gp: &str,
+) -> HashMap<String, Party> {
     all_parties_at_date(pool, date, gp)
         .await
         .map_err(|e| {
@@ -94,7 +98,9 @@ pub async fn scrape_new_legis_inits(
                 return;
             };
 
-            let code_to_parties = Arc::new(gen_code_to_parties_with_date(&pool, &legis_init.date, &legis_init.gp).await);
+            let code_to_parties = Arc::new(
+                gen_code_to_parties_with_date(&pool, &legis_init.date, &legis_init.gp).await,
+            );
             update_legis_inits_in_db(&pool, code_to_parties, &[legis_init]).await;
             // new_legis_inits.push(legis_init);
         }));
@@ -739,14 +745,16 @@ mod tests {
 
         // let pool = pollster::block_on(connect_pg());
         let pool = PgPoolOptions::new()
-        .max_connections(150)
-        .connect(DATABASE_URL).await.unwrap();
+            .max_connections(150)
+            .connect(DATABASE_URL)
+            .await
+            .unwrap();
         println!("ppoll");
 
         // let date = "18.05.2016";
         let date = NaiveDate::from_ymd_opt(2013, 11, 18).unwrap();
         let parties = gen_code_to_parties_with_date(&pool, &date, "XXV").await;
-        println!("{parties:?}") ;
+        println!("{parties:?}");
 
         // crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], "XXVI").await;
 

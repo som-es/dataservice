@@ -8,7 +8,8 @@ pub mod shutdown;
 
 use std::{
     cell::{Cell, LazyCell, OnceCell},
-    future, sync::Mutex,
+    future,
+    sync::Mutex,
 };
 
 use dotenv_codegen::dotenv;
@@ -52,13 +53,16 @@ static PG_POOL: Mutex<Option<PgPool>> = Mutex::new(None);
 pub async fn connect_pg() -> PgPool {
     let mut pool = PG_POOL.lock().unwrap();
     if let Some(pool) = (*pool).clone() {
-        return pool
+        return pool;
     }
 
-    *pool = pollster::block_on(PgPoolOptions::new()
-        .max_connections(150)
-        .connect(DATABASE_URL)).ok();
-    // *pool = 
+    *pool = pollster::block_on(
+        PgPoolOptions::new()
+            .max_connections(150)
+            .connect(DATABASE_URL),
+    )
+    .ok();
+    // *pool =
     //     .await
     //     .ok().clone();
 
