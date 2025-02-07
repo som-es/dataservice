@@ -1,3 +1,5 @@
+use std::thread::JoinHandle;
+
 use crate::{
     connect_pg, legislative_initiatives::absence_matching, services::scrape_untill_success,
     Shutdown, GPS,
@@ -29,46 +31,56 @@ async fn scrape_new_plenar_infos(scraper: &AustriaScraper) -> crate::Result<Vec<
 async fn plenar_info_once(pg_pool: &PgPool) {
     log::info!("Try scraping plenar info");
 
+    let tok_handle = Handle::current();
+
     let mut handles = vec![];
 
     for gp in GPS {
         let pg_pool = pg_pool.clone();
+        let tok_handle = tok_handle.clone();
 
-        handles.push(tokio::task::spawn(async move {
-            let mut scraper = AustriaScraper::default();
-            log::info!("PLENAR info once GP: {gp}");
-            scraper.scrape_info.gp = vec![gp.into()];
+        // tokio::task::spawn_local(future)
+        handles.push(std::thread::spawn(move || {
+            tok_handle.block_on(async move {
+                let mut scraper = AustriaScraper::default();
+                log::info!("PLENAR info once GP: {gp}");
+                scraper.scrape_info.gp = vec![gp.into()];
 
-            let new_plenar_infos = scrape_untill_success::<Vec<PlenarInfo>, _>(|| async {
-                scrape_new_plenar_infos(&scraper).await
-            })
-            .await;
+                let new_plenar_infos = scrape_untill_success::<Vec<PlenarInfo>, _>(|| async {
+                    scrape_new_plenar_infos(&scraper).await
+                })
+                .await;
 
-            let mut handles = vec![];
+                let mut handles: Vec<JoinHandle<()>> = vec![];
 
-            for plenar_info in new_plenar_infos.into_iter() {
-                if handles.len() > 32 {
-                    log::info!("awaiting 32 plenar handles");
-                    for handle in handles.drain(..) {
-                        if let Err(e) = handle.await {
-                            log::error!("could not await plenar info handle: {e:?}");
+                for plenar_info in new_plenar_infos.into_iter() {
+                    if handles.len() > 32 {
+                        log::info!("awaiting 32 plenar handles");
+                        for handle in handles.drain(..) {
+                            if let Err(e) = handle.join() {
+                                log::error!("could not await plenar info handle: {e:?}");
+                            }
                         }
                     }
+                    let pg_pool = pg_pool.clone();
+
+                    let tok_handle = Handle::current();
+                    handles.push(std::thread::spawn(move || {
+                        tok_handle.block_on(async move {
+                            update_plenar_infos_in_db(&[plenar_info], &pg_pool).await;
+                        })
+                    }));
                 }
-                let pg_pool = pg_pool.clone();
-                handles.push(tokio::task::spawn(async move {
-                    update_plenar_infos_in_db(&[plenar_info], &pg_pool).await;
-                }));
-            }
-            for handle in handles.drain(..) {
-                if let Err(e) = handle.await {
-                    log::error!("could not await plenar info handle: {e:?}");
+                for handle in handles.drain(..) {
+                    if let Err(e) = handle.join() {
+                        log::error!("could not await plenar info handle: {e:?}");
+                    }
                 }
-            }
+            })
         }));
     }
     for handle in handles.drain(..) {
-        if let Err(e) = handle.await {
+        if let Err(e) = handle.join() {
             log::error!("could not await plenar info handle: {e:?}");
         }
     }
@@ -160,6 +172,7 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
 
 use log::{info, warn};
 use sqlx::PgPool;
+use tokio::runtime::{Handle, Runtime};
 
 static mut NO_OPINION_COUNT: usize = 0;
 
