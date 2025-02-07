@@ -6,7 +6,7 @@ use crate::{
 };
 use somes_scraper::{
     call_to_order::CallToOrderInfo,
-    plenar::{self, Debate, Plenar, PlenarInfo},
+    plenar::{self, Debate, DebateInfo, Plenar, PlenarInfo},
     AustriaScraper, PlenarSpeech, Scraper, TextExtractor,
 };
 
@@ -125,9 +125,14 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
             };
 
             for plenar_speech in &debate.speeches {
-                if let Err(e) =
-                    insert_plenar_speech(pg_pool, plenar_speech, debate_id, &mut text_extractor)
-                        .await
+                if let Err(e) = insert_plenar_speech(
+                    pg_pool,
+                    plenar_speech,
+                    &debate.info,
+                    debate_id,
+                    &mut text_extractor,
+                )
+                .await
                 {
                     log::warn!(
                         "Error inserting plenar speech: '{e}'. Error occured for plenar speech: {plenar_speech:?}"
@@ -179,6 +184,7 @@ static mut NO_OPINION_COUNT: usize = 0;
 async fn insert_plenar_speech(
     pool: &PgPool,
     plenar_speech: &PlenarSpeech,
+    corresponding_debate: &DebateInfo,
     val_debate_id: i32,
     text_extractor: &mut TextExtractor,
 ) -> Result<(), sqlx::Error> {
@@ -231,6 +237,27 @@ async fn insert_plenar_speech(
     .fetch_one(pool)
     .await?
     .id;
+
+    for reference in &corresponding_debate.references {
+        let legis_init_id = if let Ok(x) = sqlx::query!(
+            "select id from legislative_initiatives where gp = $1 and ityp = $2 and inr = $3",
+            reference.legis_gp,
+            reference.legis_ityp,
+            reference.legis_inr
+        )
+        .fetch_one(pool)
+        .await
+        {
+            Some(x.id)
+        } else {
+            None
+        };
+        sqlx::query!("
+            insert into 
+                plenar_speech_legis_inits (gp, ityp, inr, speech_id, legis_init_id) 
+            values ($1, $2, $3, $4, $5) 
+            on conflict (gp, ityp, inr, speech_id) do update set legis_init_id = EXCLUDED.legis_init_id", reference.legis_gp, reference.legis_ityp, reference.legis_inr, plenar_speech_id, legis_init_id).execute(pool).await?;
+    }
 
     for url in &plenar_speech.speech.spoken_text_html_urls {
         sqlx::query!(
@@ -317,7 +344,7 @@ async fn insert_debate(pool: &PgPool, debate: &Debate, plenar_id: i32) -> Result
         RETURNING id
         "#,
         plenar_id,
-        debate.about
+        debate.info.about
     )
     .fetch_one(pool)
     .await?;
@@ -470,6 +497,7 @@ async fn insert_all_serially() {
                     if let Err(e) = insert_plenar_speech(
                         &pg_pool,
                         plenar_speech,
+                        &debate.info,
                         debate_id,
                         &mut text_extractor,
                     )
