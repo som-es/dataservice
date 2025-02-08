@@ -9,7 +9,7 @@ use somes_scraper::{
     legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative, Opinion, Party,
     ProContra,
 };
-use sqlx::PgPool;
+use sqlx::{postgres::PgQueryResult, PgPool};
 use std::{collections::HashMap, sync::Arc};
 use voted_by_name_result::{insert_named_vote_info, insert_named_votes};
 
@@ -304,6 +304,12 @@ pub async fn update_legis_inits_in_db(
             }
         };
 
+        for reference in legis_init.references.as_ref().unwrap_or(&vec![]) {
+            if let Err(e) = insert_reference(pool, reference, legis_init_id).await {
+                log::error!("Could not insert reference for legis init {legis_init_id}: {e:?}");
+            }
+        }
+
         for vote in &legis_init.votes {
             let db_vote = DbVote {
                 party: vote.party.name.clone(),
@@ -569,6 +575,14 @@ pub async fn update_legis_inits_in_db(
             }
         }
     }
+}
+
+async fn insert_reference(
+    pool: &sqlx::Pool<sqlx::Postgres>,
+    reference: &somes_scraper::Reference,
+    legislative_initiatives_id: i32,
+) -> sqlx::Result<PgQueryResult> {
+    sqlx::query!("insert into legis_inits_refs (origin_legis_init_id, ref_gp, ref_ityp, ref_inr) values ($1, $2, $3, $4)", legislative_initiatives_id, reference.gp, reference.ityp, reference.inr as i32).execute(pool).await
 }
 
 pub async fn insert_vote(pool: &PgPool, db_vote: DbVote) {

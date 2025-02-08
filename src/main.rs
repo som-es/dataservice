@@ -3,7 +3,7 @@ use sqlx::{pool, postgres::PgPoolOptions, PgPool};
 use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 128)]
+#[tokio::main(flavor = "multi_thread", worker_threads = 1024)]
 async fn main() {
     simple_logger::init_with_level(log::Level::Info).unwrap();
     // tokio::join!(services::proposals::run(),);

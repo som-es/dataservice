@@ -240,9 +240,9 @@ async fn insert_plenar_speech(
     for reference in &corresponding_debate.references {
         let legis_init_id = if let Ok(x) = sqlx::query!(
             "select id from legislative_initiatives where gp = $1 and ityp = $2 and inr = $3",
-            reference.legis_gp,
-            reference.legis_ityp,
-            reference.legis_inr
+            reference.gp,
+            reference.ityp,
+            reference.inr as i32
         )
         .fetch_one(pool)
         .await
@@ -255,7 +255,7 @@ async fn insert_plenar_speech(
             insert into 
                 plenar_speech_legis_inits (gp, ityp, inr, speech_id, legis_init_id) 
             values ($1, $2, $3, $4, $5) 
-            on conflict (gp, ityp, inr, speech_id) do update set legis_init_id = EXCLUDED.legis_init_id", reference.legis_gp, reference.legis_ityp, reference.legis_inr, plenar_speech_id, legis_init_id).execute(pool).await?;
+            on conflict (gp, ityp, inr, speech_id) do update set legis_init_id = EXCLUDED.legis_init_id", reference.gp, reference.ityp, reference.inr as i32, plenar_speech_id, legis_init_id).execute(pool).await?;
     }
 
     for url in &plenar_speech.speech.spoken_text_html_urls {
