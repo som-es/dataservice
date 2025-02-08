@@ -64,7 +64,7 @@ pub async fn scrape_new_legis_inits(
     let legis_inits = scraper.post_legis_payload().await?;
     let legis_init_paths = scraper.legis_paths(legis_inits)?;
 
-    const MAX_TASKS: usize = 2;
+    const MAX_TASKS: usize = 32;
     let mut handles: Vec<tokio::task::JoinHandle<()>> = vec![];
 
     // let code_to_parties = Arc::new(gen_code_to_parties(pool, gp).await);
@@ -121,61 +121,63 @@ async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<Legislative
             continue;
         }
         let pg_pool = pg_pool.clone();
-        let handle = tokio::spawn(async move {
-            let mut scraper = AustriaScraper::default();
-            log::info!("LEGIS INIT once GP: {gp}");
-            scraper.scrape_info.gp = vec![gp.into()];
-            let scraper = Arc::new(scraper);
+        let handle = tokio::task::spawn_blocking(move || {
+            Handle::current().block_on(async move {
+                let mut scraper = AustriaScraper::default();
+                log::info!("LEGIS INIT once GP: {gp}");
+                scraper.scrape_info.gp = vec![gp.into()];
+                let scraper = Arc::new(scraper);
 
-            if let Err(e) = scrape_new_legis_inits(&pg_pool, scraper.clone(), gp).await {
-                log::error!("could not scrape and insert legis inits: {e}");
-            }
-            // scrape_untill_success::<Vec<LegislativeInitiative>, _>(|| async {
-            //     scrape_new_legis_inits(&pg_pool, scraper.clone(), gp).await
-            // })
-            // .await;
+                if let Err(e) = scrape_new_legis_inits(&pg_pool, scraper.clone(), gp).await {
+                    log::error!("could not scrape and insert legis inits: {e}");
+                }
+                // scrape_untill_success::<Vec<LegislativeInitiative>, _>(|| async {
+                //     scrape_new_legis_inits(&pg_pool, scraper.clone(), gp).await
+                // })
+                // .await;
 
-            log::info!("finished scraping LEGIS INIT once GP: {gp}");
+                log::info!("finished scraping LEGIS INIT once GP: {gp}");
 
-            // let work_size = new_legis_inits.len() / 4;
+                // let work_size = new_legis_inits.len() / 4;
 
-            // if new_legis_inits.len() >= 16 {
-            //     let mut handles = vec![];
+                // if new_legis_inits.len() >= 16 {
+                //     let mut handles = vec![];
 
-            //     let batch1 = new_legis_inits[0..work_size].to_vec();
-            //     let pg_pool1 = pg_pool.clone();
-            //     handles.push(tokio::spawn(async move {
-            //         log::info!("Updating batch1");
-            //         update_legis_inits_in_db(&pg_pool1, &batch1, gp).await;
-            //     }));
+                //     let batch1 = new_legis_inits[0..work_size].to_vec();
+                //     let pg_pool1 = pg_pool.clone();
+                //     handles.push(tokio::spawn(async move {
+                //         log::info!("Updating batch1");
+                //         update_legis_inits_in_db(&pg_pool1, &batch1, gp).await;
+                //     }));
 
-            //     let batch2 = new_legis_inits[work_size..work_size * 2].to_vec();
-            //     let pg_pool2 = pg_pool.clone();
-            //     handles.push(tokio::spawn(async move {
-            //         log::info!("Updating batch2");
-            //         update_legis_inits_in_db(&pg_pool2, &batch2, gp).await;
-            //     }));
+                //     let batch2 = new_legis_inits[work_size..work_size * 2].to_vec();
+                //     let pg_pool2 = pg_pool.clone();
+                //     handles.push(tokio::spawn(async move {
+                //         log::info!("Updating batch2");
+                //         update_legis_inits_in_db(&pg_pool2, &batch2, gp).await;
+                //     }));
 
-            //     let batch3 = new_legis_inits[work_size * 2..work_size * 3].to_vec();
-            //     let pg_pool3 = pg_pool.clone();
-            //     handles.push(tokio::spawn(async move {
-            //         log::info!("Updating batch3");
-            //         update_legis_inits_in_db(&pg_pool3, &batch3, gp).await;
-            //     }));
+                //     let batch3 = new_legis_inits[work_size * 2..work_size * 3].to_vec();
+                //     let pg_pool3 = pg_pool.clone();
+                //     handles.push(tokio::spawn(async move {
+                //         log::info!("Updating batch3");
+                //         update_legis_inits_in_db(&pg_pool3, &batch3, gp).await;
+                //     }));
 
-            //     let batch4 = new_legis_inits[work_size * 3..].to_vec();
-            //     let pg_pool4 = pg_pool.clone();
+                //     let batch4 = new_legis_inits[work_size * 3..].to_vec();
+                //     let pg_pool4 = pg_pool.clone();
 
-            //     log::info!("Updating batch4");
-            //     update_legis_inits_in_db(&pg_pool4, &batch4, gp).await;
-            //     for handle in handles {
-            //         if let Err(e) = handle.await {
-            //             log::error!("join error batching: {e:?}");
-            //         }
-            //     }
-            // } else {
-            //     update_legis_inits_in_db(&pg_pool, &new_legis_inits, gp).await;
-            // }
+                //     log::info!("Updating batch4");
+                //     update_legis_inits_in_db(&pg_pool4, &batch4, gp).await;
+                //     for handle in handles {
+                //         if let Err(e) = handle.await {
+                //             log::error!("join error batching: {e:?}");
+                //         }
+                //     }
+                // } else {
+                //     update_legis_inits_in_db(&pg_pool, &new_legis_inits, gp).await;
+                // }
+            })
         });
         handles.push(handle);
         if only_latest {
