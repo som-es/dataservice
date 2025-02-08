@@ -1,6 +1,7 @@
 mod absence_matching;
 pub use absence_matching::*;
 use chrono::NaiveDate;
+use tokio::runtime::Handle;
 mod match_delegates_with_name;
 mod voted_by_name_result;
 
@@ -88,21 +89,23 @@ pub async fn scrape_new_legis_inits(
             info_print_counter += 1;
         }
 
-        handles.push(tokio::spawn(async move {
-            // skipping legis inits that can't be processed right now
-            // mainly many I and A
-            // https://www.parlament.gv.at/gegenstand/XXVII/I/1494
-            // https://www.parlament.gv.at/gegenstand/XXVII/A/2686
-            let Ok(legis_init) = scraper.get_legis_init(&legis_init_path).await else {
-                log::debug!("Cannot process legislative initiative: '{legis_init_path}'");
-                return;
-            };
+        handles.push(tokio::task::spawn_blocking(move || {
+            Handle::current().block_on(async move {
+                // skipping legis inits that can't be processed right now
+                // mainly many I and A
+                // https://www.parlament.gv.at/gegenstand/XXVII/I/1494
+                // https://www.parlament.gv.at/gegenstand/XXVII/A/2686
+                let Ok(legis_init) = scraper.get_legis_init(&legis_init_path).await else {
+                    log::debug!("Cannot process legislative initiative: '{legis_init_path}'");
+                    return;
+                };
 
-            let code_to_parties = Arc::new(
-                gen_code_to_parties_with_date(&pool, &legis_init.date, &legis_init.gp).await,
-            );
-            update_legis_inits_in_db(&pool, code_to_parties, &[legis_init]).await;
-            // new_legis_inits.push(legis_init);
+                let code_to_parties = Arc::new(
+                    gen_code_to_parties_with_date(&pool, &legis_init.date, &legis_init.gp).await,
+                );
+                update_legis_inits_in_db(&pool, code_to_parties, &[legis_init]).await;
+                // new_legis_inits.push(legis_init);
+            })
         }));
     }
 
