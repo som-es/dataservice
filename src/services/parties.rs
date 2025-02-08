@@ -1,6 +1,6 @@
 use somes_scraper::{parties::Parties, AustriaScraper, Party};
 
-use crate::{connect_pg, scrape_untill_success, Shutdown, GPS};
+use crate::{scrape_untill_success, Shutdown, GPS};
 
 use sqlx::PgPool;
 
@@ -44,7 +44,7 @@ pub async fn parties_once(pg_pool: &PgPool) {
     }
 }
 
-pub async fn run_shut(mut shutdown: Shutdown) {
+pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool) {
     let party_sleep = std::env::var("PARTY_SLEEP")
         .unwrap_or_else(|_| "10000".to_string())
         .parse()
@@ -64,12 +64,12 @@ pub async fn run_shut(mut shutdown: Shutdown) {
                 break;
             }
             _ = async {
+                let pg_pool = pg_pool.clone();
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting party scraper");
                 }).await {
                     log::error!("Error in party scraper: {:?}", e);
                 }
-                let pg_pool = connect_pg().await;
                 parties_once(&pg_pool).await;
                 log::info!("Party scraper service sleeps for {party_sleep} seconds...");
                 tokio::time::sleep(tokio::time::Duration::from_secs(party_sleep)).await;

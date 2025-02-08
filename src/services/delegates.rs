@@ -4,7 +4,6 @@ use somes_scraper::{delegates::DelegateScraper, AustriaScraper, Delegate, Mandat
 use sqlx::{postgres::PgQueryResult, query, PgPool};
 
 use crate::{
-    connect_pg,
     models::{DbContact, DbDelegate, DbMandate},
     services::scrape_untill_success,
     Shutdown,
@@ -342,9 +341,7 @@ pub async fn insert_mandate(
     //     .execute(conn)
 }
 
-pub async fn delegates_once(prev_delegates: &HashSet<Delegate>) -> Vec<Delegate> {
-    let pg_pool = connect_pg().await;
-
+pub async fn delegates_once(prev_delegates: &HashSet<Delegate>, pg_pool: PgPool) -> Vec<Delegate> {
     log::info!("Scraping all delegates...");
 
     let new_delegates_bs =
@@ -369,7 +366,7 @@ pub async fn delegates_once(prev_delegates: &HashSet<Delegate>) -> Vec<Delegate>
     new_delegates
 }
 
-pub async fn run_shut(mut shutdown: Shutdown) {
+pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool) {
     let prev_delegates = HashSet::new();
 
     while !shutdown.is_shutdown() {
@@ -381,7 +378,7 @@ pub async fn run_shut(mut shutdown: Shutdown) {
             _ = async {
                 log::info!("Starting delegates scraper");
 
-                delegates_once(&prev_delegates).await;
+                delegates_once(&prev_delegates, pg_pool.clone()).await;
                 log::info!("Delegates scraper service sleeps for 3 hours");
                 tokio::time::sleep(tokio::time::Duration::from_secs(60 * 60 * 3)).await;
                 // prev_delegates.extend(delegates_once(&prev_delegates).await);

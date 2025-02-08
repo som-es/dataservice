@@ -1,12 +1,11 @@
 use std::thread::JoinHandle;
 
 use crate::{
-    connect_pg, legislative_initiatives::absence_matching, services::scrape_untill_success,
-    Shutdown, GPS,
+    legislative_initiatives::absence_matching, services::scrape_untill_success, Shutdown, GPS,
 };
 use somes_scraper::{
     call_to_order::CallToOrderInfo,
-    plenar::{self, Debate, DebateInfo, Plenar, PlenarInfo},
+    plenar::{Debate, DebateInfo, Plenar, PlenarInfo},
     AustriaScraper, PlenarSpeech, Scraper, TextExtractor,
 };
 
@@ -400,7 +399,7 @@ pub async fn insert_call_to_order(
     Ok(())
 }
 
-pub async fn run_shut(mut shutdown: Shutdown) {
+pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool) {
     // insert_all_serially().await;
     // return;
     let plenar_sleep = std::env::var("PLENAR_SLEEP")
@@ -422,9 +421,9 @@ pub async fn run_shut(mut shutdown: Shutdown) {
                 break;
             }
             _ = async {
+                let pg_pool = pg_pool.clone();
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting plenar info scraper");
-                    let pg_pool = connect_pg().await;
                     plenar_info_once(&pg_pool).await;
                 }).await {
                     log::error!("Error in plenar info scraper: {:?}", e);
@@ -437,12 +436,10 @@ pub async fn run_shut(mut shutdown: Shutdown) {
     }
 }
 
-async fn insert_all_serially() {
+async fn insert_all_serially(pg_pool: PgPool) {
     let mut scraper = AustriaScraper::default();
 
     let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
-
-    let pg_pool = connect_pg().await;
 
     let mut yes = 0;
     let mut no = 0;

@@ -23,6 +23,7 @@ pub use db::*;
 #[cfg(feature = "runner")]
 pub use shutdown::*;
 use sqlx::{postgres::PgPoolOptions, PgPool};
+use tokio::runtime::Handle;
 
 pub mod with_data;
 
@@ -51,22 +52,11 @@ pub fn today_and_time() -> chrono::NaiveDateTime {
 static PG_POOL: Mutex<Option<PgPool>> = Mutex::new(None);
 
 pub async fn connect_pg() -> PgPool {
-    let mut pool = PG_POOL.lock().unwrap();
-    if let Some(pool) = (*pool).clone() {
-        return pool;
-    }
-
-    *pool = pollster::block_on(
-        PgPoolOptions::new()
-            .max_connections(150)
-            .connect(DATABASE_URL),
-    )
-    .ok();
-    // *pool =
-    //     .await
-    //     .ok().clone();
-
-    (*pool).clone().unwrap()
+    PgPoolOptions::new()
+        .max_connections(150)
+        .connect(DATABASE_URL)
+        .await
+        .unwrap()
 }
 
 pub async fn connect_pg2() -> PgPool {

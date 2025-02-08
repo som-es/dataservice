@@ -1,4 +1,4 @@
-use std::{sync::Arc, thread::JoinHandle};
+use std::sync::Arc;
 
 use dotenvy::dotenv;
 use log::error;
@@ -6,9 +6,9 @@ use somes_scraper::{
     proposals::{ProposalScraper, ProposalsPayload},
     AustriaScraper, Proposal,
 };
-use tokio::{sync::RwLock, time::Instant};
+use tokio::time::Instant;
 
-use crate::{connect_pg, Shutdown};
+use crate::Shutdown;
 
 use super::scrape_untill_success;
 
@@ -267,7 +267,7 @@ async fn proposals_once_last_5_days(pg_pool: &PgPool) {
         .unwrap();
 }
 
-pub async fn run_shut_last_5_days(mut shutdown: Shutdown) {
+pub async fn run_shut_last_5_days(mut shutdown: Shutdown, pool: PgPool) {
     dotenv().ok();
 
     let proposal_sleep = std::env::var("PROPOSAL_SLEEP")
@@ -287,7 +287,7 @@ pub async fn run_shut_last_5_days(mut shutdown: Shutdown) {
                 break;
             }
             _ = async {
-                let pg_pool = connect_pg().await;
+                let pg_pool = pool.clone();
                 proposals_once_last_5_days(&pg_pool).await;
                 log::info!("Sleeping for {proposal_sleep} seconds (last 5 days).");
                 tokio::time::sleep(tokio::time::Duration::from_secs(proposal_sleep)).await;
@@ -296,7 +296,7 @@ pub async fn run_shut_last_5_days(mut shutdown: Shutdown) {
     }
 }
 
-pub async fn run_shut(mut shutdown: Shutdown) {
+pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool) {
     dotenv().ok();
 
     let proposal_sleep_days = std::env::var("FULL_PROPOSAL_SLEEP")
@@ -316,7 +316,7 @@ pub async fn run_shut(mut shutdown: Shutdown) {
                 break;
             }
             _ = async {
-                let pg_pool = connect_pg().await;
+                let pg_pool = pg_pool.clone();
                 proposals_once(&pg_pool).await;
                 log::info!("Sleeping for {proposal_sleep} seconds.");
                 tokio::time::sleep(tokio::time::Duration::from_secs(proposal_sleep)).await;

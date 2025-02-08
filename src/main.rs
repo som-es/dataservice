@@ -1,5 +1,5 @@
-use dataservice::{connect_pg, delegates::delegate_count, services, Shutdown};
-use sqlx::PgPool;
+use dataservice::{connect_pg, delegates::delegate_count, services, Shutdown, DATABASE_URL};
+use sqlx::{pool, postgres::PgPoolOptions, PgPool};
 use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
 
@@ -16,44 +16,55 @@ async fn main() {
 }
 
 pub async fn run_services(state: &State) {
+    // let pool = connect_pg().await;
+
+    let pool = connect_pg().await;
     {
-        let pool = connect_pg().await;
         if delegate_count(&pool).await == Some(0) {
             log::info!("Delegates are 0, start scraping ...");
             let hs = std::collections::HashSet::new();
-            let _res = services::delegates::delegates_once(&hs).await;
+            let _res = services::delegates::delegates_once(&hs, pool.clone()).await;
         }
     }
 
     tokio::join!(
         // services::proposals::run(),
         tokio::spawn(services::legislative_initiatives::run_shut_every_gp(
-            Shutdown::new(state.notify_shutdown.subscribe())
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            pool.clone()
         )),
         tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
-            Shutdown::new(state.notify_shutdown.subscribe())
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            pool.clone()
         )),
         tokio::spawn(services::ministrial_proposals::run_shut_every_gp(
-            Shutdown::new(state.notify_shutdown.subscribe())
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            pool.clone(),
         )),
         tokio::spawn(services::ministrial_proposals::run_shut_latest_gp(
-            Shutdown::new(state.notify_shutdown.subscribe())
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            pool.clone()
         )),
-        tokio::spawn(services::proposals::run_shut(Shutdown::new(
-            state.notify_shutdown.subscribe()
-        ))),
-        tokio::spawn(services::proposals::run_shut_last_5_days(Shutdown::new(
-            state.notify_shutdown.subscribe()
-        ))),
-        tokio::spawn(services::plenar::run_shut(Shutdown::new(
-            state.notify_shutdown.subscribe()
-        ))),
-        tokio::spawn(services::delegates::run_shut(Shutdown::new(
-            state.notify_shutdown.subscribe()
-        ))),
-        tokio::spawn(services::parties::run_shut(Shutdown::new(
-            state.notify_shutdown.subscribe()
-        ))),
+        tokio::spawn(services::proposals::run_shut(
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            pool.clone()
+        )),
+        tokio::spawn(services::proposals::run_shut_last_5_days(
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            pool.clone()
+        )),
+        tokio::spawn(services::plenar::run_shut(
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            pool.clone()
+        )),
+        tokio::spawn(services::delegates::run_shut(
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            pool.clone()
+        )),
+        tokio::spawn(services::parties::run_shut(
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            pool.clone()
+        )),
     )
     .0
     .unwrap();

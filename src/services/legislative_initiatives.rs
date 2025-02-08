@@ -5,23 +5,19 @@ use tokio::runtime::Handle;
 mod match_delegates_with_name;
 mod voted_by_name_result;
 
-use std::{collections::HashMap, sync::Arc};
-
-use log::log;
 use somes_scraper::{
     legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative, Opinion, Party,
     ProContra,
 };
 use sqlx::PgPool;
+use std::{collections::HashMap, sync::Arc};
 use voted_by_name_result::{insert_named_vote_info, insert_named_votes};
 
 use crate::{
-    connect_pg,
     models::{
         DbEurovocTopicLegisInit, DbLegisDocument, DbLegislativeInitiative, DbNamedVoteInfo,
         DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote,
     },
-    services::scrape_untill_success,
     with_data::{all_parties_at_date, all_parties_at_gp},
     Shutdown, GPS, LATEST_GP,
 };
@@ -64,7 +60,7 @@ pub async fn scrape_new_legis_inits(
     let legis_inits = scraper.post_legis_payload().await?;
     let legis_init_paths = scraper.legis_paths(legis_inits)?;
 
-    const MAX_TASKS: usize = 32;
+    const MAX_TASKS: usize = 64;
     let mut handles: Vec<tokio::task::JoinHandle<()>> = vec![];
 
     // let code_to_parties = Arc::new(gen_code_to_parties(pool, gp).await);
@@ -638,7 +634,7 @@ pub async fn translate_votes(
     votes
 }
 
-pub async fn run_shut_latest_gp(mut shutdown: Shutdown) {
+pub async fn run_shut_latest_gp(mut shutdown: Shutdown, pg_pool: PgPool) {
     let legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP_LATEST")
         .unwrap_or_else(|_| "300".to_string())
         .parse()
@@ -658,10 +654,10 @@ pub async fn run_shut_latest_gp(mut shutdown: Shutdown) {
                 break;
             }
             _ = async {
+                let pg_pool = pg_pool.clone();
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative (latest) scraper");
 
-                    let pg_pool = connect_pg().await;
                     legis_init_once(true, &pg_pool).await;
                 }).await {
                     log::error!("Error in legislative initiative (latest) scraper: {:?}", e);
@@ -674,7 +670,7 @@ pub async fn run_shut_latest_gp(mut shutdown: Shutdown) {
     }
 }
 
-pub async fn run_shut_every_gp(mut shutdown: Shutdown) {
+pub async fn run_shut_every_gp(mut shutdown: Shutdown, pg_pool: PgPool) {
     let legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP")
         .unwrap_or_else(|_| "1000".to_string())
         .parse()
@@ -694,10 +690,10 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown) {
                 break;
             }
             _ = async {
+                let pg_pool = pg_pool.clone();
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative scraper");
 
-                    let pg_pool = connect_pg().await;
                     legis_init_once(false, &pg_pool).await;
                     log::info!("lol");
                 }).await {
@@ -825,7 +821,7 @@ mod tests {
     async fn test_legis_init_empty_gp_scrape_xxvii_a_4141() {
         let scraper: AustriaScraper = AustriaScraper::default();
         let res = scraper
-            .get_legis_init("/gegenstand/XXVII/A/4141")
+            .get_legis_init("/gegenstand/XXVII/I/1858")
             .await
             .unwrap();
 

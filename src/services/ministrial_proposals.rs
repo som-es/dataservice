@@ -5,7 +5,7 @@ use somes_scraper::{
 };
 use tokio::time::Instant;
 
-use crate::{connect_pg, services::scrape_untill_success, Shutdown, GPS};
+use crate::{services::scrape_untill_success, Shutdown, GPS};
 
 pub async fn scrape_new_ministrial_props(
     scraper: &AustriaScraper,
@@ -204,7 +204,7 @@ pub async fn update_ministrial_proposals_in_db2(
     Ok(())
 }
 
-pub async fn run_shut_latest_gp(mut shutdown: Shutdown) {
+pub async fn run_shut_latest_gp(mut shutdown: Shutdown, pg_pool: PgPool) {
     let legis_init_sleep = std::env::var("MINISTRIAL_PROPOSAL_LATEST_SLEEP")
         .unwrap_or_else(|_| "400".to_string())
         .parse()
@@ -223,9 +223,9 @@ pub async fn run_shut_latest_gp(mut shutdown: Shutdown) {
                 break;
             }
             _ = async {
+                let pg_pool = pg_pool.clone();
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting ministrial proposal (latest) scraper");
-                    let pg_pool = connect_pg().await;
                     ministrial_proposal_once(true, &pg_pool).await;
                 }).await {
                     log::error!("Error in ministrial proposal (latest) scraper: {:?}", e);
@@ -238,7 +238,7 @@ pub async fn run_shut_latest_gp(mut shutdown: Shutdown) {
     }
 }
 
-pub async fn run_shut_every_gp(mut shutdown: Shutdown) {
+pub async fn run_shut_every_gp(mut shutdown: Shutdown, pg_pool: PgPool) {
     let legis_init_sleep = std::env::var("MINISTRIAL_PROPOSAL_SLEEP")
         .unwrap_or_else(|_| "900".to_string())
         .parse()
@@ -258,10 +258,10 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown) {
                 break;
             }
             _ = async {
+                let pg_pool = pg_pool.clone();
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting ministrial proposal scraper");
 
-                    let pg_pool = connect_pg().await;
                     ministrial_proposal_once(false, &pg_pool).await;
                 }).await {
                     log::error!("Error in ministrial proposal scraper: {:?}", e);
