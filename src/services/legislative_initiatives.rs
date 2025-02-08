@@ -107,6 +107,12 @@ pub async fn scrape_new_legis_inits(
                 // new_legis_inits.push(legis_init);
             })
         }));
+
+        for handle in handles.drain(..) {
+            if let Err(e) = handle.await {
+                log::warn!("join Error: {e:?}")
+            }
+        }
     }
 
     Ok(vec![])
