@@ -6,7 +6,7 @@ use crate::{
 use somes_scraper::{
     call_to_order::CallToOrderInfo,
     plenar::{Debate, DebateInfo, Plenar, PlenarInfo},
-    AustriaScraper, PlenarSpeech, Scraper, TextExtractor,
+    AustriaScraper, PlenarSpeech, Reference, Scraper, TextExtractor,
 };
 
 async fn scrape_new_plenar_infos(scraper: &AustriaScraper) -> crate::Result<Vec<PlenarInfo>> {
@@ -175,10 +175,30 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
 }
 
 use log::{info, warn};
-use sqlx::PgPool;
+use sqlx::{postgres::PgQueryResult, PgPool};
 use tokio::runtime::{Handle, Runtime};
 
 static mut NO_OPINION_COUNT: usize = 0;
+
+async fn insert_plenar_speech_legis_init(
+    pool: &PgPool,
+    legis_init_id: Option<i32>,
+    plenar_speech_id: i32,
+    reference: &Reference,
+) -> sqlx::Result<PgQueryResult> {
+    sqlx::query!("
+            insert into 
+                plenar_speech_legis_inits (gp, ityp, inr, speech_id, legis_init_id) 
+            values ($1, $2, $3, $4, $5) 
+            on conflict (gp, ityp, inr, speech_id) do update set legis_init_id = EXCLUDED.legis_init_id", reference.gp, reference.ityp, reference.inr as i32, plenar_speech_id, legis_init_id).execute(pool).await
+}
+
+pub struct DbReference {
+    origin_legis_init_id: i32,
+    ref_gp: String,
+    ref_ityp: String,
+    ref_inr: i32,
+}
 
 async fn insert_plenar_speech(
     pool: &PgPool,
@@ -251,11 +271,47 @@ async fn insert_plenar_speech(
         } else {
             None
         };
-        sqlx::query!("
-            insert into 
-                plenar_speech_legis_inits (gp, ityp, inr, speech_id, legis_init_id) 
-            values ($1, $2, $3, $4, $5) 
-            on conflict (gp, ityp, inr, speech_id) do update set legis_init_id = EXCLUDED.legis_init_id", reference.gp, reference.ityp, reference.inr as i32, plenar_speech_id, legis_init_id).execute(pool).await?;
+
+        // let own_references = i
+        if let Err(e) =
+            insert_plenar_speech_legis_init(pool, legis_init_id, plenar_speech_id, reference).await
+        {
+            log::info!("could not insert plenar speech legis init for legis int {legis_init_id:?} and speech {plenar_speech_id}: {e:?}")
+        }
+        if let Some(legis_init_id) = legis_init_id {
+            let own_references = sqlx::query_as!(DbReference, "select origin_legis_init_id, ref_gp, ref_ityp, ref_inr from legis_inits_refs where origin_legis_init_id = $1", legis_init_id).fetch_all(pool).await.unwrap_or_default();
+
+            for reference in own_references {
+                let legis_init_id = if let Ok(x) = sqlx::query!(
+                    "select id from legislative_initiatives where gp = $1 and ityp = $2 and inr = $3",
+                    reference.ref_gp,
+                    reference.ref_ityp,
+                    reference.ref_inr
+                )
+                .fetch_one(pool)
+                .await
+                {
+                    Some(x.id)
+                } else {
+                    None
+                };
+
+                if let Err(e) = insert_plenar_speech_legis_init(
+                    pool,
+                    legis_init_id,
+                    plenar_speech_id,
+                    &Reference {
+                        gp: reference.ref_gp,
+                        ityp: reference.ref_ityp,
+                        inr: reference.ref_inr as u32,
+                    },
+                )
+                .await
+                {
+                    log::info!("could not insert plenar speech legis init for legis int {legis_init_id:?} and speech {plenar_speech_id}: {e:?}")
+                }
+            }
+        }
     }
 
     for url in &plenar_speech.speech.spoken_text_html_urls {

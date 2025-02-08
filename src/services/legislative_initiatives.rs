@@ -306,7 +306,7 @@ pub async fn update_legis_inits_in_db(
 
         for reference in legis_init.references.as_ref().unwrap_or(&vec![]) {
             if let Err(e) = insert_reference(pool, reference, legis_init_id).await {
-                log::error!("Could not insert reference for legis init {legis_init_id}: {e:?}");
+                log::error!("Could not insert reference for legis init {legis_init_id}: {e:?}")
             }
         }
 
