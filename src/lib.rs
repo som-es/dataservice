@@ -23,7 +23,6 @@ pub use db::*;
 #[cfg(feature = "runner")]
 pub use shutdown::*;
 use sqlx::{postgres::PgPoolOptions, PgPool};
-use tokio::runtime::Handle;
 
 pub mod with_data;
 
