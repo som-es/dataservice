@@ -60,7 +60,7 @@ pub async fn scrape_new_legis_inits(
     let legis_inits = scraper.post_legis_payload().await?;
     let legis_init_paths = scraper.legis_paths(legis_inits)?;
 
-    const MAX_TASKS: usize = 64;
+    const MAX_TASKS: usize = 2;
     let mut handles: Vec<tokio::task::JoinHandle<()>> = vec![];
 
     // let code_to_parties = Arc::new(gen_code_to_parties(pool, gp).await);
@@ -582,7 +582,7 @@ async fn insert_reference(
     reference: &somes_scraper::Reference,
     legislative_initiatives_id: i32,
 ) -> sqlx::Result<PgQueryResult> {
-    sqlx::query!("insert into legis_inits_refs (origin_legis_init_id, ref_gp, ref_ityp, ref_inr) values ($1, $2, $3, $4)", legislative_initiatives_id, reference.gp, reference.ityp, reference.inr as i32).execute(pool).await
+    sqlx::query!("insert into legis_inits_refs (origin_legis_init_id, ref_gp, ref_ityp, ref_inr) values ($1, $2, $3, $4) on conflict do nothing", legislative_initiatives_id, reference.gp, reference.ityp, reference.inr as i32).execute(pool).await
 }
 
 pub async fn insert_vote(pool: &PgPool, db_vote: DbVote) {

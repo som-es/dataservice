@@ -186,7 +186,8 @@ pub struct DbSpeechWithLink {
     pub infavor: Option<bool>,
     pub opinion: Option<String>,
     pub document_url: Option<String>,
-    pub legislative_initiatives_id: i32,
+    pub about: Option<String>,
+    pub legislative_initiatives_id: Option<i32>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

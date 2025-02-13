@@ -47,9 +47,6 @@ pub fn today_and_time() -> chrono::NaiveDateTime {
     chrono::Local::now().naive_local()
 }
 
-// could use variable in main -> pass to services
-static PG_POOL: Mutex<Option<PgPool>> = Mutex::new(None);
-
 pub async fn connect_pg() -> PgPool {
     PgPoolOptions::new()
         .max_connections(150)
