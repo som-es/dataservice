@@ -4,6 +4,7 @@ use chrono::NaiveDate;
 use tokio::runtime::Handle;
 mod match_delegates_with_name;
 mod voted_by_name_result;
+mod notify;
 
 use somes_scraper::{
     legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative, Opinion, Party,
@@ -17,9 +18,7 @@ use crate::{
     models::{
         DbEurovocTopicLegisInit, DbLegisDocument, DbLegislativeInitiative, DbNamedVoteInfo,
         DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote,
-    },
-    with_data::{all_parties_at_date, all_parties_at_gp},
-    Shutdown, GPS, LATEST_GP,
+    }, today, with_data::{all_parties_at_date, all_parties_at_gp}, Shutdown, GPS, LATEST_GP
 };
 
 pub async fn gen_code_to_parties_with_date(
@@ -254,6 +253,16 @@ pub async fn update_legis_inits_in_db(
             doktyp: legis_init.doktyp.clone(),
         };
         // println!("db_legis_init: {db_legis_init:?}");
+
+        let maybe_legis_init_id = sqlx::query!("select id, created_at from legislative_initiatives where inr = $1 and ityp = $2 and gp = $3", db_legis_init.inr, db_legis_init.ityp, db_legis_init.gp).fetch_optional(pool).await;
+
+        let mut notify_legis_init = false;
+        if let Ok(Some(date)) = maybe_legis_init_id {
+            let diff = today() - date.created_at;
+            if diff.num_days() <= 5 {
+                notify_legis_init = true;
+            }
+        };
 
         let legis_init_id = match sqlx::query!(
             "
