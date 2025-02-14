@@ -3,8 +3,8 @@ pub use absence_matching::*;
 use chrono::NaiveDate;
 use tokio::runtime::Handle;
 mod match_delegates_with_name;
-mod voted_by_name_result;
 mod notify;
+mod voted_by_name_result;
 
 use somes_scraper::{
     legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative, Opinion, Party,
@@ -18,7 +18,10 @@ use crate::{
     models::{
         DbEurovocTopicLegisInit, DbLegisDocument, DbLegislativeInitiative, DbNamedVoteInfo,
         DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote,
-    }, today, with_data::{all_parties_at_date, all_parties_at_gp}, Shutdown, GPS, LATEST_GP
+    },
+    today,
+    with_data::{all_parties_at_date, all_parties_at_gp},
+    Shutdown, GPS, LATEST_GP,
 };
 
 pub async fn gen_code_to_parties_with_date(
@@ -853,7 +856,6 @@ mod tests {
         crate::legislative_initiatives::update_legis_inits_in_db(&pool, code_to_parties, &[res])
             .await;
     }
-
 
     #[tokio::test]
     async fn test_legis_init_empty_gp_scrape_xxvii_iii_835() {

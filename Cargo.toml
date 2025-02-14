@@ -10,9 +10,10 @@ chrono = {version="0.4.24", optional=true, features = ["serde"]}
 # diesel = {version = "2.0.3", features = ["postgres", "chrono"] }
 dotenvy = { version = "0.15.7", optional=true}
 log = {version = "0.4.17", optional=true}
-reqwest = { version = "0.12", features = ["blocking"], optional=true }
+reqwest = { version = "0.12", features = ["json", "blocking"], optional=true }
 
 somes-scraper = {path = "../scraper"}
+somes-common-lib = {path = "../somes/somes-common-lib"}
 serde = "1.0"
 serde_derive = "1.0"
 simple_logger = { version="5", optional = true}
@@ -22,7 +23,9 @@ dotenv_codegen = "0.15.0"
 utoipa = { version = "4.2.0", optional = true }
 pollster = "0.3.0"
 lettre = "0.11.12"
-
+image = "0.25.5"
+imageproc = "0.25.0"
+serde_json = "1.0.138"
 [dev-dependencies]
 rand = "0.8"
 
