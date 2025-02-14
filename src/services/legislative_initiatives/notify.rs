@@ -88,12 +88,14 @@ fn setup_parliament(seats: &[u64]) -> Vec<Vec<(f32, f32)>> {
 fn convert_votes_to_party_color_map(votes: &[Vote]) -> HashMap<String, Rgba<u8>> {
     votes.iter()
         .map(|x| {
-            let mut rgba = Rgba(u32::from_str_radix(&x.party.color.as_str()[1..], 16).unwrap().to_be_bytes());
+            println!("party color: {:?}", x.party.color);
+            let mut rgba = Rgba(u32::from_str_radix(&format!("{}FF", &x.party.color.as_str()[1..]), 16).unwrap().to_be_bytes());
             if x.infavor {
                 rgba.0[3] = 255;
             } else {
-                rgba.0[3] = 125;
+                rgba.0[3] = 255;
             }
+
             (x.party.name.clone(), rgba)
         }).collect::<HashMap<String, Rgba<u8>>>()
 }
@@ -103,7 +105,7 @@ fn enrich_parliament_with_colors(
     votes: &[Vote],
     delegates: &[Delegate]
 ) -> Vec<Vec<(f32, f32, Rgba<u8>)>> {
-    let white = Rgba([255u8, 255u8, 255u8, 0u8]);
+    let white = Rgba([255u8, 255u8, 255u8, 255u8]);
 
     let mut parliament = parliament
         .into_iter()
@@ -115,6 +117,7 @@ fn enrich_parliament_with_colors(
         .collect::<Vec<_>>();
 
     let votes_to_party_map = convert_votes_to_party_color_map(votes);
+    println!("vtpm: {votes_to_party_map:?}");
 
     for delegate in delegates {
         match (delegate.seat_row, delegate.seat_col, &delegate.party) {
@@ -122,7 +125,8 @@ fn enrich_parliament_with_colors(
                 let seat_row = seat_row as usize;
                 let seat_col = seat_col as usize;
                 let color = *votes_to_party_map.get(party).unwrap_or(&Rgba([125, 125, 125, 255u8]));
-                parliament[seat_row - 1][seat_col - 1].2 = color;
+                let len = parliament[seat_row - 1].len();
+                parliament[seat_row - 1][len - seat_col].2 = color;
             }
             
             _ => {}
@@ -132,14 +136,13 @@ fn enrich_parliament_with_colors(
     parliament
 }
 
-pub fn generate_parliament_image(votes: &[Vote], delegates: &[Delegate], seats: &[u64]) {
+pub fn generate_parliament_image_with_delegates(votes: &[Vote], delegates: &[Delegate], seats: &[u64]) -> image::ImageBuffer<Rgba<u8>, Vec<u8>> {
     let parliament = setup_parliament(seats);
     let parliament = enrich_parliament_with_colors(parliament, votes, delegates);
 
-    let mut image = image::RgbaImage::new(IMG_WIDTH, IMG_HEIGHT / 2 + 60);
+    let mut image: image::ImageBuffer<Rgba<u8>, Vec<u8>> = image::RgbaImage::new(IMG_WIDTH, IMG_HEIGHT / 2 + 60);
 
     let white = Rgba([255u8, 255u8, 255u8, 255u8]);
-    let red = Rgba([255u8, 0, 0, 255u8]);
 
     draw_filled_rect_mut(
         &mut image,
@@ -149,14 +152,28 @@ pub fn generate_parliament_image(votes: &[Vote], delegates: &[Delegate], seats: 
 
     for half_circle in parliament {
         for (x, y, color) in half_circle {
-            println!("x: {x}, y: {y}");
+            // println!("x: {x}, y: {y}");
             draw_filled_circle_mut(&mut image, (x as i32, y as i32), CIRCLE_RADIUS, color);
             // draw_filled_circle_mut(&mut image, (IMG_WIDTH as i32 / 2, IMG_HEIGHT as i32 / 2), 10, red);
         }
     }
 
-    image.save("test_parliament.png").unwrap();
+    image
     // image.
+}
+
+pub async fn generate_parliament_image(votes: &[Vote], seats: &[u64]) -> Option<()> {
+    let delegates: Vec<Delegate> = reqwest::get("https://somes.at/delegates")
+        .await
+        .ok()?
+        .json()
+        .await
+        .ok()?;
+
+    let image = generate_parliament_image_with_delegates(votes, &delegates, seats);
+    image.save("test_parliament.png").unwrap();
+
+    Some(())
 }
 
 pub async fn get_current_seats() -> Option<Vec<u64>> {
@@ -180,7 +197,9 @@ pub async fn notify_delegates(pool: &PgPool, legis_init_topics: &[String]) {
 
 #[cfg(test)]
 mod tests {
-    use crate::legislative_initiatives::notify::{generate_parliament_image, get_current_seats};
+    use somes_scraper::{legis_init::LegislativeInitiatives, AustriaScraper};
+
+    use crate::legislative_initiatives::notify::{generate_parliament_image, generate_parliament_image_with_delegates, get_current_seats};
 
     #[tokio::test]
     async fn test_get_current_seats() {
@@ -191,6 +210,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_generate_parliament_image() {
-        generate_parliament_image(&[], &[20, 28, 37, 43, 48, 54]);
+        let scraper = AustriaScraper::default();
+        let legis_init = scraper.get_legis_init("/gegenstand/XXVIII/I/14").await.unwrap();
+        generate_parliament_image(&legis_init.votes, &[20, 28, 37, 43, 48, 54]).await;
     }
 }
