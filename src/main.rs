@@ -27,6 +27,9 @@ pub async fn run_services(state: &State) {
         }
     }
 
+    let (new_vote_result_tx, new_vote_result_rx) =
+        tokio::sync::mpsc::channel::<somes_scraper::LegislativeInitiative>(16);
+
     tokio::join!(
         // services::proposals::run(),
         tokio::spawn(services::legislative_initiatives::run_shut_every_gp(
@@ -35,7 +38,8 @@ pub async fn run_services(state: &State) {
         )),
         tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
-            pool.clone()
+            pool.clone(),
+            new_vote_result_tx.clone()
         )),
         tokio::spawn(services::ministrial_proposals::run_shut_every_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
@@ -53,6 +57,7 @@ pub async fn run_services(state: &State) {
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone()
         )),
+        // add only last gp runner
         tokio::spawn(services::plenar::run_shut(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone()

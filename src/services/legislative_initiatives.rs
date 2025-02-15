@@ -1,9 +1,9 @@
 mod absence_matching;
 pub use absence_matching::*;
 use chrono::NaiveDate;
-use tokio::runtime::Handle;
+use tokio::{runtime::Handle, sync::mpsc::Sender};
 mod match_delegates_with_name;
-mod notify;
+pub mod notify;
 mod voted_by_name_result;
 
 use somes_scraper::{
@@ -58,6 +58,7 @@ pub async fn scrape_new_legis_inits(
     pool: &PgPool,
     scraper: Arc<AustriaScraper>,
     gp: &str,
+    new_legis_init: Option<Sender<LegislativeInitiative>>,
 ) -> crate::Result<Vec<LegislativeInitiative>> {
     let legis_inits = scraper.post_legis_payload().await?;
     let legis_init_paths = scraper.legis_paths(legis_inits)?;
@@ -86,6 +87,7 @@ pub async fn scrape_new_legis_inits(
             }
             info_print_counter += 1;
         }
+        let new_legis_init = new_legis_init.clone();
 
         handles.push(tokio::task::spawn_blocking(move || {
             Handle::current().block_on(async move {
@@ -101,7 +103,8 @@ pub async fn scrape_new_legis_inits(
                 let code_to_parties = Arc::new(
                     gen_code_to_parties_with_date(&pool, &legis_init.date, &legis_init.gp).await,
                 );
-                update_legis_inits_in_db(&pool, code_to_parties, &[legis_init]).await;
+                update_legis_inits_in_db(&pool, code_to_parties, &[legis_init], new_legis_init)
+                    .await;
                 // new_legis_inits.push(legis_init);
             })
         }));
@@ -116,7 +119,11 @@ pub async fn scrape_new_legis_inits(
     Ok(vec![])
 }
 
-async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<LegislativeInitiative> {
+async fn legis_init_once(
+    only_latest: bool,
+    pg_pool: &PgPool,
+    new_legis_init: Option<Sender<LegislativeInitiative>>,
+) -> Vec<LegislativeInitiative> {
     log::info!("Try scraping legislative initiatives");
 
     let mut handles = vec![];
@@ -125,6 +132,7 @@ async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<Legislative
             continue;
         }
         let pg_pool = pg_pool.clone();
+        let new_legis_init = new_legis_init.clone();
         let handle = tokio::task::spawn_blocking(move || {
             Handle::current().block_on(async move {
                 let mut scraper = AustriaScraper::default();
@@ -132,7 +140,9 @@ async fn legis_init_once(only_latest: bool, pg_pool: &PgPool) -> Vec<Legislative
                 scraper.scrape_info.gp = vec![gp.into()];
                 let scraper = Arc::new(scraper);
 
-                if let Err(e) = scrape_new_legis_inits(&pg_pool, scraper.clone(), gp).await {
+                if let Err(e) =
+                    scrape_new_legis_inits(&pg_pool, scraper.clone(), gp, new_legis_init).await
+                {
                     log::error!("could not scrape and insert legis inits: {e}");
                 }
                 // scrape_untill_success::<Vec<LegislativeInitiative>, _>(|| async {
@@ -202,6 +212,7 @@ pub async fn update_legis_inits_in_db(
     pool: &PgPool,
     code_to_parties: Arc<HashMap<String, Party>>,
     new_legis_inits: &[LegislativeInitiative],
+    new_legis_init: Option<Sender<LegislativeInitiative>>,
 ) {
     // if let Some(jetzt_party_info) = code_to_parties.get("J").cloned() {
     //     code_to_parties.insert("P".to_string(), jetzt_party_info);
@@ -259,15 +270,17 @@ pub async fn update_legis_inits_in_db(
 
         let maybe_legis_init_id = sqlx::query!("select id, created_at from legislative_initiatives where inr = $1 and ityp = $2 and gp = $3", db_legis_init.inr, db_legis_init.ityp, db_legis_init.gp).fetch_optional(pool).await;
 
-        let mut notify_legis_init = false;
-        if let Ok(Some(date)) = maybe_legis_init_id {
-            let diff = today() - date.created_at;
-            if diff.num_days() <= 5 {
-                notify_legis_init = true;
-
-                // collect somwhere (other service), then run every 30 mins e.g.
-            }
-        };
+        if let Some(new_legis_init_tx) = &new_legis_init {
+            if let Ok(Some(date)) = maybe_legis_init_id {
+                let diff = today() - date.created_at;
+                if diff.num_days() <= 5 {
+                    // collect somwhere (other service), then run every 30 mins e.g.
+                    if let Err(e) = new_legis_init_tx.send(legis_init.clone()).await {
+                        log::error!("could not send legis init to mail notify service: {e:?}")
+                    }
+                }
+            };
+        }
 
         let legis_init_id = match sqlx::query!(
             "
@@ -662,7 +675,11 @@ pub async fn translate_votes(
     votes
 }
 
-pub async fn run_shut_latest_gp(mut shutdown: Shutdown, pg_pool: PgPool) {
+pub async fn run_shut_latest_gp(
+    mut shutdown: Shutdown,
+    pg_pool: PgPool,
+    new_legis_init: Sender<LegislativeInitiative>,
+) {
     let legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP_LATEST")
         .unwrap_or_else(|_| "300".to_string())
         .parse()
@@ -675,6 +692,7 @@ pub async fn run_shut_latest_gp(mut shutdown: Shutdown, pg_pool: PgPool) {
 
     #[cfg(feature = "legis_init_latest")]
     while !shutdown.is_shutdown() {
+        let new_legis_init = new_legis_init.clone();
         tokio::select! {
             _ = shutdown.recv() => {
                 println!("shutting down");
@@ -686,7 +704,7 @@ pub async fn run_shut_latest_gp(mut shutdown: Shutdown, pg_pool: PgPool) {
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative (latest) scraper");
 
-                    legis_init_once(true, &pg_pool).await;
+                    legis_init_once(true, &pg_pool, Some(new_legis_init)).await;
                 }).await {
                     log::error!("Error in legislative initiative (latest) scraper: {:?}", e);
                 }
@@ -722,7 +740,7 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown, pg_pool: PgPool) {
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative scraper");
 
-                    legis_init_once(false, &pg_pool).await;
+                    legis_init_once(false, &pg_pool, None).await;
                     log::info!("lol");
                 }).await {
                     log::error!("Error in legislative initiative scraper: {:?}", e);
@@ -808,8 +826,13 @@ mod tests {
 
         let pool = connect_pg().await;
         let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
-        crate::legislative_initiatives::update_legis_inits_in_db(&pool, code_to_parties, &[res])
-            .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(
+            &pool,
+            code_to_parties,
+            &[res],
+            None,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -822,8 +845,13 @@ mod tests {
 
         let pool = connect_pg().await;
         let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
-        crate::legislative_initiatives::update_legis_inits_in_db(&pool, code_to_parties, &[res])
-            .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(
+            &pool,
+            code_to_parties,
+            &[res],
+            None,
+        )
+        .await;
 
         // println!("s: {:?}", scraper.scrape_info.gp);
 
@@ -841,8 +869,13 @@ mod tests {
 
         let pool = connect_pg().await;
         let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
-        crate::legislative_initiatives::update_legis_inits_in_db(&pool, code_to_parties, &[res])
-            .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(
+            &pool,
+            code_to_parties,
+            &[res],
+            None,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -855,8 +888,13 @@ mod tests {
 
         let pool = connect_pg().await;
         let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
-        crate::legislative_initiatives::update_legis_inits_in_db(&pool, code_to_parties, &[res])
-            .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(
+            &pool,
+            code_to_parties,
+            &[res],
+            None,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -869,7 +907,12 @@ mod tests {
 
         let pool = connect_pg().await;
         let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
-        crate::legislative_initiatives::update_legis_inits_in_db(&pool, code_to_parties, &[res])
-            .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(
+            &pool,
+            code_to_parties,
+            &[res],
+            None,
+        )
+        .await;
     }
 }

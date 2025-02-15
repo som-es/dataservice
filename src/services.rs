@@ -1,6 +1,7 @@
 pub mod delegates;
 pub mod legislative_initiatives;
 pub mod ministrial_proposals;
+pub mod new_vote_results_mailer;
 pub mod parties;
 pub mod plenar;
 pub mod proposals;
