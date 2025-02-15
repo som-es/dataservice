@@ -23,8 +23,8 @@ pub use db::*;
 pub use shutdown::*;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 
-pub mod with_data;
 pub mod email;
+pub mod with_data;
 
 use dotenvy_macro::dotenv;
 

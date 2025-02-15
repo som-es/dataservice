@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use image::{Rgb, Rgba};
+use base64::alphabet::STANDARD;
+use image::{codecs::png::PngEncoder, ImageEncoder, PixelWithColorType, Rgb, Rgba};
 use imageproc::{
     drawing::{draw_filled_circle_mut, draw_filled_rect_mut},
     rect::Rect,
@@ -9,9 +10,15 @@ use somes_common_lib::Delegate;
 use somes_scraper::{LegislativeInitiative, Vote};
 use sqlx::{query, PgPool};
 
-use crate::LATEST_GP;
+use crate::{
+    email::{send_mail, EMAIL_TEMPLATE, MAILER},
+    LATEST_GP,
+};
 
-pub async fn find_notifiers<'a>(pool: &PgPool, legis_inits: &'a [LegislativeInitiative]) -> HashMap<String, Vec<&'a LegislativeInitiative>> {
+pub async fn find_notifiers<'a>(
+    pool: &PgPool,
+    legis_inits: &'a [(i32, LegislativeInitiative)],
+) -> HashMap<String, Vec<&'a (i32, LegislativeInitiative)>> {
     let ids = query!("select id, email from somes_user where is_email_hashed is false")
         .fetch_all(pool)
         .await
@@ -19,15 +26,18 @@ pub async fn find_notifiers<'a>(pool: &PgPool, legis_inits: &'a [LegislativeInit
     let mut to_notify_emails = HashMap::new();
     for id in ids {
         let user_topics = query!("select topic_name from user_topics inner join unique_topics ut on ut.id = topic_id where user_id = $1", id.id).fetch_all(pool).await.unwrap_or_default().into_iter().map(|x| x.topic_name).collect::<Vec<_>>();
-        
-        let relevant_legis_inits = legis_inits.iter().filter(|legis_init| {
-            for topic in &legis_init.eurovoc_topics {
-                if user_topics.contains(topic) {
-                    return true
+
+        let relevant_legis_inits = legis_inits
+            .iter()
+            .filter(|legis_init| {
+                for topic in &legis_init.1.eurovoc_topics {
+                    if user_topics.contains(topic) {
+                        return true;
+                    }
                 }
-            }
-            false
-        }).collect::<Vec<_>>();
+                false
+            })
+            .collect::<Vec<_>>();
 
         if !relevant_legis_inits.is_empty() {
             to_notify_emails.insert(id.email, relevant_legis_inits);
@@ -105,7 +115,7 @@ fn convert_votes_to_party_color_map(votes: &[Vote]) -> HashMap<String, Rgba<u8>>
             if x.infavor {
                 rgba.0[3] = 255;
             } else {
-                rgba.0[3] = 255;
+                rgba.0[3] = 50;
             }
 
             (x.party.name.clone(), rgba)
@@ -151,6 +161,17 @@ fn enrich_parliament_with_colors(
     parliament
 }
 
+fn blend_with_background(background: Rgba<u8>, foreground: Rgba<u8>) -> Rgba<u8> {
+    let alpha = foreground[3] as f32 / 255.0;
+    let inv_alpha = 1.0 - alpha;
+
+    let r = (foreground[0] as f32 * alpha + background[0] as f32 * inv_alpha) as u8;
+    let g = (foreground[1] as f32 * alpha + background[1] as f32 * inv_alpha) as u8;
+    let b = (foreground[2] as f32 * alpha + background[2] as f32 * inv_alpha) as u8;
+
+    Rgba([r, g, b, 255])
+}
+
 pub fn generate_parliament_image_with_delegates(
     votes: &[Vote],
     delegates: &[Delegate],
@@ -173,7 +194,13 @@ pub fn generate_parliament_image_with_delegates(
     for half_circle in parliament {
         for (x, y, color) in half_circle {
             // println!("x: {x}, y: {y}");
-            draw_filled_circle_mut(&mut image, (x as i32, y as i32), CIRCLE_RADIUS, color);
+            let blended_color = blend_with_background(white, color);
+            draw_filled_circle_mut(
+                &mut image,
+                (x as i32, y as i32),
+                CIRCLE_RADIUS,
+                blended_color,
+            );
             // draw_filled_circle_mut(&mut image, (IMG_WIDTH as i32 / 2, IMG_HEIGHT as i32 / 2), 10, red);
         }
     }
@@ -182,13 +209,17 @@ pub fn generate_parliament_image_with_delegates(
     // image.
 }
 
-pub async fn generate_parliament_image(votes: &[Vote], seats: &[u64]) -> Option<()> {
-    let delegates: Vec<Delegate> = reqwest::get("https://somes.at/delegates")
+pub async fn get_current_delegates() -> Option<Vec<Delegate>> {
+    reqwest::get("https://somes.at/delegates")
         .await
         .ok()?
         .json()
         .await
-        .ok()?;
+        .ok()
+}
+
+pub async fn generate_parliament_image(votes: &[Vote], seats: &[u64]) -> Option<()> {
+    let delegates: Vec<Delegate> = get_current_delegates().await?;
 
     let image = generate_parliament_image_with_delegates(votes, &delegates, seats);
     image.save("test_parliament.png").unwrap();
@@ -211,7 +242,77 @@ pub async fn get_current_seats() -> Option<Vec<u64>> {
     Some(seats)
 }
 
-pub async fn notify_delegates(pool: &PgPool, legis_init_topics: &[String]) {
+pub fn send_new_legis_info_mail(
+    mail_to: &str,
+    legis_inits: &[&(i32, LegislativeInitiative)],
+    seats: &[u64],
+    delegates: &[Delegate],
+) -> Result<(), Box<dyn std::error::Error>> {
+    // let content = EMAIL_TEMPLATE.replace("{*OTP*}", &white_splitted);
+    // let content = content.replace("{*MINUTOS*}", &(*EMAIL_EXPIRATION_SECONDS / 60).to_string());
+
+    let legis_inits = legis_inits.iter().map(|x| (*x).clone()).collect::<Vec<_>>();
+    let delegates = delegates.to_vec();
+    let seats = seats.to_vec();
+
+    let mail_to = mail_to.to_string();
+    std::thread::spawn(move || {
+        let mut vote_results_html = String::new();
+        for (id, legis_init) in legis_inits {
+            let parliament_img =
+                generate_parliament_image_with_delegates(&legis_init.votes, &delegates, &seats);
+
+            let mut png_parliament_img_buf = Vec::new();
+            let res = PngEncoder::new(&mut png_parliament_img_buf).write_image(
+                &parliament_img,
+                parliament_img.width(),
+                parliament_img.height(),
+                Rgba::<u8>::COLOR_TYPE
+            );
+
+            if let Err(e) = res {
+                log::error!("could not png encode image: {e:?}");
+                continue;
+            }
+
+            #[allow(deprecated)]
+            let base64_parliament_img = base64::encode(png_parliament_img_buf);
+
+            let vote_result_html_entry = format!(r#"
+                <a href="https://somes.at/alpha/vote_result?id={id}">
+                    <div style="display: flex; flex-direction: row; justify-content: space-between; width: 100%;">
+                        <div style="border: 1px solid black; width: 50%; display: flex; justify-content: center; align-items: center;">
+                            {desc}
+                        </div>
+                        <div style="border: 1px solid black; width: 50%;">
+                            <img style="width: 70%;" src="data:image/png;base64,{base64_parliament_img}"/>
+                        </div>
+                    </div>
+                </a>
+            "#, desc=legis_init.description);
+
+            vote_results_html.push_str(&vote_result_html_entry);
+        }
+
+        let content = EMAIL_TEMPLATE.replace("{*VOTE_RESULTS*}", &vote_results_html);
+        if let Err(e) = send_mail(&MAILER, &mail_to, "Dein Somes One-Time Passwort", content) {
+            log::error!("could not send legis info mail: {e:?}");
+        }
+    });
+
+    Ok(())
+}
+
+pub fn notify_users(
+    seats: &[u64],
+    delegates: &[Delegate],
+    user_legis_inits: &HashMap<String, Vec<&(i32, LegislativeInitiative)>>,
+) {
+    for (mail_to, legis_inits) in user_legis_inits {
+        if let Err(e) = send_new_legis_info_mail(mail_to, legis_inits, seats, delegates) {
+            log::error!("could not send legis info mail: {e:?}");
+        }
+    }
     // for notifier_mail in find_notifiers(pool, legis_init_topics).await {}
 }
 

@@ -58,7 +58,7 @@ pub async fn scrape_new_legis_inits(
     pool: &PgPool,
     scraper: Arc<AustriaScraper>,
     gp: &str,
-    new_legis_init: Option<Sender<LegislativeInitiative>>,
+    new_legis_init: Option<Sender<(i32, LegislativeInitiative)>>,
 ) -> crate::Result<Vec<LegislativeInitiative>> {
     let legis_inits = scraper.post_legis_payload().await?;
     let legis_init_paths = scraper.legis_paths(legis_inits)?;
@@ -122,7 +122,7 @@ pub async fn scrape_new_legis_inits(
 async fn legis_init_once(
     only_latest: bool,
     pg_pool: &PgPool,
-    new_legis_init: Option<Sender<LegislativeInitiative>>,
+    new_legis_init: Option<Sender<(i32, LegislativeInitiative)>>,
 ) -> Vec<LegislativeInitiative> {
     log::info!("Try scraping legislative initiatives");
 
@@ -212,7 +212,7 @@ pub async fn update_legis_inits_in_db(
     pool: &PgPool,
     code_to_parties: Arc<HashMap<String, Party>>,
     new_legis_inits: &[LegislativeInitiative],
-    new_legis_init: Option<Sender<LegislativeInitiative>>,
+    new_legis_init: Option<Sender<(i32, LegislativeInitiative)>>,
 ) {
     // if let Some(jetzt_party_info) = code_to_parties.get("J").cloned() {
     //     code_to_parties.insert("P".to_string(), jetzt_party_info);
@@ -271,11 +271,11 @@ pub async fn update_legis_inits_in_db(
         let maybe_legis_init_id = sqlx::query!("select id, created_at from legislative_initiatives where inr = $1 and ityp = $2 and gp = $3", db_legis_init.inr, db_legis_init.ityp, db_legis_init.gp).fetch_optional(pool).await;
 
         if let Some(new_legis_init_tx) = &new_legis_init {
-            if let Ok(Some(date)) = maybe_legis_init_id {
-                let diff = today() - date.created_at;
+            if let Ok(Some(legis_init_db)) = maybe_legis_init_id {
+                let diff = today() - legis_init_db.created_at;
                 if diff.num_days() <= 5 {
                     // collect somwhere (other service), then run every 30 mins e.g.
-                    if let Err(e) = new_legis_init_tx.send(legis_init.clone()).await {
+                    if let Err(e) = new_legis_init_tx.send((legis_init_db.id, legis_init.clone())).await {
                         log::error!("could not send legis init to mail notify service: {e:?}")
                     }
                 }
@@ -678,7 +678,7 @@ pub async fn translate_votes(
 pub async fn run_shut_latest_gp(
     mut shutdown: Shutdown,
     pg_pool: PgPool,
-    new_legis_init: Sender<LegislativeInitiative>,
+    new_legis_init: Sender<(i32, LegislativeInitiative)>,
 ) {
     let legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP_LATEST")
         .unwrap_or_else(|_| "300".to_string())

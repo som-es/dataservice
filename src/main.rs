@@ -28,7 +28,7 @@ pub async fn run_services(state: &State) {
     }
 
     let (new_vote_result_tx, new_vote_result_rx) =
-        tokio::sync::mpsc::channel::<somes_scraper::LegislativeInitiative>(16);
+        tokio::sync::mpsc::channel::<(i32, somes_scraper::LegislativeInitiative)>(16);
 
     tokio::join!(
         // services::proposals::run(),
@@ -70,6 +70,13 @@ pub async fn run_services(state: &State) {
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone()
         )),
+        tokio::spawn(
+            services::new_vote_results_mailer::notify_on_new_vote_results_service(
+                Shutdown::new(state.notify_shutdown.subscribe()),
+                new_vote_result_rx,
+                pool.clone()
+            )
+        ),
     )
     .0
     .unwrap();

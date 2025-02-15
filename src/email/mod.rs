@@ -1,4 +1,3 @@
-
 use dotenvy_macro::dotenv;
 use lettre::{
     message::header::ContentType,
@@ -55,24 +54,8 @@ pub fn send_mail(
     Ok(())
 }
 
-pub fn send_otp_mail(mail_to: &str, otp: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let mut white_splitted = String::new();
-    for (idx, ch) in otp.chars().enumerate() {
-        white_splitted.push(ch);
-        if (idx + 1) % 3 == 0 {
-            white_splitted.push(' ')
-        }
-    }
-    let content = EMAIL_TEMPLATE.replace("{*OTP*}", &white_splitted);
-    // let content = content.replace("{*MINUTOS*}", &(*EMAIL_EXPIRATION_SECONDS / 60).to_string());
-
-    send_mail(&MAILER, mail_to, "Dein Somes One-Time Passwort", content)?;
-
-    Ok(())
-}
-
 #[test]
 fn test_send_mail() {
-    send_otp_mail("robin.pautsch@it.htl-hl.ac.at", "A12 3Z2 HAC").unwrap()
+    // send_otp_mail("robin.pautsch@it.htl-hl.ac.at", "A12 3Z2 HAC").unwrap()
     // send_mail("", "tolle_id_zum_verifizieren");
 }
