@@ -7,7 +7,7 @@ use lettre::{
 };
 use once_cell::sync::Lazy;
 
-use crate::{EMAIL_EXPIRATION_SECONDS, VERIFICATION_CONTENT, VERIFICATION_SUBJECT};
+// use crate::{EMAIL_EXPIRATION_SECONDS, VERIFICATION_CONTENT, VERIFICATION_SUBJECT};
 
 // env vars?
 
@@ -41,7 +41,7 @@ pub fn send_mail(
     subject: &str,
     content: String,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let from = format!("somes auth <{}>", SMTP_USERNAME).parse()?;
+    let from = format!("somes info <{}>", SMTP_USERNAME).parse()?;
     let to = format!("Recipient <{mail_to}>").parse()?;
 
     let email = Message::builder()
@@ -64,7 +64,7 @@ pub fn send_otp_mail(mail_to: &str, otp: &str) -> Result<(), Box<dyn std::error:
         }
     }
     let content = EMAIL_TEMPLATE.replace("{*OTP*}", &white_splitted);
-    let content = content.replace("{*MINUTOS*}", &(*EMAIL_EXPIRATION_SECONDS / 60).to_string());
+    // let content = content.replace("{*MINUTOS*}", &(*EMAIL_EXPIRATION_SECONDS / 60).to_string());
 
     send_mail(&MAILER, mail_to, "Dein Somes One-Time Passwort", content)?;
 

@@ -12,7 +12,6 @@ use std::{
     sync::Mutex,
 };
 
-use dotenv_codegen::dotenv;
 #[cfg(feature = "runner")]
 pub use services::*;
 
@@ -25,6 +24,9 @@ pub use shutdown::*;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 
 pub mod with_data;
+pub mod email;
+
+use dotenvy_macro::dotenv;
 
 pub const DATABASE_URL: &str = dotenv!("DATABASE_URL");
 pub const LATEST_GP: &str = dotenv!("LATEST_GP");
