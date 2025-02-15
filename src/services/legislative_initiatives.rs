@@ -410,13 +410,14 @@ pub async fn update_legis_inits_in_db(
         if let Some(new_legis_init_tx) = &new_legis_init {
             if let Ok(info) = sqlx::query!("select * from legis_email_info where already_sent_id = $1", legis_init_id).fetch_optional(pool).await {
                 let diff = today() - legis_init.date;
-                if diff.num_days() <= 80 && info.is_none() {
+
+                let mut legis_init = legis_init.clone();
+                legis_init.votes = show_votes;
+                if diff.num_days() <= 5 && info.is_none() && !legis_init.votes.is_empty() {
                     log::info!("Sending fitting legis init: {legis_init_id}");
                     // collect somwhere (other service), then run every 30 mins e.g.
-                    let mut legis_init = legis_init.clone();
-                    legis_init.votes = show_votes;
                     if let Err(e) = new_legis_init_tx
-                        .send((legis_init_id, legis_init.clone()))
+                        .send((legis_init_id, legis_init))
                         .await
                     {
                         log::error!("could not send legis init to mail notify service: {e:?}")

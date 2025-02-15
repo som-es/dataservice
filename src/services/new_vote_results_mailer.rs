@@ -37,10 +37,13 @@ pub async fn notify_on_new_vote_results(
 
         let mut acc_legis_inits = vec![new_legis_init];
 
-        let now = Instant::now();
+        let mut now = Instant::now();
 
+        // do not use time but trigger on end of latest scraping 
+        // => new votes things could be scattered in scraper return
         while (Instant::now() - now).as_secs_f32() <= legis_init_accumulate_dur as f32 {
             if let Ok(legis_init) = new_vote_result_rx.try_recv() {
+                now = Instant::now();
                 acc_legis_inits.push(legis_init);
             }
         }
