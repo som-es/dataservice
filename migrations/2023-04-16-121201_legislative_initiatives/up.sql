@@ -20,6 +20,7 @@ create table legislative_initiatives (
     requires_simple_majority boolean default true,
     -- was_invisibly_declined boolean default false,
     plenary_session_id int,
+    notified_with_mail boolean default false,
     foreign key (plenary_session_id) references plenar_infos(id),
     UNIQUE (inr, ityp, gp)
 );

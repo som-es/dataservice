@@ -33,6 +33,8 @@ pub async fn notify_on_new_vote_results(
             continue;
         };
 
+        log::info!("Received first new vote result, now trying to receive more legis inits for {legis_init_accumulate_dur} seconds");
+
         let mut acc_legis_inits = vec![new_legis_init];
 
         let now = Instant::now();
@@ -44,6 +46,7 @@ pub async fn notify_on_new_vote_results(
         }
 
         let notify_user_legis_inits = find_notifiers(pg_pool, &acc_legis_inits).await;
+        log::info!("Constructed notifier hashmap with {} entries", notify_user_legis_inits.len());
 
         notify_users(&seats, &delegates, &notify_user_legis_inits);
     }

@@ -268,7 +268,7 @@ pub async fn update_legis_inits_in_db(
         };
         // println!("db_legis_init: {db_legis_init:?}");
 
-        let maybe_legis_init_id = sqlx::query!("select id, created_at from legislative_initiatives where inr = $1 and ityp = $2 and gp = $3", db_legis_init.inr, db_legis_init.ityp, db_legis_init.gp).fetch_optional(pool).await;
+        // let maybe_legis_init_id = sqlx::query!("select id, created_at from legislative_initiatives where inr = $1 and ityp = $2 and gp = $3", db_legis_init.inr, db_legis_init.ityp, db_legis_init.gp).fetch_optional(pool).await;
 
         let legis_init_id = match sqlx::query!(
             "
@@ -408,18 +408,22 @@ pub async fn update_legis_inits_in_db(
         }
 
         if let Some(new_legis_init_tx) = &new_legis_init {
-            if let Ok(Some(legis_init_db)) = maybe_legis_init_id {
-                let diff = today() - legis_init_db.created_at;
-                if diff.num_days() <= 5 {
+            if let Ok(info) = sqlx::query!("select * from legis_email_info where already_sent_id = $1", legis_init_id).fetch_optional(pool).await {
+                let diff = today() - legis_init.date;
+                if diff.num_days() <= 80 && info.is_none() {
+                    log::info!("Sending fitting legis init: {legis_init_id}");
                     // collect somwhere (other service), then run every 30 mins e.g.
                     let mut legis_init = legis_init.clone();
                     legis_init.votes = show_votes;
                     if let Err(e) = new_legis_init_tx
-                        .send((legis_init_db.id, legis_init.clone()))
+                        .send((legis_init_id, legis_init.clone()))
                         .await
                     {
                         log::error!("could not send legis init to mail notify service: {e:?}")
                     }
+                }
+                if let Err(e) = sqlx::query!("insert into legis_email_info (already_sent_id) values ($1)", legis_init_id).execute(pool).await {
+                    log::error!("could not insert into legis email info for id {legis_init_id}: {e:?}");
                 }
             };
         }

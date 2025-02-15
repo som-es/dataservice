@@ -303,6 +303,7 @@ pub fn send_new_legis_info_mail(
             vote_results_html.push_str(&vote_result_html_entry);
         }
 
+        log::info!("Sending composed new vote result mail to {mail_to}");
         let content = EMAIL_TEMPLATE.replace("{*VOTE_RESULTS*}", &vote_results_html);
         if let Err(e) = send_mail(&MAILER, &mail_to, "Neue Abstimmungen auf somes", content) {
             log::error!("could not send legis info mail: {e:?}");
@@ -361,7 +362,7 @@ mod tests {
             .unwrap();
 
         let legis_init1 = scraper
-            .get_legis_init("/gegenstand/XXVIII/A/6")
+            .get_legis_init("gegenstand/XXVII/I/2710")
             .await
             .unwrap();
         // gegenstand/XXVIII/A/6
@@ -371,7 +372,7 @@ mod tests {
 
         send_new_legis_info_mail(
             "florian.nagy@it.htl-hl.ac.at",
-            &[&(19106479, legis_init), &(10527226, legis_init1)],
+            &[&(19106479, legis_init), &(10527230, legis_init1)],
             &seats,
             &delegates,
         )
