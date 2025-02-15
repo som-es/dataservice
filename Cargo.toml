@@ -9,7 +9,7 @@ edition = "2021"
 chrono = {version="0.4.24", optional=true, features = ["serde"]}
 # diesel = {version = "2.0.3", features = ["postgres", "chrono"] }
 dotenvy = { version = "0.15.7", optional=true}
-log = {version = "0.4.17", optional=true}
+log = {version = "0.4.17"}
 reqwest = { version = "0.12", features = ["json", "blocking"], optional=true }
 
 somes-scraper = {path = "../scraper"}
@@ -37,7 +37,7 @@ rand = "0.8"
 default = ["runner", "legis_init_latest", "legis_init", "ministerial_latest", "ministerial", "proposals_latest", "proposals", "plenar", "parties"]
 # default = ["runner", "plenar"]
 models = ["dotenvy", "chrono"]
-runner = ["models", "chrono", "reqwest", "simple_logger", "tokio", "log", "dotenvy"]
+runner = ["models", "chrono", "reqwest", "simple_logger", "tokio", "dotenvy"]
 utoipa = ["dep:utoipa"]
 
 legis_init_latest = []

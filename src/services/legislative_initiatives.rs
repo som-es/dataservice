@@ -8,7 +8,7 @@ mod voted_by_name_result;
 
 use somes_scraper::{
     legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative, Opinion, Party,
-    ProContra,
+    ProContra, Vote,
 };
 use sqlx::{postgres::PgQueryResult, PgPool};
 use std::{collections::HashMap, sync::Arc};
@@ -17,7 +17,7 @@ use voted_by_name_result::{insert_named_vote_info, insert_named_votes};
 use crate::{
     models::{
         DbEurovocTopicLegisInit, DbLegisDocument, DbLegislativeInitiative, DbNamedVoteInfo,
-        DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote,
+        DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote, DbVoteIns,
     },
     today,
     with_data::{all_parties_at_date, all_parties_at_gp},
@@ -270,18 +270,6 @@ pub async fn update_legis_inits_in_db(
 
         let maybe_legis_init_id = sqlx::query!("select id, created_at from legislative_initiatives where inr = $1 and ityp = $2 and gp = $3", db_legis_init.inr, db_legis_init.ityp, db_legis_init.gp).fetch_optional(pool).await;
 
-        if let Some(new_legis_init_tx) = &new_legis_init {
-            if let Ok(Some(legis_init_db)) = maybe_legis_init_id {
-                let diff = today() - legis_init_db.created_at;
-                if diff.num_days() <= 5 {
-                    // collect somwhere (other service), then run every 30 mins e.g.
-                    if let Err(e) = new_legis_init_tx.send((legis_init_db.id, legis_init.clone())).await {
-                        log::error!("could not send legis init to mail notify service: {e:?}")
-                    }
-                }
-            };
-        }
-
         let legis_init_id = match sqlx::query!(
             "
                 INSERT INTO legislative_initiatives (
@@ -337,9 +325,12 @@ pub async fn update_legis_inits_in_db(
             }
         }
 
+        let mut show_votes = legis_init.votes.clone();
+
         for vote in &legis_init.votes {
-            let db_vote = DbVote {
+            let db_vote = DbVoteIns {
                 party: vote.party.name.clone(),
+                code: vote.party.code.clone(),
                 fraction: vote.party.fraction as i32,
                 infavor: vote.infavor,
                 legislative_initiatives_id: legis_init_id,
@@ -383,14 +374,25 @@ pub async fn update_legis_inits_in_db(
         {
             match &legis_init.hidden_votes_info.pro_contra_parties {
                 Some(pro_contra_parties) => {
-                    for db_vote in translate_votes(
+                    let trans_votes = translate_votes(
                         &code_to_parties,
                         legis_init_id,
                         pro_contra_parties,
                         &legis_init.gp,
                     )
-                    .await
-                    {
+                    .await;
+
+                    show_votes = trans_votes
+                        .iter()
+                        .flat_map(|vote| {
+                            Some(Vote {
+                                party: code_to_parties.get(&vote.code).cloned()?,
+                                infavor: vote.infavor,
+                            })
+                        })
+                        .collect();
+
+                    for db_vote in trans_votes {
                         insert_vote(pool, db_vote).await;
                     }
                 }
@@ -403,6 +405,23 @@ pub async fn update_legis_inits_in_db(
                     )
                 }
             }
+        }
+
+        if let Some(new_legis_init_tx) = &new_legis_init {
+            if let Ok(Some(legis_init_db)) = maybe_legis_init_id {
+                let diff = today() - legis_init_db.created_at;
+                if diff.num_days() <= 5 {
+                    // collect somwhere (other service), then run every 30 mins e.g.
+                    let mut legis_init = legis_init.clone();
+                    legis_init.votes = show_votes;
+                    if let Err(e) = new_legis_init_tx
+                        .send((legis_init_db.id, legis_init.clone()))
+                        .await
+                    {
+                        log::error!("could not send legis init to mail notify service: {e:?}")
+                    }
+                }
+            };
         }
 
         for speech in &legis_init.speeches {
@@ -612,7 +631,7 @@ async fn insert_reference(
     sqlx::query!("insert into legis_inits_refs (origin_legis_init_id, ref_gp, ref_ityp, ref_inr) values ($1, $2, $3, $4) on conflict do nothing", legislative_initiatives_id, reference.gp, reference.ityp, reference.inr as i32).execute(pool).await
 }
 
-pub async fn insert_vote(pool: &PgPool, db_vote: DbVote) {
+pub async fn insert_vote(pool: &PgPool, db_vote: DbVoteIns) {
     if let Err(e) = sqlx::query!(
         "
             INSERT INTO votes (
@@ -645,15 +664,16 @@ pub async fn translate_votes(
     legislative_initiatives_id: i32,
     pro_contra: &ProContra,
     gp: &str,
-) -> Vec<DbVote> {
-    let convert_to_vote = |code, infavor| {
+) -> Vec<DbVoteIns> {
+    let convert_to_vote = |code: &String, infavor| {
         let Some(party) = parties.get(code).cloned() else {
             log::error!("Party with code {code} not found in {gp} parties map: {parties:?}");
             return None;
         };
 
-        Some(DbVote {
+        Some(DbVoteIns {
             party: party.name,
+            code: code.to_string(),
             fraction: party.fraction as i32,
             infavor,
             legislative_initiatives_id,

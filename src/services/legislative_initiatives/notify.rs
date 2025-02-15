@@ -273,7 +273,7 @@ pub fn send_new_legis_info_mail(
                 &parliament_img,
                 parliament_img.width(),
                 parliament_img.height(),
-                Rgba::<u8>::COLOR_TYPE
+                Rgba::<u8>::COLOR_TYPE,
             );
 
             if let Err(e) = res {
@@ -284,7 +284,8 @@ pub fn send_new_legis_info_mail(
             #[allow(deprecated)]
             let base64_parliament_img = base64::encode(png_parliament_img_buf);
 
-            let vote_result_html_entry = format!(r#"
+            let vote_result_html_entry = format!(
+                r#"
                 <a href="https://somes.at/alpha/vote_result?id={id}">
                     <div style="display: flex; flex-direction: row; justify-content: space-between; width: 100%;">
                         <div style="border: 1px solid black; width: 50%; display: flex; justify-content: center; align-items: center;">
@@ -295,7 +296,9 @@ pub fn send_new_legis_info_mail(
                         </div>
                     </div>
                 </a>
-            "#, desc=legis_init.description);
+            "#,
+                desc = legis_init.description
+            );
 
             vote_results_html.push_str(&vote_result_html_entry);
         }
@@ -327,7 +330,8 @@ mod tests {
     use somes_scraper::{legis_init::LegislativeInitiatives, AustriaScraper};
 
     use crate::legislative_initiatives::notify::{
-        generate_parliament_image, generate_parliament_image_with_delegates, get_current_delegates, get_current_seats, send_new_legis_info_mail
+        generate_parliament_image, generate_parliament_image_with_delegates, get_current_delegates,
+        get_current_seats, send_new_legis_info_mail,
     };
 
     #[tokio::test]
@@ -341,7 +345,8 @@ mod tests {
     async fn test_generate_parliament_image() {
         let scraper = AustriaScraper::default();
         let legis_init = scraper
-            .get_legis_init("/gegenstand/XXVIII/I/14")
+            // .get_legis_init("/gegenstand/XXVIII/I/14")
+            .get_legis_init("/gegenstand/XXVIII/A/6")
             .await
             .unwrap();
         generate_parliament_image(&legis_init.votes, &[20, 28, 37, 43, 48, 54]).await;
@@ -363,8 +368,14 @@ mod tests {
 
         let seats = get_current_seats().await.unwrap_or_default();
         let delegates = get_current_delegates().await.unwrap_or_default();
-    
-        send_new_legis_info_mail("florian.nagy@it.htl-hl.ac.at", &[&(19106479, legis_init), &(10527226, legis_init1)], &seats, &delegates).unwrap();
+
+        send_new_legis_info_mail(
+            "florian.nagy@it.htl-hl.ac.at",
+            &[&(19106479, legis_init), &(10527226, legis_init1)],
+            &seats,
+            &delegates,
+        )
+        .unwrap();
 
         loop {}
     }

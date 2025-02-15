@@ -166,6 +166,20 @@ pub struct DbVote {
     pub infavor: bool,
     pub legislative_initiatives_id: i32,
 }
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+// #[diesel(table_name = votes)]
+// #[diesel(primary_key(party, legislative_initiatives_id))]
+// #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
+pub struct DbVoteIns {
+    pub party: String,
+    pub code: String,
+    pub fraction: i32,
+    pub infavor: bool,
+    pub legislative_initiatives_id: i32,
+}
+
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 // #[diesel(table_name = speeches)]
