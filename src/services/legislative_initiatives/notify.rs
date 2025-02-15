@@ -258,7 +258,13 @@ pub fn send_new_legis_info_mail(
     let mail_to = mail_to.to_string();
     std::thread::spawn(move || {
         let mut vote_results_html = String::new();
-        for (id, legis_init) in legis_inits {
+        for (idx, (id, legis_init)) in legis_inits.iter().enumerate() {
+            if idx >= 5 {
+                if legis_inits.len() >= 6 {
+                    vote_results_html.push_str(&"Und weitere ...");
+                }
+                break;
+            }
             let parliament_img =
                 generate_parliament_image_with_delegates(&legis_init.votes, &delegates, &seats);
 
@@ -284,7 +290,7 @@ pub fn send_new_legis_info_mail(
                         <div style="border: 1px solid black; width: 50%; display: flex; justify-content: center; align-items: center;">
                             {desc}
                         </div>
-                        <div style="border: 1px solid black; width: 50%;">
+                        <div style="border: 1px solid black; width: 60%;">
                             <img style="width: 70%;" src="data:image/png;base64,{base64_parliament_img}"/>
                         </div>
                     </div>
@@ -295,7 +301,7 @@ pub fn send_new_legis_info_mail(
         }
 
         let content = EMAIL_TEMPLATE.replace("{*VOTE_RESULTS*}", &vote_results_html);
-        if let Err(e) = send_mail(&MAILER, &mail_to, "Dein Somes One-Time Passwort", content) {
+        if let Err(e) = send_mail(&MAILER, &mail_to, "Neue Abstimmungen auf somes", content) {
             log::error!("could not send legis info mail: {e:?}");
         }
     });
@@ -321,7 +327,7 @@ mod tests {
     use somes_scraper::{legis_init::LegislativeInitiatives, AustriaScraper};
 
     use crate::legislative_initiatives::notify::{
-        generate_parliament_image, generate_parliament_image_with_delegates, get_current_seats,
+        generate_parliament_image, generate_parliament_image_with_delegates, get_current_delegates, get_current_seats, send_new_legis_info_mail
     };
 
     #[tokio::test]
@@ -339,5 +345,27 @@ mod tests {
             .await
             .unwrap();
         generate_parliament_image(&legis_init.votes, &[20, 28, 37, 43, 48, 54]).await;
+    }
+
+    #[tokio::test]
+    async fn test_send_new_votes_info_mail() {
+        let scraper = AustriaScraper::default();
+        let legis_init = scraper
+            .get_legis_init("/gegenstand/XXVIII/I/14")
+            .await
+            .unwrap();
+
+        let legis_init1 = scraper
+            .get_legis_init("/gegenstand/XXVIII/A/6")
+            .await
+            .unwrap();
+        // gegenstand/XXVIII/A/6
+
+        let seats = get_current_seats().await.unwrap_or_default();
+        let delegates = get_current_delegates().await.unwrap_or_default();
+    
+        send_new_legis_info_mail("florian.nagy@it.htl-hl.ac.at", &[&(19106479, legis_init), &(10527226, legis_init1)], &seats, &delegates).unwrap();
+
+        loop {}
     }
 }
