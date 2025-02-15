@@ -9,7 +9,7 @@ create table plenar_speech_legis_inits(
     foreign key (legis_init_id) references legislative_initiatives(id),
     foreign key (speech_id) references plenar_speeches(id),
     unique(gp, ityp, inr, speech_id)
-)
+);
 
 create table legis_inits_refs(
     id serial primary key,

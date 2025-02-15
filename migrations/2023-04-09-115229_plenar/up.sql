@@ -1,5 +1,5 @@
 -- Your SQL goes here
-CREATE TABLE plenar_infos (
+CREATE TABLE IF NOT EXISTS plenar_infos (
     -- use serial id -> add inr, and UNIQUE of (inr, ityp, gp)
     id serial primary key,
     add_date timestamp not null,
@@ -10,7 +10,7 @@ CREATE TABLE plenar_infos (
     UNIQUE (inr, legislative_period)
 );
 
-CREATE TABLE call_to_order (
+CREATE TABLE IF NOT EXISTS call_to_order (
     id varchar(20) primary key,
     plenar_id int not null,
     inr int not null,
@@ -19,7 +19,7 @@ CREATE TABLE call_to_order (
     FOREIGN KEY (receiver_id) REFERENCES delegates(id)
 );
 
-CREATE TABLE debates (
+CREATE TABLE IF NOT EXISTS debates (
     id serial primary key,
     -- use serial id -> ..
     plenar_id int not null,
@@ -29,7 +29,7 @@ CREATE TABLE debates (
     UNIQUE (plenar_id, about)
 );
 
-CREATE TABLE plenar_speeches (
+CREATE TABLE IF NOT EXISTS plenar_speeches (
     id serial primary key,
     delegate_id int not null,
     debate_id int not null,
@@ -45,7 +45,15 @@ CREATE TABLE plenar_speeches (
 );
 
 -- index is too large for speech text
-alter table plenar_speeches drop constraint plenar_speeches_spoken_text_key;
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints 
+               WHERE constraint_name = 'plenar_speeches_spoken_text_key' 
+               AND table_name = 'plenar_speeches') THEN
+        ALTER TABLE plenar_speeches DROP CONSTRAINT plenar_speeches_spoken_text_key;
+    END IF;
+END $$;
+
 DROP INDEX IF EXISTS plenar_speeches_spoken_text_key;
 
 CREATE INDEX plenar_speeches_spoken_text_hash_idx ON plenar_speeches USING hash (spoken_text);

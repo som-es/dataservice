@@ -39,6 +39,7 @@ async fn plenar_info_once(pg_pool: &PgPool) {
         let tok_handle = tok_handle.clone();
 
         // tokio::task::spawn_local(future)
+
         handles.push(std::thread::spawn(move || {
             tok_handle.block_on(async move {
                 let mut scraper = AustriaScraper::default();
@@ -478,10 +479,10 @@ pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool) {
             }
             _ = async {
                 let pg_pool = pg_pool.clone();
-                if let Err(e) = tokio::task::spawn(async move {
+                if let Err(e) = tokio::task::spawn_blocking(move || Handle::current().block_on(async move {
                     log::info!("Starting plenar info scraper");
                     plenar_info_once(&pg_pool).await;
-                }).await {
+                })).await {
                     log::error!("Error in plenar info scraper: {:?}", e);
                 }
                 // legis_init_once().await;

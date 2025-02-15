@@ -62,7 +62,7 @@ pub async fn scrape_new_legis_inits(
     let legis_inits = scraper.post_legis_payload().await?;
     let legis_init_paths = scraper.legis_paths(legis_inits)?;
 
-    const MAX_TASKS: usize = 2;
+    const MAX_TASKS: usize = 32;
     let mut handles: Vec<tokio::task::JoinHandle<()>> = vec![];
 
     // let code_to_parties = Arc::new(gen_code_to_parties(pool, gp).await);
@@ -264,6 +264,8 @@ pub async fn update_legis_inits_in_db(
             let diff = today() - date.created_at;
             if diff.num_days() <= 5 {
                 notify_legis_init = true;
+
+                // collect somwhere (other service), then run every 30 mins e.g.
             }
         };
 
