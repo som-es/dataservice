@@ -11,7 +11,7 @@ use somes_scraper::{
     ProContra, Vote,
 };
 use sqlx::{postgres::PgQueryResult, PgPool};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::{Arc, LazyLock}};
 use voted_by_name_result::{insert_named_vote_info, insert_named_votes};
 
 use crate::{
@@ -23,6 +23,10 @@ use crate::{
     with_data::{all_parties_at_date, all_parties_at_gp},
     Shutdown, GPS, LATEST_GP,
 };
+
+use dotenvy_macro::dotenv;
+
+const LEGIS_INIT_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| dotenv!("LEGIS_INIT_STILL_SEND_DAYS").parse::<i64>().unwrap_or(5));
 
 pub async fn gen_code_to_parties_with_date(
     pool: &PgPool,
@@ -408,12 +412,18 @@ pub async fn update_legis_inits_in_db(
         }
 
         if let Some(new_legis_init_tx) = &new_legis_init {
-            if let Ok(info) = sqlx::query!("select * from legis_email_info where already_sent_id = $1", legis_init_id).fetch_optional(pool).await {
+            if let Ok(info) = sqlx::query!(
+                "select * from legis_email_info where already_sent_id = $1",
+                legis_init_id
+            )
+            .fetch_optional(pool)
+            .await
+            {
                 let diff = today() - legis_init.date;
 
                 let mut legis_init = legis_init.clone();
                 legis_init.votes = show_votes;
-                if diff.num_days() <= 5 && info.is_none() && !legis_init.votes.is_empty() {
+                if diff.num_days() <= *LEGIS_INIT_STILL_SEND_DAYS && info.is_none() && !legis_init.votes.is_empty() {
                     log::info!("Sending fitting legis init: {legis_init_id}");
                     // collect somwhere (other service), then run every 30 mins e.g.
                     if let Err(e) = new_legis_init_tx
@@ -422,9 +432,18 @@ pub async fn update_legis_inits_in_db(
                     {
                         log::error!("could not send legis init to mail notify service: {e:?}")
                     }
-                }
-                if let Err(e) = sqlx::query!("insert into legis_email_info (already_sent_id) values ($1)", legis_init_id).execute(pool).await {
-                    log::error!("could not insert into legis email info for id {legis_init_id}: {e:?}");
+
+                    if let Err(e) = sqlx::query!(
+                        "insert into legis_email_info (already_sent_id) values ($1)",
+                        legis_init_id
+                    )
+                    .execute(pool)
+                    .await
+                    {
+                        log::error!(
+                            "could not insert into legis email info for id {legis_init_id}: {e:?}"
+                        );
+                    }
                 }
             };
         }

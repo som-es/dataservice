@@ -11,11 +11,12 @@ use super::{
     },
 };
 
+
 pub async fn notify_on_new_vote_results(
     pg_pool: &PgPool,
     new_vote_result_rx: &mut Receiver<Option<(i32, LegislativeInitiative)>>,
 ) {
-    let legis_init_accumulate_dur = std::env::var("LEGIS_INIT_ACCUMULATE_DUR")
+    let _legis_init_accumulate_dur = std::env::var("LEGIS_INIT_ACCUMULATE_DUR")
         .unwrap_or_else(|_| "60".to_string())
         .parse()
         .unwrap_or_else(|e| {
@@ -37,18 +38,19 @@ pub async fn notify_on_new_vote_results(
                     acc_legis_inits.push(legis_init);
                 }
 
-                Some(None) => {
-                    break
-                }
+                Some(None) => break,
                 None => {
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                    continue
+                    continue;
                 }
             }
-        } 
-        
+        }
+
         let notify_user_legis_inits = find_notifiers(pg_pool, &acc_legis_inits).await;
-        log::info!("Constructed notifier hashmap with {} entries", notify_user_legis_inits.len());
+        log::info!(
+            "Constructed notifier hashmap with {} entries",
+            notify_user_legis_inits.len()
+        );
 
         notify_users(&seats, &delegates, &notify_user_legis_inits);
     }
