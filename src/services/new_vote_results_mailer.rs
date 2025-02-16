@@ -13,7 +13,7 @@ use super::{
 
 pub async fn notify_on_new_vote_results(
     pg_pool: &PgPool,
-    new_vote_result_rx: &mut Receiver<(i32, LegislativeInitiative)>,
+    new_vote_result_rx: &mut Receiver<Option<(i32, LegislativeInitiative)>>,
 ) {
     let legis_init_accumulate_dur = std::env::var("LEGIS_INIT_ACCUMULATE_DUR")
         .unwrap_or_else(|_| "60".to_string())
@@ -29,25 +29,24 @@ pub async fn notify_on_new_vote_results(
     let delegates = get_current_delegates().await.unwrap_or_default();
 
     loop {
-        let Some(new_legis_init) = new_vote_result_rx.recv().await else {
-            continue;
-        };
+        let mut acc_legis_inits = Vec::new();
+        loop {
+            let new_legis_init = new_vote_result_rx.recv().await;
+            match new_legis_init {
+                Some(Some(legis_init)) => {
+                    acc_legis_inits.push(legis_init);
+                }
 
-        log::info!("Received first new vote result, now trying to receive more legis inits for {legis_init_accumulate_dur} seconds");
-
-        let mut acc_legis_inits = vec![new_legis_init];
-
-        let mut now = Instant::now();
-
-        // do not use time but trigger on end of latest scraping 
-        // => new votes things could be scattered in scraper return
-        while (Instant::now() - now).as_secs_f32() <= legis_init_accumulate_dur as f32 {
-            if let Ok(legis_init) = new_vote_result_rx.try_recv() {
-                now = Instant::now();
-                acc_legis_inits.push(legis_init);
+                Some(None) => {
+                    break
+                }
+                None => {
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    continue
+                }
             }
-        }
-
+        } 
+        
         let notify_user_legis_inits = find_notifiers(pg_pool, &acc_legis_inits).await;
         log::info!("Constructed notifier hashmap with {} entries", notify_user_legis_inits.len());
 
@@ -57,7 +56,7 @@ pub async fn notify_on_new_vote_results(
 
 pub async fn notify_on_new_vote_results_service(
     mut shutdown: Shutdown,
-    mut new_vote_result_rx: Receiver<(i32, LegislativeInitiative)>,
+    mut new_vote_result_rx: Receiver<Option<(i32, LegislativeInitiative)>>,
     pg_pool: PgPool,
 ) {
     while !shutdown.is_shutdown() {

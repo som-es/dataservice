@@ -58,7 +58,7 @@ pub async fn scrape_new_legis_inits(
     pool: &PgPool,
     scraper: Arc<AustriaScraper>,
     gp: &str,
-    new_legis_init: Option<Sender<(i32, LegislativeInitiative)>>,
+    new_legis_init: Option<Sender<Option<(i32, LegislativeInitiative)>>>,
 ) -> crate::Result<Vec<LegislativeInitiative>> {
     let legis_inits = scraper.post_legis_payload().await?;
     let legis_init_paths = scraper.legis_paths(legis_inits)?;
@@ -122,7 +122,7 @@ pub async fn scrape_new_legis_inits(
 async fn legis_init_once(
     only_latest: bool,
     pg_pool: &PgPool,
-    new_legis_init: Option<Sender<(i32, LegislativeInitiative)>>,
+    new_legis_init: Option<Sender<Option<(i32, LegislativeInitiative)>>>,
 ) -> Vec<LegislativeInitiative> {
     log::info!("Try scraping legislative initiatives");
 
@@ -212,7 +212,7 @@ pub async fn update_legis_inits_in_db(
     pool: &PgPool,
     code_to_parties: Arc<HashMap<String, Party>>,
     new_legis_inits: &[LegislativeInitiative],
-    new_legis_init: Option<Sender<(i32, LegislativeInitiative)>>,
+    new_legis_init: Option<Sender<Option<(i32, LegislativeInitiative)>>>,
 ) {
     // if let Some(jetzt_party_info) = code_to_parties.get("J").cloned() {
     //     code_to_parties.insert("P".to_string(), jetzt_party_info);
@@ -417,7 +417,7 @@ pub async fn update_legis_inits_in_db(
                     log::info!("Sending fitting legis init: {legis_init_id}");
                     // collect somwhere (other service), then run every 30 mins e.g.
                     if let Err(e) = new_legis_init_tx
-                        .send((legis_init_id, legis_init))
+                        .send(Some((legis_init_id, legis_init)))
                         .await
                     {
                         log::error!("could not send legis init to mail notify service: {e:?}")
@@ -703,7 +703,7 @@ pub async fn translate_votes(
 pub async fn run_shut_latest_gp(
     mut shutdown: Shutdown,
     pg_pool: PgPool,
-    new_legis_init: Sender<(i32, LegislativeInitiative)>,
+    new_legis_init: Sender<Option<(i32, LegislativeInitiative)>>,
 ) {
     let legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP_LATEST")
         .unwrap_or_else(|_| "300".to_string())
@@ -729,10 +729,18 @@ pub async fn run_shut_latest_gp(
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative (latest) scraper");
 
-                    legis_init_once(true, &pg_pool, Some(new_legis_init)).await;
+                    legis_init_once(true, &pg_pool, Some(new_legis_init.clone())).await;
+
+                    // triggers the email service
+                    let res = new_legis_init.send(None).await;
+                    if let Err(e) = res {
+                        log::error!("Could not send trigger value to email service: {e:?}");
+                    }
                 }).await {
                     log::error!("Error in legislative initiative (latest) scraper: {:?}", e);
                 }
+
+
                 // legis_init_once().await;
                 log::info!("Legislative initiative (latest) scraper service sleeps for {legis_init_sleep} seconds...");
                 tokio::time::sleep(tokio::time::Duration::from_secs(legis_init_sleep)).await;
