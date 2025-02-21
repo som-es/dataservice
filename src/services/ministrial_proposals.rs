@@ -10,6 +10,9 @@ use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{services::scrape_untill_success, today, Shutdown, GPS};
 
+mod notify;
+pub use notify::*;
+
 pub async fn scrape_new_ministrial_props(
     scraper: &AustriaScraper,
 ) -> crate::Result<Vec<MinistrialProposal>> {
@@ -36,7 +39,11 @@ pub async fn scrape_new_ministrial_props(
     Ok(new_ministrial_props)
 }
 
-async fn ministrial_proposal_once(only_latest: bool, pg_pool: &PgPool, new_ministrial_proposal_tx: Option<Sender<Option<(i32, MinistrialProposal)>>>) -> Vec<MinistrialProposal> {
+async fn ministrial_proposal_once(
+    only_latest: bool,
+    pg_pool: &PgPool,
+    new_ministrial_proposal_tx: Option<Sender<Option<(i32, MinistrialProposal)>>>,
+) -> Vec<MinistrialProposal> {
     log::info!("Try scraping ministiral proposals");
     let mut scraper = AustriaScraper::default();
 
@@ -49,9 +56,13 @@ async fn ministrial_proposal_once(only_latest: bool, pg_pool: &PgPool, new_minis
         })
         .await;
 
-        update_ministrial_proposals_in_db2(pg_pool, &new_ministrial_props, new_ministrial_proposal_tx.clone())
-            .await
-            .unwrap();
+        update_ministrial_proposals_in_db2(
+            pg_pool,
+            &new_ministrial_props,
+            new_ministrial_proposal_tx.clone(),
+        )
+        .await
+        .unwrap();
         if only_latest {
             break;
         }
@@ -61,7 +72,11 @@ async fn ministrial_proposal_once(only_latest: bool, pg_pool: &PgPool, new_minis
     vec![]
 }
 
-const MINISTRIAL_PROP_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| dotenv!("LEGIS_INIT_STILL_SEND_DAYS").parse::<i64>().unwrap_or(5));
+const MINISTRIAL_PROP_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| {
+    dotenv!("LEGIS_INIT_STILL_SEND_DAYS")
+        .parse::<i64>()
+        .unwrap_or(5)
+});
 
 use sqlx::postgres::PgPool;
 
@@ -135,7 +150,7 @@ pub async fn update_ministrial_proposals_in_db2(
             .execute(pool)
             .await?;
         }
-        
+
         if let Some(new_legis_init_tx) = &new_ministrial_proposal_tx {
             if let Ok(info) = sqlx::query!(
                 "select * from ministrial_email_info where already_sent_id = $1",
@@ -245,7 +260,11 @@ pub async fn update_ministrial_proposals_in_db2(
     Ok(())
 }
 
-pub async fn run_shut_latest_gp(mut shutdown: Shutdown, pg_pool: PgPool, new_ministrial_proposal_tx: Sender<Option<(i32, MinistrialProposal)>>) {
+pub async fn run_shut_latest_gp(
+    mut shutdown: Shutdown,
+    pg_pool: PgPool,
+    new_ministrial_proposal_tx: Sender<Option<(i32, MinistrialProposal)>>,
+) {
     let legis_init_sleep = std::env::var("MINISTRIAL_PROPOSAL_LATEST_SLEEP")
         .unwrap_or_else(|_| "400".to_string())
         .parse()

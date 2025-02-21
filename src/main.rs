@@ -30,9 +30,9 @@ pub async fn run_services(state: &State) {
     let (new_vote_result_tx, new_vote_result_rx) =
         tokio::sync::mpsc::channel::<Option<(i32, somes_scraper::LegislativeInitiative)>>(128);
 
-    let (new_ministrial_proposal_tx, new_ministrial_proposal_rx) =
-        tokio::sync::mpsc::channel::<Option<(i32, somes_scraper::ministrial_proposals::MinistrialProposal)>>(128);
-
+    let (new_ministrial_proposal_tx, new_ministrial_proposal_rx) = tokio::sync::mpsc::channel::<
+        Option<(i32, somes_scraper::ministrial_proposals::MinistrialProposal)>,
+    >(128);
 
     tokio::join!(
         // services::proposals::run(),

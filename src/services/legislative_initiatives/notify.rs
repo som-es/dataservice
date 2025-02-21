@@ -11,11 +11,11 @@ use somes_scraper::{LegislativeInitiative, Vote};
 use sqlx::{query, PgPool};
 
 use crate::{
-    email::{send_mail, EMAIL_TEMPLATE, MAILER},
+    email::{send_mail, LEGIS_INIT_EMAIL_TEMPLATE, MAILER},
     LATEST_GP,
 };
-
-pub async fn find_notifiers<'a>(
+// could generify 
+pub async fn find_notifiers_legis_init<'a>(
     pool: &PgPool,
     legis_inits: &'a [(i32, LegislativeInitiative)],
 ) -> HashMap<String, Vec<&'a (i32, LegislativeInitiative)>> {
@@ -304,7 +304,7 @@ pub fn send_new_legis_info_mail(
         }
 
         log::info!("Sending composed new vote result mail to {mail_to}");
-        let content = EMAIL_TEMPLATE.replace("{*VOTE_RESULTS*}", &vote_results_html);
+        let content = LEGIS_INIT_EMAIL_TEMPLATE.replace("{*VOTE_RESULTS*}", &vote_results_html);
         if let Err(e) = send_mail(&MAILER, &mail_to, "Neue Abstimmungen auf somes", content) {
             log::error!("could not send legis info mail: {e:?}");
         }

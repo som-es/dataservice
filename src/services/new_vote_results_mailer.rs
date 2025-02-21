@@ -7,10 +7,9 @@ use crate::Shutdown;
 use super::{
     delegates,
     legislative_initiatives::notify::{
-        find_notifiers, get_current_delegates, get_current_seats, notify_users,
+        find_notifiers_legis_init, get_current_delegates, get_current_seats, notify_users,
     },
 };
-
 
 pub async fn notify_on_new_vote_results(
     pg_pool: &PgPool,
@@ -46,7 +45,7 @@ pub async fn notify_on_new_vote_results(
             }
         }
 
-        let notify_user_legis_inits = find_notifiers(pg_pool, &acc_legis_inits).await;
+        let notify_user_legis_inits = find_notifiers_legis_init(pg_pool, &acc_legis_inits).await;
         log::info!(
             "Constructed notifier hashmap with {} entries",
             notify_user_legis_inits.len()

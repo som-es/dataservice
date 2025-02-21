@@ -15,7 +15,8 @@ pub const SMTP_PASSWORD: &str = dotenv!("SMTP_PASSWORD");
 pub const MAIL_FROM_DISPLAY: &str = dotenv!("MAIL_FROM_DISPLAY");
 pub const MAIL_SERVER: &str = dotenv!("MAIL_SERVER");
 
-pub const EMAIL_TEMPLATE: &str = include_str!("email_template.html");
+pub const LEGIS_INIT_EMAIL_TEMPLATE: &str = include_str!("legis_init_email_template.html");
+pub const MINISTRIAL_PROP_EMAIL_TEMPLATE: &str = include_str!("ministrial_prop_email_template.html");
 
 pub static MAILER: Lazy<SmtpTransport> = Lazy::new(|| {
     let creds = Credentials::new(SMTP_USERNAME.to_string(), SMTP_PASSWORD.to_string());

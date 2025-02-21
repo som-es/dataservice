@@ -11,7 +11,10 @@ use somes_scraper::{
     ProContra, Vote,
 };
 use sqlx::{postgres::PgQueryResult, PgPool};
-use std::{collections::HashMap, sync::{Arc, LazyLock}};
+use std::{
+    collections::HashMap,
+    sync::{Arc, LazyLock},
+};
 use voted_by_name_result::{insert_named_vote_info, insert_named_votes};
 
 use crate::{
@@ -26,7 +29,11 @@ use crate::{
 
 use dotenvy_macro::dotenv;
 
-const LEGIS_INIT_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| dotenv!("LEGIS_INIT_STILL_SEND_DAYS").parse::<i64>().unwrap_or(5));
+const LEGIS_INIT_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| {
+    dotenv!("LEGIS_INIT_STILL_SEND_DAYS")
+        .parse::<i64>()
+        .unwrap_or(5)
+});
 
 pub async fn gen_code_to_parties_with_date(
     pool: &PgPool,
@@ -423,7 +430,10 @@ pub async fn update_legis_inits_in_db(
 
                 let mut legis_init = legis_init.clone();
                 legis_init.votes = show_votes;
-                if diff.num_days() <= *LEGIS_INIT_STILL_SEND_DAYS && info.is_none() && !legis_init.votes.is_empty() {
+                if diff.num_days() <= *LEGIS_INIT_STILL_SEND_DAYS
+                    && info.is_none()
+                    && !legis_init.votes.is_empty()
+                {
                     log::info!("Sending fitting legis init: {legis_init_id}");
                     // collect somwhere (other service), then run every 30 mins e.g.
                     if let Err(e) = new_legis_init_tx
