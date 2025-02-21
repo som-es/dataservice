@@ -3,7 +3,7 @@ use somes_scraper::{
     proposals::ProposalsPayload,
     AustriaScraper,
 };
-use tokio::time::Instant;
+use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{services::scrape_untill_success, Shutdown, GPS};
 
@@ -33,7 +33,7 @@ pub async fn scrape_new_ministrial_props(
     Ok(new_ministrial_props)
 }
 
-async fn ministrial_proposal_once(only_latest: bool, pg_pool: &PgPool) -> Vec<MinistrialProposal> {
+async fn ministrial_proposal_once(only_latest: bool, pg_pool: &PgPool, new_ministrial_proposal_tx: Option<Sender<Option<(i32, MinistrialProposal)>>>) -> Vec<MinistrialProposal> {
     log::info!("Try scraping ministiral proposals");
     let mut scraper = AustriaScraper::default();
 
@@ -46,7 +46,7 @@ async fn ministrial_proposal_once(only_latest: bool, pg_pool: &PgPool) -> Vec<Mi
         })
         .await;
 
-        update_ministrial_proposals_in_db2(pg_pool, &new_ministrial_props)
+        update_ministrial_proposals_in_db2(pg_pool, &new_ministrial_props, new_ministrial_proposal_tx.clone())
             .await
             .unwrap();
         if only_latest {
@@ -63,6 +63,7 @@ use sqlx::postgres::PgPool;
 pub async fn update_ministrial_proposals_in_db2(
     pool: &PgPool,
     ministrial_props: &[MinistrialProposal],
+    new_ministrial_proposal_tx: Option<Sender<Option<(i32, MinistrialProposal)>>>,
 ) -> Result<(), sqlx::Error> {
     log::info!("Updating ministrial proposal in database...");
 
@@ -204,7 +205,7 @@ pub async fn update_ministrial_proposals_in_db2(
     Ok(())
 }
 
-pub async fn run_shut_latest_gp(mut shutdown: Shutdown, pg_pool: PgPool) {
+pub async fn run_shut_latest_gp(mut shutdown: Shutdown, pg_pool: PgPool, new_ministrial_proposal_tx: Sender<Option<(i32, MinistrialProposal)>>) {
     let legis_init_sleep = std::env::var("MINISTRIAL_PROPOSAL_LATEST_SLEEP")
         .unwrap_or_else(|_| "400".to_string())
         .parse()
@@ -216,6 +217,7 @@ pub async fn run_shut_latest_gp(mut shutdown: Shutdown, pg_pool: PgPool) {
         });
     #[cfg(feature = "ministerial_latest")]
     while !shutdown.is_shutdown() {
+        let new_ministrial_proposal_tx = new_ministrial_proposal_tx.clone();
         tokio::select! {
             _ = shutdown.recv() => {
                 println!("shutting down");
@@ -226,7 +228,7 @@ pub async fn run_shut_latest_gp(mut shutdown: Shutdown, pg_pool: PgPool) {
                 let pg_pool = pg_pool.clone();
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting ministrial proposal (latest) scraper");
-                    ministrial_proposal_once(true, &pg_pool).await;
+                    ministrial_proposal_once(true, &pg_pool, Some(new_ministrial_proposal_tx)).await;
                 }).await {
                     log::error!("Error in ministrial proposal (latest) scraper: {:?}", e);
                 }
@@ -262,7 +264,7 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown, pg_pool: PgPool) {
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting ministrial proposal scraper");
 
-                    ministrial_proposal_once(false, &pg_pool).await;
+                    ministrial_proposal_once(false, &pg_pool, None).await;
                 }).await {
                     log::error!("Error in ministrial proposal scraper: {:?}", e);
                 }
