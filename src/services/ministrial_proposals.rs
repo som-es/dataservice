@@ -1,3 +1,6 @@
+use std::sync::LazyLock;
+
+use dotenv_codegen::dotenv;
 use somes_scraper::{
     ministrial_proposals::{MinistrialProposal, MinistrialProposalScraper},
     proposals::ProposalsPayload,
@@ -5,7 +8,7 @@ use somes_scraper::{
 };
 use tokio::{sync::mpsc::Sender, time::Instant};
 
-use crate::{services::scrape_untill_success, Shutdown, GPS};
+use crate::{services::scrape_untill_success, today, Shutdown, GPS};
 
 pub async fn scrape_new_ministrial_props(
     scraper: &AustriaScraper,
@@ -57,6 +60,8 @@ async fn ministrial_proposal_once(only_latest: bool, pg_pool: &PgPool, new_minis
     // new_legis_inits
     vec![]
 }
+
+const MINISTRIAL_PROP_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| dotenv!("LEGIS_INIT_STILL_SEND_DAYS").parse::<i64>().unwrap_or(5));
 
 use sqlx::postgres::PgPool;
 
@@ -129,6 +134,41 @@ pub async fn update_ministrial_proposals_in_db2(
             )
             .execute(pool)
             .await?;
+        }
+        
+        if let Some(new_legis_init_tx) = &new_ministrial_proposal_tx {
+            if let Ok(info) = sqlx::query!(
+                "select * from ministrial_email_info where already_sent_id = $1",
+                ministrial_prop_id
+            )
+            .fetch_optional(pool)
+            .await
+            {
+                let diff = today() - ministrial_prop.created_at.date();
+
+                if diff.num_days() <= *MINISTRIAL_PROP_STILL_SEND_DAYS && info.is_none() {
+                    log::info!("Sending fitting ministrial prop: {ministrial_prop_id}");
+                    // collect somwhere (other service), then run every 30 mins e.g.
+                    if let Err(e) = new_legis_init_tx
+                        .send(Some((ministrial_prop_id, ministrial_prop.clone())))
+                        .await
+                    {
+                        log::error!("could not send ministrial prop to mail notify service: {e:?}")
+                    }
+
+                    if let Err(e) = sqlx::query!(
+                        "insert into ministrial_email_info (already_sent_id) values ($1)",
+                        ministrial_prop_id
+                    )
+                    .execute(pool)
+                    .await
+                    {
+                        log::error!(
+                            "could not insert into ministrial email info for id {ministrial_prop_id}: {e:?}"
+                        );
+                    }
+                }
+            };
         }
 
         // Insert or update topics
