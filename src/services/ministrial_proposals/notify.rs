@@ -10,7 +10,7 @@ pub async fn find_notifiers_ministrial_props<'a>(
     pool: &PgPool,
     legis_inits: &'a [(i32, MinistrialProposal)],
 ) -> HashMap<String, Vec<&'a (i32, MinistrialProposal)>> {
-    let ids = query!("select id, email from somes_user where is_email_hashed is false and send_new_vote_results_mails")
+    let ids = query!("select id, email from somes_user where is_email_hashed is false and send_new_ministrial_prop_mails")
         .fetch_all(pool)
         .await
         .unwrap_or_default();
