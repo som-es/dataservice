@@ -2,7 +2,7 @@ use somes_scraper::{ministrial_proposals::MinistrialProposal, LegislativeInitiat
 use sqlx::PgPool;
 use tokio::sync::mpsc::Receiver;
 
-use crate::{ministrial_proposals::find_notifiers_ministrial_props, Shutdown};
+use crate::{ministrial_proposals::{find_notifiers_ministrial_props, notify_users}, Shutdown};
 
 pub async fn notify_on_new_ministrial_props(
     pg_pool: &PgPool,
@@ -25,13 +25,13 @@ pub async fn notify_on_new_ministrial_props(
             }
         }
 
-        let notify_user_legis_inits = find_notifiers_ministrial_props(pg_pool, &acc_ministrial_props).await;
+        let notify_user_ministrial_props = find_notifiers_ministrial_props(pg_pool, &acc_ministrial_props).await;
         log::info!(
             "Constructed notifier hashmap with {} entries",
-            notify_user_legis_inits.len()
+            notify_user_ministrial_props.len()
         );
 
-        // notify_users(&seats, &delegates, &notify_user_legis_inits);
+        notify_users(&notify_user_ministrial_props);
     }
 }
 

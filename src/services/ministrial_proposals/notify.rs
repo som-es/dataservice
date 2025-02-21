@@ -88,8 +88,7 @@ pub fn notify_users(
 ) {
     for (mail_to, ministrial_props) in user_ministrial_props {
         if let Err(e) = send_new_ministrial_prop_info_mail(mail_to, ministrial_props) {
-            log::error!("could not send legis info mail: {e:?}");
+            log::error!("could not send ministrial prop info mail: {e:?}");
         }
     }
-    // for notifier_mail in find_notifiers(pool, legis_init_topics).await {}
 }
