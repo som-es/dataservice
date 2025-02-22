@@ -428,6 +428,7 @@ pub struct DbMandate {
     pub function: Option<String>,
     pub is_ministry: bool,
     pub is_chancellor: bool,
+    pub ministry: Option<String>,
     pub name: String,
     pub party: Option<String>,
     pub start_date: NaiveDate,

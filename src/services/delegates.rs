@@ -319,12 +319,24 @@ pub async fn insert_mandate(
 ) -> sqlx::Result<PgQueryResult> {
     let name_lowercase = mandate.name.to_lowercase();
 
+    let default = vec![];
+    let gov_officials = GOV_OFFICIALS;
+    let gov_officials = gov_officials.get(&(delegate_id as u64));
+
+    let is_fitting_ministry_official = gov_officials.as_ref()
+        .unwrap_or(&&default)
+        .iter()
+        .find(|x| x.start_date == mandate.start && mandate.is_ministry);
+
+    let ministry = is_fitting_ministry_official.map(|x| &x.ministry);
+
     let db_mandate = DbMandate {
         delegate_id,
         name: mandate.name.clone(),
         party: mandate.party.clone(),
         start_date: mandate.start,
         end_date: mandate.end,
+        ministry: ministry.cloned(),
         is_nr: mandate.is_nr,
         is_gov_official: mandate.is_gov,
         is_chancellor: mandate.is_chancellor,
@@ -336,9 +348,7 @@ pub async fn insert_mandate(
     }
     if name_lowercase.contains("minister") || name_lowercase.contains("kanzler") {
         if !mandate.is_gov {
-            println!("mandate: {mandate:?}");
-            println!("{delegate_id}");
-            assert!(mandate.is_gov,)
+            log::warn!("Could be a minister or kanzler thing, but no GOV in mandate!!! mandate: {mandate:?}, delegate: {delegate_id}");
         }
     }
 
