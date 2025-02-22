@@ -21,7 +21,7 @@ sqlx = { version="0.8", features = ["postgres", "runtime-tokio", "chrono"] }
 tokio = { version = "1", features = ["tokio-macros", "macros", "rt", "rt-multi-thread", "signal"], optional=true }
 dotenv_codegen = "0.15.0"
 utoipa = { version = "4.2.0", optional = true }
-pollster = "0.3.0"
+pollster = "0.4.0"
 lettre = "0.11.12"
 image = "0.25.5"
 imageproc = "0.25.0"
@@ -30,12 +30,12 @@ dotenvy_macro = "0.15.7"
 once_cell = "1.20.3"
 base64 = "0.22.1"
 [dev-dependencies]
-rand = "0.8"
+rand = "0.9"
 
 [features]
 # default = ["runner", "parties"]
-default = ["runner", "legis_init_latest", "legis_init", "ministerial_latest", "ministerial", "proposals_latest", "proposals", "plenar", "parties"]
-#default = ["runner", "legis_init_latest"]
+# default = ["runner", "legis_init_latest", "legis_init", "ministerial_latest", "ministerial", "proposals_latest", "proposals", "plenar", "parties"]
+default = ["runner", "ministerial_latest", "ministerial"]
 models = ["dotenvy", "chrono"]
 runner = ["models", "chrono", "reqwest", "simple_logger", "tokio", "dotenvy"]
 utoipa = ["dep:utoipa"]

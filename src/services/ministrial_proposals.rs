@@ -16,7 +16,8 @@ pub use notify::*;
 pub async fn scrape_new_ministrial_props(
     scraper: &AustriaScraper,
 ) -> crate::Result<Vec<MinistrialProposal>> {
-    let proposal_payload = ProposalsPayload::default();
+    let mut proposal_payload = ProposalsPayload::default();
+    proposal_payload.scrape_info = scraper.scrape_info.clone();
     let ministrial_proposals = scraper
         .post_ministrial_proposals_payload(proposal_payload)
         .await?;
