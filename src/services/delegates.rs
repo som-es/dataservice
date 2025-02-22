@@ -299,9 +299,18 @@ pub async fn insert_mandate(
         party: mandate.party.clone(),
         start_date: mandate.start,
         end_date: mandate.end,
-        is_nr: name_lowercase.contains("abgeordnete"),
-        is_gov_official: name_lowercase.contains("minister") || name_lowercase.contains("kanzler"),
+        is_nr: mandate.is_nr,
+        is_gov_official: mandate.is_gov,
+        is_chancellor: mandate.is_chancellor,
+        is_ministry: mandate.is_ministry,
+        function: mandate.function.clone()
     };
+    if name_lowercase.contains("abgeordnete") {
+        assert!(mandate.is_nr);
+    }
+    if name_lowercase.contains("minister") || name_lowercase.contains("kanzler") {
+        assert!(mandate.is_gov)
+    }
 
     sqlx::query!(
         "
@@ -319,6 +328,9 @@ pub async fn insert_mandate(
             DO UPDATE SET 
                 is_nr = EXCLUDED.is_nr,
                 is_gov_official = EXCLUDED.is_gov_official,
+                function = EXCLUDED.function,
+                is_chancellor = EXCLUDED.is_chancellor,
+                is_ministry = EXCLUDED.is_ministry,
                 party = EXCLUDED.party,
                 end_date = EXCLUDED.end_date
         ",

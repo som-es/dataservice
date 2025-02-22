@@ -149,7 +149,7 @@ async fn legis_init_once(
                 if only_latest {
                     scraper.scrape_info.date_start = today_and_time().checked_sub_days(Days::new(30));
                 }
-                
+
                 let scraper = Arc::new(scraper);
 
                 if let Err(e) =
