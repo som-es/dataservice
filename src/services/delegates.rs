@@ -361,9 +361,13 @@ pub async fn insert_mandate(
                 start_date, 
                 end_date,
                 is_nr,
-                is_gov_official
+                is_gov_official,
+                is_chancellor,
+                is_ministry,
+                function,
+                ministry
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
             ) ON CONFLICT (delegate_id, name, start_date) 
             DO UPDATE SET 
                 is_nr = EXCLUDED.is_nr,
@@ -372,7 +376,8 @@ pub async fn insert_mandate(
                 is_chancellor = EXCLUDED.is_chancellor,
                 is_ministry = EXCLUDED.is_ministry,
                 party = EXCLUDED.party,
-                end_date = EXCLUDED.end_date
+                end_date = EXCLUDED.end_date,
+                ministry = EXCLUDED.ministry
         ",
         db_mandate.delegate_id,
         db_mandate.name,
@@ -381,6 +386,10 @@ pub async fn insert_mandate(
         db_mandate.end_date,
         db_mandate.is_nr,
         db_mandate.is_gov_official,
+        db_mandate.is_chancellor,
+        db_mandate.is_ministry,
+        db_mandate.function,
+        db_mandate.ministry
     )
     .execute(conn)
     .await

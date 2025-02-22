@@ -7,6 +7,7 @@ create table mandates (
     function varchar(255),
     is_ministry boolean default false,
     is_chancellor boolean default false,
+    ministry varchar(312),
     name varchar(312) not null,
     party varchar(100),
     start_date date not null,
