@@ -1,6 +1,6 @@
 use dataservice::{
     connect_pg,
-    delegates::{delegate_count,},
+    delegates::{create_gov_officials_map, delegate_count},
     services, Shutdown, DATABASE_URL,
 };
 use std::future::Future;
@@ -8,7 +8,6 @@ use tokio::sync::{broadcast, mpsc};
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 1024)]
 async fn main() {
-    
     simple_logger::init_with_level(log::Level::Info).unwrap();
     // let _ = tokio::task::spawn_blocking(|| {
     //     let _x = &*GOV_OFFICIALS;

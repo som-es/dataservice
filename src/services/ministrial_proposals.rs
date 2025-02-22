@@ -8,7 +8,9 @@ use somes_scraper::{
 };
 use tokio::{sync::mpsc::Sender, time::Instant};
 
-use crate::{delegates::create_gov_officials_map, services::scrape_untill_success, today, Shutdown, GPS};
+use crate::{
+    delegates::create_gov_officials_map, services::scrape_untill_success, today, Shutdown, GPS,
+};
 
 mod notify;
 pub use notify::*;
@@ -142,15 +144,26 @@ pub async fn update_ministrial_proposals_in_db2(
         }
 
         if ministrial_prop.delegate_ids.is_empty() {
-            for roles in gov_officials.values() {
+            'outer: for roles in gov_officials.values() {
                 for role in roles {
                     if role.ministry == ministrial_prop.gegenstand_info.ressort
                         && ministrial_prop.created_at.date() >= role.start_date
                         && role.end_date.unwrap_or(today()) >= ministrial_prop.created_at.date()
                     {
-                        
-                        log::info!("MINISTRIAL ADDED: {}, ressort: {}", role.ministry, ministrial_prop.gegenstand_info.ressort);
-                        break;
+                        // log::info!("MINISTRIAL ADDED: {}, ressort: {}", role.ministry, ministrial_prop.gegenstand_info.ressort);
+                        sqlx::query!(
+                            r#"
+                            INSERT INTO ministrial_issuer (delegate_id, ministrial_proposal_id)
+                            VALUES ($1, $2)
+                            ON CONFLICT (ministrial_proposal_id, delegate_id)
+                            DO NOTHING
+                            "#,
+                            role.delegate_id as i32,
+                            ministrial_prop_id
+                        )
+                        .execute(pool)
+                        .await?;
+                        break 'outer;
                     }
                 }
             }

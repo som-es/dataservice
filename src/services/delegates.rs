@@ -17,7 +17,7 @@ use crate::{
 
 pub async fn create_gov_officials_map() -> HashMap<u64, Vec<GovOfficial>> {
     let scraper = AustriaScraper::default();
-    let gov_officials_listed = pollster::block_on(scraper.gov_officials());
+    let gov_officials_listed = scraper.gov_officials().await;
 
     let gov_officials_listed = gov_officials_listed.unwrap_or_default();
 
@@ -83,7 +83,6 @@ pub async fn delegate_count(conn: &PgPool) -> Option<i64> {
 }
 
 async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &PgPool) {
-
     let gov_officials = create_gov_officials_map().await;
 
     log::info!("Updating delegates in database...");
@@ -235,7 +234,9 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &PgPool) {
         }
 
         for mandate in &delegate.mandates {
-            if let Err(e) = insert_mandate(mandate, delegate.id as i32, pg_pool, &gov_officials).await {
+            if let Err(e) =
+                insert_mandate(mandate, delegate.id as i32, pg_pool, &gov_officials).await
+            {
                 log::error!("Error adding mandate ({mandate:?}) for delegate {delegate:?}: {e}",);
             }
         }
