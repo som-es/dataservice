@@ -1,11 +1,20 @@
-use dataservice::{connect_pg, delegates::delegate_count, services, Shutdown, DATABASE_URL};
-use sqlx::{pool, postgres::PgPoolOptions, PgPool};
+use dataservice::{
+    connect_pg,
+    delegates::{delegate_count,},
+    services, Shutdown, DATABASE_URL,
+};
 use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 1024)]
 async fn main() {
+    
     simple_logger::init_with_level(log::Level::Info).unwrap();
+    // let _ = tokio::task::spawn_blocking(|| {
+    //     let _x = &*GOV_OFFICIALS;
+    //     // log::info!("gov of map: {x:?}");
+    // })
+    // .await;
     // tokio::join!(services::proposals::run(),);
 
     tokio::spawn(async move {
@@ -79,6 +88,13 @@ pub async fn run_services(state: &State) {
             services::new_vote_results_mailer::notify_on_new_vote_results_service(
                 Shutdown::new(state.notify_shutdown.subscribe()),
                 new_vote_result_rx,
+                pool.clone()
+            )
+        ),
+        tokio::spawn(
+            services::new_ministrial_prop_mailer::notify_on_new_ministrial_props_service(
+                Shutdown::new(state.notify_shutdown.subscribe()),
+                new_ministrial_proposal_rx,
                 pool.clone()
             )
         ),

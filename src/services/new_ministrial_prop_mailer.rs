@@ -39,7 +39,7 @@ pub async fn notify_on_new_ministrial_props(
     }
 }
 
-pub async fn notify_on_new_vote_results_service(
+pub async fn notify_on_new_ministrial_props_service(
     mut shutdown: Shutdown,
     mut new_vote_result_rx: Receiver<Option<(i32, MinistrialProposal)>>,
     pg_pool: PgPool,

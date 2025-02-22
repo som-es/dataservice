@@ -8,7 +8,6 @@ use somes_scraper::{
     Mandate,
 };
 use sqlx::{postgres::PgQueryResult, query, PgPool};
-use tokio::runtime::Handle;
 
 use crate::{
     models::{DbContact, DbDelegate, DbMandate},
@@ -16,24 +15,22 @@ use crate::{
     Shutdown,
 };
 
-pub const GOV_OFFICIALS: LazyLock<HashMap<u64, Vec<GovOfficial>>> = LazyLock::new(|| {
-    Handle::current().block_on(async {
-        let scraper = AustriaScraper::default();
-        let gov_officials_listed = scraper.gov_officials().await;
+pub async fn create_gov_officials_map() -> HashMap<u64, Vec<GovOfficial>> {
+    let scraper = AustriaScraper::default();
+    let gov_officials_listed = pollster::block_on(scraper.gov_officials());
 
-        let gov_officials_listed = gov_officials_listed.unwrap_or_default();
+    let gov_officials_listed = gov_officials_listed.unwrap_or_default();
 
-        let mut gov_officials = HashMap::new();
-        for gov_official in gov_officials_listed {
-            gov_officials
-                .entry(gov_official.delegate_id)
-                .and_modify(|e: &mut Vec<GovOfficial>| e.push(gov_official.clone()))
-                .or_insert(vec![gov_official]);
-        }
-
+    let mut gov_officials = HashMap::new();
+    for gov_official in gov_officials_listed {
         gov_officials
-    })
-});
+            .entry(gov_official.delegate_id)
+            .and_modify(|e: &mut Vec<GovOfficial>| e.push(gov_official.clone()))
+            .or_insert(vec![gov_official]);
+    }
+
+    gov_officials
+}
 
 async fn scrape_new_delegates_bs() -> crate::Result<Vec<Delegate>> {
     let scraper = AustriaScraper::default();
@@ -86,6 +83,9 @@ pub async fn delegate_count(conn: &PgPool) -> Option<i64> {
 }
 
 async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &PgPool) {
+
+    let gov_officials = create_gov_officials_map().await;
+
     log::info!("Updating delegates in database...");
     for delegate in new_delegates {
         let db_contact = DbContact {
@@ -235,7 +235,7 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &PgPool) {
         }
 
         for mandate in &delegate.mandates {
-            if let Err(e) = insert_mandate(mandate, delegate.id as i32, pg_pool).await {
+            if let Err(e) = insert_mandate(mandate, delegate.id as i32, pg_pool, &gov_officials).await {
                 log::error!("Error adding mandate ({mandate:?}) for delegate {delegate:?}: {e}",);
             }
         }
@@ -316,14 +316,15 @@ pub async fn insert_mandate(
     mandate: &Mandate,
     delegate_id: i32,
     conn: &PgPool,
+    gov_officials: &HashMap<u64, Vec<GovOfficial>>,
 ) -> sqlx::Result<PgQueryResult> {
     let name_lowercase = mandate.name.to_lowercase();
 
     let default = vec![];
-    let gov_officials = GOV_OFFICIALS;
     let gov_officials = gov_officials.get(&(delegate_id as u64));
 
-    let is_fitting_ministry_official = gov_officials.as_ref()
+    let is_fitting_ministry_official = gov_officials
+        .as_ref()
         .unwrap_or(&&default)
         .iter()
         .find(|x| x.start_date == mandate.start && mandate.is_ministry);

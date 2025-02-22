@@ -1,14 +1,14 @@
-use std::sync::LazyLock;
+use std::{collections::HashMap, sync::LazyLock};
 
 use dotenv_codegen::dotenv;
 use somes_scraper::{
     ministrial_proposals::{MinistrialProposal, MinistrialProposalScraper},
     proposals::ProposalsPayload,
-    AustriaScraper,
+    AustriaScraper, GovOfficial,
 };
 use tokio::{sync::mpsc::Sender, time::Instant};
 
-use crate::{services::scrape_untill_success, today, Shutdown, GPS};
+use crate::{delegates::create_gov_officials_map, services::scrape_untill_success, today, Shutdown, GPS};
 
 mod notify;
 pub use notify::*;
@@ -48,6 +48,8 @@ async fn ministrial_proposal_once(
     log::info!("Try scraping ministiral proposals");
     let mut scraper = AustriaScraper::default();
 
+    let gov_officials = create_gov_officials_map().await;
+
     for gp in GPS {
         log::info!("scrape ministrial proposals for GP: {gp}");
         scraper.scrape_info.gp = vec![gp.into()];
@@ -61,6 +63,7 @@ async fn ministrial_proposal_once(
             pg_pool,
             &new_ministrial_props,
             new_ministrial_proposal_tx.clone(),
+            &gov_officials,
         )
         .await
         .unwrap();
@@ -85,6 +88,7 @@ pub async fn update_ministrial_proposals_in_db2(
     pool: &PgPool,
     ministrial_props: &[MinistrialProposal],
     new_ministrial_proposal_tx: Option<Sender<Option<(i32, MinistrialProposal)>>>,
+    gov_officials: &HashMap<u64, Vec<GovOfficial>>,
 ) -> Result<(), sqlx::Error> {
     log::info!("Updating ministrial proposal in database...");
 
@@ -135,6 +139,21 @@ pub async fn update_ministrial_proposals_in_db2(
         .id;
         if i % 10 == 0 {
             log::info!("{i} insertion dur: {:?}", start.elapsed());
+        }
+
+        if ministrial_prop.delegate_ids.is_empty() {
+            for roles in gov_officials.values() {
+                for role in roles {
+                    if role.ministry == ministrial_prop.gegenstand_info.ressort
+                        && ministrial_prop.created_at.date() >= role.start_date
+                        && role.end_date.unwrap_or(today()) >= ministrial_prop.created_at.date()
+                    {
+                        
+                        log::info!("MINISTRIAL ADDED: {}, ressort: {}", role.ministry, ministrial_prop.gegenstand_info.ressort);
+                        break;
+                    }
+                }
+            }
         }
 
         for issuer_id in &ministrial_prop.delegate_ids {
