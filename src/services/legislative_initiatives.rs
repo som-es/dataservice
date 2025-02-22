@@ -1,6 +1,6 @@
 mod absence_matching;
 pub use absence_matching::*;
-use chrono::NaiveDate;
+use chrono::{Days, NaiveDate};
 use tokio::{runtime::Handle, sync::mpsc::Sender};
 mod match_delegates_with_name;
 pub mod notify;
@@ -21,10 +21,7 @@ use crate::{
     models::{
         DbEurovocTopicLegisInit, DbLegisDocument, DbLegislativeInitiative, DbNamedVoteInfo,
         DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote, DbVoteIns,
-    },
-    today,
-    with_data::{all_parties_at_date, all_parties_at_gp},
-    Shutdown, GPS, LATEST_GP,
+    }, today, today_and_time, with_data::{all_parties_at_date, all_parties_at_gp}, Shutdown, GPS, LATEST_GP
 };
 
 use dotenvy_macro::dotenv;
@@ -149,6 +146,10 @@ async fn legis_init_once(
                 let mut scraper = AustriaScraper::default();
                 log::info!("LEGIS INIT once GP: {gp}");
                 scraper.scrape_info.gp = vec![gp.into()];
+                if only_latest {
+                    scraper.scrape_info.date_start = today_and_time().checked_sub_days(Days::new(30));
+                }
+                
                 let scraper = Arc::new(scraper);
 
                 if let Err(e) =
