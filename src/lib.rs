@@ -18,8 +18,8 @@ pub use shutdown::*;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 
 pub mod email;
-pub mod with_data;
 pub mod notify_registrars;
+pub mod with_data;
 pub use notify_registrars::*;
 
 use dotenvy_macro::dotenv;

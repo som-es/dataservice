@@ -5,7 +5,6 @@ use sqlx::{query, PgPool};
 
 use crate::email::{send_mail, MAILER};
 
-
 pub async fn find_notifiers_ministrial_props<'a>(
     pool: &PgPool,
     legis_inits: &'a [(i32, MinistrialProposal)],
@@ -41,7 +40,10 @@ pub fn send_new_ministrial_prop_info_mail(
     mail_to: &str,
     ministrial_props: &[&(i32, MinistrialProposal)],
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let ministrial_props = ministrial_props.iter().map(|x| (*x).clone()).collect::<Vec<_>>();
+    let ministrial_props = ministrial_props
+        .iter()
+        .map(|x| (*x).clone())
+        .collect::<Vec<_>>();
 
     let mail_to = mail_to.to_string();
     std::thread::spawn(move || {
@@ -74,8 +76,14 @@ pub fn send_new_ministrial_prop_info_mail(
         }
 
         log::info!("Sending composed new ministrial prop mail to {mail_to}");
-        let content = crate::email::MINISTRIAL_PROP_EMAIL_TEMPLATE.replace("{*MINISTRIAL_PROPS*}", &ministrial_props_html);
-        if let Err(e) = send_mail(&MAILER, &mail_to, "Neue Ministerialentwürfe auf somes", content) {
+        let content = crate::email::MINISTRIAL_PROP_EMAIL_TEMPLATE
+            .replace("{*MINISTRIAL_PROPS*}", &ministrial_props_html);
+        if let Err(e) = send_mail(
+            &MAILER,
+            &mail_to,
+            "Neue Ministerialentwürfe auf somes",
+            content,
+        ) {
             log::error!("could not send ministrial prop info mail: {e:?}");
         }
     });
@@ -83,9 +91,7 @@ pub fn send_new_ministrial_prop_info_mail(
     Ok(())
 }
 
-pub fn notify_users(
-    user_ministrial_props: &HashMap<String, Vec<&(i32, MinistrialProposal)>>,
-) {
+pub fn notify_users(user_ministrial_props: &HashMap<String, Vec<&(i32, MinistrialProposal)>>) {
     for (mail_to, ministrial_props) in user_ministrial_props {
         if let Err(e) = send_new_ministrial_prop_info_mail(mail_to, ministrial_props) {
             log::error!("could not send ministrial prop info mail: {e:?}");

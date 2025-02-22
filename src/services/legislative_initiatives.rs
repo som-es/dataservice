@@ -21,7 +21,10 @@ use crate::{
     models::{
         DbEurovocTopicLegisInit, DbLegisDocument, DbLegislativeInitiative, DbNamedVoteInfo,
         DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote, DbVoteIns,
-    }, today, today_and_time, with_data::{all_parties_at_date, all_parties_at_gp}, Shutdown, GPS, LATEST_GP
+    },
+    today, today_and_time,
+    with_data::{all_parties_at_date, all_parties_at_gp},
+    Shutdown, GPS, LATEST_GP,
 };
 
 use dotenvy_macro::dotenv;
@@ -147,7 +150,8 @@ async fn legis_init_once(
                 log::info!("LEGIS INIT once GP: {gp}");
                 scraper.scrape_info.gp = vec![gp.into()];
                 if only_latest {
-                    scraper.scrape_info.date_start = today_and_time().checked_sub_days(Days::new(30));
+                    scraper.scrape_info.date_start =
+                        today_and_time().checked_sub_days(Days::new(30));
                 }
 
                 let scraper = Arc::new(scraper);

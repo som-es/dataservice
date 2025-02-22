@@ -14,7 +14,7 @@ use crate::{
     email::{send_mail, LEGIS_INIT_EMAIL_TEMPLATE, MAILER},
     LATEST_GP,
 };
-// could generify 
+// could generify
 pub async fn find_notifiers_legis_init<'a>(
     pool: &PgPool,
     legis_inits: &'a [(i32, LegislativeInitiative)],

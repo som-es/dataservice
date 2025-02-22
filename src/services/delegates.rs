@@ -1,13 +1,39 @@
-use std::collections::HashSet;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::LazyLock,
+};
 
-use somes_scraper::{delegates::DelegateScraper, AustriaScraper, Delegate, Mandate};
+use somes_scraper::{
+    delegates::DelegateScraper, gov_officials::GovOfficials, AustriaScraper, Delegate, GovOfficial,
+    Mandate,
+};
 use sqlx::{postgres::PgQueryResult, query, PgPool};
+use tokio::runtime::Handle;
 
 use crate::{
     models::{DbContact, DbDelegate, DbMandate},
     services::scrape_untill_success,
     Shutdown,
 };
+
+pub const GOV_OFFICIALS: LazyLock<HashMap<u64, Vec<GovOfficial>>> = LazyLock::new(|| {
+    Handle::current().block_on(async {
+        let scraper = AustriaScraper::default();
+        let gov_officials_listed = scraper.gov_officials().await;
+
+        let gov_officials_listed = gov_officials_listed.unwrap_or_default();
+
+        let mut gov_officials = HashMap::new();
+        for gov_official in gov_officials_listed {
+            gov_officials
+                .entry(gov_official.delegate_id)
+                .and_modify(|e: &mut Vec<GovOfficial>| e.push(gov_official.clone()))
+                .or_insert(vec![gov_official]);
+        }
+
+        gov_officials
+    })
+});
 
 async fn scrape_new_delegates_bs() -> crate::Result<Vec<Delegate>> {
     let scraper = AustriaScraper::default();
@@ -303,13 +329,17 @@ pub async fn insert_mandate(
         is_gov_official: mandate.is_gov,
         is_chancellor: mandate.is_chancellor,
         is_ministry: mandate.is_ministry,
-        function: mandate.function.clone()
+        function: mandate.function.clone(),
     };
     if name_lowercase.contains("abgeordnete") {
         assert!(mandate.is_nr);
     }
     if name_lowercase.contains("minister") || name_lowercase.contains("kanzler") {
-        assert!(mandate.is_gov)
+        if !mandate.is_gov {
+            println!("mandate: {mandate:?}");
+            println!("{delegate_id}");
+            assert!(mandate.is_gov,)
+        }
     }
 
     sqlx::query!(
