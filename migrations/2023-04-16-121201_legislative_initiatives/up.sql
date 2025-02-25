@@ -9,10 +9,10 @@ create table legislative_initiatives (
     emphasis varchar(6000),
     is_emphasis_ai_generated boolean default false,
     title text not null,
-    pre_declined_type varchar(2),
+    pre_declined_type varchar(10),
     voted_by_name boolean not null default false,
     description text not null,
-    accepted varchar(2),
+    accepted varchar(10),
     -- rename this to handled_at
     created_at date not null default now(),
     appeared_at timestamp,
