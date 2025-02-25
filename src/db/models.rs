@@ -130,7 +130,7 @@ pub struct DbMinistrialProposalQuery {
     pub legis_init_gp: Option<String>,
     pub legis_init_inr: Option<i32>,
     pub legis_init_ityp: Option<String>,
-    pub has_vote_result: bool
+    pub has_vote_result: Option<bool>
 }
 use sqlx::FromRow;
 
