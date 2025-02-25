@@ -276,7 +276,7 @@ pub async fn update_legis_inits_in_db(
             requires_simple_majority: legis_init.requires_simple_majority,
             pre_declined_type: legis_init
                 .hidden_votes_info
-                .vote_type
+                .vote_stage
                 .map(|pre| pre.to_string()),
             voted_by_name: legis_init.hidden_votes_info.voted_by_name,
             plenary_session_id,
