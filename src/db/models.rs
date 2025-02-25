@@ -104,13 +104,14 @@ pub struct DbMinistrialProposal {
     pub due_to: NaiveDate,
     pub ressort: String,
     pub ressort_shortform: String,
+    pub has_vote_result: bool,
     pub legis_init_gp: Option<String>,
     pub legis_init_inr: Option<i32>,
     pub legis_init_ityp: Option<String>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, FromRow)]
 // #[diesel(table_name = ministrial_proposals)]
 pub struct DbMinistrialProposalQuery {
     pub delegate_id: i32,
@@ -129,6 +130,7 @@ pub struct DbMinistrialProposalQuery {
     pub legis_init_gp: Option<String>,
     pub legis_init_inr: Option<i32>,
     pub legis_init_ityp: Option<String>,
+    pub has_vote_result: bool
 }
 use sqlx::FromRow;
 

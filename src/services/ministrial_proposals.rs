@@ -103,9 +103,9 @@ pub async fn update_ministrial_proposals_in_db2(
             r#"
             INSERT INTO ministrial_proposals (
                 title, inr, emphasis, description, ityp, gp, created_at, updated_at,
-                due_to, ressort, ressort_shortform, legis_init_gp, legis_init_inr, legis_init_ityp
+                due_to, ressort, ressort_shortform, legis_init_gp, legis_init_inr, legis_init_ityp, has_vote_result
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             ON CONFLICT (inr, ityp, gp)
             DO UPDATE SET
                 title = EXCLUDED.title,
@@ -118,7 +118,8 @@ pub async fn update_ministrial_proposals_in_db2(
                 ressort_shortform = EXCLUDED.ressort_shortform,
                 legis_init_gp = EXCLUDED.legis_init_gp,
                 legis_init_inr = EXCLUDED.legis_init_inr,
-                legis_init_ityp = EXCLUDED.legis_init_ityp
+                legis_init_ityp = EXCLUDED.legis_init_ityp,
+                has_vote_result = EXCLUDED.has_vote_result
             RETURNING id
             "#,
             ministrial_prop.title,
@@ -134,7 +135,8 @@ pub async fn update_ministrial_proposals_in_db2(
             ministrial_prop.gegenstand_info.ressort_shortform,
             ministrial_prop.legis_gp,
             ministrial_prop.legis_init_inr.map(|x| x as i32),
-            ministrial_prop.legis_init_ityp
+            ministrial_prop.legis_init_ityp,
+            ministrial_prop.legis_init_inr.is_some(),
         )
         .fetch_one(pool)
         .await?
