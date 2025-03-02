@@ -21,6 +21,11 @@ create table legislative_initiatives (
     -- was_invisibly_declined boolean default false,
     plenary_session_id int,
     notified_with_mail boolean default false,
+    is_law boolean default false,
+    law_accepted boolean,
+    law_come_into_effect_date date,
+    law_expires_on_date date,
+    by_publication boolean,
     foreign key (plenary_session_id) references plenar_infos(id),
     UNIQUE (inr, ityp, gp)
 );

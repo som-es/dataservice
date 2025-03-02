@@ -281,6 +281,13 @@ pub async fn update_legis_inits_in_db(
             voted_by_name: legis_init.hidden_votes_info.voted_by_name,
             plenary_session_id,
             doktyp: legis_init.doktyp.clone(),
+            is_law: legis_init.is_law.clone(),
+            law_accepted: legis_init.law_accepted.clone(),
+            law_come_into_effect_date: legis_init.come_into_effect_info.as_ref().map(|x| x.law_come_into_effect_date.clone()).flatten(),
+            law_expires_on_date: legis_init.come_into_effect_info.as_ref().map(|x| x.law_expires_on_date.clone()).flatten(),
+            by_publication: legis_init.come_into_effect_info.as_ref().map(|x| x.by_publication)
+            // law_come_into_effect_date: legis_init.come_into_effect_info.map(|x| x.law_come_into_effect_date.clone()),
+
         };
         // println!("db_legis_init: {db_legis_init:?}");
 
@@ -290,9 +297,9 @@ pub async fn update_legis_inits_in_db(
             "
                 INSERT INTO legislative_initiatives (
                     title, inr, emphasis, description, ityp, gp, accepted, created_at, appeared_at, updated_at,
-                    requires_simple_majority, pre_declined_type, voted_by_name, plenary_session_id, doktyp
+                    requires_simple_majority, pre_declined_type, voted_by_name, plenary_session_id, doktyp, is_law, law_accepted, law_come_into_effect_date, law_expires_on_date, by_publication
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
                 ) ON CONFLICT (inr, ityp, gp) 
                 DO UPDATE SET 
                     title = EXCLUDED.title,
@@ -306,7 +313,11 @@ pub async fn update_legis_inits_in_db(
                     pre_declined_type = EXCLUDED.pre_declined_type,
                     voted_by_name = EXCLUDED.voted_by_name,
                     plenary_session_id = EXCLUDED.plenary_session_id,
-                    doktyp = EXCLUDED.doktyp
+                    doktyp = EXCLUDED.doktyp,
+                    law_accepted = EXCLUDED.law_accepted,
+                    law_come_into_effect_date = EXCLUDED.law_come_into_effect_date,
+                    law_expires_on_date = EXCLUDED.law_expires_on_date,
+                    by_publication = EXCLUDED.by_publication
                 RETURNING id
             ",
             db_legis_init.title,
@@ -324,6 +335,11 @@ pub async fn update_legis_inits_in_db(
             db_legis_init.voted_by_name,
             db_legis_init.plenary_session_id,
             db_legis_init.doktyp,
+            db_legis_init.is_law,
+            db_legis_init.law_accepted,
+            db_legis_init.law_come_into_effect_date,
+            db_legis_init.law_expires_on_date,
+            db_legis_init.by_publication,
         )
         .fetch_one(pool)
         .await
@@ -385,7 +401,7 @@ pub async fn update_legis_inits_in_db(
         }
 
         if legis_init.votes.is_empty()
-            && legis_init.accepted == Some(somes_scraper::AcceptedState::PreDeclined)
+            // && legis_init.accepted == Some(somes_scraper::AcceptedState::PreDeclined)
             && legis_init.hidden_votes_info.pro_contra_parties.is_some()
         {
             match &legis_init.hidden_votes_info.pro_contra_parties {
@@ -969,6 +985,26 @@ mod tests {
         let scraper: AustriaScraper = AustriaScraper::default();
         let res = scraper
             .get_legis_init("/gegenstand/XXVII/III/85")
+            .await
+            .unwrap();
+
+        let pool = connect_pg().await;
+        let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
+        crate::legislative_initiatives::update_legis_inits_in_db(
+            &pool,
+            code_to_parties,
+            &[res],
+            None,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_legis_init_empty_gp_scrape_xxviii_uea_8() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper: AustriaScraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/UEA/8")
             .await
             .unwrap();
 

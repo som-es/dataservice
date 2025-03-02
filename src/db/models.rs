@@ -87,6 +87,12 @@ pub struct DbLegislativeInitiative {
     pub pre_declined_type: Option<String>,
     pub voted_by_name: bool,
     pub plenary_session_id: Option<i32>,
+    pub is_law: bool,
+    pub law_accepted: Option<bool>,
+    pub law_come_into_effect_date: Option<NaiveDate>,
+    pub law_expires_on_date: Option<NaiveDate>,
+    pub by_publication: Option<bool>,
+
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
