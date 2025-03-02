@@ -314,6 +314,7 @@ pub async fn update_legis_inits_in_db(
                     voted_by_name = EXCLUDED.voted_by_name,
                     plenary_session_id = EXCLUDED.plenary_session_id,
                     doktyp = EXCLUDED.doktyp,
+                    is_law = EXCLUDED.is_law,
                     law_accepted = EXCLUDED.law_accepted,
                     law_come_into_effect_date = EXCLUDED.law_come_into_effect_date,
                     law_expires_on_date = EXCLUDED.law_expires_on_date,
