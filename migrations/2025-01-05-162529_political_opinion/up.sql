@@ -7,6 +7,22 @@ create table political_questions(
     unique (question)
 );
 
+create table political_questions_topics(
+    id serial primary key,
+    question_id int not null,
+    topic varchar(255) not null,
+    unique (question_id, topic),
+    FOREIGN key (question_id) REFERENCES political_questions(id)
+);
+
+create table political_questions_detailed_topics(
+    id serial primary key,
+    question_id int not null,
+    topic varchar(255) not null,
+    unique (question_id, topic),
+    FOREIGN key (question_id) REFERENCES political_questions(id)
+);
+
 create table political_answers(
     id serial primary key,
     question_id int not null,
