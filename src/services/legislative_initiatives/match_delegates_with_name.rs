@@ -89,7 +89,6 @@ pub fn match_delegate_name_with_delegate_id<'a, I: Iterator<Item = &'a (String, 
             let name_split = name.split(' ').collect::<Vec<_>>();
 
             let mut deep_split_matched = false;
-            // let mut names_are_the_same = true;
             let mut split_names_are_the_same = true;
 
             let mut deep_search_mismatch = 0;
@@ -110,7 +109,6 @@ pub fn match_delegate_name_with_delegate_id<'a, I: Iterator<Item = &'a (String, 
                 }
             }
 
-            // println!("name: {name:?}");
             let surname = name_split[0].to_string();
             let fullname = name;
 
