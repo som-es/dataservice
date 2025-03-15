@@ -615,6 +615,13 @@ pub async fn update_legis_inits_in_db(
             }
         }
 
+        for delegate_id in &legis_init.delegate_ids {
+            let res = sqlx::query!("insert into legis_init_delegates (legis_init_id, delegate_id) values ($1, $2) on conflict do nothing", legis_init_id, *delegate_id as i32).execute(pool).await;
+            if let Err(e) = res {
+                log::error!("Error inserting delegate into legis init delegates, 'eingebracht von': {e:?}")
+            }
+        }
+
         for topic in legis_init.other_keyword_topics.clone() {
             let db_other_keyword_topic = DbOtherKeywordTopicLegisInit {
                 topic,
