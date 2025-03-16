@@ -26,6 +26,7 @@ create table legislative_initiatives (
     law_come_into_effect_date date,
     law_expires_on_date date,
     by_publication boolean,
+    has_reference boolean default false,
     foreign key (plenary_session_id) references plenar_infos(id),
     UNIQUE (inr, ityp, gp)
 );
