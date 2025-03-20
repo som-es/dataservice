@@ -286,7 +286,7 @@ pub async fn update_legis_inits_in_db(
             law_come_into_effect_date: legis_init.come_into_effect_info.as_ref().map(|x| x.law_come_into_effect_date.clone()).flatten(),
             law_expires_on_date: legis_init.come_into_effect_info.as_ref().map(|x| x.law_expires_on_date.clone()).flatten(),
             by_publication: legis_init.come_into_effect_info.as_ref().map(|x| x.by_publication),
-            has_reference: Some(legis_init.references.as_ref().map(|x| !x.is_empty())).unwrap_or_default()
+            has_reference: Some(legis_init.references.as_ref().map(|x| !x.is_empty()).unwrap_or_default())
             // law_come_into_effect_date: legis_init.come_into_effect_info.map(|x| x.law_come_into_effect_date.clone()),
 
         };
@@ -1017,6 +1017,26 @@ mod tests {
         let scraper: AustriaScraper = AustriaScraper::default();
         let res = scraper
             .get_legis_init("/gegenstand/XXVIII/UEA/8")
+            .await
+            .unwrap();
+
+        let pool = connect_pg().await;
+        let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
+        crate::legislative_initiatives::update_legis_inits_in_db(
+            &pool,
+            code_to_parties,
+            &[res],
+            None,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_legis_init_empty_gp_scrape_xxviii_a_104() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper: AustriaScraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/A/104")
             .await
             .unwrap();
 
