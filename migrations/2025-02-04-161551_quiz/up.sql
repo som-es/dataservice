@@ -16,6 +16,6 @@ create table quiz_questions(
     answer3 varchar(255) not null,
     answer4 varchar(255) not null,
     correct_answer int not null,
-    unique (question),
+    unique (question, quiz_id),
     foreign key (quiz_id) references quiz(id)
 );
