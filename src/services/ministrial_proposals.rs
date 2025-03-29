@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::LazyLock};
 
 use chrono::Months;
-use dotenv_codegen::dotenv;
+use dotenvy_macro::dotenv;
 use somes_scraper::{
     ministrial_proposals::{MinistrialProposal, MinistrialProposalScraper},
     proposals::ProposalsPayload,
