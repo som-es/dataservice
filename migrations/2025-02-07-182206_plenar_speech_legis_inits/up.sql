@@ -20,3 +20,5 @@ create table legis_inits_refs(
     foreign key (origin_legis_init_id) references legislative_initiatives(id),
     unique(ref_gp, ref_ityp, ref_inr, origin_legis_init_id)
 );
+
+create index index_ref_gp ON legis_inits_refs (ref_gp, ref_ityp, ref_inr);
