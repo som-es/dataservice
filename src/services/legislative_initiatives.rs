@@ -625,7 +625,7 @@ pub async fn update_legis_inits_in_db(
         }
 
         for delegate in &legis_init.related_delegates {
-            let res = sqlx::query!("insert into legis_init_delegates (legis_init_id, delegate_id, delegate_text) values ($1, $2, $3) on conflict do nothing", legis_init_id, delegate.delegate_id as i32, delegate.text).execute(pool).await;
+            let res = sqlx::query!("insert into legis_init_delegates (legis_init_id, delegate_id, delegate_text) values ($1, $2, $3) on conflict (legis_init_id, delegate_id) do update set delegate_text = EXCLUDED.delegate_text", legis_init_id, delegate.delegate_id as i32, delegate.text).execute(pool).await;
             if let Err(e) = res {
                 log::error!("Error inserting delegate into legis init delegates, 'eingebracht von': {e:?}")
             }
@@ -1044,6 +1044,28 @@ mod tests {
             .get_legis_init("/gegenstand/XXVIII/A/104")
             .await
             .unwrap();
+
+        let pool = connect_pg().await;
+        let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
+        crate::legislative_initiatives::update_legis_inits_in_db(
+            &pool,
+            code_to_parties,
+            &[res],
+            None,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_legis_init_empty_gp_scrape_xxviii_a_104_23() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper: AustriaScraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/A/64")
+            .await
+            .unwrap();
+
+        log::info!("legis init: {res:?}");
 
         let pool = connect_pg().await;
         let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
