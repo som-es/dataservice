@@ -8,7 +8,7 @@ use tokio::sync::{broadcast, mpsc};
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 1024)]
 async fn main() {
-    simple_logger::init_with_level(log::Level::Info).unwrap();
+    simple_logger::init_with_level(log::Level::Error).unwrap();
     // let _ = tokio::task::spawn_blocking(|| {
     //     let _x = &*GOV_OFFICIALS;
     //     // log::info!("gov of map: {x:?}");
@@ -32,6 +32,7 @@ pub async fn run_services(state: &State) {
             log::info!("Delegates are 0, start scraping ...");
             let hs = std::collections::HashSet::new();
             let _res = services::delegates::delegates_once(&hs, pool.clone()).await;
+            services::parties::parties_once(&pool).await;
         }
     }
 

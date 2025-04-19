@@ -152,6 +152,8 @@ async fn legis_init_once(
                 if only_latest {
                     scraper.scrape_info.date_start =
                         today_and_time().checked_sub_days(Days::new(30));
+                } else {
+                    scraper.scrape_info.date_start = None;
                 }
 
                 let scraper = Arc::new(scraper);
