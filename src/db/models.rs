@@ -93,6 +93,7 @@ pub struct DbLegislativeInitiative {
     pub law_expires_on_date: Option<NaiveDate>,
     pub by_publication: Option<bool>,
     pub has_reference: Option<bool>,
+    pub is_voteable_on: Option<bool>,
 
 }
 

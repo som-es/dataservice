@@ -286,7 +286,8 @@ pub async fn update_legis_inits_in_db(
             law_come_into_effect_date: legis_init.come_into_effect_info.as_ref().map(|x| x.law_come_into_effect_date.clone()).flatten(),
             law_expires_on_date: legis_init.come_into_effect_info.as_ref().map(|x| x.law_expires_on_date.clone()).flatten(),
             by_publication: legis_init.come_into_effect_info.as_ref().map(|x| x.by_publication),
-            has_reference: Some(legis_init.references.as_ref().map(|x| !x.is_empty()).unwrap_or_default())
+            has_reference: Some(legis_init.references.as_ref().map(|x| !x.is_empty()).unwrap_or_default()),
+            is_voteable_on: Some(legis_init.is_voteable_on),
             // law_come_into_effect_date: legis_init.come_into_effect_info.map(|x| x.law_come_into_effect_date.clone()),
 
         };
@@ -299,9 +300,9 @@ pub async fn update_legis_inits_in_db(
                 INSERT INTO legislative_initiatives (
                     title, inr, emphasis, description, ityp, gp, accepted, created_at, appeared_at, updated_at,
                     requires_simple_majority, pre_declined_type, voted_by_name, plenary_session_id, doktyp, is_law, 
-                    law_accepted, law_come_into_effect_date, law_expires_on_date, by_publication, has_reference
+                    law_accepted, law_come_into_effect_date, law_expires_on_date, by_publication, has_reference, is_voteable_on
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
                 ) ON CONFLICT (inr, ityp, gp) 
                 DO UPDATE SET 
                     title = EXCLUDED.title,
@@ -321,7 +322,8 @@ pub async fn update_legis_inits_in_db(
                     law_come_into_effect_date = EXCLUDED.law_come_into_effect_date,
                     law_expires_on_date = EXCLUDED.law_expires_on_date,
                     by_publication = EXCLUDED.by_publication,
-                    has_reference = EXCLUDED.has_reference
+                    has_reference = EXCLUDED.has_reference,
+                    is_voteable_on = EXCLUDED.is_voteable_on
                 RETURNING id
             ",
             db_legis_init.title,
@@ -345,6 +347,7 @@ pub async fn update_legis_inits_in_db(
             db_legis_init.law_expires_on_date,
             db_legis_init.by_publication,
             db_legis_init.has_reference,
+            db_legis_init.is_voteable_on
         )
         .fetch_one(pool)
         .await
@@ -619,8 +622,8 @@ pub async fn update_legis_inits_in_db(
             }
         }
 
-        for delegate_id in &legis_init.delegate_ids {
-            let res = sqlx::query!("insert into legis_init_delegates (legis_init_id, delegate_id) values ($1, $2) on conflict do nothing", legis_init_id, *delegate_id as i32).execute(pool).await;
+        for delegate in &legis_init.related_delegates {
+            let res = sqlx::query!("insert into legis_init_delegates (legis_init_id, delegate_id, delegate_text) values ($1, $2, $3) on conflict do nothing", legis_init_id, delegate.delegate_id as i32, delegate.text).execute(pool).await;
             if let Err(e) = res {
                 log::error!("Error inserting delegate into legis init delegates, 'eingebracht von': {e:?}")
             }

@@ -141,9 +141,43 @@ diesel::table! {
 }
 
 diesel::table! {
+    favo_dels (id) {
+        id -> Int4,
+        user_id -> Int4,
+        delegate_id -> Int4,
+        favo_on -> Nullable<Timestamp>,
+    }
+}
+
+diesel::table! {
+    favo_legis_inits (id) {
+        id -> Int4,
+        user_id -> Int4,
+        legis_init_id -> Int4,
+        favo_on -> Nullable<Timestamp>,
+    }
+}
+
+diesel::table! {
     introduction_transcriptions (id) {
         id -> Int4,
         delegate_id -> Nullable<Int4>,
+    }
+}
+
+diesel::table! {
+    legis_email_info (id) {
+        id -> Int4,
+        already_sent_id -> Int4,
+        marked_on -> Nullable<Timestamp>,
+    }
+}
+
+diesel::table! {
+    legis_init_delegates (id) {
+        id -> Int4,
+        legis_init_id -> Int4,
+        delegate_id -> Int4,
     }
 }
 
@@ -186,17 +220,24 @@ diesel::table! {
         emphasis -> Nullable<Varchar>,
         is_emphasis_ai_generated -> Nullable<Bool>,
         title -> Text,
-        #[max_length = 2]
+        #[max_length = 10]
         pre_declined_type -> Nullable<Varchar>,
         voted_by_name -> Bool,
         description -> Text,
-        #[max_length = 2]
+        #[max_length = 10]
         accepted -> Nullable<Varchar>,
         created_at -> Date,
         appeared_at -> Nullable<Timestamp>,
         updated_at -> Nullable<Timestamp>,
         requires_simple_majority -> Nullable<Bool>,
         plenary_session_id -> Nullable<Int4>,
+        notified_with_mail -> Nullable<Bool>,
+        is_law -> Nullable<Bool>,
+        law_accepted -> Nullable<Bool>,
+        law_come_into_effect_date -> Nullable<Date>,
+        law_expires_on_date -> Nullable<Date>,
+        by_publication -> Nullable<Bool>,
+        has_reference -> Nullable<Bool>,
     }
 }
 
@@ -206,12 +247,26 @@ diesel::table! {
         delegate_id -> Int4,
         is_nr -> Nullable<Bool>,
         is_gov_official -> Nullable<Bool>,
+        #[max_length = 255]
+        function -> Nullable<Varchar>,
+        is_ministry -> Nullable<Bool>,
+        is_chancellor -> Nullable<Bool>,
+        #[max_length = 312]
+        ministry -> Nullable<Varchar>,
         #[max_length = 312]
         name -> Varchar,
         #[max_length = 100]
         party -> Nullable<Varchar>,
         start_date -> Date,
         end_date -> Nullable<Date>,
+    }
+}
+
+diesel::table! {
+    ministrial_email_info (id) {
+        id -> Int4,
+        already_sent_id -> Int4,
+        marked_on -> Nullable<Timestamp>,
     }
 }
 
@@ -247,6 +302,7 @@ diesel::table! {
         legis_init_inr -> Nullable<Int4>,
         #[max_length = 7]
         legis_init_ityp -> Nullable<Varchar>,
+        has_vote_result -> Nullable<Bool>,
     }
 }
 
@@ -440,6 +496,44 @@ diesel::table! {
 }
 
 diesel::table! {
+    political_questions_detailed_topics (id) {
+        id -> Int4,
+        question_id -> Int4,
+        #[max_length = 255]
+        topic -> Varchar,
+    }
+}
+
+diesel::table! {
+    political_questions_detailed_topics_influence (id) {
+        id -> Int4,
+        question_id -> Int4,
+        #[max_length = 255]
+        topic -> Varchar,
+        influence -> Float8,
+    }
+}
+
+diesel::table! {
+    political_questions_topics (id) {
+        id -> Int4,
+        question_id -> Int4,
+        #[max_length = 255]
+        topic -> Varchar,
+    }
+}
+
+diesel::table! {
+    political_questions_topics_influence (id) {
+        id -> Int4,
+        question_id -> Int4,
+        #[max_length = 255]
+        topic -> Varchar,
+        influence -> Float8,
+    }
+}
+
+diesel::table! {
     proposal_delegates (proposal_id, delegate_id) {
         #[max_length = 20]
         proposal_id -> Varchar,
@@ -543,6 +637,9 @@ diesel::table! {
         email -> Varchar,
         is_email_hashed -> Bool,
         is_admin -> Bool,
+        send_new_vote_results_mails -> Bool,
+        send_new_delegate_activity_mails -> Bool,
+        send_new_ministrial_prop_mails -> Bool,
     }
 }
 
@@ -680,11 +777,19 @@ diesel::joinable!(division_interest_score -> delegates (delegate_id));
 diesel::joinable!(eurovoc_topics_legis_init -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(eurovoc_topics_ministrial_proposals -> ministrial_proposals (ministrial_proposal_id));
 diesel::joinable!(eurovoc_topics_proposals -> proposals (proposals_id));
+diesel::joinable!(favo_dels -> delegates (delegate_id));
+diesel::joinable!(favo_dels -> somes_user (user_id));
+diesel::joinable!(favo_legis_inits -> legislative_initiatives (legis_init_id));
+diesel::joinable!(favo_legis_inits -> somes_user (user_id));
 diesel::joinable!(introduction_transcriptions -> delegates (delegate_id));
+diesel::joinable!(legis_email_info -> legislative_initiatives (already_sent_id));
+diesel::joinable!(legis_init_delegates -> delegates (delegate_id));
+diesel::joinable!(legis_init_delegates -> legislative_initiatives (legis_init_id));
 diesel::joinable!(legis_inits_refs -> legislative_initiatives (origin_legis_init_id));
 diesel::joinable!(legislative_documents -> legislative_initiatives (legislative_initiatives_id));
 diesel::joinable!(legislative_initiatives -> plenar_infos (plenary_session_id));
 diesel::joinable!(mandates -> delegates (delegate_id));
+diesel::joinable!(ministrial_email_info -> ministrial_proposals (already_sent_id));
 diesel::joinable!(ministrial_issuer -> delegates (delegate_id));
 diesel::joinable!(ministrial_issuer -> ministrial_proposals (ministrial_proposal_id));
 diesel::joinable!(ministrial_proposals_documents -> ministrial_proposals (ministrial_proposal_id));
@@ -705,6 +810,10 @@ diesel::joinable!(political_opinions -> delegates (delegate_id));
 diesel::joinable!(political_opinions -> political_answers (answer_id));
 diesel::joinable!(political_opinions -> political_questions (question_id));
 diesel::joinable!(political_positions -> delegates (delegate_id));
+diesel::joinable!(political_questions_detailed_topics -> political_questions (question_id));
+diesel::joinable!(political_questions_detailed_topics_influence -> political_questions (question_id));
+diesel::joinable!(political_questions_topics -> political_questions (question_id));
+diesel::joinable!(political_questions_topics_influence -> political_questions (question_id));
 diesel::joinable!(proposal_delegates -> delegates (delegate_id));
 diesel::joinable!(proposal_delegates -> proposals (proposal_id));
 diesel::joinable!(proposal_documents -> proposals (proposal_id));
@@ -736,11 +845,16 @@ diesel::allow_tables_to_appear_in_same_query!(
     eurovoc_topics_legis_init,
     eurovoc_topics_ministrial_proposals,
     eurovoc_topics_proposals,
+    favo_dels,
+    favo_legis_inits,
     introduction_transcriptions,
+    legis_email_info,
+    legis_init_delegates,
     legis_inits_refs,
     legislative_documents,
     legislative_initiatives,
     mandates,
+    ministrial_email_info,
     ministrial_issuer,
     ministrial_proposals,
     ministrial_proposals_documents,
@@ -758,6 +872,10 @@ diesel::allow_tables_to_appear_in_same_query!(
     political_opinions,
     political_positions,
     political_questions,
+    political_questions_detailed_topics,
+    political_questions_detailed_topics_influence,
+    political_questions_topics,
+    political_questions_topics_influence,
     proposal_delegates,
     proposal_documents,
     proposals,
