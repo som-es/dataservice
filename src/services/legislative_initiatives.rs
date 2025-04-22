@@ -1057,7 +1057,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_legis_init_empty_gp_scrape_xxviii_a_104_23() {
+    async fn test_legis_init_empty_gp_scrape_xxviii_a_64() {
         simple_logger::init_with_level(log::Level::Info).unwrap();
         let scraper: AustriaScraper = AustriaScraper::default();
         let res = scraper
