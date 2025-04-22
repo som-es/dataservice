@@ -32,6 +32,7 @@ pub async fn insert_ministrial_decree(decree: &Thing, pg_pool: &PgPool) -> crate
             mandates.is_gov_official
             AND ministry is not null
             AND mandates.start_date <= $1::date 
+            AND name not like '%sekretär%'
             AND (CASE WHEN mandates.end_date IS NULL THEN $1::date ELSE mandates.end_date END) >= $1::date;
 
         ",
@@ -44,38 +45,61 @@ pub async fn insert_ministrial_decree(decree: &Thing, pg_pool: &PgPool) -> crate
         .iter()
         .find(|x| x.ministry.as_ref() == Some(&decree.issuer))
     {
+
         let decree_id = sqlx::query!(
             "
             INSERT INTO ministrial_decrees (
-                decree_id, 
-                date, 
+                gov_official_id, 
+                ris_id, 
+                ministrial_issuer, 
                 title, 
-                text, 
-                issuer, 
-                ministry, 
-                delegate_id
-            ) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (decree_id) DO UPDATE
+                short_title, 
+                publication_date, 
+                part
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (ris_id) DO UPDATE
             SET 
-                date = EXCLUDED.date,
+                gov_official_id = EXCLUDED.gov_official_id,
                 title = EXCLUDED.title,
-                text = EXCLUDED.text,
-                issuer = EXCLUDED.issuer,
-                ministry = EXCLUDED.ministry,
-                delegate_id = EXCLUDED.delegate_id
-            RETURNING decree_id
+                short_title = EXCLUDED.short_title,
+                publication_date = EXCLUDED.publication_date,
+                part = EXCLUDED.part
+            RETURNING id;
             ",
-            decree.decree_id,
-            decree.date,
-            decree.title,
-            decree.text,
+            fitting_gov_official.delegate_id,
+            decree.id,
             decree.issuer,
-            decree.ministry,
-            fitting_gov_official.delegate_id
+            decree.title,
+            decree.short_title,
+            decree.date,
+            decree.part
         )
-        .execute(pg_pool)
+        .fetch_one(pg_pool)
         .await?;
+        
+        for document in &decree.documents {
+            sqlx::query!(
+                "
+                INSERT INTO ministrial_decrees_documents (
+                    ministrial_decree_id, 
+                    title, 
+                    document_type, 
+                    document_url
+                ) VALUES ($1, $2, $3, $4)
+                ON CONFLICT (ministrial_decree_id, document_url) DO UPDATE
+                SET 
+                    title = EXCLUDED.title,
+                    document_type = EXCLUDED.document_type,
+                    document_url = EXCLUDED.document_url;
+                ",
+                decree_id.id,
+                document.title,
+                document.ftype.to_string(),
+                document.link
+            )
+            .execute(pg_pool)
+            .await?;
+        }
     }
 
     Ok(())
