@@ -7,6 +7,7 @@ pub async fn save_ministrial_decrees(pages: u32, pg_pool: &PgPool) {
     let scraper = AustriaScraper::default();
 
     for page in 1..=pages {
+        log::info!("Currently on page {page}..");
         let Ok(decrees) = scraper.fetch_and_parse_ministrial_decrees(page).await else {
             log::error!("Cannot scrape ministrial decrees on page {page}");
             continue;
