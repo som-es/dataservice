@@ -9,7 +9,7 @@ create table ministrial_decrees(
     short_title varchar(512) not null,
     publication_date date not null,
     part varchar(255) not null,
-    unique(gov_official_id),
+    unique(ris_id),
     foreign key (gov_official_id) references delegate(id)
 )
 
