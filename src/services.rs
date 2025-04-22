@@ -1,5 +1,6 @@
 pub mod delegates;
 pub mod legislative_initiatives;
+pub mod ministrial_decrees;
 pub mod ministrial_proposals;
 pub mod new_ministrial_prop_mailer;
 pub mod new_vote_results_mailer;

@@ -10,7 +10,8 @@ use somes_scraper::{
 use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{
-    delegates::create_gov_officials_map, services::scrape_untill_success, today, today_and_time, Shutdown, GPS
+    delegates::create_gov_officials_map, services::scrape_untill_success, today, today_and_time,
+    Shutdown, GPS,
 };
 
 mod notify;
@@ -65,8 +66,11 @@ async fn ministrial_proposal_once(
             scrape_new_ministrial_props(&scraper).await
         })
         .await;
-        
-        log::info!("scraped {} new ministrial props", new_ministrial_props.len());
+
+        log::info!(
+            "scraped {} new ministrial props",
+            new_ministrial_props.len()
+        );
 
         update_ministrial_proposals_in_db2(
             pg_pool,

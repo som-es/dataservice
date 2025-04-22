@@ -285,13 +285,29 @@ pub async fn update_legis_inits_in_db(
             doktyp: legis_init.doktyp.clone(),
             is_law: legis_init.is_law.clone(),
             law_accepted: legis_init.law_accepted.clone(),
-            law_come_into_effect_date: legis_init.come_into_effect_info.as_ref().map(|x| x.law_come_into_effect_date.clone()).flatten(),
-            law_expires_on_date: legis_init.come_into_effect_info.as_ref().map(|x| x.law_expires_on_date.clone()).flatten(),
-            by_publication: legis_init.come_into_effect_info.as_ref().map(|x| x.by_publication),
-            has_reference: Some(legis_init.references.as_ref().map(|x| !x.is_empty()).unwrap_or_default()),
+            law_come_into_effect_date: legis_init
+                .come_into_effect_info
+                .as_ref()
+                .map(|x| x.law_come_into_effect_date.clone())
+                .flatten(),
+            law_expires_on_date: legis_init
+                .come_into_effect_info
+                .as_ref()
+                .map(|x| x.law_expires_on_date.clone())
+                .flatten(),
+            by_publication: legis_init
+                .come_into_effect_info
+                .as_ref()
+                .map(|x| x.by_publication),
+            has_reference: Some(
+                legis_init
+                    .references
+                    .as_ref()
+                    .map(|x| !x.is_empty())
+                    .unwrap_or_default(),
+            ),
             is_voteable_on: Some(legis_init.is_voteable_on),
             // law_come_into_effect_date: legis_init.come_into_effect_info.map(|x| x.law_come_into_effect_date.clone()),
-
         };
         // println!("db_legis_init: {db_legis_init:?}");
 
@@ -627,7 +643,9 @@ pub async fn update_legis_inits_in_db(
         for delegate in &legis_init.related_delegates {
             let res = sqlx::query!("insert into legis_init_delegates (legis_init_id, delegate_id, delegate_text) values ($1, $2, $3) on conflict (legis_init_id, delegate_id) do update set delegate_text = EXCLUDED.delegate_text", legis_init_id, delegate.delegate_id as i32, delegate.text).execute(pool).await;
             if let Err(e) = res {
-                log::error!("Error inserting delegate into legis init delegates, 'eingebracht von': {e:?}")
+                log::error!(
+                    "Error inserting delegate into legis init delegates, 'eingebracht von': {e:?}"
+                )
             }
         }
 

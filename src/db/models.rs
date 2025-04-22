@@ -94,7 +94,6 @@ pub struct DbLegislativeInitiative {
     pub by_publication: Option<bool>,
     pub has_reference: Option<bool>,
     pub is_voteable_on: Option<bool>,
-
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
@@ -138,7 +137,7 @@ pub struct DbMinistrialProposalQuery {
     pub legis_init_gp: Option<String>,
     pub legis_init_inr: Option<i32>,
     pub legis_init_ityp: Option<String>,
-    pub has_vote_result: Option<bool>
+    pub has_vote_result: Option<bool>,
 }
 use sqlx::FromRow;
 

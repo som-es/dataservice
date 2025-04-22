@@ -10,8 +10,8 @@ create table ministrial_decrees(
     publication_date date not null,
     part varchar(255) not null,
     unique(ris_id),
-    foreign key (gov_official_id) references delegate(id)
-)
+    foreign key (gov_official_id) references delegates(id)
+);
 
 create table ministrial_decrees_documents(
     id serial primary key,
@@ -21,4 +21,4 @@ create table ministrial_decrees_documents(
     document_url varchar(512) not null,
     FOREIGN KEY (ministrial_decree_id) REFERENCES ministrial_decrees(id),
     UNIQUE (ministrial_decree_id, document_url)
-)
+);

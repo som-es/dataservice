@@ -4,7 +4,9 @@ use crate::{
     legislative_initiatives::absence_matching, services::scrape_untill_success, Shutdown, GPS,
 };
 use somes_scraper::{
-    call_to_order::CallToOrderInfo, plenar::{Debate, DebateInfo, Plenar, PlenarInfo}, text_utils, AustriaScraper, PlenarSpeech, Reference, Scraper, TextExtractor
+    call_to_order::CallToOrderInfo,
+    plenar::{Debate, DebateInfo, Plenar, PlenarInfo},
+    text_utils, AustriaScraper, PlenarSpeech, Reference, Scraper, TextExtractor,
 };
 
 async fn scrape_new_plenar_infos(scraper: &AustriaScraper) -> crate::Result<Vec<PlenarInfo>> {
@@ -366,10 +368,9 @@ async fn insert_plenar_speech(
         }
 
         if let Some(updated_spoken_text) = &updated_spoken_text {
-            let (removed_parans, _) = text_utils::remove_paran_contents(updated_spoken_text, '(', ')');
-            for removed_paran in removed_parans {
-                
-            }
+            let (removed_parans, _) =
+                text_utils::remove_paran_contents(updated_spoken_text, '(', ')');
+            for removed_paran in removed_parans {}
         }
 
         sqlx::query!(

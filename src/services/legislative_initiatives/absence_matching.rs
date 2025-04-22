@@ -98,7 +98,7 @@ mod tests {
     }
 
     // /gegenstand/XXVII/NRSITZ/243
-    
+
     #[tokio::test]
     async fn test_absence_extraction_xxvii_243() {
         let scraper = AustriaScraper::default();

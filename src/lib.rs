@@ -62,7 +62,6 @@ pub async fn connect_pg2() -> PgPool {
         .unwrap()
 }
 
-
 #[cfg(test)]
 mod tests {
     use sqlx::query;
@@ -73,11 +72,16 @@ mod tests {
     async fn test_duplicate_spoken_text_check() {
         let pg = connect_pg().await;
 
-        let res = query!("SELECT spoken_text, COUNT(*) as c
+        let res = query!(
+            "SELECT spoken_text, COUNT(*) as c
 FROM plenar_speeches 
 WHERE spoken_text IS NOT NULL 
 GROUP BY spoken_text 
-HAVING COUNT(*) > 1 order by c desc;").fetch_all(&pg).await.unwrap();
+HAVING COUNT(*) > 1 order by c desc;"
+        )
+        .fetch_all(&pg)
+        .await
+        .unwrap();
 
         for (idx, ex) in res.iter().enumerate() {
             println!("ex: {ex:?}");
@@ -87,6 +91,5 @@ HAVING COUNT(*) > 1 order by c desc;").fetch_all(&pg).await.unwrap();
                 break;
             }
         }
-
     }
 }
