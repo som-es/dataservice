@@ -71,8 +71,11 @@ pub async fn run_services(state: &State) {
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone()
         )),
-        // add only last gp runner
         tokio::spawn(services::plenar::run_shut(
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            pool.clone()
+        )),
+        tokio::spawn(services::plenar::run_shut_latest(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone()
         )),

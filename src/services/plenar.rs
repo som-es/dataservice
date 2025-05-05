@@ -27,7 +27,7 @@ async fn scrape_new_plenar_infos(scraper: &AustriaScraper) -> crate::Result<Vec<
     Ok(new_plenar_infos)
 }
 
-async fn plenar_info_once(pg_pool: &PgPool) {
+async fn plenar_info_once(pg_pool: &PgPool, only_latest: bool) {
     log::info!("Try scraping plenar info");
 
     let tok_handle = Handle::current();
@@ -78,6 +78,9 @@ async fn plenar_info_once(pg_pool: &PgPool) {
                 }
             })
         }));
+        if only_latest {
+            break;
+        }
     }
     for handle in handles.drain(..) {
         if let Err(e) = handle.join() {
@@ -462,17 +465,54 @@ pub async fn insert_call_to_order(
     Ok(())
 }
 
+pub async fn run_shut_latest(mut shutdown: Shutdown, pg_pool: PgPool) {
+    // insert_all_serially().await;
+    // return;
+    let plenar_sleep = std::env::var("PLENAR_SLEEP_LATEST")
+        .unwrap_or_else(|_| "800".to_string())
+        .parse()
+        .unwrap_or_else(|e| {
+            log::warn!(
+                "Could not parse PLENAR_SLEEP_LATEST env var: {e}. Using default value of 800 seconds"
+            );
+            800
+        });
+
+    #[cfg(feature = "plenar_latest")]
+    while !shutdown.is_shutdown() {
+        tokio::select! {
+            _ = shutdown.recv() => {
+                println!("shutting down");
+                // return ok?
+                break;
+            }
+            _ = async {
+                let pg_pool = pg_pool.clone();
+                if let Err(e) = tokio::task::spawn_blocking(move || Handle::current().block_on(async move {
+                    log::info!("Starting latest plenar info scraper");
+                    plenar_info_once(&pg_pool, true).await;
+                })).await {
+                    log::error!("Error in plenar info scraper: {:?}", e);
+                }
+                // legis_init_once().await;
+                log::info!("Latest Plenar info scraper service sleeps for {plenar_sleep} seconds...");
+                tokio::time::sleep(tokio::time::Duration::from_secs(plenar_sleep)).await;
+            } => {}
+        }
+    }
+}
+
 pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool) {
     // insert_all_serially().await;
     // return;
     let plenar_sleep = std::env::var("PLENAR_SLEEP")
-        .unwrap_or_else(|_| "400".to_string())
+        .unwrap_or_else(|_| "9000".to_string())
         .parse()
         .unwrap_or_else(|e| {
             log::warn!(
-                "Could not parse PLENAR_SLEEP env var: {e}. Using default value of 400 seconds"
+                "Could not parse PLENAR_SLEEP env var: {e}. Using default value of 9000 seconds"
             );
-            400
+            9000
         });
 
     #[cfg(feature = "plenar")]
@@ -487,7 +527,7 @@ pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool) {
                 let pg_pool = pg_pool.clone();
                 if let Err(e) = tokio::task::spawn_blocking(move || Handle::current().block_on(async move {
                     log::info!("Starting plenar info scraper");
-                    plenar_info_once(&pg_pool).await;
+                    plenar_info_once(&pg_pool, false).await;
                 })).await {
                     log::error!("Error in plenar info scraper: {:?}", e);
                 }
