@@ -1,10 +1,13 @@
 use somes_scraper::{decree::RisScraper, AustriaScraper, Thing};
 use sqlx::PgPool;
 
-use crate::Shutdown;
+use crate::{today, with_data::gps::{gps, LegislativePeriod}, Shutdown};
 
 pub async fn save_ministrial_decrees(pages: u32, pg_pool: &PgPool) {
     let scraper = AustriaScraper::default();
+
+    let mut all_gps = gps(pg_pool).await.unwrap();
+    all_gps.insert(0, LegislativePeriod { gp: "".into(), start_date: today() });
 
     for page in 1..=pages {
         log::info!("Currently on page {page}..");
@@ -14,14 +17,24 @@ pub async fn save_ministrial_decrees(pages: u32, pg_pool: &PgPool) {
         };
 
         for decree in decrees {
-            if let Err(e) = insert_ministrial_decree(&decree, pg_pool).await {
+            if let Err(e) = insert_ministrial_decree(&decree, pg_pool, &all_gps).await {
                 log::error!("Cannot insert decree: {e:?}");
             }
         }
     }
 }
 
-pub async fn insert_ministrial_decree(decree: &Thing, pg_pool: &PgPool) -> crate::Result<()> {
+pub async fn insert_ministrial_decree(decree: &Thing, pg_pool: &PgPool, all_gps: &[LegislativePeriod]) -> crate::Result<()> {
+    let possible_gp = all_gps.windows(2).find_map(|gps| {
+        let end_date = gps[0].start_date;
+        let start_date = gps[1].start_date;
+        if decree.date <= end_date && decree.date >= start_date {
+            Some(&gps[1].gp)
+        } else {
+            None
+        }
+    });
+
     let gov_officials_at_date = sqlx::query!(
         "
         SELECT 
@@ -56,15 +69,17 @@ pub async fn insert_ministrial_decree(decree: &Thing, pg_pool: &PgPool) -> crate
                 title, 
                 short_title, 
                 publication_date, 
-                part
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                part,
+                gp
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             ON CONFLICT (ris_id) DO UPDATE
             SET 
                 gov_official_id = EXCLUDED.gov_official_id,
                 title = EXCLUDED.title,
                 short_title = EXCLUDED.short_title,
                 publication_date = EXCLUDED.publication_date,
-                part = EXCLUDED.part
+                part = EXCLUDED.part,
+                gp = EXCLUDED.gp
             RETURNING id;
             ",
             fitting_gov_official.delegate_id,
@@ -73,7 +88,8 @@ pub async fn insert_ministrial_decree(decree: &Thing, pg_pool: &PgPool) -> crate
             decree.title,
             decree.short_title,
             decree.date,
-            decree.part
+            decree.part,
+            possible_gp,
         )
         .fetch_one(pg_pool)
         .await?;
