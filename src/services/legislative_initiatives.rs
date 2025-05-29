@@ -151,7 +151,7 @@ async fn legis_init_once(
                 scraper.scrape_info.gp = vec![gp.into()];
                 if only_latest {
                     scraper.scrape_info.date_start =
-                        today_and_time().checked_sub_days(Days::new(30));
+                        today_and_time().checked_sub_days(Days::new(300));
                 } else {
                     scraper.scrape_info.date_start = None;
                 }
@@ -1080,6 +1080,28 @@ mod tests {
         let scraper: AustriaScraper = AustriaScraper::default();
         let res = scraper
             .get_legis_init("/gegenstand/XXVIII/A/64")
+            .await
+            .unwrap();
+
+        log::info!("legis init: {res:?}");
+
+        let pool = connect_pg().await;
+        let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
+        crate::legislative_initiatives::update_legis_inits_in_db(
+            &pool,
+            code_to_parties,
+            &[res],
+            None,
+        )
+        .await;
+    }
+    
+    #[tokio::test]
+    async fn test_legis_init_empty_gp_scrape_xxviii_a_77() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper: AustriaScraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/A/77")
             .await
             .unwrap();
 
