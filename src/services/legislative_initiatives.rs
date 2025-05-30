@@ -7,7 +7,7 @@ pub mod notify;
 mod voted_by_name_result;
 
 use somes_scraper::{
-    legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative, Opinion, Party,
+    legis_init::{LegislativeInitiatives, LEGIS_LAW_DETERMINATORS}, AustriaScraper, LegislativeInitiative, Opinion, Party,
     ProContra, Vote,
 };
 use sqlx::{postgres::PgQueryResult, PgPool};
@@ -70,8 +70,9 @@ pub async fn scrape_new_legis_inits(
     scraper: Arc<AustriaScraper>,
     gp: &str,
     new_legis_init: Option<Sender<Option<(i32, LegislativeInitiative)>>>,
+    searched_doktyps: Option<&[&str]>,
 ) -> crate::Result<Vec<LegislativeInitiative>> {
-    let legis_inits = scraper.post_legis_payload().await?;
+    let legis_inits = scraper.post_legis_payload(searched_doktyps).await?;
     let legis_init_paths = scraper.legis_paths(legis_inits)?;
 
     const MAX_TASKS: usize = 32;
@@ -132,6 +133,7 @@ pub async fn scrape_new_legis_inits(
 
 async fn legis_init_once(
     only_latest: bool,
+    only_laws: bool,
     pg_pool: &PgPool,
     new_legis_init: Option<Sender<Option<(i32, LegislativeInitiative)>>>,
 ) -> Vec<LegislativeInitiative> {
@@ -150,16 +152,29 @@ async fn legis_init_once(
                 log::info!("LEGIS INIT once GP: {gp}");
                 scraper.scrape_info.gp = vec![gp.into()];
                 if only_latest {
+                    let days = if only_laws {
+                        // this number is a magic number -> maybe reason it with average completion time + n or something
+                        // could still be possible that very old (+1001 days old) newly completed legis inits are never sent as email!
+                        1000
+                    } else {
+                        300
+                    };
                     scraper.scrape_info.date_start =
-                        today_and_time().checked_sub_days(Days::new(300));
+                        today_and_time().checked_sub_days(Days::new(days));
                 } else {
                     scraper.scrape_info.date_start = None;
                 }
 
                 let scraper = Arc::new(scraper);
 
+                let searched_doktyps = if only_laws {
+                    Some(LEGIS_LAW_DETERMINATORS.as_slice())
+                } else {
+                    None
+                };
+
                 if let Err(e) =
-                    scrape_new_legis_inits(&pg_pool, scraper.clone(), gp, new_legis_init).await
+                    scrape_new_legis_inits(&pg_pool, scraper.clone(), gp, new_legis_init, searched_doktyps).await
                 {
                     log::error!("could not scrape and insert legis inits: {e}");
                 }
@@ -789,17 +804,10 @@ pub async fn run_shut_latest_gp(
     mut shutdown: Shutdown,
     pg_pool: PgPool,
     new_legis_init: Sender<Option<(i32, LegislativeInitiative)>>,
-) {
-    let legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP_LATEST")
-        .unwrap_or_else(|_| "300".to_string())
-        .parse()
-        .unwrap_or_else(|e| {
-            log::warn!(
-                "Could not parse LEGISLATIVE_INITIATIVE_SLEEP_LATEST env var: {e}. Using default value of 300 seconds"
-            );
-            300
-        });
-
+    legis_init_sleep: u64,
+    only_latest: bool,
+    only_laws: bool,
+) { 
     #[cfg(feature = "legis_init_latest")]
     while !shutdown.is_shutdown() {
         let new_legis_init = new_legis_init.clone();
@@ -814,7 +822,7 @@ pub async fn run_shut_latest_gp(
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative (latest) scraper");
 
-                    legis_init_once(true, &pg_pool, Some(new_legis_init.clone())).await;
+                    legis_init_once(only_latest, only_laws, &pg_pool, Some(new_legis_init.clone())).await;
 
                     // triggers the email service
                     let res = new_legis_init.send(None).await;
@@ -858,7 +866,7 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown, pg_pool: PgPool) {
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative scraper");
 
-                    legis_init_once(false, &pg_pool, None).await;
+                    legis_init_once(false, false, &pg_pool, None).await;
                     log::info!("lol");
                 }).await {
                     log::error!("Error in legislative initiative scraper: {:?}", e);

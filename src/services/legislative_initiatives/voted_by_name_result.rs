@@ -207,7 +207,7 @@ mod tests {
         for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
             scraper.scrape_info.gp = vec![gp.to_string()];
 
-            let initiatives = scraper.post_legis_payload().await.unwrap();
+            let initiatives = scraper.post_legis_payload(None).await.unwrap();
             for path in scraper.legis_paths(initiatives).unwrap() {
                 println!("path: {path:?}");
                 let Ok(init) = scraper.get_legis_init(&path).await else {

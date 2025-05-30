@@ -286,7 +286,7 @@ pub fn send_new_legis_info_mail(
 
             let vote_result_html_entry = format!(
                 r#"
-                <a href="https://somes.at/alpha/vote_result?id={id}">
+                <a href="https://somes.at/alpha/vote_result/{gp}/{ityp}/{inr}">
                     <div style="display: flex; flex-direction: row; justify-content: space-between; width: 100%;">
                         <div style="border: 1px solid black; width: 50%; display: flex; justify-content: center; align-items: center;">
                             {desc}
@@ -297,7 +297,10 @@ pub fn send_new_legis_info_mail(
                     </div>
                 </a>
             "#,
-                desc = legis_init.description
+                desc = legis_init.description,
+                gp = legis_init.gp,
+                ityp = legis_init.ityp,
+                inr = legis_init.inr,
             );
 
             vote_results_html.push_str(&vote_result_html_entry);

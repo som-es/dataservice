@@ -43,6 +43,18 @@ pub async fn run_services(state: &State) {
         Option<(i32, somes_scraper::ministrial_proposals::MinistrialProposal)>,
     >(128);
 
+
+    let latest_legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP_LATEST")
+        .unwrap_or_else(|_| "300".to_string())
+        .parse()
+        .unwrap_or_else(|e| {
+            log::warn!(
+                "Could not parse LEGISLATIVE_INITIATIVE_SLEEP_LATEST env var: {e}. Using default value of 300 seconds"
+            );
+            300
+        });
+    
+
     tokio::join!(
         // services::proposals::run(),
         tokio::spawn(services::legislative_initiatives::run_shut_every_gp(
@@ -52,7 +64,18 @@ pub async fn run_services(state: &State) {
         tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone(),
-            new_vote_result_tx.clone()
+            new_vote_result_tx.clone(),
+            latest_legis_init_sleep + 150,
+            true,
+            false,
+        )),
+        tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            pool.clone(),
+            new_vote_result_tx.clone(),
+            latest_legis_init_sleep - 40,
+            true,
+            true,
         )),
         tokio::spawn(services::ministrial_proposals::run_shut_every_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
