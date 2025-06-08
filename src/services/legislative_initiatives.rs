@@ -22,7 +22,7 @@ use crate::{
         DbEurovocTopicLegisInit, DbLegisDocument, DbLegislativeInitiative, DbNamedVoteInfo,
         DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote, DbVoteIns,
     },
-    should_update::StoredUpdatedAt,
+    should_update::{self, StoredUpdatedAt},
     today, today_and_time,
     with_data::{all_parties_at_date, all_parties_at_gp},
     Shutdown, GPS, LATEST_GP,
@@ -270,6 +270,10 @@ pub async fn update_legis_inits_in_db(
     // }
 
     for (i, legis_init) in new_legis_inits.iter().enumerate() {
+        if !crate::should_update(legis_init, pool).await {
+            // log::info!("No need to update!");
+            continue
+        }
         log::info!(
             "Add legis init: {} {} {}",
             legis_init.gp,

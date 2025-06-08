@@ -20,6 +20,7 @@ use sqlx::{postgres::PgPoolOptions, PgPool};
 pub mod email;
 pub mod notify_registrars;
 pub mod should_update;
+pub use should_update::*;
 pub mod with_data;
 pub use notify_registrars::*;
 

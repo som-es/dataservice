@@ -1,7 +1,8 @@
 use std::thread::JoinHandle;
 
 use crate::{
-    legislative_initiatives::absence_matching, services::scrape_untill_success, should_update::StoredUpdatedAt, Shutdown, GPS
+    legislative_initiatives::absence_matching, services::scrape_untill_success,
+    should_update::StoredUpdatedAt, Shutdown, GPS,
 };
 use somes_scraper::{
     call_to_order::CallToOrderInfo,
@@ -96,6 +97,9 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
     let mut text_extractor = somes_scraper::TextExtractor::new(AustriaScraper::BASE_URL);
 
     for plenar_info in new_plenar_infos {
+        if !crate::should_update(plenar_info, pg_pool).await {
+            continue
+        }
         // let plenar_id = format!("{}/{}/{}", plenar_info.legislative_period, plenar_info.ityp, plenar_info.inr);
 
         let plenar_id = match insert_plenar_info(pg_pool, plenar_info).await {
@@ -404,12 +408,16 @@ async fn insert_plenar_speech(
 
 impl StoredUpdatedAt for PlenarInfo {
     async fn stored_updated_at(&self, pg: &PgPool) -> Option<chrono::NaiveDateTime> {
-        sqlx::query!("select updated_at from plenar_infos where inr = $1", self.inr as i32)
-            .fetch_optional(pg)
-            .await
-            .ok()
-            .flatten()
-            .map(|x| x.updated_at).flatten()
+        sqlx::query!(
+            "select updated_at from plenar_infos where inr = $1",
+            self.inr as i32
+        )
+        .fetch_optional(pg)
+        .await
+        .ok()
+        .flatten()
+        .map(|x| x.updated_at)
+        .flatten()
     }
 }
 

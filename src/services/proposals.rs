@@ -8,7 +8,7 @@ use somes_scraper::{
 };
 use tokio::time::Instant;
 
-use crate::Shutdown;
+use crate::{should_update::StoredUpdatedAt, Shutdown};
 
 use super::scrape_untill_success;
 
@@ -45,7 +45,7 @@ async fn scrape_new_proposals_last_5_days() -> crate::Result<Vec<String>> {
 }
 
 use log::info;
-use sqlx::PgPool;
+use sqlx::{query, PgPool};
 
 pub async fn update_proposals_in_db2(
     pool: &PgPool,
@@ -170,6 +170,19 @@ pub async fn update_proposals_in_db2(
     );
 
     Ok(())
+}
+
+impl StoredUpdatedAt for Proposal {
+    async fn stored_updated_at(&self, pg: &PgPool) -> Option<chrono::NaiveDateTime> {
+        // TODO: Too lazy!
+        None
+        // query!("select updated_at from proposals where gp = $1 and ityp = $2 and inr = $3", self.gp, self.ityp, self.inr as i32)
+        //     .fetch_optional(pg)
+        //     .await
+        //     .ok()
+        //     .flatten()
+        //     .map(|x| x.updated_at).flatten()
+    }
 }
 
 async fn insert_topics2(pool: &PgPool, proposal: &Proposal) -> Result<(), sqlx::Error> {

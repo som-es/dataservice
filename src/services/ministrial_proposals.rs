@@ -10,7 +10,8 @@ use somes_scraper::{
 use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{
-    delegates::create_gov_officials_map, services::scrape_untill_success, should_update::StoredUpdatedAt, today, today_and_time, Shutdown, GPS
+    delegates::create_gov_officials_map, services::scrape_untill_success,
+    should_update::StoredUpdatedAt, today, today_and_time, Shutdown, GPS,
 };
 
 mod notify;
@@ -99,12 +100,18 @@ use sqlx::{postgres::PgPool, query};
 
 impl StoredUpdatedAt for MinistrialProposal {
     async fn stored_updated_at(&self, pg: &PgPool) -> Option<chrono::NaiveDateTime> {
-        query!("select updated_at from ministrial_proposals where gp = $1 and ityp = $2 and inr = $3", self.gp, self.ityp, self.inr as i32)
-            .fetch_optional(pg)
-            .await
-            .ok()
-            .flatten()
-            .map(|x| x.updated_at).flatten()
+        query!(
+            "select updated_at from ministrial_proposals where gp = $1 and ityp = $2 and inr = $3",
+            self.gp,
+            self.ityp,
+            self.inr as i32
+        )
+        .fetch_optional(pg)
+        .await
+        .ok()
+        .flatten()
+        .map(|x| x.updated_at)
+        .flatten()
     }
 }
 
@@ -117,6 +124,9 @@ pub async fn update_ministrial_proposals_in_db2(
     log::info!("Updating ministrial proposal in database...");
 
     for (i, ministrial_prop) in ministrial_props.iter().enumerate() {
+        if !crate::should_update(ministrial_prop, pool).await {
+            continue
+        }
         // log::info!("inserting single ministrial prop");
 
         let start = Instant::now();
