@@ -1,7 +1,7 @@
 use std::thread::JoinHandle;
 
 use crate::{
-    legislative_initiatives::absence_matching, services::scrape_untill_success, Shutdown, GPS,
+    legislative_initiatives::absence_matching, services::scrape_untill_success, should_update::StoredUpdatedAt, Shutdown, GPS
 };
 use somes_scraper::{
     call_to_order::CallToOrderInfo,
@@ -375,7 +375,7 @@ async fn insert_plenar_speech(
                 text_utils::remove_paran_contents(updated_spoken_text, '(', ')');
             for removed_paran in removed_parans {
                 // "asdfhasdjklf ahsdfhjklasd (Abg. Hallo: Das ist eine Frechheit!)"
-                // TODO: Issue #25                
+                // TODO: Issue #25
             }
         }
 
@@ -402,6 +402,17 @@ async fn insert_plenar_speech(
     Ok(())
 }
 
+impl StoredUpdatedAt for PlenarInfo {
+    async fn stored_updated_at(&self, pg: &PgPool) -> Option<chrono::NaiveDateTime> {
+        sqlx::query!("select updated_at from plenar_infos where inr = $1", self.inr as i32)
+            .fetch_optional(pg)
+            .await
+            .ok()
+            .flatten()
+            .map(|x| x.updated_at).flatten()
+    }
+}
+
 async fn insert_debate(pool: &PgPool, debate: &Debate, plenar_id: i32) -> Result<i32, sqlx::Error> {
     let result = sqlx::query!(
         r#"
@@ -426,19 +437,21 @@ pub async fn insert_plenar_info(
 ) -> Result<i32, sqlx::Error> {
     let result = sqlx::query!(
         r#"
-        INSERT INTO plenar_infos (inr, title, description, add_date, legislative_period)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO plenar_infos (inr, title, description, add_date, legislative_period, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (inr, legislative_period)
         DO UPDATE SET
             title = EXCLUDED.title,
-            description = EXCLUDED.description
+            description = EXCLUDED.description,
+            updated_at = EXCLUDED.updated_at
         RETURNING id
         "#,
         plenar_info.inr as i32,
         plenar_info.title,
         plenar_info.description,
         plenar_info.date,
-        plenar_info.gp
+        plenar_info.gp,
+        plenar_info.updated_at
     )
     .fetch_one(pool)
     .await?;

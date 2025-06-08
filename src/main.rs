@@ -43,7 +43,6 @@ pub async fn run_services(state: &State) {
         Option<(i32, somes_scraper::ministrial_proposals::MinistrialProposal)>,
     >(128);
 
-
     let latest_legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP_LATEST")
         .unwrap_or_else(|_| "300".to_string())
         .parse()
@@ -53,7 +52,6 @@ pub async fn run_services(state: &State) {
             );
             300
         });
-    
 
     tokio::join!(
         // services::proposals::run(),

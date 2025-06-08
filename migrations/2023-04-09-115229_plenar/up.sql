@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS plenar_infos (
     -- use serial id -> add inr, and UNIQUE of (inr, ityp, gp)
     id serial primary key,
     add_date timestamp not null,
+    updated_at timestamp,
     inr int not null,
     title varchar(255) not null,
     description varchar(255) not null,

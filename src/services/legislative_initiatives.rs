@@ -7,10 +7,10 @@ pub mod notify;
 mod voted_by_name_result;
 
 use somes_scraper::{
-    legis_init::{LegislativeInitiatives, LEGIS_LAW_DETERMINATORS}, AustriaScraper, LegislativeInitiative, Opinion, Party,
-    ProContra, Vote,
+    legis_init::{LegislativeInitiatives, LEGIS_LAW_DETERMINATORS},
+    AustriaScraper, LegislativeInitiative, Opinion, Party, ProContra, Vote,
 };
-use sqlx::{postgres::PgQueryResult, PgPool};
+use sqlx::{postgres::PgQueryResult, query, PgPool};
 use std::{
     collections::HashMap,
     sync::{Arc, LazyLock},
@@ -22,6 +22,7 @@ use crate::{
         DbEurovocTopicLegisInit, DbLegisDocument, DbLegislativeInitiative, DbNamedVoteInfo,
         DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote, DbVoteIns,
     },
+    should_update::StoredUpdatedAt,
     today, today_and_time,
     with_data::{all_parties_at_date, all_parties_at_gp},
     Shutdown, GPS, LATEST_GP,
@@ -173,8 +174,14 @@ async fn legis_init_once(
                     None
                 };
 
-                if let Err(e) =
-                    scrape_new_legis_inits(&pg_pool, scraper.clone(), gp, new_legis_init, searched_doktyps).await
+                if let Err(e) = scrape_new_legis_inits(
+                    &pg_pool,
+                    scraper.clone(),
+                    gp,
+                    new_legis_init,
+                    searched_doktyps,
+                )
+                .await
                 {
                     log::error!("could not scrape and insert legis inits: {e}");
                 }
@@ -239,6 +246,17 @@ async fn legis_init_once(
     }
     // new_legis_inits
     vec![]
+}
+
+impl StoredUpdatedAt for LegislativeInitiative {
+    async fn stored_updated_at(&self, pg: &PgPool) -> Option<chrono::NaiveDateTime> {
+        query!("select updated_at from legislative_initiatives where gp = $1 and ityp = $2 and inr = $3", self.gp, self.ityp, self.inr as i32)
+            .fetch_optional(pg)
+            .await
+            .ok()
+            .flatten()
+            .map(|x| x.updated_at).flatten()
+    }
 }
 
 pub async fn update_legis_inits_in_db(
@@ -807,7 +825,7 @@ pub async fn run_shut_latest_gp(
     legis_init_sleep: u64,
     only_latest: bool,
     only_laws: bool,
-) { 
+) {
     #[cfg(feature = "legis_init_latest")]
     while !shutdown.is_shutdown() {
         let new_legis_init = new_legis_init.clone();
@@ -1103,7 +1121,7 @@ mod tests {
         )
         .await;
     }
-    
+
     #[tokio::test]
     async fn test_legis_init_empty_gp_scrape_xxviii_a_77() {
         simple_logger::init_with_level(log::Level::Info).unwrap();

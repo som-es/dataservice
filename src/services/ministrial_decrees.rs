@@ -1,13 +1,23 @@
 use somes_scraper::{decree::RisScraper, AustriaScraper, Thing};
 use sqlx::PgPool;
 
-use crate::{today, with_data::gps::{gps, LegislativePeriod}, Shutdown};
+use crate::{
+    today,
+    with_data::gps::{gps, LegislativePeriod},
+    Shutdown,
+};
 
 pub async fn save_ministrial_decrees(pages: u32, pg_pool: &PgPool) {
     let scraper = AustriaScraper::default();
 
     let mut all_gps = gps(pg_pool).await.unwrap();
-    all_gps.insert(0, LegislativePeriod { gp: "".into(), start_date: today() });
+    all_gps.insert(
+        0,
+        LegislativePeriod {
+            gp: "".into(),
+            start_date: today(),
+        },
+    );
 
     for page in 1..=pages {
         log::info!("Currently on page {page}..");
@@ -24,7 +34,11 @@ pub async fn save_ministrial_decrees(pages: u32, pg_pool: &PgPool) {
     }
 }
 
-pub async fn insert_ministrial_decree(decree: &Thing, pg_pool: &PgPool, all_gps: &[LegislativePeriod]) -> crate::Result<()> {
+pub async fn insert_ministrial_decree(
+    decree: &Thing,
+    pg_pool: &PgPool,
+    all_gps: &[LegislativePeriod],
+) -> crate::Result<()> {
     let possible_gp = all_gps.windows(2).find_map(|gps| {
         let end_date = gps[0].start_date;
         let start_date = gps[1].start_date;
@@ -59,7 +73,6 @@ pub async fn insert_ministrial_decree(decree: &Thing, pg_pool: &PgPool, all_gps:
         .iter()
         .find(|x| x.ministry.as_ref() == Some(&decree.issuer))
     {
-
         let decree_id = sqlx::query!(
             "
             INSERT INTO ministrial_decrees (
@@ -93,7 +106,7 @@ pub async fn insert_ministrial_decree(decree: &Thing, pg_pool: &PgPool, all_gps:
         )
         .fetch_one(pg_pool)
         .await?;
-        
+
         for document in &decree.documents {
             sqlx::query!(
                 "
