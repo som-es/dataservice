@@ -271,8 +271,8 @@ pub async fn update_legis_inits_in_db(
 
     for (i, legis_init) in new_legis_inits.iter().enumerate() {
         if !crate::should_update(legis_init, pool).await {
-            // log::info!("No need to update!");
-            continue
+            log::info!("No need to update!");
+            continue;
         }
         log::info!(
             "Add legis init: {} {} {}",
@@ -344,6 +344,7 @@ pub async fn update_legis_inits_in_db(
                     .unwrap_or_default(),
             ),
             is_voteable_on: Some(legis_init.is_voteable_on),
+            is_urgent: legis_init.is_urgent,
             // law_come_into_effect_date: legis_init.come_into_effect_info.map(|x| x.law_come_into_effect_date.clone()),
         };
         // println!("db_legis_init: {db_legis_init:?}");
@@ -355,9 +356,10 @@ pub async fn update_legis_inits_in_db(
                 INSERT INTO legislative_initiatives (
                     title, inr, emphasis, description, ityp, gp, accepted, created_at, appeared_at, updated_at,
                     requires_simple_majority, pre_declined_type, voted_by_name, plenary_session_id, doktyp, is_law, 
-                    law_accepted, law_come_into_effect_date, law_expires_on_date, by_publication, has_reference, is_voteable_on
+                    law_accepted, law_come_into_effect_date, law_expires_on_date, by_publication, has_reference, is_voteable_on,
+                    is_urgent
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
                 ) ON CONFLICT (inr, ityp, gp) 
                 DO UPDATE SET 
                     title = EXCLUDED.title,
@@ -378,7 +380,8 @@ pub async fn update_legis_inits_in_db(
                     law_expires_on_date = EXCLUDED.law_expires_on_date,
                     by_publication = EXCLUDED.by_publication,
                     has_reference = EXCLUDED.has_reference,
-                    is_voteable_on = EXCLUDED.is_voteable_on
+                    is_voteable_on = EXCLUDED.is_voteable_on,
+                    is_urgent = EXCLUDED.is_urgent
                 RETURNING id
             ",
             db_legis_init.title,
@@ -402,7 +405,8 @@ pub async fn update_legis_inits_in_db(
             db_legis_init.law_expires_on_date,
             db_legis_init.by_publication,
             db_legis_init.has_reference,
-            db_legis_init.is_voteable_on
+            db_legis_init.is_voteable_on,
+            db_legis_init.is_urgent
         )
         .fetch_one(pool)
         .await
@@ -421,6 +425,20 @@ pub async fn update_legis_inits_in_db(
         }
 
         let mut show_votes = legis_init.votes.clone();
+
+        if true || legis_init.votes.is_empty() {
+            if let Err(e) = sqlx::query!(
+                "delete from votes where legislative_initiatives_id = $1",
+                legis_init_id
+            )
+            .execute(pool)
+            .await
+            {
+                log::error!(
+                    "Cannot delete votes from legis init: {legis_init_id} with error {e:?}"
+                );
+            }
+        }
 
         for vote in &legis_init.votes {
             let db_vote = DbVoteIns {
@@ -500,7 +518,7 @@ pub async fn update_legis_inits_in_db(
                     )
                 }
             }
-        }
+        } 
 
         if let Some(new_legis_init_tx) = &new_legis_init {
             if let Ok(info) = sqlx::query!(

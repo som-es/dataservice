@@ -94,6 +94,7 @@ pub struct DbLegislativeInitiative {
     pub by_publication: Option<bool>,
     pub has_reference: Option<bool>,
     pub is_voteable_on: Option<bool>,
+    pub is_urgent: bool,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

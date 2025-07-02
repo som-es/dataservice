@@ -98,7 +98,7 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
 
     for plenar_info in new_plenar_infos {
         if !crate::should_update(plenar_info, pg_pool).await {
-            continue
+            continue;
         }
         // let plenar_id = format!("{}/{}/{}", plenar_info.legislative_period, plenar_info.ityp, plenar_info.inr);
 

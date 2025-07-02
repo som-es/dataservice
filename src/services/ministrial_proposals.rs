@@ -125,7 +125,7 @@ pub async fn update_ministrial_proposals_in_db2(
 
     for (i, ministrial_prop) in ministrial_props.iter().enumerate() {
         if !crate::should_update(ministrial_prop, pool).await {
-            continue
+            continue;
         }
         // log::info!("inserting single ministrial prop");
 

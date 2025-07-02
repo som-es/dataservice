@@ -4,7 +4,7 @@ use sqlx::PgPool;
 
 #[inline]
 fn mind_update_time() -> bool {
-    std::env::var("MIND_UPDATE_TIME").unwrap_or("false".into()) == "false"
+    std::env::var("MIND_UPDATE_TIME").unwrap_or("true".into()) == "true"
 }
 
 pub(crate) trait StoredUpdatedAt {
