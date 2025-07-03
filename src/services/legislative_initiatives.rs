@@ -621,7 +621,7 @@ pub async fn update_legis_inits_in_db(
                 .execute(pool)
                 .await
                 {
-                    log::warn!("could not insert speech html url: {e:?}")
+                    log::error!("could not insert speech html url: {e:?}")
                 }
             }
         }
