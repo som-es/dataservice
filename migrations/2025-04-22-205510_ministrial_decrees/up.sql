@@ -5,11 +5,11 @@ create table ministrial_decrees(
     gov_official_id int not null,
     ris_id varchar(255) not null,
     ministrial_issuer varchar(1024) not null,
-    title varchar(5096) not null,
+    title varchar(16384) not null,
     short_title varchar(1024) not null,
     publication_date date not null,
     part varchar(255) not null,
-    emphasis varchar(6000),
+    emphasis varchar(16384),
     gp varchar(255),
     unique(ris_id),
     foreign key (gov_official_id) references delegates(id)
