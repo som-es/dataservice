@@ -127,6 +127,10 @@ pub async fn run_services(state: &State) {
                 pool.clone()
             )
         ),
+        tokio::spawn(services::delete_was_updated::delete_was_updated_entries(
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            pool.clone()
+        )),
     )
     .0
     .unwrap();
