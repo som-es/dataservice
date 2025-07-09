@@ -143,7 +143,7 @@ pub struct DbMinistrialProposalQuery {
 use sqlx::FromRow;
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, FromRow, Default)]
 // #[diesel(table_name = legislative_initiatives)]
 pub struct DbLegislativeInitiativeQuery {
     pub id: i32,
