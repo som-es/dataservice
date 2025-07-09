@@ -1,4 +1,5 @@
 pub mod delegates;
+pub mod delete_was_updated;
 pub mod legislative_initiatives;
 pub mod ministrial_decrees;
 pub mod ministrial_proposals;

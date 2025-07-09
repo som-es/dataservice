@@ -518,7 +518,7 @@ pub async fn update_legis_inits_in_db(
                     )
                 }
             }
-        } 
+        }
 
         if let Some(new_legis_init_tx) = &new_legis_init {
             if let Ok(info) = sqlx::query!(
@@ -764,6 +764,21 @@ pub async fn update_legis_inits_in_db(
             {
                 log::error!("Error inserting document: '{:?}'. The error occurred for the following document: {:?}", e, document);
             }
+        }
+
+        if let Err(e) = sqlx::query!(
+            "insert into 
+            legis_init_was_updated 
+            (legis_init_id) 
+            values ($1) on conflict(legis_init_id) do update set 
+            updated_at = $2",
+            legis_init_id,
+            crate::today_and_time().and_utc()
+        )
+        .execute(pool)
+        .await
+        {
+            log::error!("Error inserting was updated info: '{:?}'. The error occurred for the following legis init: {:?}", e, legis_init_id);
         }
     }
 }
