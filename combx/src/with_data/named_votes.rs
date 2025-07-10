@@ -1,7 +1,7 @@
 use chrono::NaiveDate;
 use sqlx::{query_as, PgPool};
 
-use crate::db::models::DbPartyNamedVoteCount;
+use crate::models::DbPartyNamedVoteCount;
 
 /*
 with DelegateParty as (

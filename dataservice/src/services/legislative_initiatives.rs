@@ -426,7 +426,7 @@ pub async fn update_legis_inits_in_db(
 
         let mut show_votes = legis_init.votes.clone();
 
-        if true || legis_init.votes.is_empty() {
+        if legis_init.votes.is_empty() {
             if let Err(e) = sqlx::query!(
                 "delete from votes where legislative_initiatives_id = $1",
                 legis_init_id
