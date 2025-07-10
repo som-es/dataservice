@@ -148,7 +148,7 @@ use sqlx::FromRow;
 pub struct DbLegislativeInitiativeQuery {
     pub id: i32,
     pub ityp: String,
-    pub doktyp: Option<String>,
+    pub doktyp: String,
     pub gp: String,
     pub inr: i32,
     pub emphasis: Option<String>,
@@ -158,12 +158,12 @@ pub struct DbLegislativeInitiativeQuery {
     pub created_at: NaiveDate,
     pub appeared_at: Option<NaiveDateTime>,
     pub updated_at: Option<NaiveDateTime>,
-    pub requires_simple_majority: Option<bool>,
+    pub requires_simple_majority: bool,
     pub pre_declined_type: Option<String>,
     pub voted_by_name: bool,
     pub plenary_session_id: Option<i32>,
-    pub is_emphasis_ai_generated: Option<bool>,
-    pub is_law: Option<bool>,
+    pub is_emphasis_ai_generated: bool,
+    pub is_law: bool,
     pub law_accepted: Option<bool>,
     pub law_come_into_effect_date: Option<NaiveDate>,
     pub law_expires_on_date: Option<NaiveDate>,
@@ -180,9 +180,9 @@ pub struct DbLegislativeInitiativeQuery {
 // #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
 pub struct DbVote {
     pub party: String,
+    pub code: String,
     pub fraction: i32,
     pub infavor: bool,
-    pub legislative_initiatives_id: i32,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
@@ -480,7 +480,7 @@ pub struct DbNamedVote {
     pub searched_with: Option<String>,
     pub matched_with: String,
     pub delegate_id: i32,
-    pub named_vote_info_id: i32,
+    // pub named_vote_info_id: i32,
     pub manually_matched: Option<bool>,
 }
 
@@ -494,8 +494,6 @@ pub struct DbNamedVotes {
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct DbNamedVoteInfo {
-    pub id: i32,
-    pub legis_init_id: i32,
     pub pro_count: i32,
     pub contra_count: i32,
     pub given_vote_sum: i32,

@@ -1,13 +1,14 @@
 pub mod models;
+mod delegate_matching;
+pub use delegate_matching::*;
 use chrono::NaiveDate;
 use dotenvy_macro::dotenv;
 pub use models::*;
 mod api_models;
 pub use api_models::*;
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use sqlx::{PgPool, postgres::PgPoolOptions};
 
 mod with_data;
-
 
 pub const DATABASE_URL: &str = dotenv!("DATABASE_URL");
 pub const LATEST_GP: &str = dotenv!("LATEST_GP");
@@ -34,4 +35,3 @@ pub fn today() -> NaiveDate {
 pub fn today_and_time() -> chrono::NaiveDateTime {
     chrono::Local::now().naive_local()
 }
-

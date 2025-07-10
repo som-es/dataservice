@@ -1,1 +1,1 @@
-mod vote_result;
+mod vote_results;
