@@ -183,19 +183,6 @@ impl VoteResult {
             })
             .collect::<Vec<_>>();
 
-        // IMPORTANT: others must not rely on this id (anymore)! (e.g. Meilisearch ID/primary key)
-        let maybe_legis_init_id = sqlx::query!(
-            "select id from legislative_initiatives where inr = $1 and ityp = $2 and gp = $3",
-            db_legis_init.inr,
-            db_legis_init.ityp,
-            db_legis_init.gp
-        )
-        .fetch_optional(pool)
-        .await
-        .ok()
-        .flatten()
-        .map(|x| x.id);
-
         let mut speeches = legis_init
             .speeches
             .into_iter()
@@ -224,6 +211,19 @@ impl VoteResult {
                 }
             })
             .collect::<Vec<_>>();
+
+        // IMPORTANT: others must not rely on this id (anymore)! (e.g. Meilisearch ID/primary key)
+        let maybe_legis_init_id = sqlx::query!(
+            "select id from legislative_initiatives where inr = $1 and ityp = $2 and gp = $3",
+            db_legis_init.inr,
+            db_legis_init.ityp,
+            db_legis_init.gp
+        )
+        .fetch_optional(pool)
+        .await
+        .ok()
+        .flatten()
+        .map(|x| x.id);
 
         let (absences, referenced_by_others_ids) = if let Some(maybe_legis_init_id) =
             maybe_legis_init_id

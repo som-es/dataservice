@@ -9,6 +9,7 @@ pub use api_models::*;
 use sqlx::{PgPool, postgres::PgPoolOptions};
 
 pub mod with_data;
+mod enhancer;
 
 
 pub const DATABASE_URL: &str = dotenv!("DATABASE_URL");
