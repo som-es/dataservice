@@ -1,9 +1,9 @@
+use combx::with_data::gps::{gps, LegislativePeriod};
 use somes_scraper::{decree::RisScraper, AustriaScraper, Thing};
 use sqlx::PgPool;
 
 use crate::{
     today,
-    with_data::gps::{gps, LegislativePeriod},
     Shutdown,
 };
 

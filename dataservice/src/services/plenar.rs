@@ -1,9 +1,9 @@
 use std::thread::JoinHandle;
 
 use crate::{
-    legislative_initiatives::absence_matching, services::scrape_untill_success,
-    should_update::StoredUpdatedAt, Shutdown, GPS,
+    scrape_untill_success, should_update::StoredUpdatedAt, Shutdown, GPS
 };
+use combx::absence_matching;
 use somes_scraper::{
     call_to_order::CallToOrderInfo,
     plenar::{Debate, DebateInfo, Plenar, PlenarInfo},

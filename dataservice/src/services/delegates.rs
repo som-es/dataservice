@@ -3,6 +3,7 @@ use std::{
     sync::LazyLock,
 };
 
+use combx::{DbContact, DbDelegate, DbMandate};
 use somes_scraper::{
     delegates::DelegateScraper, gov_officials::GovOfficials, AustriaScraper, Delegate, GovOfficial,
     Mandate,
@@ -10,7 +11,6 @@ use somes_scraper::{
 use sqlx::{postgres::PgQueryResult, query, PgPool};
 
 use crate::{
-    models::{DbContact, DbDelegate, DbMandate},
     services::scrape_untill_success,
     Shutdown,
 };
