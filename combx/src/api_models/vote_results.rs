@@ -2,7 +2,7 @@ mod hidden_vote_translation;
 mod named_votes;
 
 use serde::{Deserialize, Serialize};
-use somes_scraper::{LegislativeInitiative, Opinion, RelatedDelegate};
+use somes_scraper::{LegislativeInitiative, Opinion, Reference, RelatedDelegate};
 use sqlx::{FromRow, PgPool};
 
 use crate::{
@@ -39,7 +39,7 @@ pub struct VoteResult {
     pub absences: Option<Vec<i32>>,
     pub issued_by_dels: Vec<RelatedDelegate>,
     pub referenced_by_others_ids: Option<Vec<i32>>,
-    pub references: Option<Vec<i32>>,
+    pub references: Option<Vec<Reference>>,
     #[serde(default)]
     pub meilisearch_helper: MeiliesearchHelper,
 }
@@ -225,11 +225,12 @@ impl VoteResult {
             })
             .collect::<Vec<_>>();
 
-        let (absences, referenced_by_others_ids, references) =
-            if let Some(maybe_legis_init_id) = maybe_legis_init_id {
-                if let Ok(plenar_speeches) = sqlx::query_as!(
-                    DbSpeechWithLink,
-                    "
+        let (absences, referenced_by_others_ids) = if let Some(maybe_legis_init_id) =
+            maybe_legis_init_id
+        {
+            if let Ok(plenar_speeches) = sqlx::query_as!(
+                DbSpeechWithLink,
+                "
                     SELECT
                         delegate_id,
                         CASE
@@ -247,17 +248,17 @@ impl VoteResult {
                     INNER JOIN debates ON debates.id = plenar_speeches.debate_id
                     WHERE legis_init_id = $1
                     ",
-                    maybe_legis_init_id,
-                    db_legis_init.pre_declined_type
-                )
-                .fetch_all(pool)
-                .await
-                {
-                    speeches = plenar_speeches
-                }
+                maybe_legis_init_id,
+                db_legis_init.pre_declined_type
+            )
+            .fetch_all(pool)
+            .await
+            {
+                speeches = plenar_speeches
+            }
 
-                let absences = sqlx::query!(
-                    "
+            let absences = sqlx::query!(
+                "
                    SELECT delegate_id FROM absences
         WHERE plenary_session_id = (
             SELECT plenary_session_id
@@ -265,17 +266,20 @@ impl VoteResult {
             WHERE id = $1
         ) 
             ",
-                    maybe_legis_init_id
-                )
-                .fetch_all(pool)
-                .await
-                .ok()
-                .map(|x| x.into_iter().map(|x| x.delegate_id).collect::<Vec<_>>());
+                maybe_legis_init_id
+            )
+            .fetch_all(pool)
+            .await
+            .ok()
+            .map(|x| x.into_iter().map(|x| x.delegate_id).collect::<Vec<_>>());
 
-                (absences, None, None)
-            } else {
-                (None, None, None)
-            };
+            let referenced_by_other_ids = sqlx::query!("select origin_legis_init_id from legis_inits_refs where ref_gp = $1 and ref_ityp = $2 and ref_inr = $3", legis_init.gp, legis_init.ityp, db_legis_init.inr).fetch_all(pool).await.ok()
+                .map(|x| x.into_iter().map(|x| x.origin_legis_init_id).collect::<Vec<_>>());
+
+            (absences, referenced_by_other_ids)
+        } else {
+            (None, None)
+        };
 
         VoteResult {
             id: maybe_legis_init_id,
@@ -290,7 +294,7 @@ impl VoteResult {
             absences,
             issued_by_dels: legis_init.related_delegates,
             referenced_by_others_ids,
-            references,
+            references: legis_init.references,
             meilisearch_helper: MeiliesearchHelper::default(),
         }
     }

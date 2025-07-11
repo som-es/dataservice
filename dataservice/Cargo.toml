@@ -14,6 +14,7 @@ reqwest = { version = "0.12", features = ["json", "blocking"], optional=true }
 
 somes-scraper = {path = "../../scraper"}
 somes-common-lib = {path = "../../somes/somes-common-lib"}
+combx = { path = "../combx" }
 serde = "1.0"
 serde_derive = "1.0"
 simple_logger = { version="5", optional = true}

@@ -1,6 +1,7 @@
 mod absence_matching;
 pub use absence_matching::*;
 use chrono::{Days, NaiveDate};
+use combx::VoteResult;
 use tokio::{runtime::Handle, sync::mpsc::Sender};
 mod match_delegates_with_name;
 pub mod notify;
@@ -280,76 +281,13 @@ pub async fn update_legis_inits_in_db(
             legis_init.ityp,
             legis_init.inr
         );
-        // if i % 10 == 0 {
-        //     log::info!(
-        //         "{i} inserting legis init {}{}",
-        //         legis_init.inr,
-        //         legis_init.ityp
-        //     );
-        // }
 
-        let plenary_session_id = match legis_init.plenary_session {
-            Some(session) => sqlx::query!(
-                "select id from plenar_infos where inr = $1 and legislative_period = $2",
-                session as i32,
-                legis_init.gp
-            )
-            .fetch_one(pool)
-            .await
-            .ok()
-            .map(|id| id.id),
-            None => None,
-        };
+        let mut vote_result = VoteResult::from_legis_init(pool, legis_init.clone()).await;
 
-        let db_legis_init = DbLegislativeInitiative {
-            title: legis_init.title.clone(),
-            inr: legis_init.inr as i32,
-            emphasis: legis_init.emphasis.clone(),
-            description: legis_init.description.clone(),
-            ityp: legis_init.ityp.clone(),
-            gp: legis_init.gp.clone(),
-            accepted: legis_init.accepted.map(|a| a.to_string()),
-            created_at: legis_init.date,
-            appeared_at: Some(legis_init.created_at),
-            updated_at: legis_init.updated_at,
-            requires_simple_majority: legis_init.requires_simple_majority,
-            pre_declined_type: legis_init
-                .hidden_votes_info
-                .vote_stage
-                .map(|pre| pre.to_string()),
-            voted_by_name: legis_init.hidden_votes_info.voted_by_name,
-            plenary_session_id,
-            doktyp: legis_init.doktyp.clone(),
-            is_law: legis_init.is_law.clone(),
-            law_accepted: legis_init.law_accepted.clone(),
-            law_come_into_effect_date: legis_init
-                .come_into_effect_info
-                .as_ref()
-                .map(|x| x.law_come_into_effect_date.clone())
-                .flatten(),
-            law_expires_on_date: legis_init
-                .come_into_effect_info
-                .as_ref()
-                .map(|x| x.law_expires_on_date.clone())
-                .flatten(),
-            by_publication: legis_init
-                .come_into_effect_info
-                .as_ref()
-                .map(|x| x.by_publication),
-            has_reference: Some(
-                legis_init
-                    .references
-                    .as_ref()
-                    .map(|x| !x.is_empty())
-                    .unwrap_or_default(),
-            ),
-            is_voteable_on: Some(legis_init.is_voteable_on),
-            is_urgent: legis_init.is_urgent,
-            // law_come_into_effect_date: legis_init.come_into_effect_info.map(|x| x.law_come_into_effect_date.clone()),
-        };
         // println!("db_legis_init: {db_legis_init:?}");
 
         // let maybe_legis_init_id = sqlx::query!("select id, created_at from legislative_initiatives where inr = $1 and ityp = $2 and gp = $3", db_legis_init.inr, db_legis_init.ityp, db_legis_init.gp).fetch_optional(pool).await;
+        let db_legis_init = vote_result.legislative_initiative;
 
         let legis_init_id = match sqlx::query!(
             "
