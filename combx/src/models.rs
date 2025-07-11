@@ -216,10 +216,10 @@ pub struct DbSpeech {
 pub struct DbSpeechWithLink {
     pub delegate_id: i32,
     pub infavor: Option<bool>,
+    pub duration_in_seconds: Option<i32>,
     pub opinion: Option<String>,
     pub document_url: Option<String>,
     pub about: Option<String>,
-    pub legislative_initiatives_id: Option<i32>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

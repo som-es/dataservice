@@ -4,8 +4,10 @@ use chrono::NaiveDate;
 use somes_scraper::ProContra;
 use sqlx::PgPool;
 
-use crate::{match_delegate_names_with_delegate_ids, with_data::active_delegates_at_date, DbNamedVote, LevResult};
-
+use crate::{
+    DbNamedVote, LevResult, match_delegate_names_with_delegate_ids,
+    with_data::active_delegates_at_date,
+};
 
 pub async fn create_db_named_votes(
     pg: &PgPool,
@@ -50,7 +52,10 @@ pub async fn create_db_named_votes(
         manually_matched: Some(false),
     });
 
-    Ok(pro_iter.chain(contra_iter).chain(absent_iter).collect::<Vec<_>>())
+    Ok(pro_iter
+        .chain(contra_iter)
+        .chain(absent_iter)
+        .collect::<Vec<_>>())
 }
 
 pub struct VotedByNameResult {

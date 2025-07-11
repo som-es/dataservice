@@ -5,7 +5,7 @@ use sqlx::PgPool;
 
 use crate::with_data::active_delegates_at_date;
 
-use super::match_delegates_with_name::{match_delegate_names_with_delegate_ids, MatchResult};
+use super::match_delegates_with_name::{MatchResult, match_delegate_names_with_delegate_ids};
 
 pub fn reverse_name(name: &str) -> String {
     let name = name.split_inclusive(' ').collect::<Vec<_>>();
@@ -52,10 +52,11 @@ pub async fn absence_matching(
 mod tests {
     use std::collections::HashSet;
 
-    use somes_scraper::{plenar::Plenar, AustriaScraper};
+    use somes_scraper::{AustriaScraper, plenar::Plenar};
 
     use crate::{
-        connect_pg, match_delegate_names_with_delegate_ids, reverse_name, with_data::active_delegates_at_date
+        connect_pg, match_delegate_names_with_delegate_ids, reverse_name,
+        with_data::active_delegates_at_date,
     };
 
     #[tokio::test]
