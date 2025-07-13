@@ -2,10 +2,7 @@ use combx::with_data::gps::{gps, LegislativePeriod};
 use somes_scraper::{decree::RisScraper, AustriaScraper, Thing};
 use sqlx::PgPool;
 
-use crate::{
-    today,
-    Shutdown,
-};
+use crate::{today, Shutdown};
 
 pub async fn save_ministrial_decrees(pages: u32, pg_pool: &PgPool) {
     let scraper = AustriaScraper::default();

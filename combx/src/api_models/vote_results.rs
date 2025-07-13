@@ -1,16 +1,15 @@
+mod enhancer;
 mod hidden_vote_translation;
 mod named_votes;
 
+pub use enhancer::*;
 use serde::{Deserialize, Serialize};
 use somes_scraper::{LegislativeInitiative, Opinion, Reference, RelatedDelegate};
 use sqlx::{FromRow, PgPool};
 
 use crate::{
     DbNamedVoteInfo,
-    api_models::vote_results::{
-        hidden_vote_translation::{gen_code_to_parties_with_date, translate_votes},
-        named_votes::create_db_named_votes,
-    },
+    api_models::vote_results::hidden_vote_translation::translate_votes,
     models::{
         DbLegisDocumentOptional, DbLegislativeInitiativeQuery, DbNamedVotes, DbSpeechWithLink,
         DbVote, Topic,
@@ -49,8 +48,11 @@ impl VoteResult {
     pub async fn from_db(pool: &PgPool, legis_init_id: i32) -> Self {
         todo!()
     }
-    pub async fn from_legis_init(pool: &PgPool, legis_init: LegislativeInitiative) -> Self {
-        let plenary_session_id = retrieve_plenary_session_id(pool, &legis_init).await;
+    pub async fn from_legis_init(
+        db_enhancer: impl VoteResultEnhancer,
+        legis_init: LegislativeInitiative,
+    ) -> Self {
+        let plenary_session_id = db_enhancer.retrieve_plenary_session_id(&legis_init).await;
 
         let db_legis_init = DbLegislativeInitiativeQuery {
             id: 0,
@@ -112,8 +114,9 @@ impl VoteResult {
             })
             .collect::<Vec<_>>();
 
-        let code_to_parties =
-            gen_code_to_parties_with_date(pool, &db_legis_init.created_at, &db_legis_init.gp).await;
+        let code_to_parties = db_enhancer
+            .gen_code_to_parties_with_date(&db_legis_init.created_at, &db_legis_init.gp)
+            .await;
 
         if legis_init.votes.is_empty()
             // && legis_init.accepted == Some(somes_scraper::AcceptedState::PreDeclined)
@@ -143,11 +146,10 @@ impl VoteResult {
                 };
 
                 let named_votes = match &voted_by_name_data.delegates_pro_contra {
-                    Some(pro_contra) => {
-                        create_db_named_votes(pool, pro_contra, legis_init.date, &legis_init.gp)
-                            .await
-                            .ok()
-                    }
+                    Some(pro_contra) => db_enhancer
+                        .create_db_named_votes(pro_contra, legis_init.date, &legis_init.gp)
+                        .await
+                        .ok(),
                     None => None,
                 };
                 Some(DbNamedVotes {
@@ -213,73 +215,29 @@ impl VoteResult {
             .collect::<Vec<_>>();
 
         // IMPORTANT: others must not rely on this id (anymore)! (e.g. Meilisearch ID/primary key)
-        let maybe_legis_init_id = sqlx::query!(
-            "select id from legislative_initiatives where inr = $1 and ityp = $2 and gp = $3",
-            db_legis_init.inr,
-            db_legis_init.ityp,
-            db_legis_init.gp
-        )
-        .fetch_optional(pool)
-        .await
-        .ok()
-        .flatten()
-        .map(|x| x.id);
+        let maybe_legis_init_id = db_enhancer.maybe_get_legis_init_id(&db_legis_init).await;
 
-        let (absences, referenced_by_others_ids) = if let Some(maybe_legis_init_id) =
-            maybe_legis_init_id
-        {
-            if let Ok(plenar_speeches) = sqlx::query_as!(
-                DbSpeechWithLink,
-                "
-                    SELECT
-                        delegate_id,
-                        CASE
-                            WHEN opinion = 'Pro' THEN ($2 NOT LIKE '%p%')
-                            WHEN opinion = 'Contra' THEN ($2 LIKE '%p%')
-                            ELSE NULL
-                        END AS infavor,
-                        duration_in_seconds,
-                        opinion,
-                        document_url,
-                        about
-                    FROM plenar_speeches
-                    INNER JOIN plenar_speech_links psl ON plenar_speeches.id = psl.plenar_speech_id
-                    INNER JOIN plenar_speech_legis_inits pl ON pl.speech_id = plenar_speeches.id
-                    INNER JOIN debates ON debates.id = plenar_speeches.debate_id
-                    WHERE legis_init_id = $1
-                    ",
-                maybe_legis_init_id,
-                db_legis_init.pre_declined_type
-            )
-            .fetch_all(pool)
-            .await
-            {
-                speeches = plenar_speeches
-            }
+        let (absences, referenced_by_others_ids) =
+            if let Some(maybe_legis_init_id) = maybe_legis_init_id {
+                if let Ok(plenar_speeches) = db_enhancer
+                    .get_plenar_speeches(&db_legis_init, maybe_legis_init_id)
+                    .await
+                {
+                    speeches = plenar_speeches;
+                }
 
-            let absences = sqlx::query!(
-                "
-                   SELECT delegate_id FROM absences
-        WHERE plenary_session_id = (
-            SELECT plenary_session_id
-            FROM legislative_initiatives
-            WHERE id = $1
-        ) 
-            ",
-                maybe_legis_init_id
-            )
-            .fetch_all(pool)
-            .await
-            .ok()
-            .map(|x| x.into_iter().map(|x| x.delegate_id).collect::<Vec<_>>());
+                let absences = db_enhancer
+                    .get_absences_from_legis_init(maybe_legis_init_id)
+                    .await
+                    .ok();
 
-            let referenced_by_other_ids = sqlx::query!("select origin_legis_init_id from legis_inits_refs where ref_gp = $1 and ref_ityp = $2 and ref_inr = $3", legis_init.gp, legis_init.ityp, db_legis_init.inr).fetch_all(pool).await.ok()
-                .map(|x| x.into_iter().map(|x| x.origin_legis_init_id).collect::<Vec<_>>());
+                let referenced_by_other_ids =
+                    db_enhancer.get_referenced_by_other_ids(&db_legis_init).await.ok();
 
-            (absences, referenced_by_other_ids)
-        } else {
-            (None, None)
-        };
+                (absences, referenced_by_other_ids)
+            } else {
+                (None, None)
+            };
 
         VoteResult {
             id: maybe_legis_init_id,
@@ -297,23 +255,5 @@ impl VoteResult {
             references: legis_init.references,
             meilisearch_helper: MeiliesearchHelper::default(),
         }
-    }
-}
-
-async fn retrieve_plenary_session_id(
-    pool: &sqlx::Pool<sqlx::Postgres>,
-    legis_init: &LegislativeInitiative,
-) -> Option<i32> {
-    match legis_init.plenary_session {
-        Some(session) => sqlx::query!(
-            "select id from plenar_infos where inr = $1 and legislative_period = $2",
-            session as i32,
-            legis_init.gp
-        )
-        .fetch_one(pool)
-        .await
-        .ok()
-        .map(|id| id.id),
-        None => None,
     }
 }

@@ -8,9 +8,9 @@ mod api_models;
 pub use api_models::*;
 use sqlx::{PgPool, postgres::PgPoolOptions};
 
-pub mod with_data;
 mod enhancer;
-
+pub use enhancer::*;
+pub mod with_data;
 
 pub const DATABASE_URL: &str = dotenv!("DATABASE_URL");
 pub const LATEST_GP: &str = dotenv!("LATEST_GP");

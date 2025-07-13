@@ -10,10 +10,7 @@ use somes_scraper::{
 };
 use sqlx::{postgres::PgQueryResult, query, PgPool};
 
-use crate::{
-    services::scrape_untill_success,
-    Shutdown,
-};
+use crate::{services::scrape_untill_success, Shutdown};
 
 pub async fn create_gov_officials_map() -> HashMap<u64, Vec<GovOfficial>> {
     let scraper = AustriaScraper::default();

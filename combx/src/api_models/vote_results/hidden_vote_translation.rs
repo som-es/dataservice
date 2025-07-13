@@ -40,7 +40,7 @@ pub async fn translate_votes(
     votes
 }
 
-pub async fn gen_code_to_parties_with_date(
+pub async fn pg_gen_code_to_parties_with_date(
     pool: &PgPool,
     date: &NaiveDate,
     gp: &str,

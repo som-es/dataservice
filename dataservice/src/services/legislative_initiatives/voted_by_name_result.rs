@@ -5,7 +5,7 @@ use sqlx::PgPool;
 pub async fn insert_named_vote_info(
     pg: &sqlx::PgPool,
     named_vote_info: &DbNamedVoteInfo,
-    legis_init_id: i32
+    legis_init_id: i32,
 ) -> Result<i32, sqlx::Error> {
     let result = sqlx::query!(
         "
@@ -89,4 +89,3 @@ pub async fn insert_named_votes(
 
     Ok(())
 }
-

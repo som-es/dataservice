@@ -1,8 +1,6 @@
 use std::thread::JoinHandle;
 
-use crate::{
-    scrape_untill_success, should_update::StoredUpdatedAt, Shutdown, GPS
-};
+use crate::{scrape_untill_success, should_update::StoredUpdatedAt, Shutdown, GPS};
 use combx::absence_matching;
 use somes_scraper::{
     call_to_order::CallToOrderInfo,

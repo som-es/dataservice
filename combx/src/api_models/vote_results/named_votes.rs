@@ -9,7 +9,7 @@ use crate::{
     with_data::active_delegates_at_date,
 };
 
-pub async fn create_db_named_votes(
+pub async fn pg_create_db_named_votes(
     pg: &PgPool,
     votes: &ProContra,
     voted_on: NaiveDate,

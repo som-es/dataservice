@@ -1,5 +1,5 @@
 use chrono::{Days, NaiveDate};
-use combx::{DbNamedVoteInfo, DbVote, VoteResult};
+use combx::{DbNamedVoteInfo, DbVote, PostgresEnhancer, VoteResult};
 use tokio::{runtime::Handle, sync::mpsc::Sender};
 pub mod notify;
 mod voted_by_name_result;
@@ -17,8 +17,7 @@ use std::{
 
 use crate::{
     should_update::{self, StoredUpdatedAt},
-    today, today_and_time,
-    Shutdown, GPS, LATEST_GP,
+    today, today_and_time, Shutdown, GPS, LATEST_GP,
 };
 
 use dotenvy_macro::dotenv;
@@ -76,8 +75,7 @@ pub async fn scrape_new_legis_inits(
                     return;
                 };
 
-                update_legis_inits_in_db(&pool, &[legis_init], new_legis_init)
-                    .await;
+                update_legis_inits_in_db(&pool, &[legis_init], new_legis_init).await;
                 // new_legis_inits.push(legis_init);
             })
         }));
@@ -240,7 +238,7 @@ pub async fn update_legis_inits_in_db(
             legis_init.inr
         );
 
-        let mut vote_result = VoteResult::from_legis_init(pool, legis_init.clone()).await;
+        let mut vote_result = VoteResult::from_legis_init(PostgresEnhancer(pool.clone()), legis_init.clone()).await;
 
         // println!("db_legis_init: {db_legis_init:?}");
 
@@ -342,16 +340,14 @@ pub async fn update_legis_inits_in_db(
             insert_vote(pool, vote, legis_init_id).await;
         }
         if let Some(named_votes) = vote_result.named_votes {
-            if let Ok(named_vote_info_id) = insert_named_vote_info(pool, &named_votes.named_vote_info, legis_init_id).await {
-                    if let Err(e) = insert_named_votes(
-                        pool,
-                        &named_votes.named_votes,
-                        named_vote_info_id,
-                    )
-                    .await
-                    {
-                        log::error!("Could not insert any named votes for legis init: {legis_init:?}, error: {e:?}")
-                    }
+            if let Ok(named_vote_info_id) =
+                insert_named_vote_info(pool, &named_votes.named_vote_info, legis_init_id).await
+            {
+                if let Err(e) =
+                    insert_named_votes(pool, &named_votes.named_votes, named_vote_info_id).await
+                {
+                    log::error!("Could not insert any named votes for legis init: {legis_init:?}, error: {e:?}")
+                }
             }
         }
 
@@ -483,7 +479,6 @@ pub async fn update_legis_inits_in_db(
             {
                 log::error!("Error inserting UNIQUE (eurovoc) topic: '{:?}'. The error occurred for the following eurovoc topic: {:?}", e, topic);
             }
-
 
             if let Err(e) = sqlx::query!(
                 "
@@ -617,7 +612,6 @@ pub async fn insert_vote(pool: &PgPool, db_vote: &DbVote, legis_init_id: i32) {
     }
 }
 
-
 pub async fn run_shut_latest_gp(
     mut shutdown: Shutdown,
     pg_pool: PgPool,
@@ -707,7 +701,6 @@ mod tests {
 
     use crate::{connect_pg, DATABASE_URL};
 
-
     #[test]
     fn test_date_time_parse() {
         let x = NaiveDateTime::parse_from_str("2014-5-17T12:34:56", "%Y-%m-%dT%H:%M:%S").unwrap();
@@ -768,12 +761,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(
-            &pool,
-            &[res],
-            None,
-        )
-        .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
     }
 
     #[tokio::test]
@@ -785,12 +773,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(
-            &pool,
-            &[res],
-            None,
-        )
-        .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
 
         // println!("s: {:?}", scraper.scrape_info.gp);
 
@@ -807,12 +790,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(
-            &pool,
-            &[res],
-            None,
-        )
-        .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
     }
 
     #[tokio::test]
@@ -824,12 +802,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(
-            &pool,
-            &[res],
-            None,
-        )
-        .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
     }
 
     #[tokio::test]
@@ -841,12 +814,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(
-            &pool,
-            &[res],
-            None,
-        )
-        .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
     }
 
     #[tokio::test]
@@ -859,12 +827,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(
-            &pool,
-            &[res],
-            None,
-        )
-        .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
     }
 
     #[tokio::test]
@@ -877,12 +840,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(
-            &pool,
-            &[res],
-            None,
-        )
-        .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
     }
 
     #[tokio::test]
@@ -897,12 +855,7 @@ mod tests {
         log::info!("legis init: {res:?}");
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(
-            &pool,
-            &[res],
-            None,
-        )
-        .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
     }
 
     #[tokio::test]
@@ -917,11 +870,6 @@ mod tests {
         log::info!("legis init: {res:?}");
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(
-            &pool,
-            &[res],
-            None,
-        )
-        .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
     }
 }
