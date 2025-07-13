@@ -15,6 +15,8 @@ use crate::{
         DbVote, Topic,
     },
 };
+#[cfg(feature = "utoipa")]
+use utoipa::ToSchema;
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone, FromRow, Default)]
@@ -108,7 +110,7 @@ impl VoteResult {
             .iter()
             .map(|vote| DbVote {
                 party: vote.party.name.clone(),
-                code: vote.party.code.clone(),
+                code: Some(vote.party.code.clone()),
                 fraction: vote.party.fraction as i32,
                 infavor: vote.infavor,
             })
@@ -210,6 +212,7 @@ impl VoteResult {
                         .first()
                         .map(|html_url| html_url.document_url.clone()),
                     about: None,
+                    legis_init_id: None,
                 }
             })
             .collect::<Vec<_>>();

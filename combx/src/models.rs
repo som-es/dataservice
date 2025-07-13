@@ -180,7 +180,7 @@ pub struct DbLegislativeInitiativeQuery {
 // #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
 pub struct DbVote {
     pub party: String,
-    pub code: String,
+    pub code: Option<String>,
     pub fraction: i32,
     pub infavor: bool,
 }
@@ -215,6 +215,7 @@ pub struct DbSpeech {
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct DbSpeechWithLink {
     pub delegate_id: i32,
+    pub legis_init_id: Option<i32>,
     pub infavor: Option<bool>,
     pub duration_in_seconds: Option<i32>,
     pub opinion: Option<String>,
@@ -498,6 +499,28 @@ pub struct DbNamedVoteInfo {
     pub contra_count: i32,
     pub given_vote_sum: i32,
     pub invalid_count: i32,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+pub struct DbNamedVoteInfoQuery {
+    pub id: i32,
+    pub legis_init_id: i32,
+    pub pro_count: i32,
+    pub contra_count: i32,
+    pub given_vote_sum: i32,
+    pub invalid_count: i32,
+}
+
+impl From<DbNamedVoteInfoQuery> for DbNamedVoteInfo {
+    fn from(value: DbNamedVoteInfoQuery) -> Self {
+        Self {
+            pro_count: value.pro_count,
+            contra_count: value.contra_count,
+            given_vote_sum: value.given_vote_sum,
+            invalid_count: value.invalid_count,
+        }
+    }
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

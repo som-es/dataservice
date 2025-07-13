@@ -39,7 +39,7 @@ default = ["runner", "ministerial_latest", "ministerial", "legis_init", "legis_i
 # default = ["runner", "ministerial_latest", "legis_init", "plenar", ]
 models = ["dotenvy", "chrono"]
 runner = ["models", "chrono", "reqwest", "simple_logger", "tokio", "dotenvy"]
-utoipa = ["dep:utoipa"]
+utoipa = ["dep:utoipa", "combx/utoipa"]
 
 legis_init_latest = []
 legis_init = []

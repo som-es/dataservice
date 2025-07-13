@@ -77,6 +77,7 @@ pub async fn pg_get_plenar_speeches(
         DbSpeechWithLink,
         "
                     SELECT
+                        legis_init_id,
                         delegate_id,
                         CASE
                             WHEN opinion = 'Pro' THEN ($2 NOT LIKE '%p%')

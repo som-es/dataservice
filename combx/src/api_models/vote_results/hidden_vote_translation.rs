@@ -19,7 +19,7 @@ pub async fn translate_votes(
 
         Some(DbVote {
             party: party.name,
-            code: code.to_string(),
+            code: Some(code.to_string()),
             fraction: party.fraction as i32,
             infavor,
         })
