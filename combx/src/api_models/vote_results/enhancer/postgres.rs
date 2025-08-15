@@ -59,7 +59,7 @@ impl VoteResultEnhancer for PostgresEnhancer {
     ) -> impl Future<Output = Result<Vec<i32>, Self::Error>> {
         pg_get_absences_from_legis_init(self.source(), maybe_legis_init_id)
     }
-    
+
     fn get_referenced_by_other_ids(
         &self,
         db_legis_init: &DbLegislativeInitiativeQuery,

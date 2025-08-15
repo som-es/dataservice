@@ -8,7 +8,7 @@ use somes_scraper::{LegislativeInitiative, Opinion, Reference, RelatedDelegate};
 use sqlx::{FromRow, PgPool};
 
 use crate::{
-    DbNamedVoteInfo,
+    DbNamedVoteInfo, FromScrapedType,
     api_models::vote_results::hidden_vote_translation::translate_votes,
     models::{
         DbLegisDocumentOptional, DbLegislativeInitiativeQuery, DbNamedVotes, DbSpeechWithLink,
@@ -43,6 +43,14 @@ pub struct VoteResult {
     pub references: Option<Vec<Reference>>,
     #[serde(default)]
     pub meilisearch_helper: MeiliesearchHelper,
+}
+
+impl<T: VoteResultEnhancer> FromScrapedType<T> for VoteResult {
+    type ScrapedType = LegislativeInitiative;
+
+    async fn from_scraped_type(db_enhancer: T, ty: Self::ScrapedType) -> Self {
+        Self::from_legis_init(db_enhancer, ty).await
+    }
 }
 
 impl VoteResult {
@@ -234,8 +242,10 @@ impl VoteResult {
                     .await
                     .ok();
 
-                let referenced_by_other_ids =
-                    db_enhancer.get_referenced_by_other_ids(&db_legis_init).await.ok();
+                let referenced_by_other_ids = db_enhancer
+                    .get_referenced_by_other_ids(&db_legis_init)
+                    .await
+                    .ok();
 
                 (absences, referenced_by_other_ids)
             } else {

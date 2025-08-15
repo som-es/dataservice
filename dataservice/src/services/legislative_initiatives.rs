@@ -238,7 +238,8 @@ pub async fn update_legis_inits_in_db(
             legis_init.inr
         );
 
-        let mut vote_result = VoteResult::from_legis_init(PostgresEnhancer(pool.clone()), legis_init.clone()).await;
+        let mut vote_result =
+            VoteResult::from_legis_init(PostgresEnhancer(pool.clone()), legis_init.clone()).await;
 
         // println!("db_legis_init: {db_legis_init:?}");
 

@@ -359,11 +359,6 @@ async fn insert_plenar_speech(
                     &plenar_speech.speech.delegate_display_name,
                 )
                 .await
-            // Some(
-            //     text_extractor
-            //         .extract_text_from_url(&text_html_url.document_url, None, true)
-            //         .await,
-            // )
         };
         if updated_spoken_text.is_none() {
             warn!(

@@ -1,4 +1,6 @@
-use combx::with_data::gps::{gps, LegislativePeriod};
+use std::sync::Arc;
+
+use combx::{with_data::gps::{gps, LegislativePeriod}, FromScrapedType, PostgresEnhancer};
 use somes_scraper::{decree::RisScraper, AustriaScraper, Thing};
 use sqlx::PgPool;
 
@@ -16,6 +18,8 @@ pub async fn save_ministrial_decrees(pages: u32, pg_pool: &PgPool) {
         },
     );
 
+    let all_gps: Arc<[LegislativePeriod]> = Arc::from(all_gps);
+
     for page in 1..=pages {
         log::info!("Currently on page {page}..");
         let Ok(decrees) = scraper.fetch_and_parse_ministrial_decrees(page).await else {
@@ -24,7 +28,7 @@ pub async fn save_ministrial_decrees(pages: u32, pg_pool: &PgPool) {
         };
 
         for decree in decrees {
-            if let Err(e) = insert_ministrial_decree(&decree, pg_pool, &all_gps).await {
+            if let Err(e) = insert_ministrial_decree(decree, pg_pool, all_gps.clone()).await {
                 log::error!("Cannot insert decree: {e:?}");
             }
         }
@@ -32,44 +36,14 @@ pub async fn save_ministrial_decrees(pages: u32, pg_pool: &PgPool) {
 }
 
 pub async fn insert_ministrial_decree(
-    decree: &Thing,
+    decree: Thing,
     pg_pool: &PgPool,
-    all_gps: &[LegislativePeriod],
+    all_gps: Arc<[LegislativePeriod]>,
 ) -> crate::Result<()> {
-    let possible_gp = all_gps.windows(2).find_map(|gps| {
-        let end_date = gps[0].start_date;
-        let start_date = gps[1].start_date;
-        if decree.date <= end_date && decree.date >= start_date {
-            Some(&gps[1].gp)
-        } else {
-            None
-        }
-    });
+    let decree = combx::Decree::from_scraped_type(PostgresEnhancer(pg_pool.clone()), (decree, all_gps)).await;
 
-    let gov_officials_at_date = sqlx::query!(
-        "
-        SELECT 
-            mandates.delegate_id, 
-            ministry
-        FROM 
-            mandates 
-        WHERE 
-            mandates.is_gov_official
-            AND ministry is not null
-            AND mandates.start_date <= $1::date 
-            AND name not like '%sekretär%'
-            AND (CASE WHEN mandates.end_date IS NULL THEN $1::date ELSE mandates.end_date END) >= $1::date;
 
-        ",
-        decree.date
-    )
-    .fetch_all(pg_pool)
-    .await?;
-
-    if let Some(fitting_gov_official) = gov_officials_at_date
-        .iter()
-        .find(|x| x.ministry.as_ref() == Some(&decree.issuer))
-    {
+    if let Some(gov_official_id) = decree.gov_official_id {
         let decree_id = sqlx::query!(
             "
             INSERT INTO ministrial_decrees (
@@ -92,14 +66,14 @@ pub async fn insert_ministrial_decree(
                 gp = EXCLUDED.gp
             RETURNING id;
             ",
-            fitting_gov_official.delegate_id,
-            decree.id,
-            decree.issuer,
+            gov_official_id,
+            decree.ris_id,
+            decree.ministrial_issuer,
             decree.title,
             decree.short_title,
-            decree.date,
+            decree.publication_date,
             decree.part,
-            possible_gp,
+            decree.gp,
         )
         .fetch_one(pg_pool)
         .await?;
@@ -121,8 +95,8 @@ pub async fn insert_ministrial_decree(
                 ",
                 decree_id.id,
                 document.title,
-                document.ftype.to_string(),
-                document.link
+                document.document_type,
+                document.document_url
             )
             .execute(pg_pool)
             .await?;
