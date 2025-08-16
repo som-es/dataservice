@@ -3,7 +3,7 @@ use std::{
     sync::LazyLock,
 };
 
-use combx::{DbContact, DbDelegate, DbMandate};
+use combx::{create_gov_officials_map, DbContact, DbDelegate, DbMandate};
 use somes_scraper::{
     delegates::DelegateScraper, gov_officials::GovOfficials, AustriaScraper, Delegate, GovOfficial,
     Mandate,
@@ -11,23 +11,6 @@ use somes_scraper::{
 use sqlx::{postgres::PgQueryResult, query, PgPool};
 
 use crate::{services::scrape_untill_success, Shutdown};
-
-pub async fn create_gov_officials_map() -> HashMap<u64, Vec<GovOfficial>> {
-    let scraper = AustriaScraper::default();
-    let gov_officials_listed = scraper.gov_officials().await;
-
-    let gov_officials_listed = gov_officials_listed.unwrap_or_default();
-
-    let mut gov_officials = HashMap::new();
-    for gov_official in gov_officials_listed {
-        gov_officials
-            .entry(gov_official.delegate_id)
-            .and_modify(|e: &mut Vec<GovOfficial>| e.push(gov_official.clone()))
-            .or_insert(vec![gov_official]);
-    }
-
-    gov_officials
-}
 
 async fn scrape_new_delegates_bs() -> crate::Result<Vec<Delegate>> {
     let scraper = AustriaScraper::default();

@@ -1,6 +1,7 @@
-use std::{collections::HashMap, sync::LazyLock};
+use std::{collections::HashMap, sync::{Arc, LazyLock}};
 
 use chrono::Months;
+use combx::{create_gov_officials_map, FromScrapedType, GovProposal};
 use dotenvy_macro::dotenv;
 use somes_scraper::{
     ministrial_proposals::{MinistrialProposal, MinistrialProposalScraper},
@@ -10,7 +11,7 @@ use somes_scraper::{
 use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{
-    delegates::create_gov_officials_map, services::scrape_untill_success,
+    services::scrape_untill_success,
     should_update::StoredUpdatedAt, today, today_and_time, Shutdown, GPS,
 };
 
@@ -47,12 +48,12 @@ pub async fn scrape_new_ministrial_props(
 async fn ministrial_proposal_once(
     only_latest: bool,
     pg_pool: &PgPool,
-    new_ministrial_proposal_tx: Option<Sender<Option<(i32, MinistrialProposal)>>>,
+    new_ministrial_proposal_tx: Option<Sender<Option<(i32, GovProposal)>>>,
 ) -> Vec<MinistrialProposal> {
     log::info!("Try scraping ministiral proposals");
     let mut scraper = AustriaScraper::default();
 
-    let gov_officials = create_gov_officials_map().await;
+    let gov_officials = Arc::new(create_gov_officials_map().await);
 
     for gp in GPS {
         log::info!("scrape ministrial proposals for GP: {gp}");
@@ -74,9 +75,9 @@ async fn ministrial_proposal_once(
 
         update_ministrial_proposals_in_db2(
             pg_pool,
-            &new_ministrial_props,
+            new_ministrial_props,
             new_ministrial_proposal_tx.clone(),
-            &gov_officials,
+            gov_officials.clone(),
         )
         .await
         .unwrap();
@@ -117,16 +118,18 @@ impl StoredUpdatedAt for MinistrialProposal {
 
 pub async fn update_ministrial_proposals_in_db2(
     pool: &PgPool,
-    ministrial_props: &[MinistrialProposal],
-    new_ministrial_proposal_tx: Option<Sender<Option<(i32, MinistrialProposal)>>>,
-    gov_officials: &HashMap<u64, Vec<GovOfficial>>,
+    ministrial_props: Vec<MinistrialProposal>,
+    new_ministrial_proposal_tx: Option<Sender<Option<(i32, GovProposal)>>>,
+    gov_officials: Arc<HashMap<u64, Vec<GovOfficial>>>,
 ) -> Result<(), sqlx::Error> {
     log::info!("Updating ministrial proposal in database...");
 
-    for (i, ministrial_prop) in ministrial_props.iter().enumerate() {
-        if !crate::should_update(ministrial_prop, pool).await {
+    for (i, ministrial_prop) in ministrial_props.into_iter().enumerate() {
+        if !crate::should_update(&ministrial_prop, pool).await {
             continue;
         }
+
+        let gov_proposal = GovProposal::from_scraped_type((), (ministrial_prop, gov_officials.clone())).await;
         // log::info!("inserting single ministrial prop");
 
         let start = Instant::now();
@@ -154,21 +157,21 @@ pub async fn update_ministrial_proposals_in_db2(
                 has_vote_result = EXCLUDED.has_vote_result
             RETURNING id
             "#,
-            ministrial_prop.title,
-            ministrial_prop.inr as i32,
-            ministrial_prop.emphasis,
-            ministrial_prop.description,
-            ministrial_prop.ityp,
-            ministrial_prop.gp,
-            ministrial_prop.created_at,
-            ministrial_prop.updated_at,
-            ministrial_prop.gegenstand_info.due_to,
-            ministrial_prop.gegenstand_info.ressort,
-            ministrial_prop.gegenstand_info.ressort_shortform,
-            ministrial_prop.legis_gp,
-            ministrial_prop.legis_init_inr.map(|x| x as i32),
-            ministrial_prop.legis_init_ityp,
-            ministrial_prop.legis_init_inr.is_some(),
+            gov_proposal.ministrial_proposal.title,
+            gov_proposal.ministrial_proposal.inr,
+            gov_proposal.ministrial_proposal.emphasis,
+            gov_proposal.ministrial_proposal.description,
+            gov_proposal.ministrial_proposal.ityp,
+            gov_proposal.ministrial_proposal.gp,
+            gov_proposal.ministrial_proposal.created_at,
+            gov_proposal.ministrial_proposal.updated_at,
+            gov_proposal.ministrial_proposal.due_to,
+            gov_proposal.ministrial_proposal.ressort,
+            gov_proposal.ministrial_proposal.ressort_shortform,
+            gov_proposal.ministrial_proposal.legis_init_gp,
+            gov_proposal.ministrial_proposal.legis_init_inr,
+            gov_proposal.ministrial_proposal.legis_init_ityp,
+            gov_proposal.ministrial_proposal.has_vote_result,
         )
         .fetch_one(pool)
         .await?
@@ -177,33 +180,7 @@ pub async fn update_ministrial_proposals_in_db2(
             log::info!("{i} insertion dur: {:?}", start.elapsed());
         }
 
-        if ministrial_prop.delegate_ids.is_empty() {
-            'outer: for roles in gov_officials.values() {
-                for role in roles {
-                    if role.ministry == ministrial_prop.gegenstand_info.ressort
-                        && ministrial_prop.created_at.date() >= role.start_date
-                        && role.end_date.unwrap_or(today()) >= ministrial_prop.created_at.date()
-                    {
-                        // log::info!("MINISTRIAL ADDED: {}, ressort: {}", role.ministry, ministrial_prop.gegenstand_info.ressort);
-                        sqlx::query!(
-                            r#"
-                            INSERT INTO ministrial_issuer (delegate_id, ministrial_proposal_id)
-                            VALUES ($1, $2)
-                            ON CONFLICT (ministrial_proposal_id, delegate_id)
-                            DO NOTHING
-                            "#,
-                            role.delegate_id as i32,
-                            ministrial_prop_id
-                        )
-                        .execute(pool)
-                        .await?;
-                        break 'outer;
-                    }
-                }
-            }
-        }
-
-        for issuer_id in &ministrial_prop.delegate_ids {
+        for issuer_id in &gov_proposal.ministerial_issuers {
             sqlx::query!(
                 r#"
                 INSERT INTO ministrial_issuer (delegate_id, ministrial_proposal_id)
@@ -211,7 +188,7 @@ pub async fn update_ministrial_proposals_in_db2(
                 ON CONFLICT (ministrial_proposal_id, delegate_id)
                 DO NOTHING
                 "#,
-                *issuer_id as i32,
+                *issuer_id,
                 ministrial_prop_id
             )
             .execute(pool)
@@ -226,13 +203,13 @@ pub async fn update_ministrial_proposals_in_db2(
             .fetch_optional(pool)
             .await
             {
-                let diff = today() - ministrial_prop.created_at.date();
+                let diff = today() - gov_proposal.ministrial_proposal.created_at.date();
 
                 if diff.num_days() <= *MINISTRIAL_PROP_STILL_SEND_DAYS && info.is_none() {
                     log::info!("Sending fitting ministrial prop: {ministrial_prop_id}");
                     // collect somwhere (other service), then run every 30 mins e.g.
                     if let Err(e) = new_legis_init_tx
-                        .send(Some((ministrial_prop_id, ministrial_prop.clone())))
+                        .send(Some((ministrial_prop_id, gov_proposal.clone())))
                         .await
                     {
                         log::error!("could not send ministrial prop to mail notify service: {e:?}")
@@ -254,7 +231,7 @@ pub async fn update_ministrial_proposals_in_db2(
         }
 
         // Insert or update topics
-        for topic in &ministrial_prop.topics {
+        for topic in &gov_proposal.topics {
             sqlx::query!(
                 r#"
                 INSERT INTO topics_ministrial_proposals (topic, ministrial_proposal_id)
@@ -262,7 +239,7 @@ pub async fn update_ministrial_proposals_in_db2(
                 ON CONFLICT (ministrial_proposal_id, topic)
                 DO UPDATE SET topic = EXCLUDED.topic
                 "#,
-                topic,
+                topic.topic,
                 ministrial_prop_id
             )
             .execute(pool)
@@ -270,7 +247,7 @@ pub async fn update_ministrial_proposals_in_db2(
         }
 
         // Insert or update eurovoc topics
-        for topic in &ministrial_prop.eurovoc_topics {
+        for topic in &gov_proposal.eurovoc_topics {
             sqlx::query!(
                 r#"
                 INSERT INTO eurovoc_topics_ministrial_proposals (topic, ministrial_proposal_id)
@@ -278,7 +255,7 @@ pub async fn update_ministrial_proposals_in_db2(
                 ON CONFLICT (ministrial_proposal_id, topic)
                 DO UPDATE SET topic = EXCLUDED.topic
                 "#,
-                topic,
+                topic.topic,
                 ministrial_prop_id
             )
             .execute(pool)
@@ -286,7 +263,7 @@ pub async fn update_ministrial_proposals_in_db2(
         }
 
         // Insert or update other keyword topics
-        for topic in &ministrial_prop.other_keyword_topics {
+        for topic in &gov_proposal.other_keyword_topics {
             sqlx::query!(
                 r#"
                 INSERT INTO other_keyword_topics_ministrial_proposals (topic, ministrial_proposal_id)
@@ -294,7 +271,7 @@ pub async fn update_ministrial_proposals_in_db2(
                 ON CONFLICT (ministrial_proposal_id, topic)
                 DO UPDATE SET topic = EXCLUDED.topic
                 "#,
-                topic,
+                topic.topic,
                 ministrial_prop_id
             )
             .execute(pool)
@@ -302,7 +279,7 @@ pub async fn update_ministrial_proposals_in_db2(
         }
 
         // Insert or update documents
-        for document in &ministrial_prop.documents {
+        for document in &gov_proposal.documents {
             sqlx::query!(
                 r#"
                 INSERT INTO ministrial_proposals_documents (
@@ -316,8 +293,8 @@ pub async fn update_ministrial_proposals_in_db2(
                 "#,
                 ministrial_prop_id,
                 document.title,
-                document.ftype.to_string(),
-                document.link
+                document.document_type,
+                document.document_url
             )
             .execute(pool)
             .await?;
@@ -330,7 +307,7 @@ pub async fn update_ministrial_proposals_in_db2(
 pub async fn run_shut_latest_gp(
     mut shutdown: Shutdown,
     pg_pool: PgPool,
-    new_ministrial_proposal_tx: Sender<Option<(i32, MinistrialProposal)>>,
+    new_ministrial_proposal_tx: Sender<Option<(i32, GovProposal)>>,
 ) {
     let legis_init_sleep = std::env::var("MINISTRIAL_PROPOSAL_LATEST_SLEEP")
         .unwrap_or_else(|_| "400".to_string())

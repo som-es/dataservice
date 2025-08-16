@@ -1,6 +1,7 @@
+use combx::GovProposal;
 use dataservice::{
     connect_pg,
-    delegates::{create_gov_officials_map, delegate_count},
+    delegates::delegate_count,
     services, Shutdown, DATABASE_URL,
 };
 use std::future::Future;
@@ -40,7 +41,7 @@ pub async fn run_services(state: &State) {
         tokio::sync::mpsc::channel::<Option<(i32, somes_scraper::LegislativeInitiative)>>(128);
 
     let (new_ministrial_proposal_tx, new_ministrial_proposal_rx) = tokio::sync::mpsc::channel::<
-        Option<(i32, somes_scraper::ministrial_proposals::MinistrialProposal)>,
+        Option<(i32, GovProposal)>,
     >(128);
 
     let latest_legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP_LATEST")

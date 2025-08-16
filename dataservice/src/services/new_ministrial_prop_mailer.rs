@@ -1,3 +1,4 @@
+use combx::GovProposal;
 use somes_scraper::{ministrial_proposals::MinistrialProposal, LegislativeInitiative};
 use sqlx::PgPool;
 use tokio::sync::mpsc::Receiver;
@@ -9,7 +10,7 @@ use crate::{
 
 pub async fn notify_on_new_ministrial_props(
     pg_pool: &PgPool,
-    new_ministrial_prop_rx: &mut Receiver<Option<(i32, MinistrialProposal)>>,
+    new_ministrial_prop_rx: &mut Receiver<Option<(i32, GovProposal)>>,
 ) {
     loop {
         let mut acc_ministrial_props = Vec::new();
@@ -41,7 +42,7 @@ pub async fn notify_on_new_ministrial_props(
 
 pub async fn notify_on_new_ministrial_props_service(
     mut shutdown: Shutdown,
-    mut new_vote_result_rx: Receiver<Option<(i32, MinistrialProposal)>>,
+    mut new_vote_result_rx: Receiver<Option<(i32, GovProposal)>>,
     pg_pool: PgPool,
 ) {
     while !shutdown.is_shutdown() {

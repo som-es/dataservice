@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use combx::GovProposal;
 use somes_scraper::ministrial_proposals::MinistrialProposal;
 use sqlx::{query, PgPool};
 
@@ -7,8 +8,8 @@ use crate::email::{send_mail, MAILER};
 
 pub async fn find_notifiers_ministrial_props<'a>(
     pool: &PgPool,
-    legis_inits: &'a [(i32, MinistrialProposal)],
-) -> HashMap<String, Vec<&'a (i32, MinistrialProposal)>> {
+    legis_inits: &'a [(i32, GovProposal)],
+) -> HashMap<String, Vec<&'a (i32, GovProposal)>> {
     let ids = query!("select id, email from somes_user where is_email_hashed is false and send_new_ministrial_prop_mails")
         .fetch_all(pool)
         .await
@@ -21,7 +22,7 @@ pub async fn find_notifiers_ministrial_props<'a>(
             .iter()
             .filter(|legis_init| {
                 for topic in &legis_init.1.eurovoc_topics {
-                    if user_topics.contains(topic) {
+                    if user_topics.contains(&topic.topic) {
                         return true;
                     }
                 }
@@ -38,7 +39,7 @@ pub async fn find_notifiers_ministrial_props<'a>(
 
 pub fn send_new_ministrial_prop_info_mail(
     mail_to: &str,
-    ministrial_props: &[&(i32, MinistrialProposal)],
+    ministrial_props: &[&(i32, GovProposal)],
 ) -> Result<(), Box<dyn std::error::Error>> {
     let ministrial_props = ministrial_props
         .iter()
@@ -69,7 +70,7 @@ pub fn send_new_ministrial_prop_info_mail(
                     </div>
                 </a>
             "#,
-                desc = ministrial_prop.description
+                desc = ministrial_prop.ministrial_proposal.description
             );
 
             ministrial_props_html.push_str(&ministrial_prop_html_entry);
@@ -91,7 +92,7 @@ pub fn send_new_ministrial_prop_info_mail(
     Ok(())
 }
 
-pub fn notify_users(user_ministrial_props: &HashMap<String, Vec<&(i32, MinistrialProposal)>>) {
+pub fn notify_users(user_ministrial_props: &HashMap<String, Vec<&(i32, GovProposal)>>) {
     for (mail_to, ministrial_props) in user_ministrial_props {
         if let Err(e) = send_new_ministrial_prop_info_mail(mail_to, ministrial_props) {
             log::error!("could not send ministrial prop info mail: {e:?}");
