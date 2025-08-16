@@ -1,7 +1,7 @@
 use somes_scraper::Thing;
 use sqlx::PgPool;
 
-use crate::{api_models::decrees::enhancer::DecreeEnhancer, PostgresEnhancer};
+use crate::{PostgresEnhancer, api_models::decrees::enhancer::DecreeEnhancer};
 
 impl DecreeEnhancer for PostgresEnhancer {
     fn gov_officials_at_date(
@@ -14,10 +14,13 @@ impl DecreeEnhancer for PostgresEnhancer {
 
 pub struct GovOfficialAtDate {
     pub delegate_id: i32,
-    pub ministry: Option<String>
+    pub ministry: Option<String>,
 }
 
-pub async fn pg_gov_officials_at_date(pg_pool: &PgPool, decree: &Thing) -> sqlx::Result<Vec<GovOfficialAtDate>> {
+pub async fn pg_gov_officials_at_date(
+    pg_pool: &PgPool,
+    decree: &Thing,
+) -> sqlx::Result<Vec<GovOfficialAtDate>> {
     sqlx::query_as!(GovOfficialAtDate,
         "
         SELECT 

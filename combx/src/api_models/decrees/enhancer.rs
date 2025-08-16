@@ -1,6 +1,6 @@
 use somes_scraper::Thing;
 
-use crate::{api_models::decrees::enhancer::postgres::GovOfficialAtDate, Enhancer};
+use crate::{Enhancer, api_models::decrees::enhancer::postgres::GovOfficialAtDate};
 
 mod postgres;
 

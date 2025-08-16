@@ -12,6 +12,9 @@ use crate::{
 
 mod enhancer;
 
+#[cfg(feature = "utoipa")]
+use utoipa::ToSchema;
+
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Document {
@@ -59,8 +62,10 @@ impl Decree {
             }
         });
 
-        let gov_officials_at_date = db_enhancer.gov_officials_at_date(&decree).await.unwrap_or_default();
-        
+        let gov_officials_at_date = db_enhancer
+            .gov_officials_at_date(&decree)
+            .await
+            .unwrap_or_default();
 
         let gov_official_id = gov_officials_at_date
             .iter()
@@ -77,11 +82,15 @@ impl Decree {
             part: decree.part,
             emphasis: None,
             gp: possible_gp.cloned(),
-            documents: decree.documents.into_iter().map(|doc| Document {
-                title: doc.title,
-                document_url: doc.link,
-                document_type: doc.ftype.to_string(),
-            }).collect(),
+            documents: decree
+                .documents
+                .into_iter()
+                .map(|doc| Document {
+                    title: doc.title,
+                    document_url: doc.link,
+                    document_type: doc.ftype.to_string(),
+                })
+                .collect(),
         }
     }
 }

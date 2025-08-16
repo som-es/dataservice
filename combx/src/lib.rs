@@ -6,6 +6,9 @@ use dotenvy_macro::dotenv;
 pub use models::*;
 mod api_models;
 pub use api_models::*;
+mod gov_officials;
+pub use gov_officials::*;
+
 use sqlx::{PgPool, postgres::PgPoolOptions};
 
 mod enhancer;

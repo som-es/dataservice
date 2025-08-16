@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use combx::{with_data::gps::{gps, LegislativePeriod}, FromScrapedType, PostgresEnhancer};
+use combx::{
+    with_data::gps::{gps, LegislativePeriod},
+    FromScrapedType, PostgresEnhancer,
+};
 use somes_scraper::{decree::RisScraper, AustriaScraper, Thing};
 use sqlx::PgPool;
 
@@ -40,8 +43,9 @@ pub async fn insert_ministrial_decree(
     pg_pool: &PgPool,
     all_gps: Arc<[LegislativePeriod]>,
 ) -> crate::Result<()> {
-    let decree = combx::Decree::from_scraped_type(PostgresEnhancer(pg_pool.clone()), (decree, all_gps)).await;
-
+    let decree =
+        combx::Decree::from_scraped_type(PostgresEnhancer(pg_pool.clone()), (decree, all_gps))
+            .await;
 
     if let Some(gov_official_id) = decree.gov_official_id {
         let decree_id = sqlx::query!(

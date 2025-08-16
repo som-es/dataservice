@@ -122,8 +122,8 @@ pub struct DbMinistrialProposal {
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize, FromRow)]
 // #[diesel(table_name = ministrial_proposals)]
 pub struct DbMinistrialProposalQuery {
-    pub delegate_id: i32,
     pub id: i32,
+    pub delegate_id: i32,
     pub ityp: String,
     pub gp: String,
     pub inr: i32,
@@ -133,12 +133,12 @@ pub struct DbMinistrialProposalQuery {
     pub created_at: NaiveDateTime,
     pub updated_at: Option<NaiveDateTime>,
     pub due_to: NaiveDate,
-    pub ressort: Option<String>,
-    pub ressort_shortform: Option<String>,
+    pub ressort: String,
+    pub ressort_shortform: String,
     pub legis_init_gp: Option<String>,
     pub legis_init_inr: Option<i32>,
     pub legis_init_ityp: Option<String>,
-    pub has_vote_result: Option<bool>,
+    pub has_vote_result: bool,
 }
 use sqlx::FromRow;
 
