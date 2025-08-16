@@ -31,7 +31,7 @@ pub async fn gps(pg: &PgPool) -> Result<Vec<LegislativePeriod>, Box<dyn std::err
 mod tests {
     use sqlx::postgres::PgPoolOptions;
 
-    use crate::{with_data::gps::gps, DATABASE_URL};
+    use crate::{DATABASE_URL, with_data::gps::gps};
 
     #[tokio::test]
     async fn test_gps() {

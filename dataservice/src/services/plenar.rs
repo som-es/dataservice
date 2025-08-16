@@ -1,9 +1,7 @@
 use std::thread::JoinHandle;
 
-use crate::{
-    legislative_initiatives::absence_matching, services::scrape_untill_success,
-    should_update::StoredUpdatedAt, Shutdown, GPS,
-};
+use crate::{scrape_untill_success, should_update::StoredUpdatedAt, Shutdown, GPS};
+use combx::absence_matching;
 use somes_scraper::{
     call_to_order::CallToOrderInfo,
     plenar::{Debate, DebateInfo, Plenar, PlenarInfo},
@@ -361,11 +359,6 @@ async fn insert_plenar_speech(
                     &plenar_speech.speech.delegate_display_name,
                 )
                 .await
-            // Some(
-            //     text_extractor
-            //         .extract_text_from_url(&text_html_url.document_url, None, true)
-            //         .await,
-            // )
         };
         if updated_spoken_text.is_none() {
             warn!(

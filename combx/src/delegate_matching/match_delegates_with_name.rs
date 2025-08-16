@@ -1,7 +1,4 @@
-use std::{cell::RefCell, collections::HashSet};
-
-use chrono::NaiveDate;
-use sqlx::{query_as, PgPool};
+use std::collections::HashSet;
 
 // use crate::with_data::activity::active_delegates_at_date;
 
@@ -197,8 +194,10 @@ pub fn match_delegate_names_with_delegate_ids(
             if res.lev == 0 {
                 // println!("removed");
                 prot_delegate_names_not_sure_if_matched_correctly.remove(del_name);
-                assert!(find_not_sure_if_matched_correctly
-                    .remove(&(res.matched_with.clone(), res.delegate_id)));
+                assert!(
+                    find_not_sure_if_matched_correctly
+                        .remove(&(res.matched_with.clone(), res.delegate_id))
+                );
                 Some(res)
             } else {
                 // println!("not removed");
@@ -230,8 +229,10 @@ pub fn match_delegate_names_with_delegate_ids(
             let res = x[0].clone();
             // println!("del_name: {del_name}, res: {res:?}");
             prot_delegate_names_not_sure_if_matched_correctly.remove(&del_name);
-            assert!(find_not_sure_if_matched_correctly_final
-                .remove(&(res.matched_with.clone(), res.delegate_id)));
+            assert!(
+                find_not_sure_if_matched_correctly_final
+                    .remove(&(res.matched_with.clone(), res.delegate_id))
+            );
             res
         })
         // .inspect(|x| println!("done"))
@@ -253,12 +254,9 @@ pub fn match_delegate_names_with_delegate_ids(
 mod tests {
     use std::collections::HashSet;
 
-    use somes_scraper::{legis_init::LegislativeInitiatives, plenar::Plenar, AustriaScraper};
+    use somes_scraper::{AustriaScraper, legis_init::LegislativeInitiatives, plenar::Plenar};
 
-    use crate::{
-        connect_pg, legislative_initiatives::absence_matching::reverse_name,
-        with_data::active_delegates_at_date,
-    };
+    use crate::{connect_pg, reverse_name, with_data::active_delegates_at_date};
 
     use super::{
         levenshtein_distance, match_delegate_name_with_delegate_id,

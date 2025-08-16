@@ -1,10 +1,9 @@
-mod absence_matching;
-pub use absence_matching::*;
 use chrono::{Days, NaiveDate};
+use combx::{DbNamedVoteInfo, DbVote, PostgresEnhancer, VoteResult};
 use tokio::{runtime::Handle, sync::mpsc::Sender};
-mod match_delegates_with_name;
 pub mod notify;
 mod voted_by_name_result;
+use voted_by_name_result::*;
 
 use somes_scraper::{
     legis_init::{LegislativeInitiatives, LEGIS_LAW_DETERMINATORS},
@@ -15,17 +14,10 @@ use std::{
     collections::HashMap,
     sync::{Arc, LazyLock},
 };
-use voted_by_name_result::{insert_named_vote_info, insert_named_votes};
 
 use crate::{
-    models::{
-        DbEurovocTopicLegisInit, DbLegisDocument, DbLegislativeInitiative, DbNamedVoteInfo,
-        DbOtherKeywordTopicLegisInit, DbSpeech, DbTopicLegisInit, DbVote, DbVoteIns,
-    },
     should_update::{self, StoredUpdatedAt},
-    today, today_and_time,
-    with_data::{all_parties_at_date, all_parties_at_gp},
-    Shutdown, GPS, LATEST_GP,
+    today, today_and_time, Shutdown, GPS, LATEST_GP,
 };
 
 use dotenvy_macro::dotenv;
@@ -35,36 +27,6 @@ const LEGIS_INIT_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| {
         .parse::<i64>()
         .unwrap_or(5)
 });
-
-pub async fn gen_code_to_parties_with_date(
-    pool: &PgPool,
-    date: &NaiveDate,
-    gp: &str,
-) -> HashMap<String, Party> {
-    all_parties_at_date(pool, date, gp)
-        .await
-        .map_err(|e| {
-            log::error!("all parties for gp error in legis init: {e:?}");
-            e
-        })
-        .unwrap_or_default()
-        .into_iter()
-        .map(|party| (party.code.clone(), party))
-        .collect::<HashMap<String, Party>>()
-}
-
-pub async fn gen_code_to_parties(pool: &PgPool, gp: &str) -> HashMap<String, Party> {
-    all_parties_at_gp(pool, gp)
-        .await
-        .map_err(|e| {
-            log::error!("all parties for gp error in legis init: {e:?}");
-            e
-        })
-        .unwrap_or_default()
-        .into_iter()
-        .map(|party| (party.code.clone(), party))
-        .collect::<HashMap<String, Party>>()
-}
 
 pub async fn scrape_new_legis_inits(
     pool: &PgPool,
@@ -113,11 +75,7 @@ pub async fn scrape_new_legis_inits(
                     return;
                 };
 
-                let code_to_parties = Arc::new(
-                    gen_code_to_parties_with_date(&pool, &legis_init.date, &legis_init.gp).await,
-                );
-                update_legis_inits_in_db(&pool, code_to_parties, &[legis_init], new_legis_init)
-                    .await;
+                update_legis_inits_in_db(&pool, &[legis_init], new_legis_init).await;
                 // new_legis_inits.push(legis_init);
             })
         }));
@@ -261,7 +219,6 @@ impl StoredUpdatedAt for LegislativeInitiative {
 
 pub async fn update_legis_inits_in_db(
     pool: &PgPool,
-    code_to_parties: Arc<HashMap<String, Party>>,
     new_legis_inits: &[LegislativeInitiative],
     new_legis_init: Option<Sender<Option<(i32, LegislativeInitiative)>>>,
 ) {
@@ -280,76 +237,14 @@ pub async fn update_legis_inits_in_db(
             legis_init.ityp,
             legis_init.inr
         );
-        // if i % 10 == 0 {
-        //     log::info!(
-        //         "{i} inserting legis init {}{}",
-        //         legis_init.inr,
-        //         legis_init.ityp
-        //     );
-        // }
 
-        let plenary_session_id = match legis_init.plenary_session {
-            Some(session) => sqlx::query!(
-                "select id from plenar_infos where inr = $1 and legislative_period = $2",
-                session as i32,
-                legis_init.gp
-            )
-            .fetch_one(pool)
-            .await
-            .ok()
-            .map(|id| id.id),
-            None => None,
-        };
+        let mut vote_result =
+            VoteResult::from_legis_init(PostgresEnhancer(pool.clone()), legis_init.clone()).await;
 
-        let db_legis_init = DbLegislativeInitiative {
-            title: legis_init.title.clone(),
-            inr: legis_init.inr as i32,
-            emphasis: legis_init.emphasis.clone(),
-            description: legis_init.description.clone(),
-            ityp: legis_init.ityp.clone(),
-            gp: legis_init.gp.clone(),
-            accepted: legis_init.accepted.map(|a| a.to_string()),
-            created_at: legis_init.date,
-            appeared_at: Some(legis_init.created_at),
-            updated_at: legis_init.updated_at,
-            requires_simple_majority: legis_init.requires_simple_majority,
-            pre_declined_type: legis_init
-                .hidden_votes_info
-                .vote_stage
-                .map(|pre| pre.to_string()),
-            voted_by_name: legis_init.hidden_votes_info.voted_by_name,
-            plenary_session_id,
-            doktyp: legis_init.doktyp.clone(),
-            is_law: legis_init.is_law.clone(),
-            law_accepted: legis_init.law_accepted.clone(),
-            law_come_into_effect_date: legis_init
-                .come_into_effect_info
-                .as_ref()
-                .map(|x| x.law_come_into_effect_date.clone())
-                .flatten(),
-            law_expires_on_date: legis_init
-                .come_into_effect_info
-                .as_ref()
-                .map(|x| x.law_expires_on_date.clone())
-                .flatten(),
-            by_publication: legis_init
-                .come_into_effect_info
-                .as_ref()
-                .map(|x| x.by_publication),
-            has_reference: Some(
-                legis_init
-                    .references
-                    .as_ref()
-                    .map(|x| !x.is_empty())
-                    .unwrap_or_default(),
-            ),
-            is_voteable_on: Some(legis_init.is_voteable_on),
-            is_urgent: legis_init.is_urgent,
-            // law_come_into_effect_date: legis_init.come_into_effect_info.map(|x| x.law_come_into_effect_date.clone()),
-        };
         // println!("db_legis_init: {db_legis_init:?}");
 
         // let maybe_legis_init_id = sqlx::query!("select id, created_at from legislative_initiatives where inr = $1 and ityp = $2 and gp = $3", db_legis_init.inr, db_legis_init.ityp, db_legis_init.gp).fetch_optional(pool).await;
+        let db_legis_init = vote_result.legislative_initiative;
 
         let legis_init_id = match sqlx::query!(
             "
@@ -418,7 +313,9 @@ pub async fn update_legis_inits_in_db(
             }
         };
 
-        for reference in legis_init.references.as_ref().unwrap_or(&vec![]) {
+        vote_result.id = Some(legis_init_id);
+
+        for reference in vote_result.references.as_ref().unwrap_or(&vec![]) {
             if let Err(e) = insert_reference(pool, reference, legis_init_id).await {
                 log::error!("Could not insert reference for legis init {legis_init_id}: {e:?}")
             }
@@ -440,82 +337,17 @@ pub async fn update_legis_inits_in_db(
             }
         }
 
-        for vote in &legis_init.votes {
-            let db_vote = DbVoteIns {
-                party: vote.party.name.clone(),
-                code: vote.party.code.clone(),
-                fraction: vote.party.fraction as i32,
-                infavor: vote.infavor,
-                legislative_initiatives_id: legis_init_id,
-            };
-            insert_vote(pool, db_vote).await;
+        for vote in &vote_result.votes {
+            insert_vote(pool, vote, legis_init_id).await;
         }
-
-        if let Some(voted_by_name_data) = &legis_init.hidden_votes_info.voted_by_name_data {
-            if let Ok(named_vote_info_id) = insert_named_vote_info(
-                pool,
-                &DbNamedVoteInfo {
-                    id: 0,
-                    legis_init_id,
-                    pro_count: voted_by_name_data.pro_count as i32,
-                    contra_count: voted_by_name_data.contra_count as i32,
-                    given_vote_sum: voted_by_name_data.vote_sum as i32,
-                    invalid_count: voted_by_name_data.invalid_count as i32,
-                },
-            )
-            .await
+        if let Some(named_votes) = vote_result.named_votes {
+            if let Ok(named_vote_info_id) =
+                insert_named_vote_info(pool, &named_votes.named_vote_info, legis_init_id).await
             {
-                if let Some(pro_contra) = &voted_by_name_data.delegates_pro_contra {
-                    if let Err(e) = insert_named_votes(
-                        pool,
-                        &pro_contra,
-                        legis_init.date,
-                        &legis_init.gp,
-                        named_vote_info_id,
-                    )
-                    .await
-                    {
-                        log::error!("Could not insert any named votes for legis init: {legis_init:?}, error: {e:?}")
-                    }
-                }
-            }
-        }
-
-        if legis_init.votes.is_empty()
-            // && legis_init.accepted == Some(somes_scraper::AcceptedState::PreDeclined)
-            && legis_init.hidden_votes_info.pro_contra_parties.is_some()
-        {
-            match &legis_init.hidden_votes_info.pro_contra_parties {
-                Some(pro_contra_parties) => {
-                    let trans_votes = translate_votes(
-                        &code_to_parties,
-                        legis_init_id,
-                        pro_contra_parties,
-                        &legis_init.gp,
-                    )
-                    .await;
-
-                    show_votes = trans_votes
-                        .iter()
-                        .flat_map(|vote| {
-                            Some(Vote {
-                                party: code_to_parties.get(&vote.code).cloned()?,
-                                infavor: vote.infavor,
-                            })
-                        })
-                        .collect();
-
-                    for db_vote in trans_votes {
-                        insert_vote(pool, db_vote).await;
-                    }
-                }
-                None => {
-                    log::warn!(
-                        "Pro Contra is empty despite hidden vote info for legis init: {}, {}, {}",
-                        legis_init.gp,
-                        legis_init.ityp,
-                        legis_init.inr
-                    )
+                if let Err(e) =
+                    insert_named_votes(pool, &named_votes.named_votes, named_vote_info_id).await
+                {
+                    log::error!("Could not insert any named votes for legis init: {legis_init:?}, error: {e:?}")
                 }
             }
         }
@@ -560,24 +392,8 @@ pub async fn update_legis_inits_in_db(
             };
         }
 
-        for speech in &legis_init.speeches {
-            let opinion = match &speech.opinion {
-                somes_scraper::Opinion::Infavor => Some("Pro".to_string()),
-                somes_scraper::Opinion::Against => Some("Contra".to_string()),
-                somes_scraper::Opinion::Other(text) => Some(text.clone()),
-                somes_scraper::Opinion::None => None,
-            };
-            let db_speech = DbSpeech {
-                delegate_id: speech.delegate_id as i32,
-                infavor: match speech.opinion {
-                    Opinion::Infavor => Some(true),
-                    Opinion::Against => Some(false),
-                    _ => None,
-                },
-                opinion,
-                legislative_initiatives_id: legis_init_id,
-            };
-
+        // Usage of this is deprecated! Use plenar speeches! This will combine two or more speeches held from a single delegate (on conflict clause)
+        for speech in &vote_result.speeches {
             let speech_id = match sqlx::query!(
                 "
                     INSERT INTO speeches (
@@ -590,10 +406,10 @@ pub async fn update_legis_inits_in_db(
                         opinion = EXCLUDED.opinion
                     RETURNING id
                 ",
-                db_speech.delegate_id,
-                db_speech.infavor,
-                db_speech.legislative_initiatives_id,
-                db_speech.opinion,
+                speech.delegate_id,
+                speech.infavor,
+                legis_init_id,
+                speech.opinion,
             )
             .fetch_one(pool)
             .await
@@ -605,7 +421,7 @@ pub async fn update_legis_inits_in_db(
                 Ok(id) => id.id,
             };
 
-            for html_url in &speech.spoken_text_html_urls {
+            for html_url in &speech.document_url {
                 if let Err(e) = sqlx::query!(
                     "
                     insert into speeches_html_urls(
@@ -616,7 +432,7 @@ pub async fn update_legis_inits_in_db(
                     do nothing;
                 ",
                     speech_id,
-                    html_url.document_url
+                    html_url
                 )
                 .execute(pool)
                 .await
@@ -626,12 +442,7 @@ pub async fn update_legis_inits_in_db(
             }
         }
 
-        for topic in legis_init.topics.clone() {
-            let db_topic = DbTopicLegisInit {
-                topic,
-                legislative_initiatives_id: legis_init_id,
-            };
-
+        for topic in vote_result.topics.clone() {
             if let Err(e) = sqlx::query!(
                 "
                     INSERT INTO topics_legis_init (
@@ -642,17 +453,17 @@ pub async fn update_legis_inits_in_db(
                     DO UPDATE SET 
                         topic = EXCLUDED.topic
                 ",
-                db_topic.topic,
-                db_topic.legislative_initiatives_id
+                topic.topic,
+                legis_init_id
             )
             .execute(pool)
             .await
             {
-                log::error!("Error inserting topic: '{:?}'. The error occurred for the following topic: {:?}", e, db_topic);
+                log::error!("Error inserting topic: '{:?}'. The error occurred for the following topic: {:?}", e, topic);
             }
         }
 
-        for topic in legis_init.eurovoc_topics.clone() {
+        for topic in vote_result.eurovoc_topics.clone() {
             if let Err(e) = sqlx::query!(
                 "
                     INSERT INTO unique_topics (
@@ -662,18 +473,13 @@ pub async fn update_legis_inits_in_db(
                     ) ON CONFLICT (topic_name) 
                     DO NOTHING 
                 ",
-                topic,
+                topic.topic,
             )
             .execute(pool)
             .await
             {
                 log::error!("Error inserting UNIQUE (eurovoc) topic: '{:?}'. The error occurred for the following eurovoc topic: {:?}", e, topic);
             }
-
-            let db_eurovoc_topic = DbEurovocTopicLegisInit {
-                topic,
-                legislative_initiatives_id: legis_init_id,
-            };
 
             if let Err(e) = sqlx::query!(
                 "
@@ -685,13 +491,13 @@ pub async fn update_legis_inits_in_db(
                     DO UPDATE SET 
                         topic = EXCLUDED.topic
                 ",
-                db_eurovoc_topic.topic,
-                db_eurovoc_topic.legislative_initiatives_id
+                topic.topic,
+                legis_init_id,
             )
             .execute(pool)
             .await
             {
-                log::error!("Error inserting eurovoc topic: '{:?}'. The error occurred for the following eurovoc topic: {:?}", e, db_eurovoc_topic);
+                log::error!("Error inserting eurovoc topic: '{:?}'. The error occurred for the following eurovoc topic: {:?}", e, topic);
             }
         }
 
@@ -704,12 +510,7 @@ pub async fn update_legis_inits_in_db(
             }
         }
 
-        for topic in legis_init.other_keyword_topics.clone() {
-            let db_other_keyword_topic = DbOtherKeywordTopicLegisInit {
-                topic,
-                legislative_initiatives_id: legis_init_id,
-            };
-
+        for topic in vote_result.other_keyword_topics.clone() {
             let speech_id = match sqlx::query!(
                 "
                     INSERT INTO other_keyword_topics_legis_init (
@@ -720,28 +521,21 @@ pub async fn update_legis_inits_in_db(
                     DO UPDATE SET 
                         topic = EXCLUDED.topic
                 ",
-                db_other_keyword_topic.topic,
-                db_other_keyword_topic.legislative_initiatives_id
+                topic.topic,
+                legis_init_id,
             )
             .execute(pool)
             .await
             {
                 Err(e) => {
-                    log::error!("Error inserting other keyword topic: '{:?}'. The error occurred for the following other keyword topic: {:?}", e, db_other_keyword_topic);
+                    log::error!("Error inserting other keyword topic: '{:?}'. The error occurred for the following other keyword topic: {:?}", e, topic);
                     continue;
                 }
                 Ok(id) => id,
             };
         }
 
-        for document in &legis_init.documents {
-            let db_legis_doc = DbLegisDocument {
-                // legislative_initiatives_id: legis_init_id,
-                title: document.title.clone(),
-                document_type: document.ftype.to_string(),
-                document_url: document.link.clone(),
-            };
-
+        for document in &vote_result.documents {
             if let Err(e) = sqlx::query!(
                 "
                     INSERT INTO legislative_documents (
@@ -755,9 +549,9 @@ pub async fn update_legis_inits_in_db(
                         document_url = EXCLUDED.document_url
                 ",
                 legis_init_id,
-                db_legis_doc.title,
-                db_legis_doc.document_type,
-                db_legis_doc.document_url
+                document.title,
+                document.document_type,
+                document.document_url
             )
             .execute(pool)
             .await
@@ -791,7 +585,7 @@ async fn insert_reference(
     sqlx::query!("insert into legis_inits_refs (origin_legis_init_id, ref_gp, ref_ityp, ref_inr) values ($1, $2, $3, $4) on conflict do nothing", legislative_initiatives_id, reference.gp, reference.ityp, reference.inr as i32).execute(pool).await
 }
 
-pub async fn insert_vote(pool: &PgPool, db_vote: DbVoteIns) {
+pub async fn insert_vote(pool: &PgPool, db_vote: &DbVote, legis_init_id: i32) {
     if let Err(e) = sqlx::query!(
         "
             INSERT INTO votes (
@@ -806,7 +600,7 @@ pub async fn insert_vote(pool: &PgPool, db_vote: DbVoteIns) {
         db_vote.party,
         db_vote.fraction,
         db_vote.infavor,
-        db_vote.legislative_initiatives_id
+        legis_init_id
     )
     .execute(pool)
     .await
@@ -817,42 +611,6 @@ pub async fn insert_vote(pool: &PgPool, db_vote: DbVoteIns) {
             db_vote
         );
     }
-}
-
-pub async fn translate_votes(
-    parties: &HashMap<String, Party>,
-    legislative_initiatives_id: i32,
-    pro_contra: &ProContra,
-    gp: &str,
-) -> Vec<DbVoteIns> {
-    let convert_to_vote = |code: &String, infavor| {
-        let Some(party) = parties.get(code).cloned() else {
-            log::error!("Party with code {code} not found in {gp} parties map: {parties:?}");
-            return None;
-        };
-
-        Some(DbVoteIns {
-            party: party.name,
-            code: code.to_string(),
-            fraction: party.fraction as i32,
-            infavor,
-            legislative_initiatives_id,
-        })
-    };
-    let mut votes = vec![];
-    votes.extend(
-        pro_contra
-            .contra
-            .iter()
-            .flat_map(|code| convert_to_vote(code, false)),
-    );
-    votes.extend(
-        pro_contra
-            .pro
-            .iter()
-            .flat_map(|code| convert_to_vote(code, true)),
-    );
-    votes
 }
 
 pub async fn run_shut_latest_gp(
@@ -942,9 +700,7 @@ mod tests {
     use somes_scraper::{legis_init::LegislativeInitiatives, AustriaScraper};
     use sqlx::postgres::PgPoolOptions;
 
-    use crate::{connect_pg, legislative_initiatives::gen_code_to_parties, DATABASE_URL};
-
-    use super::gen_code_to_parties_with_date;
+    use crate::{connect_pg, DATABASE_URL};
 
     #[test]
     fn test_date_time_parse() {
@@ -987,8 +743,8 @@ mod tests {
 
         // let date = "18.05.2016";
         let date = NaiveDate::from_ymd_opt(2013, 11, 18).unwrap();
-        let parties = gen_code_to_parties_with_date(&pool, &date, "XXV").await;
-        println!("{parties:?}");
+        // let parties = gen_code_to_parties_with_date(&pool, &date, "XXV").await;
+        // println!("{parties:?}");
 
         // crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], "XXVI").await;
 
@@ -1006,14 +762,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
-        crate::legislative_initiatives::update_legis_inits_in_db(
-            &pool,
-            code_to_parties,
-            &[res],
-            None,
-        )
-        .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
     }
 
     #[tokio::test]
@@ -1025,14 +774,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
-        crate::legislative_initiatives::update_legis_inits_in_db(
-            &pool,
-            code_to_parties,
-            &[res],
-            None,
-        )
-        .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
 
         // println!("s: {:?}", scraper.scrape_info.gp);
 
@@ -1049,14 +791,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
-        crate::legislative_initiatives::update_legis_inits_in_db(
-            &pool,
-            code_to_parties,
-            &[res],
-            None,
-        )
-        .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
     }
 
     #[tokio::test]
@@ -1068,14 +803,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
-        crate::legislative_initiatives::update_legis_inits_in_db(
-            &pool,
-            code_to_parties,
-            &[res],
-            None,
-        )
-        .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
     }
 
     #[tokio::test]
@@ -1087,14 +815,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
-        crate::legislative_initiatives::update_legis_inits_in_db(
-            &pool,
-            code_to_parties,
-            &[res],
-            None,
-        )
-        .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
     }
 
     #[tokio::test]
@@ -1107,14 +828,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
-        crate::legislative_initiatives::update_legis_inits_in_db(
-            &pool,
-            code_to_parties,
-            &[res],
-            None,
-        )
-        .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
     }
 
     #[tokio::test]
@@ -1127,14 +841,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
-        crate::legislative_initiatives::update_legis_inits_in_db(
-            &pool,
-            code_to_parties,
-            &[res],
-            None,
-        )
-        .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
     }
 
     #[tokio::test]
@@ -1149,14 +856,7 @@ mod tests {
         log::info!("legis init: {res:?}");
 
         let pool = connect_pg().await;
-        let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
-        crate::legislative_initiatives::update_legis_inits_in_db(
-            &pool,
-            code_to_parties,
-            &[res],
-            None,
-        )
-        .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
     }
 
     #[tokio::test]
@@ -1171,13 +871,6 @@ mod tests {
         log::info!("legis init: {res:?}");
 
         let pool = connect_pg().await;
-        let code_to_parties = Arc::new(gen_code_to_parties(&pool, &res.gp).await);
-        crate::legislative_initiatives::update_legis_inits_in_db(
-            &pool,
-            code_to_parties,
-            &[res],
-            None,
-        )
-        .await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
     }
 }

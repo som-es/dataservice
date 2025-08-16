@@ -122,8 +122,8 @@ pub struct DbMinistrialProposal {
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize, FromRow)]
 // #[diesel(table_name = ministrial_proposals)]
 pub struct DbMinistrialProposalQuery {
-    pub delegate_id: i32,
     pub id: i32,
+    pub delegate_id: i32,
     pub ityp: String,
     pub gp: String,
     pub inr: i32,
@@ -133,12 +133,12 @@ pub struct DbMinistrialProposalQuery {
     pub created_at: NaiveDateTime,
     pub updated_at: Option<NaiveDateTime>,
     pub due_to: NaiveDate,
-    pub ressort: Option<String>,
-    pub ressort_shortform: Option<String>,
+    pub ressort: String,
+    pub ressort_shortform: String,
     pub legis_init_gp: Option<String>,
     pub legis_init_inr: Option<i32>,
     pub legis_init_ityp: Option<String>,
-    pub has_vote_result: Option<bool>,
+    pub has_vote_result: bool,
 }
 use sqlx::FromRow;
 
@@ -148,7 +148,7 @@ use sqlx::FromRow;
 pub struct DbLegislativeInitiativeQuery {
     pub id: i32,
     pub ityp: String,
-    pub doktyp: Option<String>,
+    pub doktyp: String,
     pub gp: String,
     pub inr: i32,
     pub emphasis: Option<String>,
@@ -158,12 +158,12 @@ pub struct DbLegislativeInitiativeQuery {
     pub created_at: NaiveDate,
     pub appeared_at: Option<NaiveDateTime>,
     pub updated_at: Option<NaiveDateTime>,
-    pub requires_simple_majority: Option<bool>,
+    pub requires_simple_majority: bool,
     pub pre_declined_type: Option<String>,
     pub voted_by_name: bool,
     pub plenary_session_id: Option<i32>,
-    pub is_emphasis_ai_generated: Option<bool>,
-    pub is_law: Option<bool>,
+    pub is_emphasis_ai_generated: bool,
+    pub is_law: bool,
     pub law_accepted: Option<bool>,
     pub law_come_into_effect_date: Option<NaiveDate>,
     pub law_expires_on_date: Option<NaiveDate>,
@@ -180,9 +180,9 @@ pub struct DbLegislativeInitiativeQuery {
 // #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
 pub struct DbVote {
     pub party: String,
+    pub code: Option<String>,
     pub fraction: i32,
     pub infavor: bool,
-    pub legislative_initiatives_id: i32,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
@@ -215,11 +215,12 @@ pub struct DbSpeech {
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct DbSpeechWithLink {
     pub delegate_id: i32,
+    pub legis_init_id: Option<i32>,
     pub infavor: Option<bool>,
+    pub duration_in_seconds: Option<i32>,
     pub opinion: Option<String>,
     pub document_url: Option<String>,
     pub about: Option<String>,
-    pub legislative_initiatives_id: Option<i32>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
@@ -480,7 +481,7 @@ pub struct DbNamedVote {
     pub searched_with: Option<String>,
     pub matched_with: String,
     pub delegate_id: i32,
-    pub named_vote_info_id: i32,
+    // pub named_vote_info_id: i32,
     pub manually_matched: Option<bool>,
 }
 
@@ -494,12 +495,32 @@ pub struct DbNamedVotes {
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct DbNamedVoteInfo {
+    pub pro_count: i32,
+    pub contra_count: i32,
+    pub given_vote_sum: i32,
+    pub invalid_count: i32,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+pub struct DbNamedVoteInfoQuery {
     pub id: i32,
     pub legis_init_id: i32,
     pub pro_count: i32,
     pub contra_count: i32,
     pub given_vote_sum: i32,
     pub invalid_count: i32,
+}
+
+impl From<DbNamedVoteInfoQuery> for DbNamedVoteInfo {
+    fn from(value: DbNamedVoteInfoQuery) -> Self {
+        Self {
+            pro_count: value.pro_count,
+            contra_count: value.contra_count,
+            given_vote_sum: value.given_vote_sum,
+            invalid_count: value.invalid_count,
+        }
+    }
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

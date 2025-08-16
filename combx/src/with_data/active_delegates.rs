@@ -1,5 +1,5 @@
 use chrono::NaiveDate;
-use sqlx::{query_as, PgPool};
+use sqlx::{PgPool, query_as};
 
 use crate::models::DbDelegate;
 
