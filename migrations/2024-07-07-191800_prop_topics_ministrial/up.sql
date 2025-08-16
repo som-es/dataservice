@@ -15,12 +15,12 @@ create table ministrial_proposals(
     created_at timestamp not null,
     updated_at timestamp,
     due_to date not null,
-    ressort varchar(255), 
-    ressort_shortform varchar(12),
+    ressort varchar(255) not null, 
+    ressort_shortform varchar(12) not null,
     legis_init_gp varchar(14),
     legis_init_inr int,
     legis_init_ityp varchar(7),
-    has_vote_result boolean default false,
+    has_vote_result boolean default false not null,
     -- FOREIGN KEY (legis_init_gp, legis_init_inr, legis_init_ityp) REFERENCES legislative_initiatives(gp, inr, ityp),
     UNIQUE (inr, ityp, gp)
 );
