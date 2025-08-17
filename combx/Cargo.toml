@@ -4,14 +4,14 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-sqlx = { version="0.8", features = ["postgres", "runtime-tokio", "chrono", "tls-rustls"] }
-somes-scraper = { path = "../../scraper" }
-chrono = "0.4.41"
-serde = "1.0.219"
-serde_derive = "1.0.219"
+sqlx = { workspace = true }
+somes-scraper = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_derive = { workspace = true }
+dotenvy_macro = { workspace = true }
+log = { workspace = true }
 utoipa = { version = "4.2.0", optional = true }
-dotenvy_macro = "0.15.7"
-log = "0.4.27"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["tokio-macros", "macros", "rt", "rt-multi-thread", "signal"] }

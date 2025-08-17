@@ -28,7 +28,7 @@ create table ministrial_proposals(
 create table ministrial_proposals_documents(
     id serial primary key,
     ministrial_proposal_id int not null,
-    title varchar(1024),
+    title varchar(1024) not null,
     document_type varchar(100) not null,
     document_url varchar(500) not null,
     FOREIGN KEY (ministrial_proposal_id) REFERENCES ministrial_proposals(id),

@@ -1,4 +1,15 @@
 [workspace]
-members = [ "combx",
-    "dataservice"
+members = [ 
+    "combx",
+    "dataservice",
+    "getdata",
 ]
+
+[workspace.dependencies]
+sqlx = { version="0.8", features = ["postgres", "runtime-tokio", "chrono", "tls-rustls"] }
+somes-scraper = { path = "../scraper" }
+chrono = "0.4.41"
+serde = "1.0.219"
+serde_derive = "1.0.219"
+dotenvy_macro = "0.15.7"
+log = "0.4.27"

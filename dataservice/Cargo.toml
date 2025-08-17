@@ -6,19 +6,20 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-chrono = {version="0.4.24", optional=true, features = ["serde"]}
+sqlx = { workspace = true }
+somes-scraper = { workspace = true }
+chrono = { workspace = true, optional = true }
+serde = { workspace = true }
+serde_derive = { workspace = true }
+dotenvy_macro = { workspace = true }
+log = { workspace = true }
 # diesel = {version = "2.0.3", features = ["postgres", "chrono"] }
 dotenvy = { version = "0.15.7", optional=true}
-log = {version = "0.4.17"}
 reqwest = { version = "0.12", features = ["json", "blocking"], optional=true }
 
-somes-scraper = {path = "../../scraper"}
 somes-common-lib = {path = "../../somes/somes-common-lib"}
 combx = { path = "../combx" }
-serde = "1.0"
-serde_derive = "1.0"
 simple_logger = { version="5", optional = true}
-sqlx = { version="0.8", features = ["postgres", "runtime-tokio", "chrono", "tls-rustls"] }
 tokio = { version = "1", features = ["tokio-macros", "macros", "rt", "rt-multi-thread", "signal"], optional=true }
 utoipa = { version = "4.2.0", optional = true }
 pollster = "0.4.0"
@@ -26,7 +27,6 @@ lettre = "0.11.12"
 image = "0.25.5"
 imageproc = "0.25.0"
 serde_json = "1.0.138"
-dotenvy_macro = "0.15.7"
 once_cell = "1.20.3"
 base64 = "0.21.0"
 [dev-dependencies]
