@@ -252,9 +252,9 @@ pub async fn update_legis_inits_in_db(
                     title, inr, emphasis, description, ityp, gp, accepted, created_at, appeared_at, updated_at,
                     requires_simple_majority, pre_declined_type, voted_by_name, plenary_session_id, doktyp, is_law, 
                     law_accepted, law_come_into_effect_date, law_expires_on_date, by_publication, has_reference, is_voteable_on,
-                    is_urgent
+                    is_urgent, voting
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24
                 ) ON CONFLICT (inr, ityp, gp) 
                 DO UPDATE SET 
                     title = EXCLUDED.title,
@@ -276,7 +276,8 @@ pub async fn update_legis_inits_in_db(
                     by_publication = EXCLUDED.by_publication,
                     has_reference = EXCLUDED.has_reference,
                     is_voteable_on = EXCLUDED.is_voteable_on,
-                    is_urgent = EXCLUDED.is_urgent
+                    is_urgent = EXCLUDED.is_urgent,
+                    voting = EXCLUDED.voting
                 RETURNING id
             ",
             db_legis_init.title,
@@ -301,7 +302,8 @@ pub async fn update_legis_inits_in_db(
             db_legis_init.by_publication,
             db_legis_init.has_reference,
             db_legis_init.is_voteable_on,
-            db_legis_init.is_urgent
+            db_legis_init.is_urgent,
+            db_legis_init.voting.map(|voting| voting.to_string()),
         )
         .fetch_one(pool)
         .await

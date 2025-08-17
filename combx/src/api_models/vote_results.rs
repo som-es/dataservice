@@ -110,6 +110,7 @@ impl VoteResult {
             is_voteable_on: Some(legis_init.is_voteable_on),
             is_urgent: legis_init.is_urgent,
             is_emphasis_ai_generated: false,
+            voting: legis_init.voting.map(|voting| voting.to_string()),
             // law_come_into_effect_date: legis_init.come_into_effect_info.map(|x| x.law_come_into_effect_date.clone()),
         };
 

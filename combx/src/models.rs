@@ -11,6 +11,7 @@ use serde_derive::{Deserialize, Serialize};
 //     topics_ministrial_proposals, topics_proposals, votes,
 // };
 
+use somes_scraper::Voting;
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
@@ -140,6 +141,7 @@ pub struct DbMinistrialProposalQuery {
     pub legis_init_ityp: Option<String>,
     pub has_vote_result: bool,
 }
+
 use sqlx::FromRow;
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
@@ -171,6 +173,7 @@ pub struct DbLegislativeInitiativeQuery {
     pub has_reference: Option<bool>,
     pub is_voteable_on: Option<bool>,
     pub is_urgent: bool,
+    pub voting: Option<String>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
