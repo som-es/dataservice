@@ -447,6 +447,22 @@ pub async fn update_legis_inits_in_db(
         for topic in vote_result.topics.clone() {
             if let Err(e) = sqlx::query!(
                 "
+                    INSERT INTO unique_topics (
+                        topic_name
+                    ) VALUES (
+                        $1
+                    ) ON CONFLICT (topic_name) 
+                    DO NOTHING 
+                ",
+                topic.topic,
+            )
+            .execute(pool)
+            .await
+            {
+                log::error!("Error inserting UNIQUE (parent) topic: '{:?}'. The error occurred for the following eurovoc topic: {:?}", e, topic);
+            }
+            if let Err(e) = sqlx::query!(
+                "
                     INSERT INTO topics_legis_init (
                         topic, legislative_initiatives_id
                     ) VALUES (
@@ -468,7 +484,7 @@ pub async fn update_legis_inits_in_db(
         for topic in vote_result.eurovoc_topics.clone() {
             if let Err(e) = sqlx::query!(
                 "
-                    INSERT INTO unique_topics (
+                    INSERT INTO unique_eurovoc_topics (
                         topic_name
                     ) VALUES (
                         $1
