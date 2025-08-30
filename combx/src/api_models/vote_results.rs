@@ -107,7 +107,7 @@ impl VoteResult {
                     .map(|x| !x.is_empty())
                     .unwrap_or_default(),
             ),
-            is_voteable_on: Some(legis_init.is_voteable_on),
+            is_voteable_on: legis_init.is_voteable_on,
             is_urgent: legis_init.is_urgent,
             is_emphasis_ai_generated: false,
             voting: legis_init.voting.map(|voting| voting.to_string()),

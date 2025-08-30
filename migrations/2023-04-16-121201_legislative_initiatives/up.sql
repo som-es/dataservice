@@ -27,7 +27,7 @@ create table legislative_initiatives (
     law_expires_on_date date,
     by_publication boolean,
     has_reference boolean default false,
-    is_voteable_on boolean default false,
+    is_voteable_on boolean not null default false,
     is_urgent boolean not null default false,
     voting varchar(255),
     foreign key (plenary_session_id) references plenar_infos(id),

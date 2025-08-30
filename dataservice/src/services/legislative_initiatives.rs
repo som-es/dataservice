@@ -6,7 +6,7 @@ mod voted_by_name_result;
 use voted_by_name_result::*;
 
 use somes_scraper::{
-    legis_init::{LegislativeInitiatives, LEGIS_LAW_DETERMINATORS},
+    legis_init::{LegislativeInitiatives, LEGIS_IS_VOTEABLE_ON_DOKTYPES, LEGIS_LAW_DETERMINATORS},
     AustriaScraper, LegislativeInitiative, Opinion, Party, ProContra, Vote,
 };
 use sqlx::{postgres::PgQueryResult, query, PgPool};
@@ -127,7 +127,7 @@ async fn legis_init_once(
                 let scraper = Arc::new(scraper);
 
                 let searched_doktyps = if only_laws {
-                    Some(LEGIS_LAW_DETERMINATORS.as_slice())
+                    Some(LEGIS_IS_VOTEABLE_ON_DOKTYPES.as_slice())
                 } else {
                     None
                 };
@@ -682,7 +682,6 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown, pg_pool: PgPool) {
                     log::info!("Starting legislative initiative scraper");
 
                     legis_init_once(false, false, &pg_pool, None).await;
-                    log::info!("lol");
                 }).await {
                     log::error!("Error in legislative initiative scraper: {:?}", e);
                 }
