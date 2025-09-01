@@ -53,7 +53,10 @@ impl GovProposal {
                 .unwrap_or_default()
         } else {
             ministerial_proposal.delegate_ids
-        }.into_iter().map(|x| x as i32).collect();
+        }
+        .into_iter()
+        .map(|x| x as i32)
+        .collect();
         let db_ministerial_proposal = DbMinistrialProposalQuery {
             id: ministerial_proposal.id as i32,
             ityp: ministerial_proposal.ityp,
@@ -76,17 +79,31 @@ impl GovProposal {
         GovProposal {
             ministrial_proposal: db_ministerial_proposal,
             vote_result: None,
-            topics: ministerial_proposal.topics.into_iter().map(|topic| Topic { topic }).collect(),
-            eurovoc_topics: ministerial_proposal.eurovoc_topics.into_iter().map(|topic| Topic { topic }).collect(),
-            other_keyword_topics: ministerial_proposal.other_keyword_topics.into_iter().map(|topic| Topic { topic }).collect(),
+            topics: ministerial_proposal
+                .topics
+                .into_iter()
+                .map(|topic| Topic { topic })
+                .collect(),
+            eurovoc_topics: ministerial_proposal
+                .eurovoc_topics
+                .into_iter()
+                .map(|topic| Topic { topic })
+                .collect(),
+            other_keyword_topics: ministerial_proposal
+                .other_keyword_topics
+                .into_iter()
+                .map(|topic| Topic { topic })
+                .collect(),
             ministerial_issuers,
-            documents: ministerial_proposal.documents.into_iter().map(|document| {
-                Document {
+            documents: ministerial_proposal
+                .documents
+                .into_iter()
+                .map(|document| Document {
                     title: document.title,
                     document_url: document.link,
                     document_type: document.ftype.to_string(),
-                }
-            }).collect(),
+                })
+                .collect(),
         }
     }
 }

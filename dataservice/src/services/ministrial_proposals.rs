@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::{Arc, LazyLock}};
+use std::{
+    collections::HashMap,
+    sync::{Arc, LazyLock},
+};
 
 use chrono::Months;
 use combx::{create_gov_officials_map, FromScrapedType, GovProposal};
@@ -11,8 +14,8 @@ use somes_scraper::{
 use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{
-    services::scrape_untill_success,
-    should_update::StoredUpdatedAt, today, today_and_time, Shutdown, GPS,
+    services::scrape_untill_success, should_update::StoredUpdatedAt, today, today_and_time,
+    Shutdown, GPS,
 };
 
 mod notify;
@@ -129,7 +132,8 @@ pub async fn update_ministrial_proposals_in_db2(
             continue;
         }
 
-        let gov_proposal = GovProposal::from_scraped_type((), (ministrial_prop, gov_officials.clone())).await;
+        let gov_proposal =
+            GovProposal::from_scraped_type((), (ministrial_prop, gov_officials.clone())).await;
         // log::info!("inserting single ministrial prop");
 
         let start = Instant::now();

@@ -1,4 +1,4 @@
-use std::thread::JoinHandle;
+use std::{collections::HashSet, thread::JoinHandle};
 
 use crate::{scrape_untill_success, should_update::StoredUpdatedAt, Shutdown, GPS};
 use combx::absence_matching;
@@ -320,20 +320,47 @@ async fn insert_plenar_speech(
         }
     }
 
+    let mut newly_inserted = HashSet::new();
+
     for url in &plenar_speech.speech.spoken_text_html_urls {
-        sqlx::query!(
+        let id = sqlx::query_scalar!(
             r#"
             INSERT INTO plenar_speech_links (plenar_speech_id, document_url, site_start, site_end)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (plenar_speech_id, document_url) DO NOTHING
+            RETURNING id
             "#,
             plenar_speech_id,
             url.document_url.to_string(),
             url.site_start.map(|i| i as i32),
             url.site_end.map(|i| i as i32)
         )
-        .execute(pool)
+        .fetch_optional(pool)
         .await?;
+        if let Some(id) = id {
+            newly_inserted.insert(id);
+        }
+    }
+    if !newly_inserted.is_empty() {
+        let all_speech_links = sqlx::query_scalar!(
+            r#"
+            select id from plenar_speech_links where plenar_speech_id = $1
+            "#,
+            plenar_speech_id,
+        )
+        .fetch_all(pool)
+        .await?
+        .into_iter()
+        .collect::<HashSet<_>>();
+
+        for to_delete_id in newly_inserted.difference(&all_speech_links) {
+            sqlx::query!(
+                "delete from plenar_speech_links where id = $1",
+                to_delete_id
+            )
+            .execute(pool)
+            .await?;
+        }
     }
 
     // let existing_spoken_text = sqlx::query!(

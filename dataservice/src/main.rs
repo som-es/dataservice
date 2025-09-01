@@ -1,9 +1,5 @@
 use combx::GovProposal;
-use dataservice::{
-    connect_pg,
-    delegates::delegate_count,
-    services, Shutdown, DATABASE_URL,
-};
+use dataservice::{connect_pg, delegates::delegate_count, services, Shutdown, DATABASE_URL};
 use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
 
@@ -40,9 +36,8 @@ pub async fn run_services(state: &State) {
     let (new_vote_result_tx, new_vote_result_rx) =
         tokio::sync::mpsc::channel::<Option<(i32, somes_scraper::LegislativeInitiative)>>(128);
 
-    let (new_ministrial_proposal_tx, new_ministrial_proposal_rx) = tokio::sync::mpsc::channel::<
-        Option<(i32, GovProposal)>,
-    >(128);
+    let (new_ministrial_proposal_tx, new_ministrial_proposal_rx) =
+        tokio::sync::mpsc::channel::<Option<(i32, GovProposal)>>(128);
 
     let latest_legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP_LATEST")
         .unwrap_or_else(|_| "300".to_string())
