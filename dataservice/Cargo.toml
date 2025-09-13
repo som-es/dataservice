@@ -29,14 +29,15 @@ imageproc = "0.25.0"
 serde_json = "1.0.138"
 once_cell = "1.20.3"
 base64 = "0.21.0"
+serde_plain = "1.0.2"
 [dev-dependencies]
 rand = "0.9"
 
 [features]
 #default = ["runner", "legis_init"]
 # default = ["runner", "legis_init_latest", "legis_init", "ministerial_latest", "ministerial", "proposals_latest", "proposals", "plenar", "parties"]
-default = ["runner", "ministerial_latest", "ministerial", "legis_init", "legis_init_latest", "plenar_latest", "decrees", "dates", "parties"]
-# default = ["runner", "legis_init", "dates"]
+# default = ["runner", "ministerial_latest", "ministerial", "legis_init", "legis_init_latest", "plenar_latest", "decrees", "dates", "parties"]
+default = ["runner", "dates"]
 # default = ["runner", "ministerial_latest", "legis_init", "plenar", ]
 models = ["dotenvy", "chrono"]
 runner = ["models", "chrono", "reqwest", "simple_logger", "tokio", "dotenvy"]

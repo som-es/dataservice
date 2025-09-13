@@ -20,7 +20,7 @@ pub async fn save_dates(pg_pool: &PgPool, only_latest: bool) -> crate::Result<()
     Ok(())
 }
 
-pub async fn save_date(date: ParliamentDate, pg_pool: &PgPool) -> sqlx::Result<()> {
+pub async fn save_date(date: ParliamentDate, pg_pool: &PgPool) -> crate::Result<()> {
     let rec = sqlx::query!(
         r#"
         INSERT INTO dates (
@@ -35,6 +35,21 @@ pub async fn save_date(date: ParliamentDate, pg_pool: &PgPool) -> sqlx::Result<(
             $11, $12, $13, $14,
             $15, $16, $17, $18, $19
         )
+        ON CONFLICT (date, title, appointment_type, committee, media_relevant) DO UPDATE SET
+            date_sort              = EXCLUDED.date_sort,
+            time                   = EXCLUDED.time,
+            link                   = EXCLUDED.link,
+            appointment_type_display = EXCLUDED.appointment_type_display,
+            info_link              = EXCLUDED.info_link,
+            location               = EXCLUDED.location,
+            year_month             = EXCLUDED.year_month,
+            repeated_date          = EXCLUDED.repeated_date,
+            month_year             = EXCLUDED.month_year,
+            start                  = EXCLUDED.start,
+            "end"                  = EXCLUDED."end",
+            past                   = EXCLUDED.past,
+            day_with_date          = EXCLUDED.day_with_date,
+            tour_format            = EXCLUDED.tour_format
         RETURNING id
         "#,
         date.date,
@@ -42,11 +57,11 @@ pub async fn save_date(date: ParliamentDate, pg_pool: &PgPool) -> sqlx::Result<(
         date.time,
         date.title,
         date.link,
-        date.appointment_type,
+        serde_plain::to_string(&date.appointment_type)?,
         date.appointment_type_display,
         date.info_link,
         date.location,
-        date.committee,
+        serde_plain::to_string(&date.committee)?,
         date.year_month,
         date.repeated_date,
         date.month_year,
@@ -62,11 +77,16 @@ pub async fn save_date(date: ParliamentDate, pg_pool: &PgPool) -> sqlx::Result<(
 
     let date_id = rec.id;
 
-    for topic in date.topics {
+    // sqlx::query!("DELETE FROM dates_topics WHERE date_id = $1", date_id)
+    //     .execute(&mut tx)
+    //     .await?;
+
+    for topic in &date.topics {
         sqlx::query!(
             r#"
             INSERT INTO dates_topics (date_id, topic)
             VALUES ($1, $2)
+            ON CONFLICT (date_id, topic) DO NOTHING
             "#,
             date_id,
             topic
@@ -74,7 +94,6 @@ pub async fn save_date(date: ParliamentDate, pg_pool: &PgPool) -> sqlx::Result<(
         .execute(pg_pool)
         .await?;
     }
-
     Ok(())
 }
 
