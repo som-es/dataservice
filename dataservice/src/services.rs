@@ -8,6 +8,7 @@ pub mod new_vote_results_mailer;
 pub mod parties;
 pub mod plenar;
 pub mod proposals;
+pub mod dates;
 
 pub async fn scrape_untill_success<T, O>(f: impl Fn() -> O) -> T
 where

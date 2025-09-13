@@ -341,6 +341,7 @@ async fn insert_plenar_speech(
             newly_inserted.insert(id);
         }
     }
+    // this is important for speeches because of https://github.com/som-es/somes/issues/85
     if !newly_inserted.is_empty() {
         let all_speech_links = sqlx::query_scalar!(
             r#"
@@ -362,6 +363,7 @@ async fn insert_plenar_speech(
             .await?;
         }
     }
+
 
     // let existing_spoken_text = sqlx::query!(
     //     r#"

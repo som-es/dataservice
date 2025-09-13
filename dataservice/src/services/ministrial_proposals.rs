@@ -62,7 +62,7 @@ async fn ministrial_proposal_once(
         log::info!("scrape ministrial proposals for GP: {gp}");
         scraper.scrape_info.gp = vec![gp.into()];
         if only_latest {
-            // this seems to not work!
+            // this seems to not work! - Minsterial Props and NRSITZ do not have date filtering???
             scraper.scrape_info.date_start = today_and_time().checked_sub_months(Months::new(3))
         }
 

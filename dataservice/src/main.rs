@@ -127,6 +127,14 @@ pub async fn run_services(state: &State) {
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone()
         )),
+        tokio::spawn(services::dates::run_shut_dates(
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            pool.clone()
+        )),
+        tokio::spawn(services::dates::run_shut_dates_latest(
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            pool.clone()
+        )),
     )
     .0
     .unwrap();
