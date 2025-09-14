@@ -193,9 +193,9 @@ async fn insert_plenar_speech_legis_init(
     reference: &Reference,
 ) -> sqlx::Result<PgQueryResult> {
     sqlx::query!("
-            insert into 
-                plenar_speech_legis_inits (gp, ityp, inr, speech_id, legis_init_id) 
-            values ($1, $2, $3, $4, $5) 
+            insert into
+                plenar_speech_legis_inits (gp, ityp, inr, speech_id, legis_init_id)
+            values ($1, $2, $3, $4, $5)
             on conflict (gp, ityp, inr, speech_id) do update set legis_init_id = EXCLUDED.legis_init_id", reference.gp, reference.ityp, reference.inr as i32, plenar_speech_id, legis_init_id).execute(pool).await
 }
 
@@ -319,7 +319,6 @@ async fn insert_plenar_speech(
             }
         }
     }
-
     let mut newly_inserted = HashSet::new();
 
     for url in &plenar_speech.speech.spoken_text_html_urls {
@@ -327,7 +326,10 @@ async fn insert_plenar_speech(
             r#"
             INSERT INTO plenar_speech_links (plenar_speech_id, document_url, site_start, site_end)
             VALUES ($1, $2, $3, $4)
-            ON CONFLICT (plenar_speech_id, document_url) DO NOTHING
+            ON CONFLICT (plenar_speech_id, document_url) DO UPDATE SET
+                site_start = EXCLUDED.site_start,
+                site_end = EXCLUDED.site_end
+
             RETURNING id
             "#,
             plenar_speech_id,
@@ -337,33 +339,31 @@ async fn insert_plenar_speech(
         )
         .fetch_optional(pool)
         .await?;
+        // this will also return something if an conflict happens (do update set)
         if let Some(id) = id {
             newly_inserted.insert(id);
         }
     }
     // this is important for speeches because of https://github.com/som-es/somes/issues/85
-    if !newly_inserted.is_empty() {
-        let all_speech_links = sqlx::query_scalar!(
-            r#"
+    let all_speech_links = sqlx::query_scalar!(
+        r#"
             select id from plenar_speech_links where plenar_speech_id = $1
             "#,
-            plenar_speech_id,
+        plenar_speech_id,
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .collect::<HashSet<_>>();
+
+    for to_delete_id in all_speech_links.difference(&newly_inserted) {
+        sqlx::query!(
+            "delete from plenar_speech_links where id = $1",
+            to_delete_id
         )
-        .fetch_all(pool)
-        .await?
-        .into_iter()
-        .collect::<HashSet<_>>();
-
-        for to_delete_id in newly_inserted.difference(&all_speech_links) {
-            sqlx::query!(
-                "delete from plenar_speech_links where id = $1",
-                to_delete_id
-            )
-            .execute(pool)
-            .await?;
-        }
+        .execute(pool)
+        .await?;
     }
-
 
     // let existing_spoken_text = sqlx::query!(
     //     r#"
@@ -409,7 +409,7 @@ async fn insert_plenar_speech(
             r#"
                     UPDATE plenar_speeches
                     SET spoken_text = $1
-                    WHERE id = $2 
+                    WHERE id = $2
                     "#,
             updated_spoken_text,
             plenar_speech_id,

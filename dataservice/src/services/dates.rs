@@ -1,5 +1,5 @@
 use chrono::Months;
-use somes_scraper::{dates::{DateFilter, DateRange, Dates, ParliamentDate}, AustriaScraper};
+use somes_scraper::{dates::{DateFilter, DateRange, Dates, Gremium, ParliamentDate, Terminart}, AustriaScraper};
 use sqlx::PgPool;
 
 use crate::{today_and_time, Shutdown};
@@ -9,12 +9,14 @@ pub async fn save_dates(pg_pool: &PgPool, only_latest: bool) -> crate::Result<()
     let mut date_filter = DateFilter::default();
     if only_latest {
         date_filter.daterange = Some(DateRange {
-            from: Some(today_and_time().checked_sub_months(Months::new(3)).unwrap()),
-            to: None,
+            from: Some(today_and_time().checked_sub_months(Months::new(1)).unwrap()),
+            to: Some(today_and_time().checked_add_months(Months::new(1)).unwrap()),
         });
     }
     let dates = scraper.post_dates_payload(&date_filter).await?;
-    for date in scraper.raw_dates_into_parliament_dates(dates).await.unwrap_or_default() {
+    let dates = scraper.raw_dates_into_parliament_dates(dates).await.unwrap_or_default();
+    println!("{only_latest}, len: {}", dates.len());
+    for date in dates {
         save_date(date, pg_pool).await?
     }
     Ok(())
@@ -57,11 +59,23 @@ pub async fn save_date(date: ParliamentDate, pg_pool: &PgPool) -> crate::Result<
         date.time,
         date.title,
         date.link,
-        serde_plain::to_string(&date.appointment_type)?,
+        serde_plain::to_string(&date.appointment_type).unwrap_or_else(|_e| {
+            if let Terminart::Other(ty) = date.appointment_type {
+                ty
+            } else {
+                panic!("Other newtype variant not covered")
+            }
+        }),
         date.appointment_type_display,
         date.info_link,
         date.location,
-        serde_plain::to_string(&date.committee)?,
+        serde_plain::to_string(&date.committee).unwrap_or_else(|_e| {
+            if let Gremium::Other(ty) = date.committee {
+                ty
+            } else {
+                panic!("Other newtype variant not covered")
+            }
+        }),
         date.year_month,
         date.repeated_date,
         date.month_year,
@@ -153,13 +167,22 @@ pub async fn run_shut_dates_latest(mut shutdown: Shutdown, pg_pool: PgPool) {
             }
             _ = async {
                 let pg_pool = pg_pool.clone();
-                if let Err(e) = tokio::task::spawn(async move {
+                let handle = tokio::task::spawn(async move {
                     log::info!("Starting (latest) dates Scraper");
                     save_dates(&pg_pool, true).await
-                }).await {
-                    log::error!("Error in (latest) dates Scraper: {:?}", e);
+                }).await;
+
+                match handle {
+                    Ok(v) => {
+                        if let Err(e) = v {
+                            log::error!("Error in (latest) dates Scraper: {:?}", e);
+                        }
+                    },
+                    Err(e) => {
+                        log::error!("Error in (latest) dates Scraper: {:?}", e);
+                    },
                 }
-                log::info!("(latest) dates Scraper service sleeps for {dates_sleep} seconds...");
+
                 tokio::time::sleep(tokio::time::Duration::from_secs(dates_sleep)).await;
             } => {}
         }
