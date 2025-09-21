@@ -35,6 +35,8 @@ pub struct Decree {
     pub part: String,
     pub emphasis: Option<String>,
     pub gp: Option<String>,
+    pub eli: String,
+    pub document_url: String,
     pub documents: Vec<Document>,
 }
 
@@ -80,6 +82,8 @@ impl Decree {
             short_title: decree.short_title,
             publication_date: decree.date,
             part: decree.part,
+            eli: decree.eli,
+            document_url: decree.document_url,
             emphasis: None,
             gp: possible_gp.cloned(),
             documents: decree

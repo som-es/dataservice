@@ -10,6 +10,8 @@ create table ministrial_decrees(
     publication_date date not null,
     part varchar(255) not null,
     emphasis varchar(16384),
+    eli varchar(1024),
+    document_url varchar(1024),
     gp varchar(255),
     unique(ris_id),
     foreign key (gov_official_id) references delegates(id)

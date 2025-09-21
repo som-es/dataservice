@@ -58,8 +58,10 @@ pub async fn insert_ministrial_decree(
                 short_title, 
                 publication_date, 
                 part,
+                document_url,
+                eli,
                 gp
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             ON CONFLICT (ris_id) DO UPDATE
             SET 
                 gov_official_id = EXCLUDED.gov_official_id,
@@ -67,6 +69,8 @@ pub async fn insert_ministrial_decree(
                 short_title = EXCLUDED.short_title,
                 publication_date = EXCLUDED.publication_date,
                 part = EXCLUDED.part,
+                document_url = EXCLUDED.document_url,
+                eli = EXCLUDED.eli,
                 gp = EXCLUDED.gp
             RETURNING id;
             ",
@@ -77,6 +81,8 @@ pub async fn insert_ministrial_decree(
             decree.short_title,
             decree.publication_date,
             decree.part,
+            decree.document_url,
+            decree.eli,
             decree.gp,
         )
         .fetch_one(pg_pool)
