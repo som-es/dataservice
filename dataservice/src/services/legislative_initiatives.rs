@@ -114,7 +114,7 @@ async fn legis_init_once(
                     let days = if only_laws {
                         // this number is a magic number -> maybe reason it with average completion time + n or something
                         // could still be possible that very old (+1001 days old) newly completed legis inits are never sent as email!
-                        333 
+                        333
                     } else {
                         100
                     };

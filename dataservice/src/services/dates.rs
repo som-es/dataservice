@@ -1,5 +1,8 @@
 use chrono::Months;
-use somes_scraper::{dates::{DateFilter, DateRange, Dates, Gremium, ParliamentDate, Terminart}, AustriaScraper};
+use somes_scraper::{
+    dates::{DateFilter, DateRange, Dates, Gremium, ParliamentDate, Terminart},
+    AustriaScraper,
+};
 use sqlx::PgPool;
 
 use crate::{today_and_time, Shutdown};
@@ -14,7 +17,10 @@ pub async fn save_dates(pg_pool: &PgPool, only_latest: bool) -> crate::Result<()
         });
     }
     let dates = scraper.post_dates_payload(&date_filter).await?;
-    let dates = scraper.raw_dates_into_parliament_dates(dates).await.unwrap_or_default();
+    let dates = scraper
+        .raw_dates_into_parliament_dates(dates)
+        .await
+        .unwrap_or_default();
     println!("{only_latest}, len: {}", dates.len());
     for date in dates {
         save_date(date, pg_pool).await?
@@ -110,7 +116,6 @@ pub async fn save_date(date: ParliamentDate, pg_pool: &PgPool) -> crate::Result<
     }
     Ok(())
 }
-
 
 pub async fn run_shut_dates(mut shutdown: Shutdown, pg_pool: PgPool) {
     let dates_sleep = std::env::var("DATES_SLEEP")

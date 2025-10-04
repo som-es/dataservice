@@ -20,6 +20,18 @@ async fn main() {
     .unwrap();
 }
 
+pub fn decree_pages() -> usize {
+    std::env::var("DECREE_PAGES")
+        .unwrap_or_else(|_| "150".to_string())
+        .parse()
+        .unwrap_or_else(|e| {
+            log::warn!(
+                "Could not parse DECREE_PAGES env var: {e}. Using default value of 150 pages"
+            );
+            150
+        })
+}
+
 pub async fn run_services(state: &State) {
     // let pool = connect_pg().await;
 
@@ -107,7 +119,7 @@ pub async fn run_services(state: &State) {
         tokio::spawn(services::ministrial_decrees::run_shut_pages(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone(),
-            100
+            decree_pages() as u32
         )),
         tokio::spawn(
             services::new_vote_results_mailer::notify_on_new_vote_results_service(

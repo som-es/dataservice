@@ -320,6 +320,11 @@ async fn insert_plenar_speech(
         }
     }
     let mut newly_inserted = HashSet::new();
+    // log::info!(
+    //     "delegate_id: {} about: {}",
+    //     plenar_speech.speech.delegate_id,
+    //     corresponding_debate.about
+    // );
 
     for url in &plenar_speech.speech.spoken_text_html_urls {
         let id = sqlx::query_scalar!(
@@ -341,6 +346,7 @@ async fn insert_plenar_speech(
         .await?;
         // this will also return something if an conflict happens (do update set)
         if let Some(id) = id {
+            // log::info!("newly_inserted: {url:?}");
             newly_inserted.insert(id);
         }
     }
@@ -702,9 +708,12 @@ mod tests {
 
     use chrono::NaiveDateTime;
     use rand::Rng;
-    use somes_scraper::{AustriaScraper, TextExtractor};
+    use somes_scraper::{plenar::Plenar, AustriaScraper, Scraper, TextExtractor};
 
-    use crate::connect_pg;
+    use crate::{
+        connect_pg,
+        plenar::{insert_plenar_info, update_plenar_infos_in_db},
+    };
 
     #[test]
     fn test_date_time_parse() {
@@ -749,5 +758,22 @@ mod tests {
             std::io::stdin().read_to_string(&mut input).unwrap();
             println!("input: {input}")
         }
+    }
+
+    #[tokio::test]
+    async fn test_speeches_lijnks8() {
+        unsafe { std::env::set_var("MIND_UPDATE_TIME", "false") };
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper: AustriaScraper = AustriaScraper::default();
+        let res = scraper
+            .get_plenar("/gegenstand/XXVIII/NRSITZ/37")
+            .await
+            .unwrap();
+
+        log::info!("legis init: {res:?}");
+
+        let pool = connect_pg().await;
+
+        update_plenar_infos_in_db(&[res], &pool).await;
     }
 }
