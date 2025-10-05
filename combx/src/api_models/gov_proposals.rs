@@ -65,7 +65,7 @@ impl GovProposal {
             description: ministerial_proposal.description,
             delegate_id: ministerial_issuers[0],
             inr: ministerial_proposal.inr as i32,
-            emphasis: None,
+            emphasis: ministerial_proposal.emphasis,
             created_at: ministerial_proposal.created_at,
             updated_at: ministerial_proposal.updated_at,
             due_to: ministerial_proposal.gegenstand_info.due_to,
