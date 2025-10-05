@@ -1,9 +1,9 @@
 use chrono::NaiveDate;
 use combx::{DbNamedVote, DbNamedVoteInfo};
-use sqlx::PgPool;
+use sqlx::{Executor, PgPool, Postgres};
 
-pub async fn insert_named_vote_info(
-    pg: &sqlx::PgPool,
+pub async fn insert_named_vote_info<'a>(
+    pg: impl Executor<'a, Database = Postgres>,
     named_vote_info: &DbNamedVoteInfo,
     legis_init_id: i32,
 ) -> Result<i32, sqlx::Error> {
@@ -13,8 +13,8 @@ pub async fn insert_named_vote_info(
                 legis_init_id, pro_count, contra_count, given_vote_sum, invalid_count
             ) VALUES (
                 $1, $2, $3, $4, $5
-            ) ON CONFLICT (legis_init_id) 
-            DO UPDATE SET 
+            ) ON CONFLICT (legis_init_id)
+            DO UPDATE SET
                 pro_count = EXCLUDED.pro_count,
                 contra_count = EXCLUDED.contra_count,
                 given_vote_sum = EXCLUDED.given_vote_sum,
@@ -43,8 +43,8 @@ pub async fn insert_named_vote_info(
     }
 }
 
-pub async fn insert_named_votes(
-    pg: &PgPool,
+pub async fn insert_named_votes<'a>(
+    tx: &mut sqlx::Transaction<'a, Postgres>,
     named_votes: &[DbNamedVote],
     named_vote_info_id: i32,
 ) -> sqlx::Result<()> {
@@ -56,8 +56,8 @@ pub async fn insert_named_votes(
                     searched_with, matched_with, delegate_id, named_vote_info_id, manually_matched
                 ) VALUES (
                     $1, $2, $3, $4, $5, $6, $7, $8, $9
-                ) ON CONFLICT (delegate_id, named_vote_info_id) 
-                DO UPDATE SET 
+                ) ON CONFLICT (delegate_id, named_vote_info_id)
+                DO UPDATE SET
                     infavor = EXCLUDED.infavor,
                     was_absent = EXCLUDED.was_absent,
                     lev = EXCLUDED.lev,
@@ -76,7 +76,7 @@ pub async fn insert_named_votes(
             named_vote_info_id,
             named_vote.manually_matched
         )
-        .execute(pg)
+        .execute(&mut **tx)
         .await
         {
             log::warn!(
