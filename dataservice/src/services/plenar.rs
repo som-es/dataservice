@@ -99,8 +99,9 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
             continue;
         }
         // let plenar_id = format!("{}/{}/{}", plenar_info.legislative_period, plenar_info.ityp, plenar_info.inr);
+        let mut pg_pool = pg_pool.begin().await.unwrap();
 
-        let plenar_id = match insert_plenar_info(pg_pool, plenar_info).await {
+        let plenar_id = match insert_plenar_info(&mut *pg_pool, plenar_info).await {
             Ok(id) => id,
             Err(e) => {
                 log::error!(
@@ -111,7 +112,9 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
         };
 
         for call_to_order_entry in &plenar_info.call_to_orders {
-            if let Err(e) = insert_call_to_order(pg_pool, call_to_order_entry, plenar_id).await {
+            if let Err(e) =
+                insert_call_to_order(&mut *pg_pool, call_to_order_entry, plenar_id).await
+            {
                 log::warn!("Error inserting call to order: '{e}'. Error occured for call to order: {call_to_order_entry:?}");
             }
         }
@@ -119,7 +122,7 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
         for debate in &plenar_info.debates {
             // get id from here, log here
 
-            let debate_id = match insert_debate(pg_pool, debate, plenar_id).await {
+            let debate_id = match insert_debate(&mut *pg_pool, debate, plenar_id).await {
                 Ok(debate_id) => debate_id,
                 Err(e) => {
                     log::warn!(
@@ -131,7 +134,7 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
 
             for plenar_speech in &debate.speeches {
                 if let Err(e) = insert_plenar_speech(
-                    pg_pool,
+                    &mut pg_pool,
                     plenar_speech,
                     &debate.info,
                     debate_id,
@@ -148,7 +151,7 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
 
         if let Some(absences) = &plenar_info.absences {
             let matching = absence_matching(
-                pg_pool,
+                &mut *pg_pool,
                 absences,
                 plenar_info.date.date(),
                 plenar_info.gp.clone(),
@@ -172,7 +175,7 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
                         matched_with = EXCLUDED.matched_with,
                         manually_matched = EXCLUDED.manually_matched
                     ", match_res.lev as i64, match_res.similiarity_score as i64, match_res.searched_with, match_res.matched_with, match_res.delegate_id as i32, match_res.manually_matched, plenar_id
-                ).execute(pg_pool).await {
+                ).execute(&mut *pg_pool).await {
                     log::warn!("Error inserting absene {e:?} for absence {match_res:?}");
                 }
             }
@@ -181,13 +184,13 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
 }
 
 use log::{info, warn};
-use sqlx::{postgres::PgQueryResult, PgPool};
+use sqlx::{postgres::PgQueryResult, Executor, PgPool, Postgres};
 use tokio::runtime::{Handle, Runtime};
 
 static mut NO_OPINION_COUNT: usize = 0;
 
-async fn insert_plenar_speech_legis_init(
-    pool: &PgPool,
+async fn insert_plenar_speech_legis_init<'a>(
+    pool: impl Executor<'a, Database = Postgres>,
     legis_init_id: Option<i32>,
     plenar_speech_id: i32,
     reference: &Reference,
@@ -206,8 +209,8 @@ pub struct DbReference {
     ref_inr: i32,
 }
 
-async fn insert_plenar_speech(
-    pool: &PgPool,
+async fn insert_plenar_speech<'a>(
+    pool: &mut sqlx::Transaction<'a, Postgres>,
     plenar_speech: &PlenarSpeech,
     corresponding_debate: &DebateInfo,
     val_debate_id: i32,
@@ -259,7 +262,7 @@ async fn insert_plenar_speech(
         plenar_speech.ty,
         plenar_speech.speech.delegate_display_name,
     )
-    .fetch_one(pool)
+    .fetch_one(&mut **pool)
     .await?
     .id;
 
@@ -270,7 +273,7 @@ async fn insert_plenar_speech(
             reference.ityp,
             reference.inr as i32
         )
-        .fetch_one(pool)
+        .fetch_one(&mut **pool)
         .await
         {
             Some(x.id)
@@ -280,12 +283,13 @@ async fn insert_plenar_speech(
 
         // let own_references = i
         if let Err(e) =
-            insert_plenar_speech_legis_init(pool, legis_init_id, plenar_speech_id, reference).await
+            insert_plenar_speech_legis_init(&mut **pool, legis_init_id, plenar_speech_id, reference)
+                .await
         {
             log::info!("could not insert plenar speech legis init for legis int {legis_init_id:?} and speech {plenar_speech_id}: {e:?}")
         }
         if let Some(legis_init_id) = legis_init_id {
-            let own_references = sqlx::query_as!(DbReference, "select origin_legis_init_id, ref_gp, ref_ityp, ref_inr from legis_inits_refs where origin_legis_init_id = $1", legis_init_id).fetch_all(pool).await.unwrap_or_default();
+            let own_references = sqlx::query_as!(DbReference, "select origin_legis_init_id, ref_gp, ref_ityp, ref_inr from legis_inits_refs where origin_legis_init_id = $1", legis_init_id).fetch_all(&mut **pool).await.unwrap_or_default();
 
             for reference in own_references {
                 let legis_init_id = if let Ok(x) = sqlx::query!(
@@ -294,7 +298,7 @@ async fn insert_plenar_speech(
                     reference.ref_ityp,
                     reference.ref_inr
                 )
-                .fetch_one(pool)
+                .fetch_one(&mut **pool)
                 .await
                 {
                     Some(x.id)
@@ -303,7 +307,7 @@ async fn insert_plenar_speech(
                 };
 
                 if let Err(e) = insert_plenar_speech_legis_init(
-                    pool,
+                    &mut **pool,
                     legis_init_id,
                     plenar_speech_id,
                     &Reference {
@@ -342,7 +346,7 @@ async fn insert_plenar_speech(
             url.site_start.map(|i| i as i32),
             url.site_end.map(|i| i as i32)
         )
-        .fetch_optional(pool)
+        .fetch_optional(&mut **pool)
         .await?;
         // this will also return something if an conflict happens (do update set)
         if let Some(id) = id {
@@ -357,7 +361,7 @@ async fn insert_plenar_speech(
             "#,
         plenar_speech_id,
     )
-    .fetch_all(pool)
+    .fetch_all(&mut **pool)
     .await?
     .into_iter()
     .collect::<HashSet<_>>();
@@ -367,7 +371,7 @@ async fn insert_plenar_speech(
             "delete from plenar_speech_links where id = $1",
             to_delete_id
         )
-        .execute(pool)
+        .execute(&mut **pool)
         .await?;
     }
 
@@ -420,7 +424,7 @@ async fn insert_plenar_speech(
             updated_spoken_text,
             plenar_speech_id,
         )
-        .execute(pool)
+        .execute(&mut **pool)
         .await?;
     } else {
         warn!(
@@ -449,7 +453,11 @@ impl StoredUpdatedAt for PlenarInfo {
     }
 }
 
-async fn insert_debate(pool: &PgPool, debate: &Debate, plenar_id: i32) -> Result<i32, sqlx::Error> {
+async fn insert_debate<'a>(
+    pool: impl Executor<'a, Database = Postgres>,
+    debate: &Debate,
+    plenar_id: i32,
+) -> Result<i32, sqlx::Error> {
     let result = sqlx::query!(
         r#"
         INSERT INTO debates (plenar_id, about)
@@ -467,8 +475,8 @@ async fn insert_debate(pool: &PgPool, debate: &Debate, plenar_id: i32) -> Result
     Ok(result.id)
 }
 
-pub async fn insert_plenar_info(
-    pool: &PgPool,
+pub async fn insert_plenar_info<'a>(
+    pool: impl Executor<'a, Database = Postgres>,
     plenar_info: &PlenarInfo,
 ) -> Result<i32, sqlx::Error> {
     let result = sqlx::query!(
@@ -495,8 +503,8 @@ pub async fn insert_plenar_info(
     Ok(result.id)
 }
 
-pub async fn insert_call_to_order(
-    pool: &PgPool,
+pub async fn insert_call_to_order<'a>(
+    pool: impl Executor<'a, Database = Postgres>,
     call_to_order: &CallToOrderInfo,
     plenar_id: i32,
 ) -> Result<(), sqlx::Error> {
@@ -622,7 +630,9 @@ async fn insert_all_serially(pg_pool: PgPool) {
                 continue;
             };
 
-            let plenar_id = match insert_plenar_info(&pg_pool, &plenar_info).await {
+            let mut pg_pool = pg_pool.begin().await.unwrap();
+
+            let plenar_id = match insert_plenar_info(&mut *pg_pool, &plenar_info).await {
                 Ok(id) => id,
                 Err(e) => {
                     log::error!(
@@ -635,7 +645,7 @@ async fn insert_all_serially(pg_pool: PgPool) {
             for debate in &plenar_info.debates {
                 // get id from here, log here
 
-                let debate_id = match insert_debate(&pg_pool, debate, plenar_id).await {
+                let debate_id = match insert_debate(&mut *pg_pool, debate, plenar_id).await {
                     Ok(debate_id) => debate_id,
                     Err(e) => {
                         log::warn!(
@@ -647,7 +657,7 @@ async fn insert_all_serially(pg_pool: PgPool) {
 
                 for plenar_speech in &debate.speeches {
                     if let Err(e) = insert_plenar_speech(
-                        &pg_pool,
+                        &mut pg_pool,
                         plenar_speech,
                         &debate.info,
                         debate_id,

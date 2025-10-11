@@ -11,7 +11,6 @@ use serde_derive::{Deserialize, Serialize};
 //     topics_ministrial_proposals, topics_proposals, votes,
 // };
 
-use somes_scraper::Voting;
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 

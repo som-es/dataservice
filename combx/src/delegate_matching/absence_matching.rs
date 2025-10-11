@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use chrono::NaiveDate;
-use sqlx::PgPool;
+use sqlx::{Executor, PgPool, Postgres};
 
 use crate::with_data::active_delegates_at_date;
 
@@ -24,13 +24,13 @@ pub fn reverse_name(name: &str) -> String {
     }
 }
 
-pub async fn absence_matching(
-    pg: &PgPool,
+pub async fn absence_matching<'a>(
+    pool: impl Executor<'a, Database = Postgres>,
     absences_names: &[String],
     plenar_date: NaiveDate,
     gp: String,
 ) -> MatchResult {
-    let active_delegates = active_delegates_at_date(pg, plenar_date)
+    let active_delegates = active_delegates_at_date(pool, plenar_date)
         .await
         .unwrap()
         .into_iter()
