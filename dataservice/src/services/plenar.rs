@@ -180,6 +180,9 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
                 }
             }
         }
+        if let Err(e) = pg_pool.commit().await {
+            log::error!("Cannot commit transaction: {e:}");
+        }
     }
 }
 
