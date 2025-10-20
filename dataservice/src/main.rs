@@ -121,20 +121,16 @@ pub async fn run_services(state: &State) {
             pool.clone(),
             decree_pages() as u32
         )),
-        tokio::spawn(
-            services::new_vote_results_mailer::notify_on_new_vote_results_service(
-                Shutdown::new(state.notify_shutdown.subscribe()),
-                new_vote_result_rx,
-                pool.clone()
-            )
-        ),
-        tokio::spawn(
-            services::new_ministrial_prop_mailer::notify_on_new_ministrial_props_service(
-                Shutdown::new(state.notify_shutdown.subscribe()),
-                new_ministrial_proposal_rx,
-                pool.clone()
-            )
-        ),
+        tokio::spawn(services::mailer::notify_on_new_vote_results_service(
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            new_vote_result_rx,
+            pool.clone()
+        )),
+        tokio::spawn(services::mailer::notify_on_new_ministrial_props_service(
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            new_ministrial_proposal_rx,
+            pool.clone()
+        )),
         tokio::spawn(services::delete_was_updated::delete_was_updated_entries(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone()

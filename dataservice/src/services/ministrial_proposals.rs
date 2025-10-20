@@ -7,7 +7,7 @@ use chrono::Months;
 use combx::{create_gov_officials_map, FromScrapedType, GovProposal};
 use dotenvy_macro::dotenv;
 use somes_scraper::{
-    ministrial_proposals::{MinistrialProposal, MinistrialProposalScraper},
+    ministrial_proposals::{GegenstandInfo, MinistrialProposal, MinistrialProposalScraper},
     proposals::ProposalsPayload,
     AustriaScraper, GovOfficial,
 };
@@ -29,7 +29,8 @@ pub async fn scrape_new_ministrial_props(
     let ministrial_proposals = scraper
         .post_ministrial_proposals_payload(proposal_payload)
         .await?;
-    let ministrial_props_paths = scraper.ministrial_prop_paths(ministrial_proposals)?;
+    let mut ministrial_props_paths = scraper.ministrial_prop_paths(ministrial_proposals)?;
+    sort_ministerial_prop_paths_desc(&mut ministrial_props_paths);
 
     let mut new_ministrial_props = Vec::with_capacity(ministrial_props_paths.len());
 
@@ -97,7 +98,7 @@ async fn ministrial_proposal_once(
 const MINISTRIAL_PROP_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| {
     dotenv!("LEGIS_INIT_STILL_SEND_DAYS")
         .parse::<i64>()
-        .unwrap_or(5)
+        .unwrap_or(10)
 });
 
 use sqlx::{postgres::PgPool, query};
@@ -127,6 +128,7 @@ pub async fn update_ministrial_proposals_in_db2(
 ) -> Result<(), sqlx::Error> {
     log::info!("Updating ministrial proposal in database...");
 
+    let mut started_acc = false;
     for (i, ministrial_prop) in ministrial_props.into_iter().enumerate() {
         if !crate::should_update(&ministrial_prop, pool).await {
             continue;
@@ -209,14 +211,20 @@ pub async fn update_ministrial_proposals_in_db2(
             {
                 let diff = today() - gov_proposal.ministrial_proposal.created_at.date();
 
-                if diff.num_days() <= *MINISTRIAL_PROP_STILL_SEND_DAYS && info.is_none() {
+                // this works, because the specific ministerial prop paths are sorted desc by inr
+                const TOTAL_MINISTERIAL_PROP_SENT: usize = 30;
+                if diff.num_days() <= *MINISTRIAL_PROP_STILL_SEND_DAYS
+                    && info.is_none()
+                    && i < TOTAL_MINISTERIAL_PROP_SENT
+                {
                     log::info!("Sending fitting ministrial prop: {ministrial_prop_id}");
-                    // collect somwhere (other service), then run every 30 mins e.g.
                     if let Err(e) = new_legis_init_tx
                         .send(Some((ministrial_prop_id, gov_proposal.clone())))
                         .await
                     {
                         log::error!("could not send ministrial prop to mail notify service: {e:?}")
+                    } else {
+                        started_acc = true;
                     }
 
                     if let Err(e) = sqlx::query!(
@@ -229,6 +237,13 @@ pub async fn update_ministrial_proposals_in_db2(
                         log::error!(
                             "could not insert into ministrial email info for id {ministrial_prop_id}: {e:?}"
                         );
+                    }
+                } else if started_acc {
+                    started_acc = false;
+
+                    // early triggering / stop accumulating
+                    if let Err(e) = new_legis_init_tx.send(None).await {
+                        log::error!("could not trigger mail sending service: {e:?}")
                     }
                 }
             };
@@ -302,6 +317,15 @@ pub async fn update_ministrial_proposals_in_db2(
             )
             .execute(pool)
             .await?;
+        }
+    }
+
+    // without this, the mail sending service wouldn't be triggered if e.g. gov proposals list length  is lower than TOTAL_MINISTERIAL_PROP_SENT threshold
+    if started_acc {
+        if let Some(new_legis_init_tx) = &new_ministrial_proposal_tx {
+            if let Err(e) = new_legis_init_tx.send(None).await {
+                log::error!("could not trigger mail sending service: {e:?}")
+            }
         }
     }
 
@@ -383,10 +407,69 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown, pg_pool: PgPool) {
     }
 }
 
+fn convert_inr_from_path_to_num(path: &str) -> Option<usize> {
+    let start = path.rfind('/')?;
+    path[start + 1..].parse().ok()
+}
+
+fn sort_ministerial_prop_paths_desc(prop_paths: &mut Vec<GegenstandInfo>) {
+    prop_paths.sort_by(|a, b| {
+        convert_inr_from_path_to_num(&b.path)
+            .unwrap()
+            .cmp(&convert_inr_from_path_to_num(&a.path).unwrap())
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use chrono::NaiveDateTime;
-    use somes_scraper::AustriaScraper;
+    use somes_scraper::{ministrial_proposals::GegenstandInfo, AustriaScraper};
+
+    use crate::{ministrial_proposals::sort_ministerial_prop_paths_desc, today};
+
+    #[test]
+    fn test_sort_ministerial_paths() {
+        let mut paths = vec![
+            GegenstandInfo {
+                path: "/gegenstand/XXVIII/ME/1".into(),
+                ressort: "wenig".into(),
+                ressort_shortform: "nix".into(),
+                due_to: today(),
+            },
+            GegenstandInfo {
+                path: "/gegenstand/XXVIII/ME/15".into(),
+                ressort: "wenig".into(),
+                ressort_shortform: "nix".into(),
+                due_to: today(),
+            },
+            GegenstandInfo {
+                path: "/gegenstand/XXVIII/ME/32".into(),
+                ressort: "wenig".into(),
+                ressort_shortform: "nix".into(),
+                due_to: today(),
+            },
+            GegenstandInfo {
+                path: "/gegenstand/XXVIII/ME/101".into(),
+                ressort: "wenig".into(),
+                ressort_shortform: "nix".into(),
+                due_to: today(),
+            },
+            GegenstandInfo {
+                path: "/gegenstand/XXVIII/ME/10".into(),
+                ressort: "wenig".into(),
+                ressort_shortform: "nix".into(),
+                due_to: today(),
+            },
+            GegenstandInfo {
+                path: "/gegenstand/XXVIII/ME/40".into(),
+                ressort: "wenig".into(),
+                ressort_shortform: "nix".into(),
+                due_to: today(),
+            },
+        ];
+        sort_ministerial_prop_paths_desc(&mut paths);
+        dbg!(&paths);
+    }
 
     #[test]
     fn test_date_time_parse() {

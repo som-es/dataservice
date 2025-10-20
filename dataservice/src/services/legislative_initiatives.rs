@@ -25,7 +25,7 @@ use dotenvy_macro::dotenv;
 const LEGIS_INIT_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| {
     dotenv!("LEGIS_INIT_STILL_SEND_DAYS")
         .parse::<i64>()
-        .unwrap_or(5)
+        .unwrap_or(10)
 });
 
 pub async fn scrape_new_legis_inits(
@@ -373,7 +373,6 @@ pub async fn update_legis_inits_in_db(
                     && !legis_init.votes.is_empty()
                 {
                     log::info!("Sending fitting legis init: {legis_init_id}");
-                    // collect somwhere (other service), then run every 30 mins e.g.
                     if let Err(e) = new_legis_init_tx
                         .send(Some((legis_init_id, legis_init)))
                         .await

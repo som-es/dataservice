@@ -4,11 +4,14 @@ use combx::GovProposal;
 use somes_scraper::ministrial_proposals::MinistrialProposal;
 use sqlx::{query, PgPool};
 
-use crate::email::{send_mail, MAILER};
+use crate::{
+    email::{send_mail, MAILER},
+    mailer::SimpleGovOfficial,
+};
 
 pub async fn find_notifiers_ministrial_props<'a>(
     pool: &PgPool,
-    legis_inits: &'a [(i32, GovProposal)],
+    gov_props: &'a [(i32, GovProposal)],
 ) -> HashMap<String, Vec<&'a (i32, GovProposal)>> {
     let ids = query!("select id, email from somes_user where is_email_hashed is false and send_new_ministrial_prop_mails")
         .fetch_all(pool)
@@ -18,7 +21,7 @@ pub async fn find_notifiers_ministrial_props<'a>(
     for id in ids {
         let user_topics = query!("select topic_name from user_topics inner join unique_eurovoc_topics ut on ut.id = topic_id where user_id = $1", id.id).fetch_all(pool).await.unwrap_or_default().into_iter().map(|x| x.topic_name).collect::<Vec<_>>();
 
-        let relevant_legis_inits = legis_inits
+        let relevant_gov_props = gov_props
             .iter()
             .filter(|legis_init| {
                 for topic in &legis_init.1.eurovoc_topics {
@@ -30,16 +33,17 @@ pub async fn find_notifiers_ministrial_props<'a>(
             })
             .collect::<Vec<_>>();
 
-        if !relevant_legis_inits.is_empty() {
-            to_notify_emails.insert(id.email, relevant_legis_inits);
+        if !relevant_gov_props.is_empty() {
+            to_notify_emails.insert(id.email, relevant_gov_props);
         }
     }
     to_notify_emails
 }
 
-pub fn send_new_ministrial_prop_info_mail(
+pub(crate) fn send_new_ministrial_prop_info_mail(
     mail_to: &str,
     ministrial_props: &[&(i32, GovProposal)],
+    gov_officials: &HashMap<i32, SimpleGovOfficial>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let ministrial_props = ministrial_props
         .iter()
@@ -47,9 +51,10 @@ pub fn send_new_ministrial_prop_info_mail(
         .collect::<Vec<_>>();
 
     let mail_to = mail_to.to_string();
+    let gov_officials = gov_officials.clone();
     std::thread::spawn(move || {
         let mut ministrial_props_html = String::new();
-        for (idx, (id, ministrial_prop)) in ministrial_props.iter().enumerate() {
+        for (idx, (_id, ministrial_prop)) in ministrial_props.iter().enumerate() {
             if idx >= 5 {
                 if ministrial_props.len() >= 6 {
                     ministrial_props_html.push_str(&"Und weitere ...");
@@ -57,21 +62,46 @@ pub fn send_new_ministrial_prop_info_mail(
                 break;
             }
 
-            let ministrial_prop_html_entry = format!(
-                r#"
-                <a href="https://somes.at/alpha/vote_result?id={id}">
-                    <div style="display: flex; flex-direction: row; justify-content: space-between; width: 100%;">
-                        <div style="border: 1px solid black; width: 50%; display: flex; justify-content: center; align-items: center;">
-                            {desc}
-                        </div>
-                        <div style="border: 1px solid black; width: 60%;">
-                            <img style="width: 70%;" src="data:image/png;base64"/>
-                        </div>
-                    </div>
-                </a>
-            "#,
-                desc = ministrial_prop.ministrial_proposal.description
-            );
+            let Some(gov_official) =
+                gov_officials.get(&ministrial_prop.ministrial_proposal.delegate_id)
+            else {
+                continue;
+            };
+            let ministrial_prop_html_entry = crate::email::MINISTRIAL_PROP_ENTRY_TEMPLATE
+                .replace(
+                    "{*PROPOSAL_DESCRIPTION*}",
+                    &ministrial_prop.ministrial_proposal.description,
+                )
+                .replace(
+                    "{*PROPOSAL_MINISTRY*}",
+                    &ministrial_prop.ministrial_proposal.ressort_shortform,
+                )
+                .replace(
+                    "{*PROPOSAL_DATE*}",
+                    &ministrial_prop
+                        .ministrial_proposal
+                        .created_at
+                        .date()
+                        .format("%d.%m.%Y")
+                        .to_string(),
+                )
+                .replace("{*PROPOSAL_GP*}", &ministrial_prop.ministrial_proposal.gp)
+                .replace("{*PROPOSAL_GOV_OFFICIAL_NAME*}", &gov_official.name)
+                .replace(
+                    "{*PROPOSAL_DELEGATE_IMG_URL*}",
+                    &gov_official
+                        .image_url
+                        .as_ref()
+                        .unwrap_or(&"https://somes.at/images/somes_logo.png".to_string()),
+                )
+                .replace(
+                    "{*PROPOSAL_SOMES_URL*}",
+                    &format!(
+                        "https://somes.at/alpha/gov_proposal/{gp}/ME/{inr}",
+                        gp = ministrial_prop.ministrial_proposal.gp,
+                        inr = ministrial_prop.ministrial_proposal.inr
+                    ),
+                );
 
             ministrial_props_html.push_str(&ministrial_prop_html_entry);
         }
@@ -79,6 +109,7 @@ pub fn send_new_ministrial_prop_info_mail(
         log::info!("Sending composed new ministrial prop mail to {mail_to}");
         let content = crate::email::MINISTRIAL_PROP_EMAIL_TEMPLATE
             .replace("{*MINISTRIAL_PROPS*}", &ministrial_props_html);
+        println!("content: {content}");
         if let Err(e) = send_mail(
             &MAILER,
             &mail_to,
@@ -92,9 +123,13 @@ pub fn send_new_ministrial_prop_info_mail(
     Ok(())
 }
 
-pub fn notify_users(user_ministrial_props: &HashMap<String, Vec<&(i32, GovProposal)>>) {
+pub(crate) fn notify_users(
+    user_ministrial_props: &HashMap<String, Vec<&(i32, GovProposal)>>,
+    gov_officials: &HashMap<i32, SimpleGovOfficial>,
+) {
     for (mail_to, ministrial_props) in user_ministrial_props {
-        if let Err(e) = send_new_ministrial_prop_info_mail(mail_to, ministrial_props) {
+        if let Err(e) = send_new_ministrial_prop_info_mail(mail_to, ministrial_props, gov_officials)
+        {
             log::error!("could not send ministrial prop info mail: {e:?}");
         }
     }

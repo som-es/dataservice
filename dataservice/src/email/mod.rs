@@ -18,21 +18,16 @@ pub const MAIL_SERVER: &str = dotenv!("MAIL_SERVER");
 pub const LEGIS_INIT_EMAIL_TEMPLATE: &str = include_str!("legis_init_email_template.html");
 pub const MINISTRIAL_PROP_EMAIL_TEMPLATE: &str =
     include_str!("ministrial_prop_email_template.html");
+pub const MINISTRIAL_PROP_ENTRY_TEMPLATE: &str =
+    include_str!("ministrial_prop_entry_template.html");
 
 pub static MAILER: Lazy<SmtpTransport> = Lazy::new(|| {
     let creds = Credentials::new(SMTP_USERNAME.to_string(), SMTP_PASSWORD.to_string());
     log::info!("Connecting to email relay...");
-    let tls_parameters = TlsParameters::builder(MAIL_SERVER.to_string())
-        .dangerous_accept_invalid_certs(true)
-        .build()
-        .expect("Failed to build TLS parameters");
 
-    SmtpTransport::relay(MAIL_SERVER)
+    SmtpTransport::starttls_relay(MAIL_SERVER)
         .expect("Email relay not available.")
         .credentials(creds)
-        .tls(lettre::transport::smtp::client::Tls::Wrapper(
-            tls_parameters,
-        ))
         .build()
 });
 

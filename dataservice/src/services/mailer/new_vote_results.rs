@@ -1,14 +1,11 @@
 use somes_scraper::LegislativeInitiative;
 use sqlx::PgPool;
-use tokio::{sync::mpsc::Receiver, time::Instant};
+use tokio::sync::mpsc::Receiver;
 
 use crate::Shutdown;
 
-use super::{
-    delegates,
-    legislative_initiatives::notify::{
-        find_notifiers_legis_init, get_current_delegates, get_current_seats, notify_users,
-    },
+use crate::legislative_initiatives::notify::{
+    find_notifiers_legis_init, get_current_delegates, get_current_seats, notify_users,
 };
 
 pub async fn notify_on_new_vote_results(
