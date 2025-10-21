@@ -1,3 +1,4 @@
+use combx::{PostgresEnhancer, VoteResult};
 use somes_scraper::LegislativeInitiative;
 use sqlx::PgPool;
 use tokio::sync::mpsc::Receiver;
@@ -5,7 +6,8 @@ use tokio::sync::mpsc::Receiver;
 use crate::Shutdown;
 
 use crate::legislative_initiatives::notify::{
-    find_notifiers_legis_init, get_current_delegates, get_current_seats, notify_users,
+    create_color_map, find_notifiers_legis_init, get_current_delegates, get_current_parties,
+    get_current_seats, notify_users,
 };
 
 pub async fn notify_on_new_vote_results(
@@ -24,14 +26,18 @@ pub async fn notify_on_new_vote_results(
 
     let seats = get_current_seats().await.unwrap_or_default();
     let delegates = get_current_delegates().await.unwrap_or_default();
+    let colors = create_color_map(get_current_parties().await.unwrap_or_default());
 
     loop {
         let mut acc_legis_inits = Vec::new();
         loop {
             let new_legis_init = new_vote_result_rx.recv().await;
             match new_legis_init {
-                Some(Some(legis_init)) => {
-                    acc_legis_inits.push(legis_init);
+                Some(Some((id, legis_init))) => {
+                    let pg_pool_enhancer = PostgresEnhancer(pg_pool.clone());
+                    let legis_init =
+                        VoteResult::from_legis_init(pg_pool_enhancer, legis_init).await;
+                    acc_legis_inits.push((id, legis_init));
                 }
 
                 Some(None) => break,
@@ -48,7 +54,7 @@ pub async fn notify_on_new_vote_results(
             notify_user_legis_inits.len()
         );
 
-        notify_users(&seats, &delegates, &notify_user_legis_inits);
+        notify_users(&seats, &delegates, &notify_user_legis_inits, colors.clone());
     }
 }
 
