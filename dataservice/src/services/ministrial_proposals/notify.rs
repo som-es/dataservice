@@ -13,23 +13,35 @@ pub async fn find_notifiers_ministrial_props<'a>(
     pool: &PgPool,
     gov_props: &'a [(i32, GovProposal)],
 ) -> HashMap<String, Vec<&'a (i32, GovProposal)>> {
-    let ids = query!("select id, email from somes_user where is_email_hashed is false and send_new_ministrial_prop_mails")
+    let ids = query!("select id, email from somes_user where is_email_hashed is false and (send_new_ministrial_prop_mails or send_new_ministrial_prop_by_favo_mails)")
         .fetch_all(pool)
         .await
         .unwrap_or_default();
     let mut to_notify_emails = HashMap::new();
     for id in ids {
         let user_topics = query!("select topic_name from user_topics inner join unique_eurovoc_topics ut on ut.id = topic_id where user_id = $1", id.id).fetch_all(pool).await.unwrap_or_default().into_iter().map(|x| x.topic_name).collect::<Vec<_>>();
+        let favo_dels = query!(
+            "select delegate_id from favo_dels where user_id = $1",
+            id.id
+        )
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
 
         let relevant_gov_props = gov_props
             .iter()
-            .filter(|legis_init| {
-                for topic in &legis_init.1.eurovoc_topics {
+            .filter(|(_id, gov_prop)| {
+                for topic in &gov_prop.eurovoc_topics {
                     if user_topics.contains(&topic.topic) {
                         return true;
                     }
                 }
-                false
+                favo_dels
+                    .iter()
+                    .find(|favo_del| {
+                        favo_del.delegate_id == gov_prop.ministrial_proposal.delegate_id
+                    })
+                    .is_some()
             })
             .collect::<Vec<_>>();
 
