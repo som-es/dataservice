@@ -1,15 +1,17 @@
 [workspace]
-members = [ 
+members = [
     "combx",
     "dataservice",
-    "getdata",
+    "getdata", "somai-client",
 ]
 
 [workspace.dependencies]
 sqlx = { version="0.8", features = ["postgres", "runtime-tokio", "chrono", "tls-rustls"] }
 somes-scraper = { path = "../scraper" }
 chrono = "0.4.41"
-serde = "1.0.219"
+serde = { version = "1.0.219", features = ["derive"] }
 serde_derive = "1.0.219"
 dotenvy_macro = "0.15.7"
 log = "0.4.27"
+reqwest = { version = "0.12", features = ["json", "blocking"] }
+tokio = { version = "1", features = ["tokio-macros", "macros", "rt", "rt-multi-thread", "signal"] }

@@ -15,13 +15,13 @@ dotenvy_macro = { workspace = true }
 log = { workspace = true }
 # diesel = {version = "2.0.3", features = ["postgres", "chrono"] }
 dotenvy = { version = "0.15.7", optional=true}
-reqwest = { version = "0.12", features = ["json", "blocking"], optional=true }
+reqwest = {workspace=true, optional=true}
 
 somes-common-lib = {path = "../../somes/somes-common-lib"}
 combx = { path = "../combx" }
 simple_logger = { version="5", optional = true}
-tokio = { version = "1", features = ["tokio-macros", "macros", "rt", "rt-multi-thread", "signal"], optional=true }
 utoipa = { version = "4.2.0", optional = true }
+tokio = { workspace = true, optional = true }
 pollster = "0.4.0"
 lettre = "0.11.12"
 image = "0.25.5"

@@ -1,0 +1,9 @@
+[package]
+name = "somai-client"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = {workspace = true}
+reqwest = { workspace = true }
+tokio = {workspace = true}

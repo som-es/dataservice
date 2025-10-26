@@ -12,6 +12,7 @@ serde_derive = { workspace = true }
 dotenvy_macro = { workspace = true }
 log = { workspace = true }
 utoipa = { version = "4.2.0", optional = true }
+reqwest = { workspace = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["tokio-macros", "macros", "rt", "rt-multi-thread", "signal"] }
