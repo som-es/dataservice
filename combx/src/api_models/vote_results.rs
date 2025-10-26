@@ -2,8 +2,11 @@ mod enhancer;
 mod hidden_vote_translation;
 mod named_votes;
 
+use std::sync::Arc;
+
 pub use enhancer::*;
 use serde::{Deserialize, Serialize};
+use somai_client::SomAiClient;
 use somes_scraper::{LegislativeInitiative, Opinion, Reference, RelatedDelegate};
 use sqlx::{FromRow, PgPool};
 
@@ -49,7 +52,7 @@ impl<T: VoteResultEnhancer> FromScrapedType<T> for VoteResult {
     type ScrapedType = LegislativeInitiative;
 
     async fn from_scraped_type(db_enhancer: T, ty: Self::ScrapedType) -> Self {
-        Self::from_legis_init(db_enhancer, ty).await
+        Self::from_legis_init(db_enhancer, ty, None).await
     }
 }
 
@@ -61,6 +64,7 @@ impl VoteResult {
     pub async fn from_legis_init(
         db_enhancer: impl VoteResultEnhancer,
         legis_init: LegislativeInitiative,
+        somai_client: Option<Arc<SomAiClient>>,
     ) -> Self {
         let plenary_session_id = db_enhancer.retrieve_plenary_session_id(&legis_init).await;
 
@@ -176,7 +180,7 @@ impl VoteResult {
             .into_iter()
             .map(|topic| Topic { topic })
             .collect::<Vec<_>>();
-        let eurovoc_topics = legis_init
+        let mut eurovoc_topics = legis_init
             .eurovoc_topics
             .into_iter()
             .map(|topic| Topic { topic })
@@ -195,6 +199,24 @@ impl VoteResult {
                 document_url: Some(document.link),
             })
             .collect::<Vec<_>>();
+
+        if let Some(somai_client) = somai_client {
+            if eurovoc_topics.is_empty() {
+                // check if there are already stored in db to avoid expensive model call?
+                fn extract_text_from_docs() -> String {
+                    "text from docs".into()
+                }
+                eurovoc_topics = somai_client
+                    .make_topics_predictions(extract_text_from_docs())
+                    .await
+                    .unwrap()
+                    .topics
+                    .into_iter()
+                    .map(|topic| Topic { topic })
+                    .collect();
+                panic!()
+            }
+        }
 
         let mut speeches = legis_init
             .speeches

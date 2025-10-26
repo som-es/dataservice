@@ -36,7 +36,7 @@ pub async fn notify_on_new_vote_results(
                 Some(Some((id, legis_init))) => {
                     let pg_pool_enhancer = PostgresEnhancer(pg_pool.clone());
                     let legis_init =
-                        VoteResult::from_legis_init(pg_pool_enhancer, legis_init).await;
+                        VoteResult::from_legis_init(pg_pool_enhancer, legis_init, None).await;
                     acc_legis_inits.push((id, legis_init));
                 }
 
