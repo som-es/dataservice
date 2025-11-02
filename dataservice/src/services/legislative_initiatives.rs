@@ -1,6 +1,6 @@
 use chrono::{Days, NaiveDate};
 use combx::{DbNamedVoteInfo, DbVote, PostgresEnhancer, VoteResult};
-use tokio::{runtime::Handle, sync::mpsc::Sender};
+use tokio::{runtime::Handle, sync::mpsc::Sender, task::JoinError};
 pub mod notify;
 mod voted_by_name_result;
 use voted_by_name_result::*;
@@ -57,7 +57,9 @@ pub async fn scrape_new_legis_inits(
             }
             for handle in handles.drain(..MAX_TASKS) {
                 if let Err(e) = handle.await {
-                    log::warn!("join Error: {e:?}")
+                    if e.is_panic() {
+                        log::error!("join Error: {e:?}")
+                    }
                 }
             }
             info_print_counter += 1;
@@ -82,7 +84,9 @@ pub async fn scrape_new_legis_inits(
 
         for handle in handles.drain(..) {
             if let Err(e) = handle.await {
-                log::warn!("join Error: {e:?}")
+                if e.is_panic() {
+                    log::warn!("join Error: {e:?}")
+                }
             }
         }
     }
@@ -199,7 +203,9 @@ async fn legis_init_once(
 
     for handle in handles {
         if let Err(e) = handle.await {
-            log::error!("join error: {e:?}");
+            if e.is_panic() {
+                log::error!("join error: {e:?}");
+            }
         }
     }
     // new_legis_inits
@@ -247,7 +253,7 @@ pub async fn update_legis_inits_in_db(
         // let maybe_legis_init_id = sqlx::query!("select id, created_at from legislative_initiatives where inr = $1 and ityp = $2 and gp = $3", db_legis_init.inr, db_legis_init.ityp, db_legis_init.gp).fetch_optional(pool).await;
         let db_legis_init = vote_result.legislative_initiative;
 
-        let mut tx = pool.begin().await.unwrap();
+        // let mut tx = pool.begin().await.unwrap();
 
         let legis_init_id = match sqlx::query!(
             "
@@ -308,7 +314,7 @@ pub async fn update_legis_inits_in_db(
             db_legis_init.is_urgent,
             db_legis_init.voting.map(|voting| voting.to_string()),
         )
-        .fetch_one(&mut *tx)
+        .fetch_one(pool)
         .await
         {
             Ok(record) => record.id,
@@ -321,7 +327,7 @@ pub async fn update_legis_inits_in_db(
         vote_result.id = Some(legis_init_id);
 
         for reference in vote_result.references.as_ref().unwrap_or(&vec![]) {
-            if let Err(e) = insert_reference(&mut *tx, reference, legis_init_id).await {
+            if let Err(e) = insert_reference(pool, reference, legis_init_id).await {
                 log::error!("Could not insert reference for legis init {legis_init_id}: {e:?}")
             }
         }
@@ -333,7 +339,7 @@ pub async fn update_legis_inits_in_db(
                 "delete from votes where legislative_initiatives_id = $1",
                 legis_init_id
             )
-            .execute(&mut *tx)
+            .execute(pool)
             .await
             {
                 log::error!(
@@ -343,16 +349,21 @@ pub async fn update_legis_inits_in_db(
         }
 
         for vote in &vote_result.votes {
-            insert_vote(&mut *tx, vote, legis_init_id).await;
+            insert_vote(pool, vote, legis_init_id).await;
         }
         if let Some(named_votes) = vote_result.named_votes {
             if let Ok(named_vote_info_id) =
-                insert_named_vote_info(&mut *tx, &named_votes.named_vote_info, legis_init_id).await
+                insert_named_vote_info(pool, &named_votes.named_vote_info, legis_init_id).await
             {
+                let mut tx = pool.begin().await.unwrap();
                 if let Err(e) =
                     insert_named_votes(&mut tx, &named_votes.named_votes, named_vote_info_id).await
                 {
                     log::error!("Could not insert any named votes for legis init: {legis_init:?}, error: {e:?}")
+                }
+
+                if let Err(e) = tx.commit().await {
+                    log::error!("Cannot commit legis init transaction: {e:?}");
                 }
             }
         }
@@ -362,7 +373,7 @@ pub async fn update_legis_inits_in_db(
                 "select * from legis_email_info where already_sent_id = $1",
                 legis_init_id
             )
-            .fetch_optional(&mut *tx)
+            .fetch_optional(pool)
             .await
             {
                 let diff = today() - legis_init.date;
@@ -385,7 +396,7 @@ pub async fn update_legis_inits_in_db(
                         "insert into legis_email_info (already_sent_id) values ($1)",
                         legis_init_id
                     )
-                    .execute(&mut *tx)
+                    .execute(pool)
                     .await
                     {
                         log::error!(
@@ -415,7 +426,7 @@ pub async fn update_legis_inits_in_db(
                 legis_init_id,
                 speech.opinion,
             )
-            .fetch_one(&mut *tx)
+            .fetch_one(pool)
             .await
             {
                 Err(e) => {
@@ -438,7 +449,7 @@ pub async fn update_legis_inits_in_db(
                     speech_id,
                     html_url
                 )
-                .execute(&mut *tx)
+                .execute(pool)
                 .await
                 {
                     log::error!("could not insert speech html url: {e:?}")
@@ -458,7 +469,7 @@ pub async fn update_legis_inits_in_db(
                 ",
                 topic.topic,
             )
-            .execute(&mut *tx)
+            .execute(pool)
             .await
             {
                 log::error!("Error inserting UNIQUE (parent) topic: '{:?}'. The error occurred for the following eurovoc topic: {:?}", e, topic);
@@ -476,7 +487,7 @@ pub async fn update_legis_inits_in_db(
                 topic.topic,
                 legis_init_id
             )
-            .execute(&mut *tx)
+            .execute(pool)
             .await
             {
                 log::error!("Error inserting topic: '{:?}'. The error occurred for the following topic: {:?}", e, topic);
@@ -495,7 +506,7 @@ pub async fn update_legis_inits_in_db(
                 ",
                 topic.topic,
             )
-            .execute(&mut *tx)
+            .execute(pool)
             .await
             {
                 log::error!("Error inserting UNIQUE (eurovoc) topic: '{:?}'. The error occurred for the following eurovoc topic: {:?}", e, topic);
@@ -514,7 +525,7 @@ pub async fn update_legis_inits_in_db(
                 topic.topic,
                 legis_init_id,
             )
-            .execute(&mut *tx)
+            .execute(pool)
             .await
             {
                 log::error!("Error inserting eurovoc topic: '{:?}'. The error occurred for the following eurovoc topic: {:?}", e, topic);
@@ -522,7 +533,9 @@ pub async fn update_legis_inits_in_db(
         }
 
         for delegate in &legis_init.related_delegates {
-            let res = sqlx::query!("insert into legis_init_delegates (legis_init_id, delegate_id, delegate_text) values ($1, $2, $3) on conflict (legis_init_id, delegate_id) do update set delegate_text = EXCLUDED.delegate_text", legis_init_id, delegate.delegate_id as i32, delegate.text).execute(&mut *tx).await;
+            let res = sqlx::query!("insert into legis_init_delegates (legis_init_id, delegate_id, delegate_text) values ($1, $2, $3) on conflict (legis_init_id, delegate_id) do update set delegate_text = EXCLUDED.delegate_text",
+                legis_init_id, delegate.delegate_id as i32, delegate.text)
+            .execute(pool).await;
             if let Err(e) = res {
                 log::error!(
                     "Error inserting delegate into legis init delegates, 'eingebracht von': {e:?}"
@@ -544,7 +557,7 @@ pub async fn update_legis_inits_in_db(
                 topic.topic,
                 legis_init_id,
             )
-            .execute(&mut *tx)
+            .execute(pool)
             .await
             {
                 Err(e) => {
@@ -573,7 +586,7 @@ pub async fn update_legis_inits_in_db(
                 document.document_type,
                 document.document_url
             )
-            .execute(&mut *tx)
+            .execute(pool)
             .await
             {
                 log::error!("Error inserting document: '{:?}'. The error occurred for the following document: {:?}", e, document);
@@ -589,14 +602,10 @@ pub async fn update_legis_inits_in_db(
             legis_init_id,
             crate::today_and_time().and_utc()
         )
-        .execute(&mut *tx)
+        .execute(pool)
         .await
         {
             log::error!("Error inserting was updated info: '{:?}'. The error occurred for the following legis init: {:?}", e, legis_init_id);
-        }
-
-        if let Err(e) = tx.commit().await {
-            log::error!("Cannot commit legis init transaction: {e:?}");
         }
     }
 }

@@ -99,9 +99,10 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
             continue;
         }
         // let plenar_id = format!("{}/{}/{}", plenar_info.legislative_period, plenar_info.ityp, plenar_info.inr);
-        let mut pg_pool = pg_pool.begin().await.unwrap();
+        // let mut pg_pool = pg_pool.begin().await.unwrap();
+        let mut pg_pool = pg_pool;
 
-        let plenar_id = match insert_plenar_info(&mut *pg_pool, plenar_info).await {
+        let plenar_id = match insert_plenar_info(pg_pool, plenar_info).await {
             Ok(id) => id,
             Err(e) => {
                 log::error!(
@@ -112,29 +113,43 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
         };
 
         for call_to_order_entry in &plenar_info.call_to_orders {
-            if let Err(e) =
-                insert_call_to_order(&mut *pg_pool, call_to_order_entry, plenar_id).await
-            {
-                log::warn!("Error inserting call to order: '{e}'. Error occured for call to order: {call_to_order_entry:?}");
+            if let Err(e) = insert_call_to_order(pg_pool, call_to_order_entry, plenar_id).await {
+                log::error!("Error inserting call to order: '{e}'. Error occured for call to order: {call_to_order_entry:?}");
             }
         }
 
         for debate in &plenar_info.debates {
             // get id from here, log here
 
-            let debate_id = match insert_debate(&mut *pg_pool, debate, plenar_id).await {
+            let debate_id = match insert_debate(pg_pool, debate, plenar_id).await {
                 Ok(debate_id) => debate_id,
                 Err(e) => {
-                    log::warn!(
+                    log::error!(
                         "Error inserting debate: '{e}'. Error occured for debate: {debate:?}"
                     );
                     continue;
                 }
             };
 
+            let mut tx = pg_pool.begin().await.unwrap();
+
+            // SELECT ps.id, ty, duration_in_seconds, about, add_date, legislative_period, inr, debates.id as debate_id, pi.id as plenar_id FROM plenar_speeches ps inner join debates on debates.id = debate_id inner join plenar_infos pi on pi.id = plenar_id where spoken_text is not null and delegate_id = 2326 and legislative_period = 'XXVI' and inr = 43;
+            // Add on delete cascade
+            /*if let Err(e) = query!(
+                "delete from plenar_speeches where debate_id = $1",
+                debate_id
+            )
+            .execute(&mut *pg_pool)
+            .await
+            {
+                log::error!(
+                    "Cannot delete from plenar speeches for debate id: {debate_id}, e: {e:?}"
+                )
+            }*/
+
             for plenar_speech in &debate.speeches {
                 if let Err(e) = insert_plenar_speech(
-                    &mut pg_pool,
+                    &mut tx,
                     plenar_speech,
                     &debate.info,
                     debate_id,
@@ -147,11 +162,15 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
                     );
                 }
             }
+
+            if let Err(e) = tx.commit().await {
+                log::error!("Cannot commit transaction: {e:}");
+            }
         }
 
         if let Some(absences) = &plenar_info.absences {
             let matching = absence_matching(
-                &mut *pg_pool,
+                pg_pool,
                 absences,
                 plenar_info.date.date(),
                 plenar_info.gp.clone(),
@@ -175,19 +194,16 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
                         matched_with = EXCLUDED.matched_with,
                         manually_matched = EXCLUDED.manually_matched
                     ", match_res.lev as i64, match_res.similiarity_score as i64, match_res.searched_with, match_res.matched_with, match_res.delegate_id as i32, match_res.manually_matched, plenar_id
-                ).execute(&mut *pg_pool).await {
+                ).execute(pg_pool).await {
                     log::warn!("Error inserting absene {e:?} for absence {match_res:?}");
                 }
             }
-        }
-        if let Err(e) = pg_pool.commit().await {
-            log::error!("Cannot commit transaction: {e:}");
         }
     }
 }
 
 use log::{info, warn};
-use sqlx::{postgres::PgQueryResult, Executor, PgPool, Postgres};
+use sqlx::{postgres::PgQueryResult, query, Executor, PgPool, Postgres};
 use tokio::runtime::{Handle, Runtime};
 
 static mut NO_OPINION_COUNT: usize = 0;
