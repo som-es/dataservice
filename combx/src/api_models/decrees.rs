@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
+use somes_common_lib::Document;
 use somes_scraper::Thing;
 use sqlx::FromRow;
 
@@ -14,14 +15,6 @@ mod enhancer;
 
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct Document {
-    pub title: String,
-    pub document_url: String,
-    pub document_type: String,
-}
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -90,9 +83,9 @@ impl Decree {
                 .documents
                 .into_iter()
                 .map(|doc| Document {
-                    title: doc.title,
-                    document_url: doc.link,
-                    document_type: doc.ftype.to_string(),
+                    title: Some(doc.title),
+                    document_url: Some(doc.link),
+                    document_type: Some(doc.ftype.to_string()),
                 })
                 .collect(),
         }

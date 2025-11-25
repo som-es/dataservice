@@ -1,11 +1,12 @@
 use std::{collections::HashMap, sync::Arc};
 
 use serde::{Deserialize, Serialize};
+use somes_common_lib::Document;
 use somes_scraper::{GovOfficial, ministrial_proposals::MinistrialProposal};
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
-use crate::{DbMinistrialProposalQuery, Document, FromScrapedType, Topic, VoteResult, today};
+use crate::{DbMinistrialProposalQuery, FromScrapedType, Topic, VoteResult, today};
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -99,9 +100,9 @@ impl GovProposal {
                 .documents
                 .into_iter()
                 .map(|document| Document {
-                    title: document.title,
-                    document_url: document.link,
-                    document_type: document.ftype.to_string(),
+                    title: Some(document.title),
+                    document_url: Some(document.link),
+                    document_type: Some(document.ftype.to_string()),
                 })
                 .collect(),
         }
