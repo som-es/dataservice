@@ -1,10 +1,10 @@
-use std::sync::Arc;
-
 use chrono::NaiveDate;
+use optional_struct::*;
 use serde::{Deserialize, Serialize};
 use somes_common_lib::Document;
 use somes_scraper::Thing;
 use sqlx::FromRow;
+use std::sync::Arc;
 
 use crate::{
     FromScrapedType, api_models::decrees::enhancer::DecreeEnhancer,
@@ -16,6 +16,7 @@ mod enhancer;
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
+#[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Decree {
