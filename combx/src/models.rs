@@ -1,18 +1,12 @@
 use chrono::{NaiveDate, NaiveDateTime};
+use optional_struct::optional_struct;
 use serde_derive::{Deserialize, Serialize};
 
-// use super::schema::{
-//     call_to_order, contacts, debates, delegates, eurovoc_topics_legis_init,
-//     eurovoc_topics_ministrial_proposals, eurovoc_topics_proposals, legislative_documents,
-//     legislative_initiatives, mandates, ministrial_proposals, ministrial_proposals_documents,
-//     other_keyword_topics_legis_init, other_keyword_topics_ministrial_proposals,
-//     other_keyword_topics_proposals, parties, plenar_infos, plenar_speech_links, plenar_speeches,
-//     proposal_delegates, proposal_documents, proposals, speeches, topics_legis_init,
-//     topics_ministrial_proposals, topics_proposals, votes,
-// };
-
+use somes_macro::CompositeType;
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
+
+pub use crate::api_models::*;
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
@@ -70,35 +64,6 @@ pub struct ProposalDelegate {
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-// #[diesel(table_name = legislative_initiatives)]
-pub struct DbLegislativeInitiative {
-    pub ityp: String,
-    pub doktyp: String,
-    pub gp: String,
-    pub inr: i32,
-    pub emphasis: Option<String>,
-    pub title: String,
-    pub description: String,
-    pub accepted: Option<String>,
-    pub created_at: NaiveDate,
-    pub appeared_at: Option<NaiveDateTime>,
-    pub updated_at: Option<NaiveDateTime>,
-    pub requires_simple_majority: bool,
-    pub pre_declined_type: Option<String>,
-    pub voted_by_name: bool,
-    pub plenary_session_id: Option<i32>,
-    pub is_law: bool,
-    pub law_accepted: Option<bool>,
-    pub law_come_into_effect_date: Option<NaiveDate>,
-    pub law_expires_on_date: Option<NaiveDate>,
-    pub by_publication: Option<bool>,
-    pub has_reference: Option<bool>,
-    pub is_voteable_on: Option<bool>,
-    pub is_urgent: bool,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 // #[diesel(table_name = ministrial_proposals)]
 pub struct DbMinistrialProposal {
     pub ityp: String,
@@ -144,63 +109,6 @@ pub struct DbMinistrialProposalQuery {
 use sqlx::FromRow;
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, FromRow, Default)]
-// #[diesel(table_name = legislative_initiatives)]
-pub struct DbLegislativeInitiativeQuery {
-    pub id: i32,
-    pub ityp: String,
-    pub doktyp: String,
-    pub gp: String,
-    pub inr: i32,
-    pub emphasis: Option<String>,
-    pub title: String,
-    pub description: String,
-    pub accepted: Option<String>,
-    pub created_at: NaiveDate,
-    pub appeared_at: Option<NaiveDateTime>,
-    pub updated_at: Option<NaiveDateTime>,
-    pub requires_simple_majority: bool,
-    pub pre_declined_type: Option<String>,
-    pub voted_by_name: bool,
-    pub plenary_session_id: Option<i32>,
-    pub is_emphasis_ai_generated: bool,
-    pub is_law: bool,
-    pub law_accepted: Option<bool>,
-    pub law_come_into_effect_date: Option<NaiveDate>,
-    pub law_expires_on_date: Option<NaiveDate>,
-    pub by_publication: Option<bool>,
-    pub has_reference: Option<bool>,
-    pub is_voteable_on: bool,
-    pub is_urgent: bool,
-    pub voting: Option<String>,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-// #[diesel(table_name = votes)]
-// #[diesel(primary_key(party, legislative_initiatives_id))]
-// #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
-pub struct DbVote {
-    pub party: String,
-    pub code: Option<String>,
-    pub fraction: i32,
-    pub infavor: bool,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-// #[diesel(table_name = votes)]
-// #[diesel(primary_key(party, legislative_initiatives_id))]
-// #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
-pub struct DbVoteIns {
-    pub party: String,
-    pub code: String,
-    pub fraction: i32,
-    pub infavor: bool,
-    pub legislative_initiatives_id: i32,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 // #[diesel(table_name = speeches)]
 // #[diesel(primary_key(delegate_id, legislative_initiatives_id))]
@@ -215,157 +123,6 @@ pub struct DbSpeech {
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-pub struct DbSpeechWithLink {
-    pub delegate_id: i32,
-    pub legis_init_id: Option<i32>,
-    pub infavor: Option<bool>,
-    pub duration_in_seconds: Option<i32>,
-    pub opinion: Option<String>,
-    pub document_url: Option<String>,
-    pub about: Option<String>,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-// #[diesel(table_name = topics_legis_init)]
-// #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
-pub struct DbTopicLegisInit {
-    pub topic: String,
-    pub legislative_initiatives_id: i32,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-// #[diesel(table_name = eurovoc_topics_legis_init)]
-// #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
-pub struct DbEurovocTopicLegisInit {
-    pub topic: String,
-    pub legislative_initiatives_id: i32,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-// #[diesel(table_name = other_keyword_topics_legis_init)]
-// #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
-pub struct DbOtherKeywordTopicLegisInit {
-    pub topic: String,
-    pub legislative_initiatives_id: i32,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-// #[diesel(table_name = topics_ministrial_proposals)]
-// #[diesel(belongs_to(DbMinistrialProposal, foreign_key = ministrial_proposal_id))]
-pub struct DbTopicMinistrialProposals {
-    pub topic: String,
-    pub ministrial_proposal_id: i32,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-// #[diesel(table_name = eurovoc_topics_ministrial_proposals)]
-// #[diesel(belongs_to(DbMinistrialProposal, foreign_key = ministrial_proposal_id))]
-pub struct DbEurovocTopicMinsistrialProposals {
-    pub topic: String,
-    pub ministrial_proposal_id: i32,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-// #[diesel(table_name = other_keyword_topics_ministriy = ministrial_proposal_id))]
-pub struct DbOtherKeywordTopicMinistrialProposals {
-    pub topic: String,
-    pub ministrial_proposal_id: i32,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-// #[diesel(table_name = topics_proposals)]
-// #[diesel(belongs_to(DbProposal, foreign_key = proposal_id))]
-pub struct DbTopicProposals {
-    pub topic: String,
-    pub proposals_id: String,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-// #[diesel(table_name = eurovoc_topics_proposals)]
-// #[diesel(belongs_to(DbProposal, foreign_key = proposal_id))]
-pub struct DbEurovocTopicProposals {
-    pub topic: String,
-    pub proposals_id: String,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-// #[diesel(table_name = other_keyword_topics_proposals)]
-// #[diesel(belongs_to(DbProposal, foreign_key = proposal_id))]
-pub struct DbOtherKeywordTopicProposals {
-    pub topic: String,
-    pub proposals_id: String,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-// #[diesel(table_name = legislative_documents)]
-// #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
-pub struct DbLegisDocument {
-    pub title: String,
-    pub document_type: String,
-    pub document_url: String,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-// #[diesel(table_name = legislative_documents)]
-// #[diesel(belongs_to(DbLegislativeInitiative, foreign_key = legislative_initiatives_id))]
-pub struct DbLegisDocumentOptional {
-    pub title: Option<String>,
-    pub document_type: Option<String>,
-    pub document_url: Option<String>,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-// #[diesel(table_name = ministrial_proposals_documents)]
-// #[diesel(belongs_to(DbMinistrialProposal, foreign_key = ministrial_proposal_id))]
-pub struct DbMinistrialProposalDocument {
-    pub title: String,
-    pub document_type: String,
-    pub document_url: String,
-    pub ministrial_proposal_id: i32,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-// #[diesel(table_name = proposal_documents)]
-// #[diesel(belongs_to(DbProposal, foreign_key = proposal_id))]
-pub struct DbProposalDocument {
-    pub title: String,
-    pub document_type: String,
-    pub document_url: String,
-    pub proposal_id: String,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-// #[diesel(table_name = contacts)]
-pub struct DbContactQuery {
-    pub id: i32,
-    pub mail: Option<String>,
-    pub phone_number: Option<String>,
-    pub twitter_url: Option<String>,
-    pub facebook_url: Option<String>,
-    pub website_url: Option<String>,
-    pub tiktok_url: Option<String>,
-    pub instagram_url: Option<String>,
-    pub youtube_url: Option<String>,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-// #[diesel(table_name = contacts)]
-// #[diesel(primary_key(id))]
 pub struct DbContact {
     pub id: i32,
     pub mail: Option<String>,
@@ -473,68 +230,9 @@ pub struct DbParty {
     pub color: String,
 }
 
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-pub struct DbNamedVote {
-    pub id: i32,
-    pub infavor: Option<bool>,
-    pub was_absent: Option<bool>,
-    pub lev: i64,
-    pub similiarity_score: i64,
-    pub searched_with: Option<String>,
-    pub matched_with: String,
-    pub delegate_id: i32,
-    // pub named_vote_info_id: i32,
-    pub manually_matched: Option<bool>,
-}
-
+#[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-pub struct DbNamedVotes {
-    pub named_vote_info: DbNamedVoteInfo,
-    pub named_votes: Vec<DbNamedVote>,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-pub struct DbNamedVoteInfo {
-    pub pro_count: i32,
-    pub contra_count: i32,
-    pub given_vote_sum: i32,
-    pub invalid_count: i32,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-pub struct DbNamedVoteInfoQuery {
-    pub id: i32,
-    pub legis_init_id: i32,
-    pub pro_count: i32,
-    pub contra_count: i32,
-    pub given_vote_sum: i32,
-    pub invalid_count: i32,
-}
-
-impl From<DbNamedVoteInfoQuery> for DbNamedVoteInfo {
-    fn from(value: DbNamedVoteInfoQuery) -> Self {
-        Self {
-            pro_count: value.pro_count,
-            contra_count: value.contra_count,
-            given_vote_sum: value.given_vote_sum,
-            invalid_count: value.invalid_count,
-        }
-    }
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-pub struct DbPartyNamedVoteCount {
-    pub party: Option<String>,
-    pub infavor: Option<bool>,
-    pub count: Option<i64>,
-}
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord, CompositeType)]
 pub struct Topic {
     pub topic: String,
 }

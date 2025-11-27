@@ -1,10 +1,10 @@
-mod vote_results;
+pub mod vote_results;
 pub use vote_results::*;
 
-mod decrees;
+pub mod decrees;
 pub use decrees::*;
 
-mod gov_proposals;
+pub mod gov_proposals;
 pub use gov_proposals::*;
 
 pub trait FromScrapedType<DbEnhancer> {

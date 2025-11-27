@@ -4,7 +4,7 @@ use chrono::NaiveDate;
 pub use delegate_matching::*;
 use dotenvy_macro::dotenv;
 pub use models::*;
-mod api_models;
+pub mod api_models;
 pub use api_models::*;
 mod gov_officials;
 pub use gov_officials::*;

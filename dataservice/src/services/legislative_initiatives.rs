@@ -1,5 +1,5 @@
 use chrono::{Days, NaiveDate};
-use combx::{DbNamedVoteInfo, DbVote, PostgresEnhancer, VoteResult};
+use combx::{DbNamedVoteInfo, DbReference, DbVote, PostgresEnhancer, VoteResult};
 use tokio::{runtime::Handle, sync::mpsc::Sender, task::JoinError};
 pub mod notify;
 mod voted_by_name_result;
@@ -612,7 +612,7 @@ pub async fn update_legis_inits_in_db(
 
 async fn insert_reference<'a>(
     pool: impl Executor<'a, Database = Postgres>,
-    reference: &somes_scraper::Reference,
+    reference: &DbReference,
     legislative_initiatives_id: i32,
 ) -> sqlx::Result<PgQueryResult> {
     sqlx::query!("insert into legis_inits_refs (origin_legis_init_id, ref_gp, ref_ityp, ref_inr) values ($1, $2, $3, $4) on conflict do nothing", legislative_initiatives_id, reference.gp, reference.ityp, reference.inr as i32).execute(pool).await

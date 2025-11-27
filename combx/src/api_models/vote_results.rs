@@ -1,33 +1,46 @@
 mod enhancer;
 mod hidden_vote_translation;
+mod models;
+pub use models::*;
+use somes_macro::CompositeType;
 mod named_votes;
 
 use std::sync::Arc;
 
 pub use enhancer::*;
+use optional_struct::optional_struct;
 use serde::{Deserialize, Serialize};
 use somai_client::SomAiClient;
-use somes_scraper::{LegislativeInitiative, Opinion, Reference, RelatedDelegate};
+use somes_common_lib::Document;
+use somes_scraper::{LegislativeInitiative, Opinion};
 use sqlx::{FromRow, PgPool};
 
 use crate::{
-    DbNamedVoteInfo, FromScrapedType,
-    api_models::vote_results::hidden_vote_translation::translate_votes,
-    models::{
-        DbLegisDocumentOptional, DbLegislativeInitiativeQuery, DbNamedVotes, DbSpeechWithLink,
-        DbVote, Topic,
-    },
+    FromScrapedType, Topic, api_models::vote_results::hidden_vote_translation::translate_votes,
 };
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Debug, Deserialize, Serialize, Clone, FromRow, Default)]
+#[derive(
+    Debug,
+    Deserialize,
+    Serialize,
+    Clone,
+    FromRow,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    CompositeType,
+)]
 pub struct MeiliesearchHelper {
     #[serde(default)]
     pub votes: Vec<String>,
 }
 
+#[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone, FromRow, Default)]
 pub struct VoteResult {
@@ -39,11 +52,11 @@ pub struct VoteResult {
     pub topics: Vec<Topic>,
     pub eurovoc_topics: Vec<Topic>,
     pub other_keyword_topics: Vec<Topic>,
-    pub documents: Vec<DbLegisDocumentOptional>,
+    pub documents: Vec<Document>,
     pub absences: Option<Vec<i32>>,
-    pub issued_by_dels: Vec<RelatedDelegate>,
+    pub issued_by_dels: Vec<DbRelatedDelegate>,
     pub referenced_by_others_ids: Option<Vec<i32>>,
-    pub references: Option<Vec<Reference>>,
+    pub references: Option<Vec<DbReference>>,
     #[serde(default)]
     pub meilisearch_helper: MeiliesearchHelper,
 }
@@ -193,7 +206,7 @@ impl VoteResult {
         let documents = legis_init
             .documents
             .into_iter()
-            .map(|document| DbLegisDocumentOptional {
+            .map(|document| Document {
                 title: Some(document.title),
                 document_type: Some(document.ftype.to_string()),
                 document_url: Some(document.link),
@@ -286,9 +299,25 @@ impl VoteResult {
             other_keyword_topics,
             documents,
             absences,
-            issued_by_dels: legis_init.related_delegates,
+            issued_by_dels: legis_init
+                .related_delegates
+                .into_iter()
+                .map(|related_delegate| DbRelatedDelegate {
+                    text: related_delegate.text,
+                    delegate_id: related_delegate.delegate_id,
+                })
+                .collect(),
             referenced_by_others_ids,
-            references: legis_init.references,
+            references: legis_init.references.map(|references| {
+                references
+                    .into_iter()
+                    .map(|reference| DbReference {
+                        gp: reference.gp,
+                        ityp: reference.ityp,
+                        inr: reference.inr,
+                    })
+                    .collect()
+            }),
             meilisearch_helper: MeiliesearchHelper::default(),
         }
     }
