@@ -106,7 +106,7 @@ pub struct DbMinistrialProposalQuery {
     pub has_vote_result: bool,
 }
 
-use sqlx::FromRow;
+use sqlx::{FromRow, prelude::Type};
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
@@ -232,7 +232,9 @@ pub struct DbParty {
 
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord, CompositeType)]
+#[derive(
+    Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord, CompositeType, Type,
+)]
 pub struct Topic {
     pub topic: String,
 }

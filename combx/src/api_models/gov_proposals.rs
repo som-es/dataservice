@@ -6,13 +6,15 @@ use somes_scraper::{GovOfficial, ministrial_proposals::MinistrialProposal};
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
-use crate::{DbMinistrialProposalQuery, FromScrapedType, Topic, VoteResult, today};
+use crate::{
+    DbMinistrialProposalQuery, FromScrapedType, OptionalVoteResult, Topic, VoteResult, today,
+};
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct GovProposal {
     pub ministrial_proposal: DbMinistrialProposalQuery,
-    pub vote_result: Option<VoteResult>,
+    pub vote_result: Option<OptionalVoteResult>,
     pub topics: Vec<Topic>,
     pub eurovoc_topics: Vec<Topic>,
     pub other_keyword_topics: Vec<Topic>,

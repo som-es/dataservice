@@ -1,5 +1,5 @@
 use chrono::NaiveDate;
-use combx::{DbNamedVote, DbNamedVoteInfo};
+use combx::{DbNamedVote, DbNamedVoteInfo, OptionalDbNamedVote};
 use sqlx::{Executor, PgPool, Postgres};
 
 pub async fn insert_named_vote_info<'a>(
@@ -45,7 +45,7 @@ pub async fn insert_named_vote_info<'a>(
 
 pub async fn insert_named_votes<'a>(
     tx: &mut sqlx::Transaction<'a, Postgres>,
-    named_votes: &[DbNamedVote],
+    named_votes: &[OptionalDbNamedVote],
     named_vote_info_id: i32,
 ) -> sqlx::Result<()> {
     for named_vote in named_votes {

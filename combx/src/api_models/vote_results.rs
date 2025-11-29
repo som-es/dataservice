@@ -13,14 +13,16 @@ use serde::{Deserialize, Serialize};
 use somai_client::SomAiClient;
 use somes_common_lib::Document;
 use somes_scraper::{LegislativeInitiative, Opinion};
-use sqlx::{FromRow, PgPool};
+use sqlx::{FromRow, PgPool, prelude::Type};
 
 use crate::{
-    FromScrapedType, Topic, api_models::vote_results::hidden_vote_translation::translate_votes,
+    FromScrapedType, OptionalTopic, Topic,
+    api_models::vote_results::hidden_vote_translation::translate_votes,
 };
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
+#[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     Debug,
@@ -34,15 +36,15 @@ use utoipa::ToSchema;
     PartialOrd,
     Ord,
     CompositeType,
+    Type,
 )]
-pub struct MeiliesearchHelper {
+pub struct MeilisearchHelper {
     #[serde(default)]
     pub votes: Vec<String>,
 }
 
-#[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Debug, Deserialize, Serialize, Clone, FromRow, Default)]
+#[derive(Debug, Deserialize, Default, Serialize, Clone, FromRow)]
 pub struct VoteResult {
     pub id: Option<i32>,
     pub legislative_initiative: DbLegislativeInitiativeQuery,
@@ -58,7 +60,27 @@ pub struct VoteResult {
     pub referenced_by_others_ids: Option<Vec<i32>>,
     pub references: Option<Vec<DbReference>>,
     #[serde(default)]
-    pub meilisearch_helper: MeiliesearchHelper,
+    pub meilisearch_helper: MeilisearchHelper,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Default)]
+pub struct OptionalVoteResult {
+    pub id: Option<i32>,
+    pub legislative_initiative: Option<OptionalDbLegislativeInitiativeQuery>,
+    pub votes: Option<Vec<OptionalDbVote>>,
+    pub speeches: Option<Vec<OptionalDbSpeechWithLink>>,
+    pub named_votes: Option<OptionalDbNamedVotes>,
+    pub topics: Option<Vec<OptionalTopic>>,
+    pub eurovoc_topics: Option<Vec<OptionalTopic>>,
+    pub other_keyword_topics: Option<Vec<OptionalTopic>>,
+    pub documents: Option<Vec<Document>>,
+    pub absences: Option<Vec<i32>>,
+    pub issued_by_dels: Option<Vec<OptionalDbRelatedDelegate>>,
+    pub referenced_by_others_ids: Option<Vec<i32>>,
+    pub references: Option<Vec<OptionalDbReference>>,
+    #[serde(default)]
+    pub meilisearch_helper: Option<OptionalMeilisearchHelper>,
 }
 
 impl<T: VoteResultEnhancer> FromScrapedType<T> for VoteResult {
@@ -182,7 +204,24 @@ impl VoteResult {
                 };
                 Some(DbNamedVotes {
                     named_vote_info,
-                    named_votes: named_votes.unwrap_or_default(),
+                    named_votes: named_votes
+                        .unwrap_or_default()
+                        .into_iter()
+                        // TODO add From trait impl for optional_struct
+                        // .map(Into::into)
+                        // TODO add Vec support for optional_struct
+                        .map(|named_vote| OptionalDbNamedVote {
+                            id: Some(named_vote.id),
+                            infavor: named_vote.infavor,
+                            was_absent: named_vote.was_absent,
+                            lev: Some(named_vote.lev),
+                            similiarity_score: Some(named_vote.similiarity_score),
+                            searched_with: named_vote.searched_with,
+                            matched_with: Some(named_vote.matched_with),
+                            delegate_id: Some(named_vote.delegate_id),
+                            manually_matched: named_vote.manually_matched,
+                        })
+                        .collect(),
                 })
             }
             _ => None,
@@ -304,7 +343,7 @@ impl VoteResult {
                 .into_iter()
                 .map(|related_delegate| DbRelatedDelegate {
                     text: related_delegate.text,
-                    delegate_id: related_delegate.delegate_id,
+                    delegate_id: related_delegate.delegate_id as i32,
                 })
                 .collect(),
             referenced_by_others_ids,
@@ -314,11 +353,11 @@ impl VoteResult {
                     .map(|reference| DbReference {
                         gp: reference.gp,
                         ityp: reference.ityp,
-                        inr: reference.inr,
+                        inr: reference.inr as i32,
                     })
                     .collect()
             }),
-            meilisearch_helper: MeiliesearchHelper::default(),
+            meilisearch_helper: MeilisearchHelper::default(),
         }
     }
 }
