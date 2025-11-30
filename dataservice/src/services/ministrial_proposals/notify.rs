@@ -39,7 +39,8 @@ pub async fn find_notifiers_ministrial_props<'a>(
                 favo_dels
                     .iter()
                     .find(|favo_del| {
-                        favo_del.delegate_id == gov_prop.ministrial_proposal.delegate_id
+                        // TODO: prevent that the same user gets multiple mails for the same ministrial prop if he has multiple favorite delegates 
+                        gov_prop.ministerial_issuers.contains(&favo_del.delegate_id)
                     })
                     .is_some()
             })
@@ -74,8 +75,10 @@ pub(crate) fn send_new_ministrial_prop_info_mail(
                 break;
             }
 
+            // TODO: display multiple gov officials if there are multiple ministerial issuers / this would also prevent multiple mails to the same user if he has multiple favorite delegates
+            // https://github.com/som-es/somes/issues/113
             let Some(gov_official) =
-                gov_officials.get(&ministrial_prop.ministrial_proposal.delegate_id)
+                gov_officials.get(&ministrial_prop.ministerial_issuers[0])
             else {
                 continue;
             };

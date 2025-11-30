@@ -1,20 +1,25 @@
 use std::{collections::HashMap, sync::Arc};
 
+use optional_struct::optional_struct;
 use serde::{Deserialize, Serialize};
 use somes_common_lib::Document;
+use somes_macro::CompositeType;
 use somes_scraper::{GovOfficial, ministrial_proposals::MinistrialProposal};
+use sqlx::Type;
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
 use crate::{
-    DbMinistrialProposalQuery, FromScrapedType, OptionalVoteResult, Topic, VoteResult, today,
+    DbMinistrialProposalQueryMeta, FromScrapedType, Topic, VoteResult, today
 };
 
+#[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, Type, CompositeType)]
 pub struct GovProposal {
-    pub ministrial_proposal: DbMinistrialProposalQuery,
-    pub vote_result: Option<OptionalVoteResult>,
+    pub id: Option<i32>,
+    pub ministrial_proposal: DbMinistrialProposalQueryMeta,
+    pub vote_result: Option<VoteResult>,
     pub topics: Vec<Topic>,
     pub eurovoc_topics: Vec<Topic>,
     pub other_keyword_topics: Vec<Topic>,
@@ -60,13 +65,12 @@ impl GovProposal {
         .into_iter()
         .map(|x| x as i32)
         .collect();
-        let db_ministerial_proposal = DbMinistrialProposalQuery {
+        let db_ministerial_proposal = DbMinistrialProposalQueryMeta {
             id: ministerial_proposal.id as i32,
             ityp: ministerial_proposal.ityp,
             gp: ministerial_proposal.gp,
             title: ministerial_proposal.title,
             description: ministerial_proposal.description,
-            delegate_id: ministerial_issuers[0],
             inr: ministerial_proposal.inr as i32,
             emphasis: ministerial_proposal.emphasis,
             created_at: ministerial_proposal.created_at,
@@ -80,6 +84,7 @@ impl GovProposal {
             has_vote_result: ministerial_proposal.legis_init_inr.is_some(),
         };
         GovProposal {
+            id: Some(ministerial_proposal.id as i32),
             ministrial_proposal: db_ministerial_proposal,
             vote_result: None,
             topics: ministerial_proposal

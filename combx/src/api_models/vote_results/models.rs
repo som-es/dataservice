@@ -39,6 +39,7 @@ pub struct DbLegislativeInitiative {
 #[derive(
     PartialEq, Debug, Clone, Serialize, Deserialize, FromRow, Default, CompositeType, Type,
 )]
+#[sqlx(type_name = "db_legislative_initiative_query")]
 pub struct DbLegislativeInitiativeQuery {
     pub id: i32,
     pub ityp: String,
@@ -71,6 +72,7 @@ pub struct DbLegislativeInitiativeQuery {
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type)]
+#[sqlx(type_name = "db_vote")]
 pub struct DbVote {
     pub party: String,
     pub code: Option<String>,
@@ -91,6 +93,7 @@ pub struct DbVoteIns {
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type)]
+#[sqlx(type_name = "db_speech_with_link")]
 pub struct DbSpeechWithLink {
     pub delegate_id: i32,
     pub legis_init_id: Option<i32>,
@@ -103,6 +106,7 @@ pub struct DbSpeechWithLink {
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type)]
+#[sqlx(type_name = "db_named_vote")]
 pub struct DbNamedVote {
     pub id: i32,
     pub infavor: Option<bool>,
@@ -135,6 +139,7 @@ pub struct OptionalDbNamedVote {
 // #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type)]
+#[sqlx(type_name = "db_named_vote_info")]
 pub struct DbNamedVoteInfo {
     pub pro_count: i32,
     pub contra_count: i32,
@@ -154,9 +159,10 @@ pub struct OptionalDbNamedVoteInfo {
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type)]
+#[sqlx(type_name = "db_named_votes")]
 pub struct DbNamedVotes {
     pub named_vote_info: DbNamedVoteInfo,
-    pub named_votes: Vec<OptionalDbNamedVote>,
+    pub named_votes: Option<Vec<DbNamedVote>>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
@@ -169,6 +175,7 @@ pub struct OptionalDbNamedVotes {
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type)]
+#[sqlx(type_name = "db_named_vote_info_query")]
 pub struct DbNamedVoteInfoQuery {
     pub id: i32,
     pub legis_init_id: i32,
@@ -181,6 +188,7 @@ pub struct DbNamedVoteInfoQuery {
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type)]
+#[sqlx(type_name = "db_party_named_vote_count")]
 pub struct DbPartyNamedVoteCount {
     pub party: Option<String>,
     pub infavor: Option<bool>,
@@ -190,6 +198,7 @@ pub struct DbPartyNamedVoteCount {
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, CompositeType, Type)]
+#[sqlx(type_name = "db_reference")]
 pub struct DbReference {
     pub gp: String,
     pub ityp: String,
@@ -199,6 +208,7 @@ pub struct DbReference {
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, CompositeType, Type)]
+#[sqlx(type_name = "db_related_delegate")]
 pub struct DbRelatedDelegate {
     pub text: Option<String>,
     pub delegate_id: i32,

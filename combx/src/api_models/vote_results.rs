@@ -38,13 +38,14 @@ use utoipa::ToSchema;
     CompositeType,
     Type,
 )]
+#[sqlx(type_name = "meilisearch_helper")]
 pub struct MeilisearchHelper {
     #[serde(default)]
     pub votes: Vec<String>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Debug, Deserialize, Default, Serialize, Clone, FromRow)]
+#[derive(Debug, Deserialize, Default, PartialEq, Serialize, Clone, FromRow, Type, CompositeType)]
 pub struct VoteResult {
     pub id: Option<i32>,
     pub legislative_initiative: DbLegislativeInitiativeQuery,
@@ -58,29 +59,29 @@ pub struct VoteResult {
     pub absences: Option<Vec<i32>>,
     pub issued_by_dels: Vec<DbRelatedDelegate>,
     pub referenced_by_others_ids: Option<Vec<i32>>,
-    pub references: Option<Vec<DbReference>>,
+    pub references_to: Option<Vec<DbReference>>,
     #[serde(default)]
-    pub meilisearch_helper: MeilisearchHelper,
+    pub meilisearch_helper: Option<MeilisearchHelper>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Default)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Default, Type, CompositeType)]
 pub struct OptionalVoteResult {
     pub id: Option<i32>,
-    pub legislative_initiative: Option<OptionalDbLegislativeInitiativeQuery>,
-    pub votes: Option<Vec<OptionalDbVote>>,
-    pub speeches: Option<Vec<OptionalDbSpeechWithLink>>,
-    pub named_votes: Option<OptionalDbNamedVotes>,
-    pub topics: Option<Vec<OptionalTopic>>,
-    pub eurovoc_topics: Option<Vec<OptionalTopic>>,
-    pub other_keyword_topics: Option<Vec<OptionalTopic>>,
+    pub legislative_initiative: Option<DbLegislativeInitiativeQuery>,
+    pub votes: Option<Vec<DbVote>>,
+    pub speeches: Option<Vec<DbSpeechWithLink>>,
+    pub named_votes: Option<DbNamedVotes>,
+    pub topics: Option<Vec<Topic>>,
+    pub eurovoc_topics: Option<Vec<Topic>>,
+    pub other_keyword_topics: Option<Vec<Topic>>,
     pub documents: Option<Vec<Document>>,
     pub absences: Option<Vec<i32>>,
-    pub issued_by_dels: Option<Vec<OptionalDbRelatedDelegate>>,
+    pub issued_by_dels: Option<Vec<DbRelatedDelegate>>,
     pub referenced_by_others_ids: Option<Vec<i32>>,
-    pub references: Option<Vec<OptionalDbReference>>,
+    pub references: Option<Vec<DbReference>>,
     #[serde(default)]
-    pub meilisearch_helper: Option<OptionalMeilisearchHelper>,
+    pub meilisearch_helper: Option<MeilisearchHelper>,
 }
 
 impl<T: VoteResultEnhancer> FromScrapedType<T> for VoteResult {
@@ -204,24 +205,7 @@ impl VoteResult {
                 };
                 Some(DbNamedVotes {
                     named_vote_info,
-                    named_votes: named_votes
-                        .unwrap_or_default()
-                        .into_iter()
-                        // TODO add From trait impl for optional_struct
-                        // .map(Into::into)
-                        // TODO add Vec support for optional_struct
-                        .map(|named_vote| OptionalDbNamedVote {
-                            id: Some(named_vote.id),
-                            infavor: named_vote.infavor,
-                            was_absent: named_vote.was_absent,
-                            lev: Some(named_vote.lev),
-                            similiarity_score: Some(named_vote.similiarity_score),
-                            searched_with: named_vote.searched_with,
-                            matched_with: Some(named_vote.matched_with),
-                            delegate_id: Some(named_vote.delegate_id),
-                            manually_matched: named_vote.manually_matched,
-                        })
-                        .collect(),
+                    named_votes
                 })
             }
             _ => None,
@@ -347,7 +331,7 @@ impl VoteResult {
                 })
                 .collect(),
             referenced_by_others_ids,
-            references: legis_init.references.map(|references| {
+            references_to: legis_init.references.map(|references| {
                 references
                     .into_iter()
                     .map(|reference| DbReference {
@@ -357,7 +341,7 @@ impl VoteResult {
                     })
                     .collect()
             }),
-            meilisearch_helper: MeilisearchHelper::default(),
+            meilisearch_helper: Some(MeilisearchHelper::default()),
         }
     }
 }

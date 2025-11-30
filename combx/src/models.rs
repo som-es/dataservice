@@ -84,11 +84,10 @@ pub struct DbMinistrialProposal {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, FromRow, Type, CompositeType)]
 // #[diesel(table_name = ministrial_proposals)]
-pub struct DbMinistrialProposalQuery {
+pub struct DbMinistrialProposalQueryMeta {
     pub id: i32,
-    pub delegate_id: i32,
     pub ityp: String,
     pub gp: String,
     pub inr: i32,

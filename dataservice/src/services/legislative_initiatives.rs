@@ -326,7 +326,7 @@ pub async fn update_legis_inits_in_db(
 
         vote_result.id = Some(legis_init_id);
 
-        for reference in vote_result.references.as_ref().unwrap_or(&vec![]) {
+        for reference in vote_result.references_to.as_ref().unwrap_or(&vec![]) {
             if let Err(e) = insert_reference(pool, reference, legis_init_id).await {
                 log::error!("Could not insert reference for legis init {legis_init_id}: {e:?}")
             }
@@ -357,7 +357,7 @@ pub async fn update_legis_inits_in_db(
             {
                 let mut tx = pool.begin().await.unwrap();
                 if let Err(e) =
-                    insert_named_votes(&mut tx, &named_votes.named_votes, named_vote_info_id).await
+                    insert_named_votes(&mut tx, &named_votes.named_votes.as_ref().unwrap_or(&vec![]), named_vote_info_id).await
                 {
                     log::error!("Could not insert any named votes for legis init: {legis_init:?}, error: {e:?}")
                 }

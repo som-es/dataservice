@@ -45,7 +45,7 @@ pub async fn insert_named_vote_info<'a>(
 
 pub async fn insert_named_votes<'a>(
     tx: &mut sqlx::Transaction<'a, Postgres>,
-    named_votes: &[OptionalDbNamedVote],
+    named_votes: &[DbNamedVote],
     named_vote_info_id: i32,
 ) -> sqlx::Result<()> {
     for named_vote in named_votes {
