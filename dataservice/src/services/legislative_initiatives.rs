@@ -7,6 +7,7 @@ use tokio::{runtime::Handle, sync::mpsc::Sender};
 pub mod notify;
 mod voted_by_name_result;
 use voted_by_name_result::*;
+mod ai_tasks;
 
 use somes_scraper::{
     legis_init::{LegislativeInitiatives, LEGIS_IS_VOTEABLE_ON_DOKTYPES},
@@ -335,49 +336,23 @@ pub async fn update_legis_inits_in_db(
 
         vote_result.id = Some(legis_init_id);
 
-        let summarization_task = AiTask {
-            input: combine_texts(
-                &extract_text_from_documents_html_first(&vote_result.documents).await,
-            ),
-            task_id: crate::hash!(),
-            db_entry_id: legis_init_id,
-            task: Box::new(|task_args| {
-                Box::pin(async move {
-                    // is emphasis already generated/set? -> skip
-                    if sqlx::query!(
-                        "select emphasis from legislative_initiatives where id = $1",
-                        task_args.db_entry_id
-                    )
-                    .fetch_one(&task_args.pg_pool)
-                    .await?
-                    .emphasis
-                    .is_some()
-                    {
-                        log::info!(
-                            "Skipping legis init emphasis summarization for id {}, already set.",
-                            task_args.db_entry_id
-                        );
-                        return Ok(());
-                    }
-                    let output = task_args
-                        .som_ai_client
-                        .summarize_input(task_args.ai_task_input, None)
-                        .await?;
-                    sqlx::query!(
-                        "UPDATE legislative_initiatives SET emphasis = $1, is_emphasis_ai_generated = true WHERE id = $2",
-                        output.summary,
-                        task_args.db_entry_id
-                    )
-                    .execute(&task_args.pg_pool)
-                    .await?;
-                    Ok(())
-                })
-            }),
-        };
-
+        #[cfg(feature = "ai")]
         if let Some(ai_task_tx) = &ai_task_tx {
-            if let Err(e) = ai_task_tx.send(summarization_task).await {
-                log::error!("Could not send AI task for legis init emphasis summarization: {e:?}");
+            if db_legis_init.gp.as_str() == "XXVIII" {
+                let summarization_task = AiTask {
+                    input: combine_texts(
+                        &extract_text_from_documents_html_first(&vote_result.documents).await,
+                    ),
+                    task_id: crate::hash!(),
+                    db_entry_id: legis_init_id,
+                    task: Box::new(|task_args| Box::pin(ai_tasks::summarize_laws(task_args))),
+                };
+
+                if let Err(e) = ai_task_tx.send(summarization_task).await {
+                    log::error!(
+                        "Could not send AI task for legis init emphasis summarization: {e:?}"
+                    );
+                }
             }
         }
 

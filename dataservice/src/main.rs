@@ -7,7 +7,7 @@ use tokio::sync::{broadcast, mpsc};
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 1024)]
 async fn main() {
-    simple_logger::init_with_level(log::Level::Warn).unwrap();
+    simple_logger::init_with_level(log::Level::Error).unwrap();
     // let _ = tokio::task::spawn_blocking(|| {
     //     let _x = &*GOV_OFFICIALS;
     //     // log::info!("gov of map: {x:?}");
@@ -149,6 +149,12 @@ pub async fn run_services(state: &State) {
         tokio::spawn(services::dates::run_shut_dates_latest(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone()
+        )),
+
+        tokio::spawn(services::ai_task_service::ai_tasks_service(
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            pool.clone(),
+            ai_task_rx,
         )),
     )
     .0
