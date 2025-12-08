@@ -96,7 +96,7 @@ impl SomAiClient {
         &self,
         input: String,
         prompt: String,
-        model: String,
+        model: Option<String>,
         use_openai: bool,
     ) -> Result<LLMResponse, reqwest::Error> {
         let req = LLMRequest {
@@ -118,7 +118,7 @@ impl SomAiClient {
     pub async fn summarize_input(
         &self,
         input: String,
-        model: String,
+        model: Option<String>,
     ) -> Result<SummaryResponse, reqwest::Error> {
         let req = SummaryRequest { input, model };
         let resp = self
@@ -134,7 +134,7 @@ impl SomAiClient {
     pub async fn summarize_input_from_url(
         &self,
         url: String,
-        model: String,
+        model: Option<String>,
     ) -> Result<SummaryResponse, reqwest::Error> {
         let req = SummaryFromUrlRequest { url, model };
         let resp = self
@@ -283,7 +283,7 @@ impl SomAiClient {
         &self,
         delegate_id: i32,
         question_or_input: String,
-        model: String,
+        model: Option<String>,
     ) -> Result<PoliticalStanceResponse, reqwest::Error> {
         let req = PoliticalStanceRequest {
             delegate_id,

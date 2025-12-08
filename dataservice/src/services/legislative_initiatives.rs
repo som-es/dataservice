@@ -1,22 +1,24 @@
-use chrono::{Days, NaiveDate};
-use combx::{DbNamedVoteInfo, DbReference, DbVote, PostgresEnhancer, VoteResult};
-use tokio::{runtime::Handle, sync::mpsc::Sender, task::JoinError};
+use chrono::Days;
+use combx::{
+    document_text::{combine_texts, extract_text_from_documents_html_first},
+    DbReference, DbVote, PostgresEnhancer, VoteResult,
+};
+use tokio::{runtime::Handle, sync::mpsc::Sender};
 pub mod notify;
 mod voted_by_name_result;
 use voted_by_name_result::*;
 
 use somes_scraper::{
-    legis_init::{LegislativeInitiatives, LEGIS_IS_VOTEABLE_ON_DOKTYPES, LEGIS_LAW_DETERMINATORS},
-    AustriaScraper, LegislativeInitiative, Opinion, Party, ProContra, Vote,
+    legis_init::{LegislativeInitiatives, LEGIS_IS_VOTEABLE_ON_DOKTYPES},
+    AustriaScraper, LegislativeInitiative,
 };
 use sqlx::{postgres::PgQueryResult, query, Executor, PgPool, Postgres};
-use std::{
-    collections::HashMap,
-    sync::{Arc, LazyLock},
-};
+use std::sync::{Arc, LazyLock};
 
 use crate::{
-    should_update::{self, StoredUpdatedAt},
+    ai_task::{self, AiTask},
+    location,
+    should_update::StoredUpdatedAt,
     today, today_and_time, Shutdown, GPS, LATEST_GP,
 };
 
@@ -33,6 +35,7 @@ pub async fn scrape_new_legis_inits(
     scraper: Arc<AustriaScraper>,
     gp: &str,
     new_legis_init: Option<Sender<Option<(i32, LegislativeInitiative)>>>,
+    ai_task_tx: Sender<AiTask>,
     searched_doktyps: Option<&[&str]>,
 ) -> crate::Result<Vec<LegislativeInitiative>> {
     let legis_inits = scraper.post_legis_payload(searched_doktyps).await?;
@@ -65,6 +68,7 @@ pub async fn scrape_new_legis_inits(
             info_print_counter += 1;
         }
         let new_legis_init = new_legis_init.clone();
+        let ai_task_tx = ai_task_tx.clone();
 
         handles.push(tokio::task::spawn_blocking(move || {
             Handle::current().block_on(async move {
@@ -77,7 +81,8 @@ pub async fn scrape_new_legis_inits(
                     return;
                 };
 
-                update_legis_inits_in_db(&pool, &[legis_init], new_legis_init).await;
+                update_legis_inits_in_db(&pool, &[legis_init], new_legis_init, Some(ai_task_tx))
+                    .await;
                 // new_legis_inits.push(legis_init);
             })
         }));
@@ -99,6 +104,7 @@ async fn legis_init_once(
     only_laws: bool,
     pg_pool: &PgPool,
     new_legis_init: Option<Sender<Option<(i32, LegislativeInitiative)>>>,
+    ai_task_ts: Sender<AiTask>,
 ) -> Vec<LegislativeInitiative> {
     log::info!("Try scraping legislative initiatives");
 
@@ -109,6 +115,7 @@ async fn legis_init_once(
         }
         let pg_pool = pg_pool.clone();
         let new_legis_init = new_legis_init.clone();
+        let ai_task_ts = ai_task_ts.clone();
         let handle = tokio::task::spawn_blocking(move || {
             Handle::current().block_on(async move {
                 let mut scraper = AustriaScraper::default();
@@ -141,6 +148,7 @@ async fn legis_init_once(
                     scraper.clone(),
                     gp,
                     new_legis_init,
+                    ai_task_ts,
                     searched_doktyps,
                 )
                 .await
@@ -227,6 +235,7 @@ pub async fn update_legis_inits_in_db(
     pool: &PgPool,
     new_legis_inits: &[LegislativeInitiative],
     new_legis_init: Option<Sender<Option<(i32, LegislativeInitiative)>>>,
+    ai_task_tx: Option<Sender<AiTask>>,
 ) {
     // if let Some(jetzt_party_info) = code_to_parties.get("J").cloned() {
     //     code_to_parties.insert("P".to_string(), jetzt_party_info);
@@ -267,7 +276,7 @@ pub async fn update_legis_inits_in_db(
                 ) ON CONFLICT (inr, ityp, gp)
                 DO UPDATE SET
                     title = EXCLUDED.title,
-                    emphasis = COALESCE(legislative_initiatives.emphasis, EXCLUDED.emphasis),
+                    emphasis = COALESCE(EXCLUDED.emphasis, legislative_initiatives.emphasis),
                     description = EXCLUDED.description,
                     accepted = EXCLUDED.accepted,
                     created_at = EXCLUDED.created_at,
@@ -326,6 +335,52 @@ pub async fn update_legis_inits_in_db(
 
         vote_result.id = Some(legis_init_id);
 
+        let summarization_task = AiTask {
+            input: combine_texts(
+                &extract_text_from_documents_html_first(&vote_result.documents).await,
+            ),
+            task_id: crate::hash!(),
+            db_entry_id: legis_init_id,
+            task: Box::new(|task_args| {
+                Box::pin(async move {
+                    // is emphasis already generated/set? -> skip
+                    if sqlx::query!(
+                        "select emphasis from legislative_initiatives where id = $1",
+                        task_args.db_entry_id
+                    )
+                    .fetch_one(&task_args.pg_pool)
+                    .await?
+                    .emphasis
+                    .is_some()
+                    {
+                        log::info!(
+                            "Skipping legis init emphasis summarization for id {}, already set.",
+                            task_args.db_entry_id
+                        );
+                        return Ok(());
+                    }
+                    let output = task_args
+                        .som_ai_client
+                        .summarize_input(task_args.ai_task_input, None)
+                        .await?;
+                    sqlx::query!(
+                        "UPDATE legislative_initiatives SET emphasis = $1, is_emphasis_ai_generated = true WHERE id = $2",
+                        output.summary,
+                        task_args.db_entry_id
+                    )
+                    .execute(&task_args.pg_pool)
+                    .await?;
+                    Ok(())
+                })
+            }),
+        };
+
+        if let Some(ai_task_tx) = &ai_task_tx {
+            if let Err(e) = ai_task_tx.send(summarization_task).await {
+                log::error!("Could not send AI task for legis init emphasis summarization: {e:?}");
+            }
+        }
+
         for reference in vote_result.references_to.as_ref().unwrap_or(&vec![]) {
             if let Err(e) = insert_reference(pool, reference, legis_init_id).await {
                 log::error!("Could not insert reference for legis init {legis_init_id}: {e:?}")
@@ -356,8 +411,12 @@ pub async fn update_legis_inits_in_db(
                 insert_named_vote_info(pool, &named_votes.named_vote_info, legis_init_id).await
             {
                 let mut tx = pool.begin().await.unwrap();
-                if let Err(e) =
-                    insert_named_votes(&mut tx, &named_votes.named_votes.as_ref().unwrap_or(&vec![]), named_vote_info_id).await
+                if let Err(e) = insert_named_votes(
+                    &mut tx,
+                    &named_votes.named_votes.as_ref().unwrap_or(&vec![]),
+                    named_vote_info_id,
+                )
+                .await
                 {
                     log::error!("Could not insert any named votes for legis init: {legis_init:?}, error: {e:?}")
                 }
@@ -654,6 +713,7 @@ pub async fn run_shut_latest_gp(
     mut shutdown: Shutdown,
     pg_pool: PgPool,
     new_legis_init: Sender<Option<(i32, LegislativeInitiative)>>,
+    ai_task_ts: Sender<AiTask>,
     legis_init_sleep: u64,
     only_latest: bool,
     only_laws: bool,
@@ -661,6 +721,7 @@ pub async fn run_shut_latest_gp(
     #[cfg(feature = "legis_init_latest")]
     while !shutdown.is_shutdown() {
         let new_legis_init = new_legis_init.clone();
+        let ai_task_ts = ai_task_ts.clone();
         tokio::select! {
             _ = shutdown.recv() => {
                 println!("shutting down");
@@ -672,7 +733,7 @@ pub async fn run_shut_latest_gp(
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative (latest) scraper");
 
-                    legis_init_once(only_latest, only_laws, &pg_pool, Some(new_legis_init.clone())).await;
+                    legis_init_once(only_latest, only_laws, &pg_pool, Some(new_legis_init.clone()), ai_task_ts.clone()).await;
 
                     // triggers the email service
                     let res = new_legis_init.send(None).await;
@@ -692,7 +753,11 @@ pub async fn run_shut_latest_gp(
     }
 }
 
-pub async fn run_shut_every_gp(mut shutdown: Shutdown, pg_pool: PgPool) {
+pub async fn run_shut_every_gp(
+    mut shutdown: Shutdown,
+    pg_pool: PgPool,
+    ai_task_ts: Sender<AiTask>,
+) {
     let legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP")
         .unwrap_or_else(|_| "1000".to_string())
         .parse()
@@ -705,6 +770,7 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown, pg_pool: PgPool) {
 
     #[cfg(feature = "legis_init")]
     while !shutdown.is_shutdown() {
+        let ai_task_ts = ai_task_ts.clone();
         tokio::select! {
             _ = shutdown.recv() => {
                 println!("shutting down");
@@ -716,7 +782,7 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown, pg_pool: PgPool) {
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative scraper");
 
-                    legis_init_once(false, false, &pg_pool, None).await;
+                    legis_init_once(false, false, &pg_pool, None, ai_task_ts.clone()).await;
                 }).await {
                     log::error!("Error in legislative initiative scraper: {:?}", e);
                 }
@@ -798,7 +864,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None, None).await;
     }
 
     #[tokio::test]
@@ -810,7 +876,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None, None).await;
 
         // println!("s: {:?}", scraper.scrape_info.gp);
 
@@ -827,7 +893,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None, None).await;
     }
 
     #[tokio::test]
@@ -839,7 +905,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None, None).await;
     }
 
     #[tokio::test]
@@ -851,7 +917,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None, None).await;
     }
 
     #[tokio::test]
@@ -864,7 +930,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None, None).await;
     }
 
     #[tokio::test]
@@ -877,7 +943,7 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None, None).await;
     }
 
     #[tokio::test]
@@ -892,7 +958,7 @@ mod tests {
         log::info!("legis init: {res:?}");
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None, None).await;
     }
 
     #[tokio::test]
@@ -907,6 +973,6 @@ mod tests {
         log::info!("legis init: {res:?}");
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None).await;
+        crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], None, None).await;
     }
 }

@@ -11,12 +11,13 @@ serde = { workspace = true }
 serde_derive = { workspace = true }
 dotenvy_macro = { workspace = true }
 log = { workspace = true }
-utoipa = { version = "4.2.0", optional = true }
+utoipa = { workspace = true, optional = true }
 reqwest = { workspace = true }
 somai-client = { path = "../somai-client" }
 somes-common-lib = { path = "../../somes/somes-common-lib" }
 somes-macro = { path = "../../somes/somes-macro" }
 optional_struct = "0.5"
+pdf-extract = "0.10.0"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["tokio-macros", "macros", "rt", "rt-multi-thread", "signal"] }

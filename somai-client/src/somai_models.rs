@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 pub struct LLMRequest {
     pub input: String,
     pub prompt: String,
-    pub model: String,
+    #[serde(default)]
+    pub model: Option<String>,
     #[serde(default)]
     pub use_openai: bool,
 }
@@ -16,12 +17,14 @@ pub struct LLMResponse {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SummaryRequest {
     pub input: String,
-    pub model: String,
+    #[serde(default)]
+    pub model: Option<String>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SummaryFromUrlRequest {
     pub url: String,
-    pub model: String,
+    #[serde(default)]
+    pub model: Option<String>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SummaryResponse {
@@ -93,7 +96,8 @@ pub struct CosineResponse {
 pub struct PoliticalStanceRequest {
     pub delegate_id: i32,
     pub question_or_input: String,
-    pub model: String,
+    #[serde(default)]
+    pub model: Option<String>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PoliticalStanceResponse {

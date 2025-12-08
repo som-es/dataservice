@@ -18,6 +18,7 @@ use sqlx::{FromRow, PgPool, prelude::Type};
 use crate::{
     FromScrapedType, OptionalTopic, Topic,
     api_models::vote_results::hidden_vote_translation::translate_votes,
+    document_text::{TextDocument, combine_texts, extract_text_from_documents_html_first},
 };
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
@@ -45,7 +46,9 @@ pub struct MeilisearchHelper {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Debug, Deserialize, Default, PartialEq, Serialize, Clone, FromRow, Type, CompositeType)]
+#[derive(
+    Debug, Deserialize, Default, PartialEq, Serialize, Clone, FromRow, Type, CompositeType,
+)]
 pub struct VoteResult {
     pub id: Option<i32>,
     pub legislative_initiative: DbLegislativeInitiativeQuery,
@@ -65,7 +68,9 @@ pub struct VoteResult {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Default, Type, CompositeType)]
+#[derive(
+    Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Default, Type, CompositeType,
+)]
 pub struct OptionalVoteResult {
     pub id: Option<i32>,
     pub legislative_initiative: Option<DbLegislativeInitiativeQuery>,
@@ -205,7 +210,7 @@ impl VoteResult {
                 };
                 Some(DbNamedVotes {
                     named_vote_info,
-                    named_votes
+                    named_votes,
                 })
             }
             _ => None,
@@ -232,18 +237,21 @@ impl VoteResult {
             .map(|document| Document {
                 title: Some(document.title),
                 document_type: Some(document.ftype.to_string()),
-                document_url: Some(document.link),
+                document_url: Some(document.link), // store complete URL
             })
             .collect::<Vec<_>>();
 
         if let Some(somai_client) = somai_client {
+            let document_texts =
+                combine_texts(&extract_text_from_documents_html_first(&documents).await);
+            // if db_legis_init.emphasis.is_none()  {
+            //     db_legis_init.emphasis = Some(somai_client.make_emphasis_prediction(document_texts.clone()).await);
+            // }
             if eurovoc_topics.is_empty() {
                 // check if there are already stored in db to avoid expensive model call?
-                fn extract_text_from_docs() -> String {
-                    "text from docs".into()
-                }
+
                 eurovoc_topics = somai_client
-                    .make_topics_predictions(extract_text_from_docs())
+                    .make_topics_predictions(document_texts.clone())
                     .await
                     .unwrap()
                     .topics
@@ -343,5 +351,44 @@ impl VoteResult {
             }),
             meilisearch_helper: Some(MeilisearchHelper::default()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use somai_client::SomAiClient;
+    use somes_common_lib::Document;
+
+    use crate::document_text::{combine_texts, extract_text_from_documents_html_first};
+
+    #[tokio::test]
+    async fn test_ai_summary_from_vote_result() {
+        let url = "/dokument/XXVIII/A/468/fname_1715462.pdf";
+        let documents = vec![Document {
+            title: Some("Test Document".to_string()),
+            document_url: Some(url.to_string()),
+            document_type: Some("DigitalPDF".to_string()),
+        }];
+
+        let somai_client = Arc::new(
+            SomAiClient::new_local("http://127.0.0.1:8000")
+                .await
+                .unwrap(),
+        );
+
+        let document_texts =
+            combine_texts(&extract_text_from_documents_html_first(&documents).await);
+
+        println!(
+            "document_texts: {}",
+            &document_texts[..300.min(document_texts.len())]
+        );
+        let out = somai_client
+            .summarize_input(document_texts, None)
+            .await
+            .unwrap();
+        println!("{:?}", out);
     }
 }

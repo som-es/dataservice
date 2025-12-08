@@ -17,6 +17,9 @@ pub use db::*;
 pub use shutdown::*;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 
+pub mod location_hasher;
+
+pub mod ai_task;
 pub mod email;
 pub mod notify_registrars;
 pub mod should_update;

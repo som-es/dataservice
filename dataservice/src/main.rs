@@ -1,5 +1,7 @@
 use combx::GovProposal;
-use dataservice::{connect_pg, delegates::delegate_count, services, Shutdown, DATABASE_URL};
+use dataservice::{
+    ai_task::AiTask, connect_pg, delegates::delegate_count, services, Shutdown, DATABASE_URL,
+};
 use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
 
@@ -51,6 +53,8 @@ pub async fn run_services(state: &State) {
     let (new_ministrial_proposal_tx, new_ministrial_proposal_rx) =
         tokio::sync::mpsc::channel::<Option<(i32, GovProposal)>>(128);
 
+    let (ai_task_tx, ai_task_rx) = tokio::sync::mpsc::channel::<AiTask>(16536 * 22);
+
     let latest_legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP_LATEST")
         .unwrap_or_else(|_| "300".to_string())
         .parse()
@@ -65,12 +69,14 @@ pub async fn run_services(state: &State) {
         // services::proposals::run(),
         tokio::spawn(services::legislative_initiatives::run_shut_every_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
-            pool.clone()
+            pool.clone(),
+            ai_task_tx.clone(),
         )),
         tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone(),
             new_vote_result_tx.clone(),
+            ai_task_tx.clone(),
             latest_legis_init_sleep + 150,
             true,
             false,
@@ -79,6 +85,7 @@ pub async fn run_services(state: &State) {
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone(),
             new_vote_result_tx.clone(),
+            ai_task_tx.clone(),
             latest_legis_init_sleep - 40,
             true,
             true,

@@ -6,6 +6,7 @@ use dotenvy_macro::dotenv;
 pub use models::*;
 pub mod api_models;
 pub use api_models::*;
+pub mod document_text;
 mod gov_officials;
 pub use gov_officials::*;
 
