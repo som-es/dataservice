@@ -39,7 +39,7 @@ rand = "0.9"
 # default = ["runner", "legis_init_latest", "legis_init", "ministerial_latest", "ministerial", "proposals_latest", "proposals", "plenar", "parties"]
 # default = ["runner", "ministerial_latest", "ministerial", "legis_init", "legis_init_latest", "plenar_latest", "decrees", "dates", "parties"]
 # default = ["runner", "plenar"]
-default = ["runner", "legis_init_latest"]
+default = ["runner", "legis_init_latest", "ai"]
 models = ["dotenvy", "chrono"]
 runner = ["models", "chrono", "reqwest", "simple_logger", "tokio", "dotenvy"]
 utoipa = ["dep:utoipa", "combx/utoipa"]
@@ -56,3 +56,9 @@ plenar_latest = []
 parties = []
 decrees = []
 dates = []
+
+[profile.dev]
+panic = "unwind"
+
+[profile.release]
+panic = "unwind"

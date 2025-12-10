@@ -21,7 +21,7 @@ pub async fn save_dates(pg_pool: &PgPool, only_latest: bool) -> crate::Result<()
         .raw_dates_into_parliament_dates(dates)
         .await
         .unwrap_or_default();
-    println!("{only_latest}, len: {}", dates.len());
+    // println!("{only_latest}, len: {}", dates.len());
     for date in dates {
         save_date(date, pg_pool).await?
     }

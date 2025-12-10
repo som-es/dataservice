@@ -150,7 +150,6 @@ pub async fn run_services(state: &State) {
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone()
         )),
-
         tokio::spawn(services::ai_task_service::ai_tasks_service(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone(),

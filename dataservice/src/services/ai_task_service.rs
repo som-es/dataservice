@@ -14,7 +14,6 @@ pub async fn ai_tasks_service(
     pg_pool: PgPool,
     mut ai_task_rx: Receiver<AiTask>,
 ) {
-    
     let somai_client = Arc::new(
         SomAiClient::new_local("http://127.0.0.1:8000")
             .await

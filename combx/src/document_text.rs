@@ -106,7 +106,11 @@ pub async fn extract_text_from_pdf_document(_url: &str) -> Option<String> {
         .bytes()
         .await
         .ok()?;
-    pdf_extract::extract_text_from_mem(&contents).ok()
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        pdf_extract::extract_text_from_mem(&contents).ok()
+    }))
+    .ok()
+    .flatten()
 }
 
 #[cfg(test)]
