@@ -340,41 +340,22 @@ pub async fn update_legis_inits_in_db(
         if let Some(ai_task_tx) = &ai_task_tx {
             if db_legis_init.is_voteable_on {
                 let documents = vote_result.documents.clone();
-                
-                match tokio::spawn(async move {
-                    use crate::OCR_ENGINE;
+                let summarization_task = AiTask {
+                    input: None,
+                    task_id: crate::hash!(),
+                    db_entry_id: legis_init_id,
+                    task: Box::new(move |task_args| {
+                        Box::pin(async move {
+                            // let input =
+                            ai_tasks::summarize_laws(task_args, &documents).await
+                        })
+                    }),
+                };
 
-                    combine_texts(&extract_text_from_documents_html_first(&documents, OCR_ENGINE.clone()).await)
-                })
-                .await
-                {
-                    Ok(input) => {
-                        if input.len() < 50 {
-                            log::error!(
-                                "Cannot summarize legis init {legis_init_id}, input is too short / empty for documents: {:?}",
-                                vote_result.documents
-                            );
-                        } else {
-                            let summarization_task = AiTask {
-                                input,
-                                task_id: crate::hash!(),
-                                db_entry_id: legis_init_id,
-                                task: Box::new(|task_args| {
-                                    Box::pin(ai_tasks::summarize_laws(task_args))
-                                }),
-                            };
-
-                            if let Err(e) = ai_task_tx.send(summarization_task).await {
-                                log::error!(
+                if let Err(e) = ai_task_tx.send(summarization_task).await {
+                    log::error!(
                         "Could not send AI task for legis init emphasis summarization: {e:?}"
                     );
-                            }
-                        }
-                    }
-                    Err(e) => log::error!(
-                        "cannot extract text input from {:?} because of {e:?}",
-                        vote_result.documents
-                    ),
                 }
             }
         }

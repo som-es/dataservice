@@ -1,6 +1,7 @@
 use combx::{download_ocr_models, GovProposal};
 use dataservice::{
-    DATABASE_URL, Shutdown, ai_task::AiTask, connect_pg, delegates::delegate_count, model_dir, services, setup_app_data
+    ai_task::AiTask, connect_pg, delegates::delegate_count, model_dir, services, setup_app_data,
+    Shutdown, DATABASE_URL,
 };
 use std::future::Future;
 use tokio::sync::{broadcast, mpsc};

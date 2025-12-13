@@ -4,13 +4,13 @@ use sqlx::PgPool;
 
 pub struct TaskArgs {
     pub db_entry_id: i32,
-    pub ai_task_input: String,
+    pub ai_task_input: Option<String>,
     pub pg_pool: PgPool,
     pub som_ai_client: Arc<somai_client::SomAiClient>,
 }
 
 pub struct AiTask {
-    pub input: String,
+    pub input: Option<String>,
     pub task_id: u64,
     pub db_entry_id: i32,
     pub task: Box<

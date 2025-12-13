@@ -1,9 +1,7 @@
 use image::{DynamicImage, ImageBuffer, Luma, Rgb};
 use lopdf::{Document, Object};
 
-pub fn extract_images_from_pdf(
-    contents: &[u8],
-) -> crate::Result<Vec<((u32, u16), DynamicImage)>> {
+pub fn extract_images_from_pdf(contents: &[u8]) -> crate::Result<Vec<((u32, u16), DynamicImage)>> {
     let doc = Document::load_mem(&contents)?;
     let mut collected_images = Vec::new();
 

@@ -33,7 +33,9 @@ pub mod combx {
 }
 
 pub const OCR_ENGINE: LazyCell<Option<Arc<ocrs::OcrEngine>>> = LazyCell::new(|| {
-    init_ocr_engine(&model_dir()).ok().map(|engine| Arc::new(engine))
+    init_ocr_engine(&model_dir())
+        .ok()
+        .map(|engine| Arc::new(engine))
 });
 
 use dotenvy_macro::dotenv;
