@@ -1,11 +1,16 @@
-use image::{DynamicImage, ImageBuffer, Luma, Rgb};
+use image::DynamicImage;
 use lopdf::{Document, Object};
+
+const MAX_IMAGE_COUNT: usize = 16; // MAX_IMAGE_COUNT pages of law de facto
 
 pub fn extract_images_from_pdf(contents: &[u8]) -> crate::Result<Vec<((u32, u16), DynamicImage)>> {
     let doc = Document::load_mem(&contents)?;
     let mut collected_images = Vec::new();
 
     for (_id, object) in &doc.objects {
+        if collected_images.len() >= MAX_IMAGE_COUNT {
+            break
+        }
         match object {
             Object::Stream(stream) => {
                 let is_image = stream
