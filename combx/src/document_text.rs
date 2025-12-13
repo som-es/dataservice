@@ -180,17 +180,13 @@ pub async fn extract_text_from_pdf_document(_url: &str) -> crate::Result<String>
     // TODO: store base url directly in the document url
     let url = format!("{}{}", AustriaScraper::BASE_URL, _url);
     let contents = reqwest::get(&url).await?.bytes().await?;
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| async {
+
+    let text = tokio::task::spawn_blocking(move || {
         pdf_extract::extract_text_from_mem(&contents)
-    })) {
-        Ok(extraction) => Ok(extraction.await?),
-        Err(e) => {
-            log::error!("Cannot extract pdf text contents for {url}. Error: {e:?}");
-            return Err(Box::new(crate::Error::Custom(format!(
-                "Cannot extract pdf text contents for {url}. Error: {e:?}"
-            ))));
-        }
-    }
+    })
+    .await??;
+
+    Ok(text)
 }
 
 pub async fn extract_text_from_original_pdf_document(
