@@ -248,7 +248,7 @@ pub async fn update_legis_inits_in_db(
             continue;
         }
         log::info!(
-            "Add legis init: {} {} {}",
+            "ADD legislative initiative: {} {} {}",
             legis_init.gp,
             legis_init.ityp,
             legis_init.inr
