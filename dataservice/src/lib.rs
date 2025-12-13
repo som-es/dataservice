@@ -32,8 +32,8 @@ pub mod combx {
     pub use combx::*;
 }
 
-pub const OCR_ENGINE: LazyCell<ocrs::OcrEngine> = LazyCell::new(|| {
-    init_ocr_engine(&model_dir()).unwrap()
+pub const OCR_ENGINE: LazyCell<Option<ocrs::OcrEngine>> = LazyCell::new(|| {
+    init_ocr_engine(&model_dir()).ok()
 });
 
 use dotenvy_macro::dotenv;

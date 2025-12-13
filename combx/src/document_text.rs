@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use ocrs::OcrEngine;
 use somes_common_lib::Document;
 use somes_scraper::{AustriaScraper, Scraper, TextExtractor};
 
@@ -33,7 +34,7 @@ pub fn combine_texts(documents: &[TextDocument]) -> String {
 
 const TOTAL_PROMPT_LENGTH: usize = 125000;
 
-pub async fn extract_text_from_documents_html_first(documents: &[Document]) -> Vec<TextDocument> {
+pub async fn extract_text_from_documents_html_first(documents: &[Document], ocr_engine: Option<&OcrEngine>) -> Vec<TextDocument> {
     let mut results = Vec::with_capacity(documents.len());
     let mut grouped_documents = HashMap::<String, Vec<Document>>::new();
     for document in documents {
@@ -49,7 +50,7 @@ pub async fn extract_text_from_documents_html_first(documents: &[Document]) -> V
         let mut try_extract_digital_pdf = false;
         match maybe_html {
             Some(html_doc) => {
-                if let Some(text) = extract_text_from_document(html_doc).await {
+                if let Some(text) = extract_text_from_document(html_doc, ocr_engine).await {
                     results.push(TextDocument {
                         document: html_doc.clone(),
                         text,
@@ -69,7 +70,7 @@ pub async fn extract_text_from_documents_html_first(documents: &[Document]) -> V
                 .iter()
                 .find(|x| x.document_type.as_deref() == Some("DigitalPDF"));
             if let Some(pdf_doc) = maybe_pdf {
-                if let Some(text) = extract_text_from_document(pdf_doc).await {
+                if let Some(text) = extract_text_from_document(pdf_doc, ocr_engine).await {
                     results.push(TextDocument {
                         document: pdf_doc.clone(),
                         text,
@@ -87,7 +88,8 @@ pub async fn extract_text_from_documents_html_first(documents: &[Document]) -> V
                 .iter()
                 .find(|x| x.document_type.as_deref() == Some("OriginalPDF"));
             if let Some(orig_pdf_doc) = maybe_orig_pdf {
-                if let Some(text) = extract_text_from_document(orig_pdf_doc).await {
+                if let Some(text) = extract_text_from_document(orig_pdf_doc, ocr_engine).await {
+                    println!("Extracted text from OriginalPDF document: {}", &text[..800.min(text.len())]);
                     results.push(TextDocument {
                         document: orig_pdf_doc.clone(),
                         text,
@@ -118,10 +120,10 @@ pub async fn extract_text_from_documents_html_first(documents: &[Document]) -> V
         .collect()
 }
 
-pub async fn extract_text_from_documents(documents: &[Document]) -> Vec<TextDocument> {
+pub async fn extract_text_from_documents(documents: &[Document], ocr_engine: Option<&OcrEngine>) -> Vec<TextDocument> {
     let mut results = Vec::with_capacity(documents.len());
     for document in documents {
-        let Some(text) = extract_text_from_document(document).await else {
+        let Some(text) = extract_text_from_document(document, ocr_engine).await else {
             continue;
         };
         results.push(TextDocument {
@@ -132,7 +134,7 @@ pub async fn extract_text_from_documents(documents: &[Document]) -> Vec<TextDocu
     results
 }
 
-pub async fn extract_text_from_document(document: &Document) -> Option<String> {
+pub async fn extract_text_from_document(document: &Document, ocr_engine: Option<&OcrEngine>) -> Option<String> {
     let document_url = document.document_url.as_ref()?;
     let document_type = document.document_type.as_ref()?;
     match document_type.as_str() {
@@ -144,7 +146,13 @@ pub async fn extract_text_from_document(document: &Document) -> Option<String> {
                 None
             }
         },
-        "OriginalPDF" => None,
+        "OriginalPDF" => match extract_text_from_original_pdf_document(document_url.as_str(), ocr_engine?).await {
+            Ok(text) => Some(text),
+            Err(e) => {
+                log::error!("Cannot process original document {document:?} because of {e:?}");
+                None
+            }
+        },
         _ => None,
     }
 }
@@ -171,15 +179,14 @@ pub async fn extract_text_from_pdf_document(_url: &str) -> crate::Result<String>
     }
 }
 
-pub async fn extract_text_from_original_pdf_document(_url: &str) -> crate::Result<String> {
+pub async fn extract_text_from_original_pdf_document(_url: &str, ocr_engine: &OcrEngine) -> crate::Result<String> {
     // TODO: store base url directly in the document url
     let url = format!("{}{}", AustriaScraper::BASE_URL, _url);
     let contents = reqwest::get(&url).await?.bytes().await?;
     let images = extract_images_from_pdf(&contents).await?;
     images.into_iter().rev().map(|(_, img)| {
-        // image_to_text(img, engine)
-    });
-    todo!()
+        image_to_text(img, ocr_engine)
+    }).collect()
 }
 #[cfg(test)]
 mod tests {
@@ -237,7 +244,7 @@ der Abgeordnete";
                 document_url: Some("/dokument/XXVIII/A/468/fname_1715462.pdf".to_string()),
             },
         ];
-        let text_documents = extract_text_from_documents_html_first(&documents).await;
+        let text_documents = extract_text_from_documents_html_first(&documents, None).await;
         assert_eq!(text_documents.len(), 2);
         assert_eq!(
             text_documents[0].document.title.as_deref(),
@@ -263,7 +270,7 @@ der Abgeordnete";
             document_type: Some("HTML".to_string()),
             document_url: Some("/dokument/XXVIII/III/257/fnameorig_1723642.html".to_string()),
         }];
-        let text_documents = extract_text_from_documents_html_first(&documents).await;
+        let text_documents = extract_text_from_documents_html_first(&documents, None).await;
         let input = combine_texts(&text_documents);
         dbg!(input);
     }

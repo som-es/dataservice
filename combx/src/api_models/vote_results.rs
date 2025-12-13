@@ -243,22 +243,22 @@ impl VoteResult {
             .collect::<Vec<_>>();
 
         if let Some(somai_client) = somai_client {
-            let document_texts =
-                combine_texts(&extract_text_from_documents_html_first(&documents).await);
+            // let document_texts =
+            //     combine_texts(&extract_text_from_documents_html_first(&documents).await);
             // if db_legis_init.emphasis.is_none()  {
             //     db_legis_init.emphasis = Some(somai_client.make_emphasis_prediction(document_texts.clone()).await);
             // }
             if eurovoc_topics.is_empty() {
                 // check if there are already stored in db to avoid expensive model call?
 
-                eurovoc_topics = somai_client
-                    .make_topics_predictions(document_texts.clone())
-                    .await
-                    .unwrap()
-                    .topics
-                    .into_iter()
-                    .map(|topic| Topic { topic })
-                    .collect();
+                // eurovoc_topics = somai_client
+                //     .make_topics_predictions(document_texts.clone())
+                //     .await
+                //     .unwrap()
+                //     .topics
+                //     .into_iter()
+                //     .map(|topic| Topic { topic })
+                //     .collect();
                 panic!()
             }
         }
@@ -380,7 +380,7 @@ mod tests {
         );
 
         let document_texts =
-            combine_texts(&extract_text_from_documents_html_first(&documents).await);
+            combine_texts(&extract_text_from_documents_html_first(&documents, None).await);
 
         println!(
             "document_texts: {}",
