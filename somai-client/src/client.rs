@@ -12,6 +12,7 @@ pub struct SomAiClient {
     token: RwLock<String>,
     token_created: RwLock<Instant>,
     client: Client,
+    is_local: bool,
 }
 
 impl SomAiClient {
@@ -28,6 +29,7 @@ impl SomAiClient {
             token: RwLock::new(String::new()),
             token_created: RwLock::new(Instant::now() - Duration::from_secs(3600)),
             client,
+            is_local: false
         };
         somai.relogin().await?;
         Ok(somai)
@@ -42,6 +44,7 @@ impl SomAiClient {
             token: RwLock::new(String::new()),
             token_created: RwLock::new(Instant::now() - Duration::from_secs(3600)),
             client,
+            is_local: true
         };
         somai.local_login().await?;
         Ok(somai)
@@ -61,6 +64,13 @@ impl SomAiClient {
             *token_created_guard = Instant::now();
         }
         Ok(())
+    }
+    pub async fn login(&self)  -> Result<(), reqwest::Error> {
+        if self.is_local {
+            self.local_login().await
+        } else {
+            self.relogin().await
+        }
     }
 
     pub async fn relogin(&self) -> Result<(), reqwest::Error> {
@@ -85,7 +95,7 @@ impl SomAiClient {
     }
 
     async fn auth_header(&self) -> String {
-        self.relogin().await.unwrap();
+        self.login().await.unwrap();
         let token = self.token.read().await;
         format!("Bearer {}", token.as_str())
     }

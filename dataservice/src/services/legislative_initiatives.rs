@@ -366,7 +366,7 @@ pub async fn update_legis_inits_in_db(
             }
         }
 
-        let mut show_votes = legis_init.votes.clone();
+        let show_votes = legis_init.votes.clone();
 
         if legis_init.votes.is_empty() {
             if let Err(e) = sqlx::query!(
