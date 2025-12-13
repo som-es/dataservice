@@ -6,7 +6,7 @@ pub mod services;
 #[cfg(feature = "runner")]
 pub mod shutdown;
 
-use std::cell::LazyCell;
+use std::{cell::LazyCell, sync::Arc};
 
 use ::combx::init_ocr_engine;
 #[cfg(feature = "runner")]
@@ -32,8 +32,8 @@ pub mod combx {
     pub use combx::*;
 }
 
-pub const OCR_ENGINE: LazyCell<Option<ocrs::OcrEngine>> = LazyCell::new(|| {
-    init_ocr_engine(&model_dir()).ok()
+pub const OCR_ENGINE: LazyCell<Option<Arc<ocrs::OcrEngine>>> = LazyCell::new(|| {
+    init_ocr_engine(&model_dir()).ok().map(|engine| Arc::new(engine))
 });
 
 use dotenvy_macro::dotenv;

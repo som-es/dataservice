@@ -1,7 +1,7 @@
 use image::{DynamicImage, ImageBuffer, Luma, Rgb};
 use lopdf::{Document, Object};
 
-pub async fn extract_images_from_pdf(
+pub fn extract_images_from_pdf(
     contents: &[u8],
 ) -> crate::Result<Vec<((u32, u16), DynamicImage)>> {
     let doc = Document::load_mem(&contents)?;
@@ -76,6 +76,6 @@ mod tests {
 
         let url2 = "https://parlament.gv.at/dokument/XXVIII/A/644/imfname_1729196.pdf";
         let contents2 = reqwest::get(url2).await.unwrap().bytes().await.unwrap();
-        extract_images_from_pdf(&contents2).await.unwrap();
+        extract_images_from_pdf(&contents2).unwrap();
     }
 }

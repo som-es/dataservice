@@ -340,10 +340,11 @@ pub async fn update_legis_inits_in_db(
         if let Some(ai_task_tx) = &ai_task_tx {
             if db_legis_init.is_voteable_on {
                 let documents = vote_result.documents.clone();
+                
                 match tokio::spawn(async move {
                     use crate::OCR_ENGINE;
 
-                    combine_texts(&extract_text_from_documents_html_first(&documents, OCR_ENGINE.as_ref()).await)
+                    combine_texts(&extract_text_from_documents_html_first(&documents, OCR_ENGINE.clone()).await)
                 })
                 .await
                 {

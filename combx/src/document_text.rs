@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use ocrs::OcrEngine;
 use somes_common_lib::Document;
@@ -34,7 +34,7 @@ pub fn combine_texts(documents: &[TextDocument]) -> String {
 
 const TOTAL_PROMPT_LENGTH: usize = 125000;
 
-pub async fn extract_text_from_documents_html_first(documents: &[Document], ocr_engine: Option<&OcrEngine>) -> Vec<TextDocument> {
+pub async fn extract_text_from_documents_html_first(documents: &[Document], ocr_engine: Option<Arc<OcrEngine>>) -> Vec<TextDocument> {
     let mut results = Vec::with_capacity(documents.len());
     let mut grouped_documents = HashMap::<String, Vec<Document>>::new();
     for document in documents {
@@ -50,7 +50,7 @@ pub async fn extract_text_from_documents_html_first(documents: &[Document], ocr_
         let mut try_extract_digital_pdf = false;
         match maybe_html {
             Some(html_doc) => {
-                if let Some(text) = extract_text_from_document(html_doc, ocr_engine).await {
+                if let Some(text) = extract_text_from_document(html_doc, ocr_engine.clone()).await {
                     results.push(TextDocument {
                         document: html_doc.clone(),
                         text,
@@ -70,7 +70,7 @@ pub async fn extract_text_from_documents_html_first(documents: &[Document], ocr_
                 .iter()
                 .find(|x| x.document_type.as_deref() == Some("DigitalPDF"));
             if let Some(pdf_doc) = maybe_pdf {
-                if let Some(text) = extract_text_from_document(pdf_doc, ocr_engine).await {
+                if let Some(text) = extract_text_from_document(pdf_doc, ocr_engine.clone()).await {
                     results.push(TextDocument {
                         document: pdf_doc.clone(),
                         text,
@@ -88,7 +88,7 @@ pub async fn extract_text_from_documents_html_first(documents: &[Document], ocr_
                 .iter()
                 .find(|x| x.document_type.as_deref() == Some("OriginalPDF"));
             if let Some(orig_pdf_doc) = maybe_orig_pdf {
-                if let Some(text) = extract_text_from_document(orig_pdf_doc, ocr_engine).await {
+                if let Some(text) = extract_text_from_document(orig_pdf_doc, ocr_engine.clone()).await {
                     // println!("Extracted text from OriginalPDF document: {}", &text[..800.min(text.len())]);
                     results.push(TextDocument {
                         document: orig_pdf_doc.clone(),
@@ -120,10 +120,10 @@ pub async fn extract_text_from_documents_html_first(documents: &[Document], ocr_
         .collect()
 }
 
-pub async fn extract_text_from_documents(documents: &[Document], ocr_engine: Option<&OcrEngine>) -> Vec<TextDocument> {
+pub async fn extract_text_from_documents(documents: &[Document], ocr_engine: Option<Arc<OcrEngine>>) -> Vec<TextDocument> {
     let mut results = Vec::with_capacity(documents.len());
     for document in documents {
-        let Some(text) = extract_text_from_document(document, ocr_engine).await else {
+        let Some(text) = extract_text_from_document(document, ocr_engine.clone()).await else {
             continue;
         };
         results.push(TextDocument {
@@ -134,7 +134,7 @@ pub async fn extract_text_from_documents(documents: &[Document], ocr_engine: Opt
     results
 }
 
-pub async fn extract_text_from_document(document: &Document, ocr_engine: Option<&OcrEngine>) -> Option<String> {
+pub async fn extract_text_from_document(document: &Document, ocr_engine: Option<Arc<OcrEngine>>) -> Option<String> {
     let document_url = document.document_url.as_ref()?;
     let document_type = document.document_type.as_ref()?;
     match document_type.as_str() {
@@ -179,14 +179,17 @@ pub async fn extract_text_from_pdf_document(_url: &str) -> crate::Result<String>
     }
 }
 
-pub async fn extract_text_from_original_pdf_document(_url: &str, ocr_engine: &OcrEngine) -> crate::Result<String> {
+pub async fn extract_text_from_original_pdf_document(_url: &str, ocr_engine: Arc<OcrEngine>) -> crate::Result<String> {
     // TODO: store base url directly in the document url
     let url = format!("{}{}", AustriaScraper::BASE_URL, _url);
     let contents = reqwest::get(&url).await?.bytes().await?;
-    let images = extract_images_from_pdf(&contents).await?;
-    images.into_iter().rev().map(|(_, img)| {
-        image_to_text(img, ocr_engine)
-    }).collect()
+    tokio::task::spawn_blocking(move || {
+
+        let images = extract_images_from_pdf(&contents)?;
+        images.into_iter().rev().map(|(_, img)| {
+            image_to_text(img, &ocr_engine)
+        }).collect::<crate::Result<String>>()
+    }).await?
 }
 #[cfg(test)]
 mod tests {
