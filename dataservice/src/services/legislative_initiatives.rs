@@ -777,7 +777,7 @@ pub async fn run_shut_every_gp(
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative scraper");
 
-                    legis_init_once(false, true, &pg_pool, None, ai_task_ts.clone()).await;
+                    legis_init_once(false, false, &pg_pool, None, ai_task_ts.clone()).await;
                 }).await {
                     log::error!("Error in legislative initiative scraper: {:?}", e);
                 }
