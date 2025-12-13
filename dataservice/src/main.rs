@@ -72,7 +72,7 @@ pub async fn run_services(state: &State) {
             pool.clone(),
             ai_task_tx.clone(),
         )),
-        tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
+        /*tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone(),
             new_vote_result_tx.clone(),
@@ -80,7 +80,7 @@ pub async fn run_services(state: &State) {
             latest_legis_init_sleep + 150,
             true,
             false,
-        )),
+        )),*/
         tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone(),
