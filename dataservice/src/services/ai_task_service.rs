@@ -38,7 +38,8 @@ pub async fn ai_tasks_service(
                 pg_pool: pg_pool.clone(),
                 som_ai_client: somai_client.clone(),
             };
-            if let Err(e) = (ai_task.task)(task_args).await {
+
+            if let Err(e) = tokio::spawn((ai_task.task)(task_args)).await {
                 log::error!(
                     "Cannot process ai task: {:?}, {:?}, Error: {e:?}",
                     ai_task.db_entry_id,

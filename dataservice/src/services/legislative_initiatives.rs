@@ -347,7 +347,10 @@ pub async fn update_legis_inits_in_db(
                 {
                     Ok(input) => {
                         if input.is_empty() {
-                            log::error!("Cannot summarize legis init, input is empty for documents: {:?}", vote_result.documents);
+                            log::error!(
+                                "Cannot summarize legis init, input is empty for documents: {:?}",
+                                vote_result.documents
+                            );
                         } else {
                             let summarization_task = AiTask {
                                 input,
