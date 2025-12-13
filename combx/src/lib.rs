@@ -9,6 +9,8 @@ pub use api_models::*;
 pub mod document_text;
 mod gov_officials;
 pub use gov_officials::*;
+mod pdf;
+pub use pdf::*;
 
 use sqlx::{PgPool, postgres::PgPoolOptions};
 

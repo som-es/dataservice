@@ -348,7 +348,7 @@ pub async fn update_legis_inits_in_db(
                     Ok(input) => {
                         if input.is_empty() {
                             log::error!(
-                                "Cannot summarize legis init, input is empty for documents: {:?}",
+                                "Cannot summarize legis init {legis_init_id}, input is empty for documents: {:?}",
                                 vote_result.documents
                             );
                         } else {
@@ -622,6 +622,20 @@ pub async fn update_legis_inits_in_db(
             };
         }
 
+        let mut tx = pool.begin().await.unwrap();
+
+        if let Err(e) = sqlx::query!(
+            "delete from legislative_documents where legislative_initiatives_id = $1",
+            legis_init_id
+        )
+        .execute(&mut *tx)
+        .await 
+        {
+            log::error!(
+                "Error deleting old documents for legis init id {legis_init_id}: {e:?}"
+            );
+        }
+
         for document in &vote_result.documents {
             if let Err(e) = sqlx::query!(
                 "
@@ -640,11 +654,14 @@ pub async fn update_legis_inits_in_db(
                 document.document_type,
                 document.document_url
             )
-            .execute(pool)
+            .execute(&mut *tx)
             .await
             {
                 log::error!("Error inserting document: '{:?}'. The error occurred for the following document: {:?}", e, document);
             }
+        }
+        if let Err(e) = tx.commit().await {
+            log::error!("Cannot commit legis init document transaction: {e:?}");
         }
 
         if let Err(e) = sqlx::query!(

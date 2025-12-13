@@ -18,6 +18,8 @@ somes-common-lib = { path = "../../somes/somes-common-lib" }
 somes-macro = { path = "../../somes/somes-macro" }
 optional_struct = "0.5"
 pdf-extract = "0.10.0"
+lopdf = "0.38.0"
+image = "0.25.9"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["tokio-macros", "macros", "rt", "rt-multi-thread", "signal"] }

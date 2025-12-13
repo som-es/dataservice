@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use somes_common_lib::Document;
 use somes_scraper::{AustriaScraper, Scraper, TextExtractor};
 
+#[derive(Debug)]
 pub struct TextDocument {
     pub document: Document,
     pub text: String,
@@ -12,8 +13,14 @@ pub fn combine_texts(documents: &[TextDocument]) -> String {
     documents
         .iter()
         .map(|doc| {
+            let important_marker = if doc.document.title == Some("Gesetzestext".to_string()) {
+                "analysiere diesen Gesetzestext besonders sorgfältig und ausführlich."
+            } else {
+                ""
+            };
+
             format!(
-                "{}\n {}",
+                "{} - {important_marker}\n {}",
                 doc.document.title.as_deref().unwrap_or(""),
                 doc.text
             )
@@ -22,7 +29,7 @@ pub fn combine_texts(documents: &[TextDocument]) -> String {
         .join(" ")
 }
 
-const TOTAL_PROMPT_LENGTH: usize = 130000;
+const TOTAL_PROMPT_LENGTH: usize = 125000;
 
 pub async fn extract_text_from_documents_html_first(documents: &[Document]) -> Vec<TextDocument> {
     let mut results = Vec::with_capacity(documents.len());
@@ -70,6 +77,15 @@ pub async fn extract_text_from_documents_html_first(documents: &[Document]) -> V
 
     results.sort_by(|a, b| b.text.len().cmp(&a.text.len()));
 
+    // move document called "Gesetzestext" to the front if exists
+    if let Some(pos) = results
+        .iter()
+        .position(|doc| doc.document.title.as_deref() == Some("Gesetzestext"))
+    {
+        let doc = results.remove(pos);
+        results.insert(0, doc);
+    }   
+
     let mut acc_text_length = 0;
     results.into_iter().filter(|doc| {
         acc_text_length += doc.text.len();
@@ -97,12 +113,15 @@ pub async fn extract_text_from_document(document: &Document) -> Option<String> {
     match document_type.as_str() {
         "HTML" => extract_text_from_html_document(document_url.as_str()).await,
         "DigitalPDF" => match extract_text_from_pdf_document(document_url.as_str()).await {
-            Ok(text) => return Some(text),
+            Ok(text) => Some(text),
             Err(e) => {
                 log::error!("Cannot process document {document:?} because of {e:?}");
-                return None;
+                None
             }
         },
+        "OriginalPDF" => { 
+            None
+        }
         _ => None,
     }
 }
@@ -202,5 +221,19 @@ der Abgeordnete";
         //         &text_doc.text[..300.min(text_doc.text.len())]
         //     );
         // }
+    }
+
+    #[tokio::test]
+    async fn test_extract_text_from_specific_html() {
+        let documents = vec![
+            Document {
+                title: Some("Test HTML Document".to_string()),
+                document_type: Some("HTML".to_string()),
+                document_url: Some("/dokument/XXVIII/III/257/fnameorig_1723642.html".to_string()),
+            },
+        ];
+        let text_documents = extract_text_from_documents_html_first(&documents).await;
+        let input = combine_texts(&text_documents);
+        dbg!(input);
     }
 }
