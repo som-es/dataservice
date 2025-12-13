@@ -325,7 +325,7 @@ pub async fn insert_mandate(
         is_ministry: mandate.is_ministry,
         function: mandate.function.clone(),
     };
-    if name_lowercase.contains("abgeordnete") {
+    if name_lowercase.contains("abgeordnete") && mandate.function.as_deref() != Some("AH") {
         if !mandate.is_nr {
             log::error!("Mandate name contains 'abgeordnete' but is isn't set to is_nr: {db_mandate:?}");
         }
