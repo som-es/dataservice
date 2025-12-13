@@ -338,20 +338,30 @@ pub async fn update_legis_inits_in_db(
 
         #[cfg(feature = "ai")]
         if let Some(ai_task_tx) = &ai_task_tx {
-            if db_legis_init.gp.as_str() == "XXVIII" {
-                let summarization_task = AiTask {
-                    input: combine_texts(
-                        &extract_text_from_documents_html_first(&vote_result.documents).await,
-                    ),
-                    task_id: crate::hash!(),
-                    db_entry_id: legis_init_id,
-                    task: Box::new(|task_args| Box::pin(ai_tasks::summarize_laws(task_args))),
-                };
+            if db_legis_init.is_voteable_on {
+                let documents = vote_result.documents.clone();
+                match tokio::spawn(async move {
+                    combine_texts(&extract_text_from_documents_html_first(&documents).await)
+                })
+                .await
+                {
+                    Ok(input) => {
+                        let summarization_task = AiTask {
+                            input,
+                            task_id: crate::hash!(),
+                            db_entry_id: legis_init_id,
+                            task: Box::new(|task_args| {
+                                Box::pin(ai_tasks::summarize_laws(task_args))
+                            }),
+                        };
 
-                if let Err(e) = ai_task_tx.send(summarization_task).await {
-                    log::error!(
+                        if let Err(e) = ai_task_tx.send(summarization_task).await {
+                            log::error!(
                         "Could not send AI task for legis init emphasis summarization: {e:?}"
                     );
+                        }
+                    }
+                    Err(e) => log::error!("cannot extract text input from {:?} because of {e:?}", vote_result.documents),
                 }
             }
         }

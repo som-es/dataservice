@@ -88,7 +88,13 @@ pub async fn extract_text_from_document(document: &Document) -> Option<String> {
     let document_type = document.document_type.as_ref()?;
     match document_type.as_str() {
         "HTML" => extract_text_from_html_document(document_url.as_str()).await,
-        "DigitalPDF" => extract_text_from_pdf_document(document_url.as_str()).await,
+        "DigitalPDF" => match extract_text_from_pdf_document(document_url.as_str()).await {
+            Ok(text) => return Some(text),
+            Err(e) => {
+                log::error!("Cannot process document {document:?} because of {e:?}");
+                return None;
+            },
+        }
         _ => None,
     }
 }
@@ -98,19 +104,21 @@ pub async fn extract_text_from_html_document(url: &str) -> Option<String> {
     text_extractor.extract_text_from_url(&url, None, true).await
 }
 
-pub async fn extract_text_from_pdf_document(_url: &str) -> Option<String> {
+pub async fn extract_text_from_pdf_document(_url: &str) -> crate::Result<String> {
     // TODO: store base url directly in the document url
-    let contents = reqwest::get(format!("{}{}", AustriaScraper::BASE_URL, _url))
-        .await
-        .ok()?
-        .bytes()
-        .await
-        .ok()?;
-    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        pdf_extract::extract_text_from_mem(&contents).ok()
-    }))
-    .ok()
-    .flatten()
+    let url = format!("{}{}", AustriaScraper::BASE_URL, _url);
+    let contents = reqwest::get(&url).await?.bytes().await?;
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| async {
+        pdf_extract::extract_text_from_mem(&contents)
+    })) {
+        Ok(extraction) => Ok(extraction.await?),
+        Err(e) => {
+            log::error!("Cannot extract pdf text contents for {url}. Error: {e:?}");
+            return Err(Box::new(crate::Error::Custom(format!(
+                "Cannot extract pdf text contents for {url}. Error: {e:?}"
+            ))));
+        }
+    }
 }
 
 #[cfg(test)]
@@ -120,7 +128,7 @@ mod tests {
     #[tokio::test]
     async fn test_extract_text_from_html_document() {
         let url = "/dokument/XXVIII/A/468/fname_1715462.pdf";
-        let text = extract_text_from_pdf_document(url).await;
+        let text = extract_text_from_pdf_document(url).await.ok();
         assert!(text.is_some());
         let text = text.unwrap();
         println!("Extracted text: {}", &text[..300.min(text.len())]);

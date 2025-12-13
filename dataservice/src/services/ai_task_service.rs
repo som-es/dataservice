@@ -14,11 +14,16 @@ pub async fn ai_tasks_service(
     pg_pool: PgPool,
     mut ai_task_rx: Receiver<AiTask>,
 ) {
-    let somai_client = Arc::new(
-        SomAiClient::new_local("http://127.0.0.1:8000")
-            .await
-            .unwrap(),
-    );
+    let mut somai_client = None;
+    while somai_client.is_none() {
+        let temp_somai_client = SomAiClient::new_local("http://127.0.0.1:8000").await;
+        if let Err(ref e) = temp_somai_client {
+            log::error!("Could not connect to somai API: {e}");
+            sleep(std::time::Duration::from_millis(10000)).await;
+        }
+        somai_client = temp_somai_client.ok()
+    }
+    let somai_client = Arc::new(somai_client.unwrap());
 
     #[cfg(feature = "ai")]
     while !shutdown.is_shutdown() {
