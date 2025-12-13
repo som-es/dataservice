@@ -47,6 +47,7 @@ pub struct DbLegislativeInitiativeQuery {
     pub gp: String,
     pub inr: i32,
     pub emphasis: Option<String>,
+    pub ai_emphasis: Option<String>,
     pub title: String,
     pub description: String,
     pub accepted: Option<String>,

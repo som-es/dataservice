@@ -22,6 +22,8 @@ pub fn combine_texts(documents: &[TextDocument]) -> String {
         .join(" ")
 }
 
+const TOTAL_PROMPT_LENGTH: usize = 130000;
+
 pub async fn extract_text_from_documents_html_first(documents: &[Document]) -> Vec<TextDocument> {
     let mut results = Vec::with_capacity(documents.len());
     let mut grouped_documents = HashMap::<String, Vec<Document>>::new();
@@ -66,7 +68,13 @@ pub async fn extract_text_from_documents_html_first(documents: &[Document]) -> V
         }
     }
 
-    results
+    results.sort_by(|a, b| b.text.len().cmp(&a.text.len()));
+
+    let mut acc_text_length = 0;
+    results.into_iter().filter(|doc| {
+        acc_text_length += doc.text.len();
+        acc_text_length <= TOTAL_PROMPT_LENGTH
+    }).collect()
 }
 
 pub async fn extract_text_from_documents(documents: &[Document]) -> Vec<TextDocument> {

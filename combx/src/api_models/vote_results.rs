@@ -114,6 +114,7 @@ impl VoteResult {
             title: legis_init.title.clone(),
             inr: legis_init.inr as i32,
             emphasis: legis_init.emphasis.clone(),
+            ai_emphasis: None,
             description: legis_init.description.clone(),
             ityp: legis_init.ityp.clone(),
             gp: legis_init.gp.clone(),
