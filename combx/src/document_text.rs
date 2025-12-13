@@ -93,8 +93,8 @@ pub async fn extract_text_from_document(document: &Document) -> Option<String> {
             Err(e) => {
                 log::error!("Cannot process document {document:?} because of {e:?}");
                 return None;
-            },
-        }
+            }
+        },
         _ => None,
     }
 }

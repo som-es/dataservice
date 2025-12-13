@@ -626,7 +626,7 @@ async fn insert_all_serially(pg_pool: PgPool) {
     let mut yes = 0;
     let mut no = 0;
 
-    std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false");
+    unsafe { std::env::set_var("SCRAPER_IGNORE_CACHE_XXVII", "false") };
     let mut all_speeches_count = 0;
     'outer: for gp in ["XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX"] {
         // 'outer: for gp in ["XXI", "XX"] {

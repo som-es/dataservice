@@ -346,22 +346,29 @@ pub async fn update_legis_inits_in_db(
                 .await
                 {
                     Ok(input) => {
-                        let summarization_task = AiTask {
-                            input,
-                            task_id: crate::hash!(),
-                            db_entry_id: legis_init_id,
-                            task: Box::new(|task_args| {
-                                Box::pin(ai_tasks::summarize_laws(task_args))
-                            }),
-                        };
+                        if input.is_empty() {
+                            log::error!("Cannot summarize legis init, input is empty for documents: {:?}", vote_result.documents);
+                        } else {
+                            let summarization_task = AiTask {
+                                input,
+                                task_id: crate::hash!(),
+                                db_entry_id: legis_init_id,
+                                task: Box::new(|task_args| {
+                                    Box::pin(ai_tasks::summarize_laws(task_args))
+                                }),
+                            };
 
-                        if let Err(e) = ai_task_tx.send(summarization_task).await {
-                            log::error!(
+                            if let Err(e) = ai_task_tx.send(summarization_task).await {
+                                log::error!(
                         "Could not send AI task for legis init emphasis summarization: {e:?}"
                     );
+                            }
                         }
                     }
-                    Err(e) => log::error!("cannot extract text input from {:?} because of {e:?}", vote_result.documents),
+                    Err(e) => log::error!(
+                        "cannot extract text input from {:?} because of {e:?}",
+                        vote_result.documents
+                    ),
                 }
             }
         }
