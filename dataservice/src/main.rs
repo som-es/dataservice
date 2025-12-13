@@ -1,6 +1,6 @@
-use combx::GovProposal;
+use combx::{download_ocr_models, GovProposal};
 use dataservice::{
-    ai_task::AiTask, connect_pg, delegates::delegate_count, services, Shutdown, DATABASE_URL,
+    DATABASE_URL, Shutdown, ai_task::AiTask, connect_pg, delegates::delegate_count, model_dir, services, setup_app_data
 };
 use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
@@ -14,6 +14,14 @@ async fn main() {
     // })
     // .await;
     // tokio::join!(services::proposals::run(),);
+
+    if let Err(e) = setup_app_data().await {
+        log::error!("Cannot create app data directory: {e:?}");
+    }
+
+    if let Err(e) = download_ocr_models(&model_dir()).await {
+        log::error!("Cannot download ocr models: {e:?}");
+    }
 
     tokio::spawn(async move {
         run(tokio::signal::ctrl_c()).await;

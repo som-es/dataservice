@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use somes_common_lib::Document;
 use somes_scraper::{AustriaScraper, Scraper, TextExtractor};
 
+use crate::{extract_images_from_pdf, image_to_text, pdf};
+
 #[derive(Debug)]
 pub struct TextDocument {
     pub document: Document,
@@ -44,7 +46,7 @@ pub async fn extract_text_from_documents_html_first(documents: &[Document]) -> V
         let maybe_html = docs
             .iter()
             .find(|x| x.document_type.as_deref() == Some("HTML"));
-        let mut try_extract_pdf = false;
+        let mut try_extract_digital_pdf = false;
         match maybe_html {
             Some(html_doc) => {
                 if let Some(text) = extract_text_from_document(html_doc).await {
@@ -53,14 +55,16 @@ pub async fn extract_text_from_documents_html_first(documents: &[Document]) -> V
                         text,
                     });
                 } else {
-                    try_extract_pdf = true;
+                    try_extract_digital_pdf = true;
                 }
             }
             None => {
-                try_extract_pdf = true;
+                try_extract_digital_pdf = true;
             }
         }
-        if try_extract_pdf {
+
+        let mut try_extract_original_pdf = false;
+        if try_extract_digital_pdf {
             let maybe_pdf = docs
                 .iter()
                 .find(|x| x.document_type.as_deref() == Some("DigitalPDF"));
@@ -68,6 +72,24 @@ pub async fn extract_text_from_documents_html_first(documents: &[Document]) -> V
                 if let Some(text) = extract_text_from_document(pdf_doc).await {
                     results.push(TextDocument {
                         document: pdf_doc.clone(),
+                        text,
+                    });
+                } else {
+                    try_extract_original_pdf = true;
+                }
+            } else {
+                try_extract_original_pdf = true;
+            }
+        }
+
+        if try_extract_original_pdf {
+            let maybe_orig_pdf = docs
+                .iter()
+                .find(|x| x.document_type.as_deref() == Some("OriginalPDF"));
+            if let Some(orig_pdf_doc) = maybe_orig_pdf {
+                if let Some(text) = extract_text_from_document(orig_pdf_doc).await {
+                    results.push(TextDocument {
+                        document: orig_pdf_doc.clone(),
                         text,
                     });
                 }
@@ -84,13 +106,16 @@ pub async fn extract_text_from_documents_html_first(documents: &[Document]) -> V
     {
         let doc = results.remove(pos);
         results.insert(0, doc);
-    }   
+    }
 
     let mut acc_text_length = 0;
-    results.into_iter().filter(|doc| {
-        acc_text_length += doc.text.len();
-        acc_text_length <= TOTAL_PROMPT_LENGTH
-    }).collect()
+    results
+        .into_iter()
+        .filter(|doc| {
+            acc_text_length += doc.text.len();
+            acc_text_length <= TOTAL_PROMPT_LENGTH
+        })
+        .collect()
 }
 
 pub async fn extract_text_from_documents(documents: &[Document]) -> Vec<TextDocument> {
@@ -119,9 +144,7 @@ pub async fn extract_text_from_document(document: &Document) -> Option<String> {
                 None
             }
         },
-        "OriginalPDF" => { 
-            None
-        }
+        "OriginalPDF" => None,
         _ => None,
     }
 }
@@ -148,6 +171,16 @@ pub async fn extract_text_from_pdf_document(_url: &str) -> crate::Result<String>
     }
 }
 
+pub async fn extract_text_from_original_pdf_document(_url: &str) -> crate::Result<String> {
+    // TODO: store base url directly in the document url
+    let url = format!("{}{}", AustriaScraper::BASE_URL, _url);
+    let contents = reqwest::get(&url).await?.bytes().await?;
+    let images = extract_images_from_pdf(&contents).await?;
+    images.into_iter().rev().map(|(_, img)| {
+        // image_to_text(img, engine)
+    });
+    todo!()
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -225,13 +258,11 @@ der Abgeordnete";
 
     #[tokio::test]
     async fn test_extract_text_from_specific_html() {
-        let documents = vec![
-            Document {
-                title: Some("Test HTML Document".to_string()),
-                document_type: Some("HTML".to_string()),
-                document_url: Some("/dokument/XXVIII/III/257/fnameorig_1723642.html".to_string()),
-            },
-        ];
+        let documents = vec![Document {
+            title: Some("Test HTML Document".to_string()),
+            document_type: Some("HTML".to_string()),
+            document_url: Some("/dokument/XXVIII/III/257/fnameorig_1723642.html".to_string()),
+        }];
         let text_documents = extract_text_from_documents_html_first(&documents).await;
         let input = combine_texts(&text_documents);
         dbg!(input);

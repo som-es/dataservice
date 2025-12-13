@@ -20,6 +20,10 @@ optional_struct = "0.5"
 pdf-extract = "0.10.0"
 lopdf = "0.38.0"
 image = "0.25.9"
+ocrs = { workspace = true }
+rten = { version = "0.22.0", default-features = false }
+rten-imageproc = { version = "0.22.0" }
+rten-tensor = { version = "0.22.0" }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["tokio-macros", "macros", "rt", "rt-multi-thread", "signal"] }

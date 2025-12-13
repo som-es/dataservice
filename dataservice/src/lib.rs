@@ -6,6 +6,9 @@ pub mod services;
 #[cfg(feature = "runner")]
 pub mod shutdown;
 
+use std::cell::LazyCell;
+
+use ::combx::init_ocr_engine;
 #[cfg(feature = "runner")]
 pub use services::*;
 
@@ -29,7 +32,28 @@ pub mod combx {
     pub use combx::*;
 }
 
+pub const OCR_ENGINE: LazyCell<ocrs::OcrEngine> = LazyCell::new(|| {
+    init_ocr_engine(&model_dir()).unwrap()
+});
+
 use dotenvy_macro::dotenv;
+
+#[cfg(feature = "runner")]
+pub async fn setup_app_data() -> tokio::io::Result<()> {
+    let home = std::env::var("HOME")
+        .map_err(|_| tokio::io::Error::from(tokio::io::ErrorKind::NotFound))?;
+    let path = format!("{}/.dataservice", home);
+
+    if tokio::fs::try_exists(&path).await? {
+        return Ok(());
+    }
+    tokio::fs::create_dir(&path).await
+}
+
+pub fn model_dir() -> String {
+    let home = std::env::var("HOME").expect("HOME env var must be set");
+    format!("{}/.dataservice", home)
+}
 
 pub const DATABASE_URL: &str = dotenv!("DATABASE_URL");
 pub const LATEST_GP: &str = dotenv!("LATEST_GP");

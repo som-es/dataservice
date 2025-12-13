@@ -629,11 +629,9 @@ pub async fn update_legis_inits_in_db(
             legis_init_id
         )
         .execute(&mut *tx)
-        .await 
+        .await
         {
-            log::error!(
-                "Error deleting old documents for legis init id {legis_init_id}: {e:?}"
-            );
+            log::error!("Error deleting old documents for legis init id {legis_init_id}: {e:?}");
         }
 
         for document in &vote_result.documents {
