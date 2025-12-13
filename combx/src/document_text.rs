@@ -89,7 +89,7 @@ pub async fn extract_text_from_documents_html_first(documents: &[Document], ocr_
                 .find(|x| x.document_type.as_deref() == Some("OriginalPDF"));
             if let Some(orig_pdf_doc) = maybe_orig_pdf {
                 if let Some(text) = extract_text_from_document(orig_pdf_doc, ocr_engine).await {
-                    println!("Extracted text from OriginalPDF document: {}", &text[..800.min(text.len())]);
+                    // println!("Extracted text from OriginalPDF document: {}", &text[..800.min(text.len())]);
                     results.push(TextDocument {
                         document: orig_pdf_doc.clone(),
                         text,

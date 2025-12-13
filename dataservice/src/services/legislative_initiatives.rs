@@ -348,9 +348,9 @@ pub async fn update_legis_inits_in_db(
                 .await
                 {
                     Ok(input) => {
-                        if input.is_empty() {
+                        if input.len() < 50 {
                             log::error!(
-                                "Cannot summarize legis init {legis_init_id}, input is empty for documents: {:?}",
+                                "Cannot summarize legis init {legis_init_id}, input is too short / empty for documents: {:?}",
                                 vote_result.documents
                             );
                         } else {
