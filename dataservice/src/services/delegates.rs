@@ -326,7 +326,9 @@ pub async fn insert_mandate(
         function: mandate.function.clone(),
     };
     if name_lowercase.contains("abgeordnete") {
-        assert!(mandate.is_nr);
+        if !mandate.is_nr {
+            log::error!("Mandate name contains 'abgeordnete' but is isn't set to is_nr: {db_mandate:?}");
+        }
     }
     if name_lowercase.contains("minister") || name_lowercase.contains("kanzler") {
         if !mandate.is_gov {
