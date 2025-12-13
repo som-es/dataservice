@@ -2,14 +2,15 @@ use crate::ai_task::TaskArgs;
 
 pub async fn summarize_laws(task_args: TaskArgs) -> combx::Result<()> {
     // is emphasis already generated/set? -> skip
-    if sqlx::query!(
-        "select emphasis from legislative_initiatives where id = $1",
+    let info = sqlx::query!(
+        "select emphasis, is_emphasis_ai_generated from legislative_initiatives where id = $1",
         task_args.db_entry_id
     )
     .fetch_one(&task_args.pg_pool)
-    .await?
-    .emphasis
-    .is_some()
+    .await?;
+    if info.emphasis
+    .is_some() 
+    && !info.is_emphasis_ai_generated // remove this again!
     {
         log::info!(
             "Skipping legis init emphasis summarization for id {}, already set.",
