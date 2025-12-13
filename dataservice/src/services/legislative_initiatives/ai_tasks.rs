@@ -8,10 +8,7 @@ pub async fn summarize_laws(task_args: TaskArgs) -> combx::Result<()> {
     )
     .fetch_one(&task_args.pg_pool)
     .await?;
-    if info.emphasis
-    .is_some() 
-    && !info.is_emphasis_ai_generated // remove this again!
-    {
+    if info.emphasis.is_some() {
         log::info!(
             "Skipping legis init emphasis summarization for id {}, already set.",
             task_args.db_entry_id
@@ -23,8 +20,9 @@ pub async fn summarize_laws(task_args: TaskArgs) -> combx::Result<()> {
         .summarize_input(task_args.ai_task_input, None)
         .await?;
 
-    let idx = output.summary.rfind("<|message|>").unwrap_or_default();
-    let summary = &output.summary[idx..];
+    let find = "<|message|>";
+    let idx = output.summary.rfind(find).unwrap_or_default();
+    let summary = &output.summary[idx + find.len()..];
     sqlx::query!(
         "UPDATE legislative_initiatives SET emphasis = $1, is_emphasis_ai_generated = true WHERE id = $2",
         summary,
