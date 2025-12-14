@@ -1,8 +1,8 @@
 use chrono::Days;
 use combx::{
-    document_text::{combine_texts, extract_text_from_documents_html_first},
-    DbReference, DbVote, PostgresEnhancer, VoteResult,
+    DbReference, DbVote, PostgresEnhancer, Topic, VoteResult, document_text::{combine_texts, extract_text_from_documents_html_first}
 };
+use somes_common_lib::Document;
 use tokio::{runtime::Handle, sync::mpsc::Sender};
 pub mod notify;
 mod voted_by_name_result;
@@ -10,8 +10,7 @@ use voted_by_name_result::*;
 mod ai_tasks;
 
 use somes_scraper::{
-    legis_init::{LegislativeInitiatives, LEGIS_IS_VOTEABLE_ON_DOKTYPES},
-    AustriaScraper, LegislativeInitiative,
+    AustriaScraper, LegislativeInitiative, RelatedDelegate, legis_init::{LEGIS_IS_VOTEABLE_ON_DOKTYPES, LegislativeInitiatives}
 };
 use sqlx::{postgres::PgQueryResult, query, Executor, PgPool, Postgres};
 use std::sync::{Arc, LazyLock};
@@ -232,17 +231,16 @@ impl StoredUpdatedAt for LegislativeInitiative {
     }
 }
 
+use sqlx::{Acquire, Transaction};
+
 pub async fn update_legis_inits_in_db(
     pool: &PgPool,
     new_legis_inits: &[LegislativeInitiative],
     new_legis_init: Option<Sender<Option<(i32, LegislativeInitiative)>>>,
     ai_task_tx: Option<Sender<AiTask>>,
 ) {
-    // if let Some(jetzt_party_info) = code_to_parties.get("J").cloned() {
-    //     code_to_parties.insert("P".to_string(), jetzt_party_info);
-    // }
-
-    for (i, legis_init) in new_legis_inits.iter().enumerate() {
+    let start = tokio::time::Instant::now();
+    for (_i, legis_init) in new_legis_inits.iter().enumerate() {
         if !crate::should_update(legis_init, pool).await {
             log::info!("No need to update!");
             continue;
@@ -254,16 +252,22 @@ pub async fn update_legis_inits_in_db(
             legis_init.inr
         );
 
+        let start = tokio::time::Instant::now();
         let mut vote_result =
             VoteResult::from_legis_init(PostgresEnhancer(pool.clone()), legis_init.clone(), None)
                 .await;
 
-        // println!("db_legis_init: {db_legis_init:?}");
-
-        // let maybe_legis_init_id = sqlx::query!("select id, created_at from legislative_initiatives where inr = $1 and ityp = $2 and gp = $3", db_legis_init.inr, db_legis_init.ityp, db_legis_init.gp).fetch_optional(pool).await;
+        log::info!("legis init to vote result conversion duration: {:?}", start.elapsed());
+        
         let db_legis_init = vote_result.legislative_initiative;
 
-        // let mut tx = pool.begin().await.unwrap();
+        let mut tx = match pool.begin().await {
+            Ok(t) => t,
+            Err(e) => {
+                log::error!("Failed to start transaction for legis init: {:?}", e);
+                continue;
+            }
+        };
 
         let legis_init_id = match sqlx::query!(
             "
@@ -324,7 +328,7 @@ pub async fn update_legis_inits_in_db(
             db_legis_init.is_urgent,
             db_legis_init.voting.map(|voting| voting.to_string()),
         )
-        .fetch_one(pool)
+        .fetch_one(&mut *tx)
         .await
         {
             Ok(record) => record.id,
@@ -360,9 +364,9 @@ pub async fn update_legis_inits_in_db(
             }
         }
 
-        for reference in vote_result.references_to.as_ref().unwrap_or(&vec![]) {
-            if let Err(e) = insert_reference(pool, reference, legis_init_id).await {
-                log::error!("Could not insert reference for legis init {legis_init_id}: {e:?}")
+        if let Some(refs) = vote_result.references_to.as_ref() {
+            if let Err(e) = insert_references_batch(&mut tx, refs, legis_init_id).await {
+                log::error!("Could not insert references for legis init {legis_init_id}: {e:?}")
             }
         }
 
@@ -373,7 +377,7 @@ pub async fn update_legis_inits_in_db(
                 "delete from votes where legislative_initiatives_id = $1",
                 legis_init_id
             )
-            .execute(pool)
+            .execute(&mut *tx)
             .await
             {
                 log::error!(
@@ -382,14 +386,14 @@ pub async fn update_legis_inits_in_db(
             }
         }
 
-        for vote in &vote_result.votes {
-            insert_vote(pool, vote, legis_init_id).await;
+        if let Err(e) = insert_votes_batch(&mut tx, &vote_result.votes, legis_init_id).await {
+             log::warn!("Error inserting votes: '{:?}'.", e);
         }
+
         if let Some(named_votes) = vote_result.named_votes {
             if let Ok(named_vote_info_id) =
-                insert_named_vote_info(pool, &named_votes.named_vote_info, legis_init_id).await
+                insert_named_vote_info(&mut *tx, &named_votes.named_vote_info, legis_init_id).await
             {
-                let mut tx = pool.begin().await.unwrap();
                 if let Err(e) = insert_named_votes(
                     &mut tx,
                     &named_votes.named_votes.as_ref().unwrap_or(&vec![]),
@@ -399,10 +403,6 @@ pub async fn update_legis_inits_in_db(
                 {
                     log::error!("Could not insert any named votes for legis init: {legis_init:?}, error: {e:?}")
                 }
-
-                if let Err(e) = tx.commit().await {
-                    log::error!("Cannot commit legis init transaction: {e:?}");
-                }
             }
         }
 
@@ -411,7 +411,7 @@ pub async fn update_legis_inits_in_db(
                 "select * from legis_email_info where already_sent_id = $1",
                 legis_init_id
             )
-            .fetch_optional(pool)
+            .fetch_optional(&mut *tx)
             .await
             {
                 let diff = today() - legis_init.date;
@@ -434,7 +434,7 @@ pub async fn update_legis_inits_in_db(
                         "insert into legis_email_info (already_sent_id) values ($1)",
                         legis_init_id
                     )
-                    .execute(pool)
+                    .execute(&mut *tx)
                     .await
                     {
                         log::error!(
@@ -445,205 +445,24 @@ pub async fn update_legis_inits_in_db(
             };
         }
 
-        // Usage of this is deprecated! Use plenar speeches! This will combine two or more speeches held from a single delegate (on conflict clause)
-        for speech in &vote_result.speeches {
-            let speech_id = match sqlx::query!(
-                "
-                    INSERT INTO speeches (
-                        delegate_id, infavor, legislative_initiatives_id, opinion
-                    ) VALUES (
-                        $1, $2, $3, $4
-                    ) ON CONFLICT (legislative_initiatives_id, delegate_id)
-                    DO UPDATE SET
-                        infavor = EXCLUDED.infavor,
-                        opinion = EXCLUDED.opinion
-                    RETURNING id
-                ",
-                speech.delegate_id,
-                speech.infavor,
-                legis_init_id,
-                speech.opinion,
-            )
-            .fetch_one(pool)
-            .await
-            {
-                Err(e) => {
-                    log::warn!("Error inserting speech, probably delegate does not exist in database and has got inactive recently: {:?}, for speech: {:?}", e, speech);
-                    continue;
-                }
-                Ok(id) => id.id,
-            };
-
-            for html_url in &speech.document_url {
-                if let Err(e) = sqlx::query!(
-                    "
-                    insert into speeches_html_urls(
-                        speech_id, document_url
-                    ) values (
-                        $1, $2
-                    ) on conflict (speech_id, document_url)
-                    do nothing;
-                ",
-                    speech_id,
-                    html_url
-                )
-                .execute(pool)
-                .await
-                {
-                    log::error!("could not insert speech html url: {e:?}")
-                }
-            }
+        if let Err(e) = insert_topics_batch(&mut tx, &vote_result.topics, legis_init_id).await {
+            log::error!("Error inserting topics for legis init {legis_init_id}: {e:?}");
         }
 
-        for topic in vote_result.topics.clone() {
-            if let Err(e) = sqlx::query!(
-                "
-                    INSERT INTO unique_topics (
-                        topic_name
-                    ) VALUES (
-                        $1
-                    ) ON CONFLICT (topic_name)
-                    DO NOTHING
-                ",
-                topic.topic,
-            )
-            .execute(pool)
-            .await
-            {
-                log::error!("Error inserting UNIQUE (parent) topic: '{:?}'. The error occurred for the following eurovoc topic: {:?}", e, topic);
-            }
-            if let Err(e) = sqlx::query!(
-                "
-                    INSERT INTO topics_legis_init (
-                        topic, legislative_initiatives_id
-                    ) VALUES (
-                        $1, $2
-                    ) ON CONFLICT (legislative_initiatives_id, topic)
-                    DO UPDATE SET
-                        topic = EXCLUDED.topic
-                ",
-                topic.topic,
-                legis_init_id
-            )
-            .execute(pool)
-            .await
-            {
-                log::error!("Error inserting topic: '{:?}'. The error occurred for the following topic: {:?}", e, topic);
-            }
+        if let Err(e) = insert_eurovoc_topics_batch(&mut tx, &vote_result.eurovoc_topics, legis_init_id).await {
+            log::error!("Error inserting eurovoc topics for legis init {legis_init_id}: {e:?}");
         }
 
-        for topic in vote_result.eurovoc_topics.clone() {
-            if let Err(e) = sqlx::query!(
-                "
-                    INSERT INTO unique_eurovoc_topics (
-                        topic_name
-                    ) VALUES (
-                        $1
-                    ) ON CONFLICT (topic_name)
-                    DO NOTHING
-                ",
-                topic.topic,
-            )
-            .execute(pool)
-            .await
-            {
-                log::error!("Error inserting UNIQUE (eurovoc) topic: '{:?}'. The error occurred for the following eurovoc topic: {:?}", e, topic);
-            }
-
-            if let Err(e) = sqlx::query!(
-                "
-                    INSERT INTO eurovoc_topics_legis_init (
-                        topic, legislative_initiatives_id
-                    ) VALUES (
-                        $1, $2
-                    ) ON CONFLICT (legislative_initiatives_id, topic)
-                    DO UPDATE SET
-                        topic = EXCLUDED.topic
-                ",
-                topic.topic,
-                legis_init_id,
-            )
-            .execute(pool)
-            .await
-            {
-                log::error!("Error inserting eurovoc topic: '{:?}'. The error occurred for the following eurovoc topic: {:?}", e, topic);
-            }
+        if let Err(e) = insert_delegates_batch(&mut tx, &legis_init.related_delegates, legis_init_id).await {
+            log::error!("Error inserting delegates for legis init {legis_init_id}: {e:?}");
         }
 
-        for delegate in &legis_init.related_delegates {
-            let res = sqlx::query!("insert into legis_init_delegates (legis_init_id, delegate_id, delegate_text) values ($1, $2, $3) on conflict (legis_init_id, delegate_id) do update set delegate_text = EXCLUDED.delegate_text",
-                legis_init_id, delegate.delegate_id as i32, delegate.text)
-            .execute(pool).await;
-            if let Err(e) = res {
-                log::error!(
-                    "Error inserting delegate into legis init delegates, 'eingebracht von': {e:?}"
-                )
-            }
+        if let Err(e) = insert_other_keyword_topics_batch(&mut tx, &vote_result.other_keyword_topics, legis_init_id).await {
+            log::error!("Error inserting other keyword topics for legis init {legis_init_id}: {e:?}");
         }
 
-        for topic in vote_result.other_keyword_topics.clone() {
-            let speech_id = match sqlx::query!(
-                "
-                    INSERT INTO other_keyword_topics_legis_init (
-                        topic, legislative_initiatives_id
-                    ) VALUES (
-                        $1, $2
-                    ) ON CONFLICT (legislative_initiatives_id, topic)
-                    DO UPDATE SET
-                        topic = EXCLUDED.topic
-                ",
-                topic.topic,
-                legis_init_id,
-            )
-            .execute(pool)
-            .await
-            {
-                Err(e) => {
-                    log::error!("Error inserting other keyword topic: '{:?}'. The error occurred for the following other keyword topic: {:?}", e, topic);
-                    continue;
-                }
-                Ok(id) => id,
-            };
-        }
-
-        let mut tx = pool.begin().await.unwrap();
-
-        if let Err(e) = sqlx::query!(
-            "delete from legislative_documents where legislative_initiatives_id = $1",
-            legis_init_id
-        )
-        .execute(&mut *tx)
-        .await
-        {
-            log::error!("Error deleting old documents for legis init id {legis_init_id}: {e:?}");
-        }
-
-        for document in &vote_result.documents {
-            if let Err(e) = sqlx::query!(
-                "
-                    INSERT INTO legislative_documents (
-                        legislative_initiatives_id, title, document_type, document_url
-                    ) VALUES (
-                        $1, $2, $3, $4
-                    ) ON CONFLICT (document_url, legislative_initiatives_id)
-                    DO UPDATE SET
-                        title = EXCLUDED.title,
-                        document_type = EXCLUDED.document_type,
-                        document_url = EXCLUDED.document_url
-                ",
-                legis_init_id,
-                document.title,
-                document.document_type,
-                document.document_url
-            )
-            .execute(&mut *tx)
-            .await
-            {
-                log::error!("Error inserting document: '{:?}'. The error occurred for the following document: {:?}", e, document);
-            }
-        }
-        if let Err(e) = tx.commit().await {
-            log::error!("Cannot commit legis init document transaction: {e:?}");
+        if let Err(e) = insert_documents_batch(&mut tx, &vote_result.documents, legis_init_id).await {
+             log::error!("Error inserting documents for legis init {legis_init_id}: {e:?}");
         }
 
         if let Err(e) = sqlx::query!(
@@ -655,52 +474,281 @@ pub async fn update_legis_inits_in_db(
             legis_init_id,
             crate::today_and_time().and_utc()
         )
-        .execute(pool)
+        .execute(&mut *tx)
         .await
         {
             log::error!("Error inserting was updated info: '{:?}'. The error occurred for the following legis init: {:?}", e, legis_init_id);
         }
+
+        if let Err(e) = tx.commit().await {
+            log::error!("Cannot commit legis init transaction: {e:?}");
+        }
+    }
+    log::info!("Insertion duration for legis init: {:?}", start.elapsed());
+}
+
+async fn insert_references_batch<'a>(
+    tx: &mut Transaction<'a, Postgres>,
+    references: &[DbReference],
+    legislative_initiatives_id: i32,
+) -> sqlx::Result<()> {
+    if references.is_empty() { return Ok(()); }
+    
+    let mut sp = tx.begin().await?;
+
+    let init_ids = vec![legislative_initiatives_id; references.len()];
+    let gps: Vec<String> = references.iter().map(|r| r.gp.clone()).collect();
+    let ityps: Vec<String> = references.iter().map(|r| r.ityp.clone()).collect();
+    let inrs: Vec<i32> = references.iter().map(|r| r.inr as i32).collect();
+
+    let res = sqlx::query!(
+        "INSERT INTO legis_inits_refs (origin_legis_init_id, ref_gp, ref_ityp, ref_inr) 
+         SELECT * FROM UNNEST($1::int4[], $2::text[], $3::text[], $4::int4[]) 
+         ON CONFLICT DO NOTHING",
+        &init_ids, &gps, &ityps, &inrs
+    )
+    .execute(&mut *sp)
+    .await;
+
+    match res {
+        Ok(_) => {
+            sp.commit().await?;
+            Ok(())
+        }
+        Err(e) => Err(e)
     }
 }
 
-async fn insert_reference<'a>(
-    pool: impl Executor<'a, Database = Postgres>,
-    reference: &DbReference,
-    legislative_initiatives_id: i32,
-) -> sqlx::Result<PgQueryResult> {
-    sqlx::query!("insert into legis_inits_refs (origin_legis_init_id, ref_gp, ref_ityp, ref_inr) values ($1, $2, $3, $4) on conflict do nothing", legislative_initiatives_id, reference.gp, reference.ityp, reference.inr as i32).execute(pool).await
+pub async fn insert_votes_batch<'a>(
+    tx: &mut Transaction<'a, Postgres>,
+    votes: &[DbVote],
+    legis_init_id: i32,
+) -> sqlx::Result<()> {
+    if votes.is_empty() { return Ok(()); }
+
+    let mut sp = tx.begin().await?;
+
+    let parties: Vec<String> = votes.iter().map(|v| v.party.clone()).collect();
+    let fractions: Vec<i32> = votes.iter().map(|v| v.fraction.clone()).collect();
+    let infavors: Vec<bool> = votes.iter().map(|v| v.infavor).collect();
+    let ids = vec![legis_init_id; votes.len()];
+
+    let res = sqlx::query!(
+        "
+            INSERT INTO votes (party, fraction, infavor, legislative_initiatives_id) 
+            SELECT * FROM UNNEST($1::text[], $2::int4[], $3::bool[], $4::int4[])
+            ON CONFLICT (legislative_initiatives_id, party)
+            DO UPDATE SET fraction = EXCLUDED.fraction, infavor = EXCLUDED.infavor
+        ",
+        &parties, &fractions, &infavors, &ids
+    )
+    .execute(&mut *sp)
+    .await;
+
+    match res {
+        Ok(_) => {
+            sp.commit().await?;
+            Ok(())
+        }
+        Err(e) => Err(e)
+    }
 }
 
-pub async fn insert_vote<'a>(
-    pool: impl Executor<'a, Database = Postgres>,
-    db_vote: &DbVote,
+async fn insert_topics_batch<'a>(
+    tx: &mut Transaction<'a, Postgres>,
+    topics: &[Topic],
     legis_init_id: i32,
-) {
+) -> sqlx::Result<()> {
+    if topics.is_empty() { return Ok(()); }
+
+    let mut sp = tx.begin().await?;
+
+    let topic_names: Vec<String> = topics.iter().map(|t| t.topic.clone()).collect();
+    let ids = vec![legis_init_id; topics.len()];
+
+    let r1 = sqlx::query!(
+        "INSERT INTO unique_topics (topic_name) 
+         SELECT * FROM UNNEST($1::text[]) 
+         ON CONFLICT (topic_name) DO NOTHING",
+        &topic_names
+    )
+    .execute(&mut *sp)
+    .await;
+
+    if let Err(e) = r1 { return Err(e); }
+
+    let r2 = sqlx::query!(
+        "INSERT INTO topics_legis_init (topic, legislative_initiatives_id) 
+         SELECT * FROM UNNEST($1::text[], $2::int4[]) 
+         ON CONFLICT (legislative_initiatives_id, topic) 
+         DO UPDATE SET topic = EXCLUDED.topic",
+        &topic_names, &ids
+    )
+    .execute(&mut *sp)
+    .await;
+
+    match r2 {
+        Ok(_) => {
+            sp.commit().await?;
+            Ok(())
+        }
+        Err(e) => Err(e)
+    }
+}
+
+async fn insert_eurovoc_topics_batch<'a>(
+    tx: &mut Transaction<'a, Postgres>,
+    topics: &[Topic],
+    legis_init_id: i32,
+) -> sqlx::Result<()> {
+    if topics.is_empty() { return Ok(()); }
+
+    let mut sp = tx.begin().await?;
+
+    let topic_names: Vec<String> = topics.iter().map(|t| t.topic.clone()).collect();
+    let ids = vec![legis_init_id; topics.len()];
+
+    let r1 = sqlx::query!(
+        "INSERT INTO unique_eurovoc_topics (topic_name) 
+         SELECT * FROM UNNEST($1::text[]) 
+         ON CONFLICT (topic_name) DO NOTHING",
+        &topic_names
+    )
+    .execute(&mut *sp)
+    .await;
+
+    if let Err(e) = r1 { return Err(e); }
+
+    let r2 = sqlx::query!(
+        "INSERT INTO eurovoc_topics_legis_init (topic, legislative_initiatives_id) 
+         SELECT * FROM UNNEST($1::text[], $2::int4[]) 
+         ON CONFLICT (legislative_initiatives_id, topic) 
+         DO UPDATE SET topic = EXCLUDED.topic",
+        &topic_names, &ids
+    )
+    .execute(&mut *sp)
+    .await;
+
+    match r2 {
+        Ok(_) => {
+            sp.commit().await?;
+            Ok(())
+        }
+        Err(e) => Err(e)
+    }
+}
+
+async fn insert_delegates_batch<'a>(
+    tx: &mut Transaction<'a, Postgres>,
+    delegates: &[RelatedDelegate],
+    legis_init_id: i32,
+) -> sqlx::Result<()> {
+    if delegates.is_empty() { return Ok(()); }
+
+    let mut sp = tx.begin().await?;
+
+    let ids = vec![legis_init_id; delegates.len()];
+    let delegate_ids: Vec<i32> = delegates.iter().map(|d| d.delegate_id as i32).collect();
+    let texts: Vec<Option<String>> = delegates.iter().map(|d| d.text.clone()).collect();
+
+    let res = sqlx::query!(
+        "INSERT INTO legis_init_delegates (legis_init_id, delegate_id, delegate_text) 
+         SELECT * FROM UNNEST($1::int4[], $2::int4[], $3::text[]) 
+         ON CONFLICT (legis_init_id, delegate_id) 
+         DO UPDATE SET delegate_text = EXCLUDED.delegate_text",
+        &ids, &delegate_ids, &texts as &[Option<String>]
+    )
+    .execute(&mut *sp)
+    .await;
+
+    match res {
+        Ok(_) => {
+            sp.commit().await?;
+            Ok(())
+        }
+        Err(e) => Err(e)
+    }
+}
+
+async fn insert_other_keyword_topics_batch<'a>(
+    tx: &mut Transaction<'a, Postgres>,
+    topics: &[Topic],
+    legis_init_id: i32,
+) -> sqlx::Result<()> {
+    if topics.is_empty() { return Ok(()); }
+
+    let mut sp = tx.begin().await?;
+
+    let topic_names: Vec<String> = topics.iter().map(|t| t.topic.clone()).collect();
+    let ids = vec![legis_init_id; topics.len()];
+
+    let res = sqlx::query!(
+        "INSERT INTO other_keyword_topics_legis_init (topic, legislative_initiatives_id) 
+         SELECT * FROM UNNEST($1::text[], $2::int4[]) 
+         ON CONFLICT (legislative_initiatives_id, topic) 
+         DO UPDATE SET topic = EXCLUDED.topic",
+        &topic_names, &ids
+    )
+    .execute(&mut *sp)
+    .await;
+
+    match res {
+        Ok(_) => {
+            sp.commit().await?;
+            Ok(())
+        }
+        Err(e) => Err(e)
+    }
+}
+
+async fn insert_documents_batch<'a>(
+    tx: &mut Transaction<'a, Postgres>,
+    documents: &[Document],
+    legis_init_id: i32,
+) -> sqlx::Result<()> {
+    let mut sp = tx.begin().await?;
+
     if let Err(e) = sqlx::query!(
-        "
-            INSERT INTO votes (
-                party, fraction, infavor, legislative_initiatives_id
-            ) VALUES (
-                $1, $2, $3, $4
-            ) ON CONFLICT (legislative_initiatives_id, party)
-            DO UPDATE SET
-                fraction = EXCLUDED.fraction,
-                infavor = EXCLUDED.infavor
-        ",
-        db_vote.party,
-        db_vote.fraction,
-        db_vote.infavor,
+        "delete from legislative_documents where legislative_initiatives_id = $1",
         legis_init_id
     )
-    .execute(pool)
-    .await
+    .execute(&mut *sp)
+    .await 
     {
-        log::warn!(
-            "Error inserting vote: '{:?}'. The error occurred for the following vote: {:?}",
-            e,
-            db_vote
-        );
+        return Err(e);
     }
+
+    let documents: Vec<&Document> = documents.iter()
+        .filter(|d| d.document_url.is_some())
+        .collect();
+
+    if !documents.is_empty() {
+        let titles: Vec<Option<String>> = documents.iter().map(|d| d.title.clone()).collect();
+        let types: Vec<Option<String>> = documents.iter().map(|d| d.document_type.clone()).collect();
+        let urls: Vec<Option<String>> = documents.iter().map(|d| d.document_url.clone()).collect();
+        let ids = vec![legis_init_id; titles.len()];
+
+        if let Err(e) = sqlx::query!(
+            "
+                INSERT INTO legislative_documents (legislative_initiatives_id, title, document_type, document_url) 
+                SELECT * FROM UNNEST($1::int4[], $2::text[], $3::text[], $4::text[])
+                ON CONFLICT (document_url, legislative_initiatives_id)
+                DO UPDATE SET
+                    title = EXCLUDED.title,
+                    document_type = EXCLUDED.document_type,
+                    document_url = EXCLUDED.document_url
+            ",
+            &ids, &titles as &[Option<String>], &types as &[Option<String>], &urls as &[Option<String>]
+        )
+        .execute(&mut *sp)
+        .await
+        {
+            return Err(e);
+        }
+    }
+
+    sp.commit().await?;
+    Ok(())
 }
 
 pub async fn run_shut_latest_gp(

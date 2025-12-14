@@ -1,6 +1,6 @@
 use chrono::NaiveDate;
 use combx::{DbNamedVote, DbNamedVoteInfo, OptionalDbNamedVote};
-use sqlx::{Executor, PgPool, Postgres};
+use sqlx::{Executor, PgPool, Postgres, Acquire};
 
 pub async fn insert_named_vote_info<'a>(
     pg: impl Executor<'a, Database = Postgres>,
@@ -88,4 +88,69 @@ pub async fn insert_named_votes<'a>(
     }
 
     Ok(())
+}
+
+pub async fn insert_named_votes_batched<'a>(
+    tx: &mut sqlx::Transaction<'a, Postgres>,
+    named_votes: &[DbNamedVote],
+    named_vote_info_id: i32,
+) -> sqlx::Result<()> {
+    if named_votes.is_empty() {
+        return Ok(());
+    }
+
+    let mut sp = tx.begin().await?;
+
+    let infavors: Vec<Option<bool>> = named_votes.iter().map(|v| v.infavor).collect();
+    let was_absents: Vec<Option<bool>> = named_votes.iter().map(|v| v.was_absent).collect();
+    let levs: Vec<i32> = named_votes.iter().map(|v| v.lev as i32).collect();
+    let similarity_scores: Vec<i32> = named_votes.iter().map(|v| v.similiarity_score as i32).collect();
+    let searched_withs: Vec<Option<String>> = named_votes.iter().map(|v| v.searched_with.clone()).collect();
+    let matched_withs: Vec<String> = named_votes.iter().map(|v| v.matched_with.clone()).collect();
+    let delegate_ids: Vec<i32> = named_votes.iter().map(|v| v.delegate_id).collect();
+    let manually_matcheds: Vec<Option<bool>> = named_votes.iter().map(|v| v.manually_matched).collect();
+    let named_vote_info_ids = vec![named_vote_info_id; named_votes.len()];
+
+    let res = sqlx::query!(
+        "
+            INSERT INTO named_votes (
+                infavor, was_absent, lev, similiarity_score,
+                searched_with, matched_with, delegate_id, manually_matched, named_vote_info_id
+            )
+            SELECT * FROM UNNEST(
+                $1::bool[], $2::bool[], $3::int4[], $4::int4[], 
+                $5::text[], $6::text[], $7::int4[], $8::bool[], $9::int4[]
+            )
+            ON CONFLICT (delegate_id, named_vote_info_id)
+            DO UPDATE SET
+                infavor = EXCLUDED.infavor,
+                was_absent = EXCLUDED.was_absent,
+                lev = EXCLUDED.lev,
+                similiarity_score = EXCLUDED.similiarity_score,
+                searched_with = EXCLUDED.searched_with,
+                matched_with = EXCLUDED.matched_with,
+                manually_matched = EXCLUDED.manually_matched
+        ",
+        &infavors as &[Option<bool>],
+        &was_absents as &[Option<bool>],
+        &levs,
+        &similarity_scores,
+        &searched_withs as &[Option<String>],
+        &matched_withs,
+        &delegate_ids,
+        &manually_matcheds as &[Option<bool>],
+        &named_vote_info_ids
+    )
+    .execute(&mut *sp)
+    .await;
+
+    match res {
+        Ok(_) => {
+            sp.commit().await?;
+            Ok(())
+        }
+        Err(e) => {
+            Err(e)
+        }
+    }
 }
