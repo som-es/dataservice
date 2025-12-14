@@ -9,7 +9,7 @@ pub fn extract_images_from_pdf(contents: &[u8]) -> crate::Result<Vec<((u32, u16)
 
     for (_id, object) in &doc.objects {
         if collected_images.len() >= MAX_IMAGE_COUNT {
-            break
+            break;
         }
         match object {
             Object::Stream(stream) => {

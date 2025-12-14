@@ -1,7 +1,6 @@
 use combx::{download_ocr_models, GovProposal};
 use dataservice::{
-    ai_task::AiTask, connect_pg, delegates::delegate_count, model_dir, services, setup_app_data,
-    Shutdown,
+    Shutdown, ai_task::{self, AiTask}, connect_pg, delegates::delegate_count, model_dir, services, setup_app_data
 };
 use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
@@ -79,58 +78,82 @@ pub async fn run_services(state: &State, config: Config) {
             let hs = std::collections::HashSet::new();
             let _res = services::delegates::delegates_once(&hs, pool.clone()).await;
             services::parties::parties_once(&pool).await;
-            services::plenar::run_shut(
-                Shutdown::new(state.notify_shutdown.subscribe()),
-                pool.clone(),
+
+            services::plenar::plenar_info_once(&pool, false).await;
+            services::legislative_initiatives::legis_init_once(
                 false,
-            )
-            .await;
-            services::legislative_initiatives::run_shut_every_gp(
-                Shutdown::new(state.notify_shutdown.subscribe()),
-                pool.clone(),
+                true,
+                &pool,
+                None,
                 ai_task_tx.clone(),
-                false,
             )
             .await;
 
-            tokio::join!(
-                tokio::spawn(services::ministrial_proposals::run_shut_every_gp(
-                    Shutdown::new(state.notify_shutdown.subscribe()),
-                    pool.clone(),
-                    false,
-                )),
-                tokio::spawn(services::ministrial_decrees::run_shut_pages(
-                    Shutdown::new(state.notify_shutdown.subscribe()),
-                    pool.clone(),
+            let pool1 = pool.clone();
+            let ministerial_proposals = async move {
+                services::ministrial_proposals::ministrial_proposal_once(false, &pool1, None).await
+            };
+            let pool1 = pool.clone();
+            let decrees = async move {
+                services::ministrial_decrees::save_ministrial_decrees(
                     decree_pages() as u32,
-                )),
-                tokio::spawn(services::dates::run_shut_dates(
-                    Shutdown::new(state.notify_shutdown.subscribe()),
-                    pool.clone()
-                ))
+                    &pool1,
+                )
+                .await;
+            };
+            let pool1 = pool.clone();
+            let dates = async move { services::dates::save_dates(&pool1, false).await };
+            tokio::join!(
+                tokio::spawn(ministerial_proposals),
+                tokio::spawn(decrees),
+                tokio::spawn(dates)
             )
             .0
             .unwrap();
         }
         if config.force_fill {
-            let handles = [
-                tokio::spawn(services::legislative_initiatives::run_shut_every_gp(
-                    Shutdown::new(state.notify_shutdown.subscribe()),
-                    pool.clone(),
+
+            let pool1 = pool.clone();
+            let ai_task_tx = ai_task_tx.clone();
+            let legis_inits = async move {
+                services::legislative_initiatives::legis_init_once(
+                    true,
+                    false,
+                    &pool1,
+                    None,
                     ai_task_tx.clone(),
-                    false,
-                )),
-                tokio::spawn(services::ministrial_proposals::run_shut_every_gp(
-                    Shutdown::new(state.notify_shutdown.subscribe()),
-                    pool.clone(),
-                    false,
-                )),
-                tokio::spawn(services::plenar::run_shut(
-                    Shutdown::new(state.notify_shutdown.subscribe()),
-                    pool.clone(),
-                    false,
-                )),
+                )
+                .await;
+            };
+
+            let pool1 = pool.clone();
+            let plenars = async move {
+                services::plenar::plenar_info_once(&pool1, true).await;
+            };
+
+            let pool1 = pool.clone();
+            let ministerial_proposals = async move {
+                services::ministrial_proposals::ministrial_proposal_once(false, &pool1, None).await;
+            };
+            let pool1 = pool.clone();
+            let decrees = async move {
+                services::ministrial_decrees::save_ministrial_decrees(
+                    decree_pages() as u32,
+                    &pool1,
+                )
+                .await;
+            };
+            let pool1 = pool.clone();
+            let dates = async move { let _ = services::dates::save_dates(&pool1, false).await; };
+            
+            let handles = [
+                tokio::spawn(plenars),
+                tokio::spawn(legis_inits),
+                tokio::spawn(ministerial_proposals),
+                tokio::spawn(decrees),
+                tokio::spawn(dates),
             ];
+
             if !config.only_latest || config.exit_after_force_fill {
                 for handle in handles {
                     if let Err(e) = handle.await {

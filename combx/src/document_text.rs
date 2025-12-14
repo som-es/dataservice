@@ -181,10 +181,8 @@ pub async fn extract_text_from_pdf_document(_url: &str) -> crate::Result<String>
     let url = format!("{}{}", AustriaScraper::BASE_URL, _url);
     let contents = reqwest::get(&url).await?.bytes().await?;
 
-    let text = tokio::task::spawn_blocking(move || {
-        pdf_extract::extract_text_from_mem(&contents)
-    })
-    .await??;
+    let text = tokio::task::spawn_blocking(move || pdf_extract::extract_text_from_mem(&contents))
+        .await??;
 
     Ok(text)
 }

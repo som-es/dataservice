@@ -26,7 +26,7 @@ async fn scrape_new_plenar_infos(scraper: &AustriaScraper) -> crate::Result<Vec<
     Ok(new_plenar_infos)
 }
 
-async fn plenar_info_once(pg_pool: &PgPool, only_latest: bool) {
+pub async fn plenar_info_once(pg_pool: &PgPool, only_latest: bool) {
     log::info!("Try scraping plenar info");
 
     let tok_handle = Handle::current();

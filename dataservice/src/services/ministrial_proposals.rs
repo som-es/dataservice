@@ -49,7 +49,7 @@ pub async fn scrape_new_ministrial_props(
     Ok(new_ministrial_props)
 }
 
-async fn ministrial_proposal_once(
+pub async fn ministrial_proposal_once(
     only_latest: bool,
     pg_pool: &PgPool,
     new_ministrial_proposal_tx: Option<Sender<Option<(i32, GovProposal)>>>,

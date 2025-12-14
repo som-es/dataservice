@@ -29,7 +29,7 @@ impl SomAiClient {
             token: RwLock::new(String::new()),
             token_created: RwLock::new(Instant::now() - Duration::from_secs(3600)),
             client,
-            is_local: false
+            is_local: false,
         };
         somai.relogin().await?;
         Ok(somai)
@@ -44,7 +44,7 @@ impl SomAiClient {
             token: RwLock::new(String::new()),
             token_created: RwLock::new(Instant::now() - Duration::from_secs(3600)),
             client,
-            is_local: true
+            is_local: true,
         };
         somai.local_login().await?;
         Ok(somai)
@@ -65,7 +65,7 @@ impl SomAiClient {
         }
         Ok(())
     }
-    pub async fn login(&self)  -> Result<(), reqwest::Error> {
+    pub async fn login(&self) -> Result<(), reqwest::Error> {
         if self.is_local {
             self.local_login().await
         } else {

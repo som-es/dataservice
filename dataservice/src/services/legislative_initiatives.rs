@@ -27,7 +27,7 @@ pub(self) const LEGIS_INIT_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| {
         .unwrap_or(10)
 });
 
-async fn legis_init_once(
+pub async fn legis_init_once(
     only_latest: bool,
     only_laws: bool,
     pg_pool: &PgPool,
@@ -161,7 +161,7 @@ pub async fn run_shut_latest_gp(
 pub async fn run_shut_every_gp(
     mut shutdown: Shutdown,
     pg_pool: PgPool,
-    ai_task_ts: Sender<AiTask>,
+    ai_task_tx: Sender<AiTask>,
     only_latest: bool,
 ) {
     if only_latest {
@@ -179,7 +179,7 @@ pub async fn run_shut_every_gp(
 
     #[cfg(feature = "legis_init")]
     while !shutdown.is_shutdown() {
-        let ai_task_ts = ai_task_ts.clone();
+        let ai_task_ts = ai_task_tx.clone();
         tokio::select! {
             _ = shutdown.recv() => {
                 println!("shutting down");
@@ -191,7 +191,7 @@ pub async fn run_shut_every_gp(
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative scraper");
 
-                    legis_init_once(false, true, &pg_pool, None, ai_task_ts.clone()).await;
+                    legis_init_once(false, false, &pg_pool, None, ai_task_ts.clone()).await;
                 }).await {
                     log::error!("Error in legislative initiative scraper: {:?}", e);
                 }

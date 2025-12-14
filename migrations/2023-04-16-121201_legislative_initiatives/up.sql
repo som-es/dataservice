@@ -21,7 +21,6 @@ create table legislative_initiatives (
     requires_simple_majority boolean not null default true,
     -- was_invisibly_declined boolean default false,
     plenary_session_id int,
-    notified_with_mail boolean default false,
     is_law boolean not null default false,
     law_accepted boolean,
     law_come_into_effect_date date,
