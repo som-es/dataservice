@@ -1,6 +1,45 @@
-use chrono::NaiveDate;
-use combx::{DbNamedVote, DbNamedVoteInfo, OptionalDbNamedVote};
-use sqlx::{Executor, PgPool, Postgres, Acquire};
+use combx::{DbNamedVote, DbNamedVoteInfo, DbVote};
+use sqlx::{Acquire, Executor, Postgres, Transaction};
+
+pub async fn insert_votes_batch<'a>(
+    tx: &mut Transaction<'a, Postgres>,
+    votes: &[DbVote],
+    legis_init_id: i32,
+) -> sqlx::Result<()> {
+    if votes.is_empty() {
+        return Ok(());
+    }
+
+    let mut sp = tx.begin().await?;
+
+    let parties: Vec<String> = votes.iter().map(|v| v.party.clone()).collect();
+    let fractions: Vec<i32> = votes.iter().map(|v| v.fraction.clone()).collect();
+    let infavors: Vec<bool> = votes.iter().map(|v| v.infavor).collect();
+    let ids = vec![legis_init_id; votes.len()];
+
+    let res = sqlx::query!(
+        "
+            INSERT INTO votes (party, fraction, infavor, legislative_initiatives_id) 
+            SELECT * FROM UNNEST($1::text[], $2::int4[], $3::bool[], $4::int4[])
+            ON CONFLICT (legislative_initiatives_id, party)
+            DO UPDATE SET fraction = EXCLUDED.fraction, infavor = EXCLUDED.infavor
+        ",
+        &parties,
+        &fractions,
+        &infavors,
+        &ids
+    )
+    .execute(&mut *sp)
+    .await;
+
+    match res {
+        Ok(_) => {
+            sp.commit().await?;
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
+}
 
 pub async fn insert_named_vote_info<'a>(
     pg: impl Executor<'a, Database = Postgres>,
@@ -104,11 +143,18 @@ pub async fn insert_named_votes_batched<'a>(
     let infavors: Vec<Option<bool>> = named_votes.iter().map(|v| v.infavor).collect();
     let was_absents: Vec<Option<bool>> = named_votes.iter().map(|v| v.was_absent).collect();
     let levs: Vec<i32> = named_votes.iter().map(|v| v.lev as i32).collect();
-    let similarity_scores: Vec<i32> = named_votes.iter().map(|v| v.similiarity_score as i32).collect();
-    let searched_withs: Vec<Option<String>> = named_votes.iter().map(|v| v.searched_with.clone()).collect();
+    let similarity_scores: Vec<i32> = named_votes
+        .iter()
+        .map(|v| v.similiarity_score as i32)
+        .collect();
+    let searched_withs: Vec<Option<String>> = named_votes
+        .iter()
+        .map(|v| v.searched_with.clone())
+        .collect();
     let matched_withs: Vec<String> = named_votes.iter().map(|v| v.matched_with.clone()).collect();
     let delegate_ids: Vec<i32> = named_votes.iter().map(|v| v.delegate_id).collect();
-    let manually_matcheds: Vec<Option<bool>> = named_votes.iter().map(|v| v.manually_matched).collect();
+    let manually_matcheds: Vec<Option<bool>> =
+        named_votes.iter().map(|v| v.manually_matched).collect();
     let named_vote_info_ids = vec![named_vote_info_id; named_votes.len()];
 
     let res = sqlx::query!(
@@ -149,8 +195,6 @@ pub async fn insert_named_votes_batched<'a>(
             sp.commit().await?;
             Ok(())
         }
-        Err(e) => {
-            Err(e)
-        }
+        Err(e) => Err(e),
     }
 }

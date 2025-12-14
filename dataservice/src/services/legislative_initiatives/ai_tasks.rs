@@ -21,7 +21,9 @@ pub async fn summarize_laws(task_args: TaskArgs, docs: &[Document]) -> combx::Re
 
     let inner_docs = docs.to_vec();
     match tokio::spawn(async move {
-        combine_texts(&extract_text_from_documents_html_first(&inner_docs, OCR_ENGINE.clone()).await)
+        combine_texts(
+            &extract_text_from_documents_html_first(&inner_docs, OCR_ENGINE.clone()).await,
+        )
     })
     .await
     {
