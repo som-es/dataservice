@@ -562,17 +562,20 @@ pub async fn run_shut_latest(mut shutdown: Shutdown, pg_pool: PgPool) {
     }
 }
 
-pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool) {
+pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool, only_latest: bool) {
+    if only_latest {
+        return;
+    }
     // insert_all_serially().await;
     // return;
     let plenar_sleep = std::env::var("PLENAR_SLEEP")
-        .unwrap_or_else(|_| "9000".to_string())
+        .unwrap_or_else(|_| "80000".to_string())
         .parse()
         .unwrap_or_else(|e| {
             log::warn!(
-                "Could not parse PLENAR_SLEEP env var: {e}. Using default value of 9000 seconds"
+                "Could not parse PLENAR_SLEEP env var: {e}. Using default value of 80000 seconds"
             );
-            9000
+            80000
         });
 
     #[cfg(feature = "plenar")]

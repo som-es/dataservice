@@ -162,15 +162,19 @@ pub async fn run_shut_every_gp(
     mut shutdown: Shutdown,
     pg_pool: PgPool,
     ai_task_ts: Sender<AiTask>,
+    only_latest: bool,
 ) {
+    if only_latest {
+        return;
+    }
     let legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP")
-        .unwrap_or_else(|_| "1000".to_string())
+        .unwrap_or_else(|_| "80000".to_string())
         .parse()
         .unwrap_or_else(|e| {
             log::warn!(
-                "Could not parse LEGISLATIVE_INITIATIVE_SLEEP env var: {e}. Using default value of 1000 seconds"
+                "Could not parse LEGISLATIVE_INITIATIVE_SLEEP env var: {e}. Using default value of 80000 seconds"
             );
-            1000
+            80000
         });
 
     #[cfg(feature = "legis_init")]

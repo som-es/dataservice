@@ -133,6 +133,7 @@ pub async fn update_or_insert_legis_init_in_db(
                     Box::pin(async move {
                         use crate::legislative_initiatives::ai_tasks;
                         ai_tasks::summarize_laws(task_args, &documents).await
+                        // TODO: update meilisearch index on finish
                     })
                 }),
             };

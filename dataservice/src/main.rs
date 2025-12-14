@@ -1,20 +1,35 @@
 use combx::{download_ocr_models, GovProposal};
 use dataservice::{
     ai_task::AiTask, connect_pg, delegates::delegate_count, model_dir, services, setup_app_data,
-    Shutdown, DATABASE_URL,
+    Shutdown,
 };
 use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
 
+use clap::Parser;
+
+/// Somes-Dataservice
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Force insert and update all build-time-configured data
+    #[arg(short, long, default_value_t = false)]
+    force_fill: bool,
+
+    /// Exit after force fill was completed
+    #[arg(long, default_value_t = false)]
+    exit_after_force_fill: bool,
+
+    /// Runs only latest services
+    #[arg(long, default_value_t = false)]
+    only_latest: bool,
+}
+
 #[tokio::main(flavor = "multi_thread", worker_threads = 1024)]
 async fn main() {
+    let args = Args::parse();
+
     simple_logger::init_with_level(log::Level::Info).unwrap();
-    // let _ = tokio::task::spawn_blocking(|| {
-    //     let _x = &*GOV_OFFICIALS;
-    //     // log::info!("gov of map: {x:?}");
-    // })
-    // .await;
-    // tokio::join!(services::proposals::run(),);
 
     if let Err(e) = setup_app_data().await {
         log::error!("Cannot create app data directory: {e:?}");
@@ -25,11 +40,22 @@ async fn main() {
     }
 
     tokio::spawn(async move {
-        run(tokio::signal::ctrl_c()).await;
+        run(
+            tokio::signal::ctrl_c(),
+            Config {
+                force_fill: args.force_fill,
+                exit_after_force_fill: args.exit_after_force_fill,
+                only_latest: args.only_latest,
+            },
+        )
+        .await;
     })
     .await
     .unwrap();
 }
+
+pub const ONLY_LATEST: bool = true;
+pub const FETCH_ONLY_LAWS: bool = true;
 
 pub fn decree_pages() -> usize {
     std::env::var("DECREE_PAGES")
@@ -43,8 +69,8 @@ pub fn decree_pages() -> usize {
         })
 }
 
-pub async fn run_services(state: &State) {
-    // let pool = connect_pg().await;
+pub async fn run_services(state: &State, config: Config) {
+    let (ai_task_tx, ai_task_rx) = tokio::sync::mpsc::channel::<AiTask>(16536 * 22);
 
     let pool = connect_pg().await;
     {
@@ -53,6 +79,66 @@ pub async fn run_services(state: &State) {
             let hs = std::collections::HashSet::new();
             let _res = services::delegates::delegates_once(&hs, pool.clone()).await;
             services::parties::parties_once(&pool).await;
+            services::plenar::run_shut(
+                Shutdown::new(state.notify_shutdown.subscribe()),
+                pool.clone(),
+                false,
+            )
+            .await;
+            services::legislative_initiatives::run_shut_every_gp(
+                Shutdown::new(state.notify_shutdown.subscribe()),
+                pool.clone(),
+                ai_task_tx.clone(),
+                false,
+            )
+            .await;
+
+            tokio::join!(
+                tokio::spawn(services::ministrial_proposals::run_shut_every_gp(
+                    Shutdown::new(state.notify_shutdown.subscribe()),
+                    pool.clone(),
+                    false,
+                )),
+                tokio::spawn(services::ministrial_decrees::run_shut_pages(
+                    Shutdown::new(state.notify_shutdown.subscribe()),
+                    pool.clone(),
+                    decree_pages() as u32,
+                )),
+                tokio::spawn(services::dates::run_shut_dates(
+                    Shutdown::new(state.notify_shutdown.subscribe()),
+                    pool.clone()
+                ))
+            )
+            .0
+            .unwrap();
+        }
+        if config.force_fill {
+            let handles = [
+                tokio::spawn(services::legislative_initiatives::run_shut_every_gp(
+                    Shutdown::new(state.notify_shutdown.subscribe()),
+                    pool.clone(),
+                    ai_task_tx.clone(),
+                    false,
+                )),
+                tokio::spawn(services::ministrial_proposals::run_shut_every_gp(
+                    Shutdown::new(state.notify_shutdown.subscribe()),
+                    pool.clone(),
+                    false,
+                )),
+                tokio::spawn(services::plenar::run_shut(
+                    Shutdown::new(state.notify_shutdown.subscribe()),
+                    pool.clone(),
+                    false,
+                )),
+            ];
+            if !config.only_latest || config.exit_after_force_fill {
+                for handle in handles {
+                    if let Err(e) = handle.await {
+                        log::error!("Cannot await handle: {e:?}")
+                    }
+                }
+                return;
+            }
         }
     }
 
@@ -61,8 +147,6 @@ pub async fn run_services(state: &State) {
 
     let (new_ministrial_proposal_tx, new_ministrial_proposal_rx) =
         tokio::sync::mpsc::channel::<Option<(i32, GovProposal)>>(128);
-
-    let (ai_task_tx, ai_task_rx) = tokio::sync::mpsc::channel::<AiTask>(16536 * 22);
 
     let latest_legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP_LATEST")
         .unwrap_or_else(|_| "300".to_string())
@@ -80,28 +164,30 @@ pub async fn run_services(state: &State) {
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone(),
             ai_task_tx.clone(),
+            config.only_latest,
         )),
-        /*tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
+        tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone(),
             new_vote_result_tx.clone(),
             ai_task_tx.clone(),
-            latest_legis_init_sleep + 150,
-            true,
-            false,
-        )),*/
+            latest_legis_init_sleep + 500,
+            ONLY_LATEST,
+            false, // also fetches everything that isn't a law
+        )),
         tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone(),
             new_vote_result_tx.clone(),
             ai_task_tx.clone(),
             latest_legis_init_sleep - 40,
-            true,
-            true,
+            ONLY_LATEST,
+            FETCH_ONLY_LAWS,
         )),
         tokio::spawn(services::ministrial_proposals::run_shut_every_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone(),
+            config.only_latest
         )),
         tokio::spawn(services::ministrial_proposals::run_shut_latest_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
@@ -110,7 +196,8 @@ pub async fn run_services(state: &State) {
         )),
         tokio::spawn(services::plenar::run_shut(
             Shutdown::new(state.notify_shutdown.subscribe()),
-            pool.clone()
+            pool.clone(),
+            config.only_latest
         )),
         tokio::spawn(services::plenar::run_shut_latest(
             Shutdown::new(state.notify_shutdown.subscribe()),
@@ -167,7 +254,13 @@ pub struct State {
     shutdown_complete_tx: mpsc::Sender<()>,
 }
 
-pub async fn run(shutdown: impl Future) {
+pub struct Config {
+    force_fill: bool,
+    exit_after_force_fill: bool,
+    only_latest: bool,
+}
+
+pub async fn run(shutdown: impl Future, config: Config) {
     let (notify_shutdown, _) = broadcast::channel(1);
     let (shutdown_complete_tx, shutdown_complete_rx) = mpsc::channel(1);
 
@@ -181,7 +274,7 @@ pub async fn run(shutdown: impl Future) {
         _ = shutdown => {
             println!("Shutdown signal received");
         }
-        _ = run_services(&state) => {
+        _ = run_services(&state, config) => {
             println!("Services finished");
         }
     }

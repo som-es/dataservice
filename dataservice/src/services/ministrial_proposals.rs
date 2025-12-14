@@ -371,15 +371,18 @@ pub async fn run_shut_latest_gp(
     }
 }
 
-pub async fn run_shut_every_gp(mut shutdown: Shutdown, pg_pool: PgPool) {
+pub async fn run_shut_every_gp(mut shutdown: Shutdown, pg_pool: PgPool, only_latest: bool) {
+    if only_latest {
+        return;
+    }
     let legis_init_sleep = std::env::var("MINISTRIAL_PROPOSAL_SLEEP")
-        .unwrap_or_else(|_| "900".to_string())
+        .unwrap_or_else(|_| "10000".to_string())
         .parse()
         .unwrap_or_else(|e| {
             log::warn!(
-                "Could not parse MINISTRIAL_PROPOSAL_SLEEP env var: {e}. Using default value of 1000 seconds"
+                "Could not parse MINISTRIAL_PROPOSAL_SLEEP env var: {e}. Using default value of 10000 seconds"
             );
-            1000
+            10000
         });
 
     #[cfg(feature = "ministerial")]
