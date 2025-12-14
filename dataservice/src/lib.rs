@@ -80,7 +80,8 @@ pub fn today_and_time() -> chrono::NaiveDateTime {
 
 pub async fn connect_pg() -> PgPool {
     PgPoolOptions::new()
-        .max_connections(150)
+        .max_connections(128)
+        .min_connections(4)
         .connect(DATABASE_URL)
         .await
         .unwrap()

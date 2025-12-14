@@ -41,7 +41,11 @@ pub async fn scrape_new_legis_inits(
     let legis_inits = scraper.post_legis_payload(searched_doktyps).await?;
     let legis_init_paths = scraper.legis_paths(legis_inits)?;
 
-    const MAX_TASKS: usize = 32;
+    let max_tasks = if gp != LATEST_GP {
+        5 // cache hit rate MUST be high for this to work
+    } else {
+        1
+    };
     let mut handles: Vec<tokio::task::JoinHandle<()>> = vec![];
 
     // let code_to_parties = Arc::new(gen_code_to_parties(pool, gp).await);
@@ -54,11 +58,11 @@ pub async fn scrape_new_legis_inits(
         let pool = pool.clone();
         // let code_to_parties = code_to_parties.clone();
 
-        if handles.len() > MAX_TASKS {
+        if handles.len() > max_tasks {
             if info_print_counter % 16 == 0 {
                 log::info!("Awaiting handles ({gp}) now.");
             }
-            for handle in handles.drain(..MAX_TASKS) {
+            for handle in handles.drain(..max_tasks) {
                 if let Err(e) = handle.await {
                     if e.is_panic() {
                         log::error!("join Error: {e:?}")
@@ -87,11 +91,12 @@ pub async fn scrape_new_legis_inits(
             })
         }));
 
-        for handle in handles.drain(..) {
-            if let Err(e) = handle.await {
-                if e.is_panic() {
-                    log::warn!("join Error: {e:?}")
-                }
+        
+    }
+    for handle in handles.drain(..) {
+        if let Err(e) = handle.await {
+            if e.is_panic() {
+                log::warn!("join Error: {e:?}")
             }
         }
     }
