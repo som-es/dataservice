@@ -108,14 +108,6 @@ pub async fn run_services(state: &State) {
             pool.clone(),
             new_ministrial_proposal_tx
         )),
-        tokio::spawn(services::proposals::run_shut(
-            Shutdown::new(state.notify_shutdown.subscribe()),
-            pool.clone()
-        )),
-        tokio::spawn(services::proposals::run_shut_last_5_days(
-            Shutdown::new(state.notify_shutdown.subscribe()),
-            pool.clone()
-        )),
         tokio::spawn(services::plenar::run_shut(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone()
