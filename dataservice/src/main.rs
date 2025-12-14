@@ -1,6 +1,9 @@
 use combx::{download_ocr_models, GovProposal};
 use dataservice::{
-    Shutdown, ai_task::{self, AiTask}, connect_pg, delegates::delegate_count, model_dir, services, setup_app_data
+    ai_task::{self, AiTask},
+    connect_pg,
+    delegates::delegate_count,
+    model_dir, services, setup_app_data, Shutdown,
 };
 use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
@@ -112,7 +115,6 @@ pub async fn run_services(state: &State, config: Config) {
             .unwrap();
         }
         if config.force_fill {
-
             let pool1 = pool.clone();
             let ai_task_tx = ai_task_tx.clone();
             let legis_inits = async move {
@@ -144,8 +146,10 @@ pub async fn run_services(state: &State, config: Config) {
                 .await;
             };
             let pool1 = pool.clone();
-            let dates = async move { let _ = services::dates::save_dates(&pool1, false).await; };
-            
+            let dates = async move {
+                let _ = services::dates::save_dates(&pool1, false).await;
+            };
+
             let handles = [
                 tokio::spawn(plenars),
                 tokio::spawn(legis_inits),
