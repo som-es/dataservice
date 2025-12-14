@@ -1,13 +1,7 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::LazyLock,
-};
+use std::collections::{HashMap, HashSet};
 
 use combx::{create_gov_officials_map, DbContact, DbDelegate, DbMandate};
-use somes_scraper::{
-    delegates::DelegateScraper, gov_officials::GovOfficials, AustriaScraper, Delegate, GovOfficial,
-    Mandate,
-};
+use somes_scraper::{delegates::DelegateScraper, AustriaScraper, Delegate, GovOfficial, Mandate};
 use sqlx::{postgres::PgQueryResult, query, PgPool};
 
 use crate::{services::scrape_untill_success, Shutdown};

@@ -100,7 +100,7 @@ async fn update_plenar_infos_in_db(new_plenar_infos: &[PlenarInfo], pg_pool: &Pg
         }
         // let plenar_id = format!("{}/{}/{}", plenar_info.legislative_period, plenar_info.ityp, plenar_info.inr);
         // let mut pg_pool = pg_pool.begin().await.unwrap();
-        let mut pg_pool = pg_pool;
+        let pg_pool = pg_pool;
 
         let plenar_id = match insert_plenar_info(pg_pool, plenar_info).await {
             Ok(id) => id,
@@ -205,8 +205,6 @@ use log::{info, warn};
 use sqlx::{postgres::PgQueryResult, query, Executor, PgPool, Postgres};
 use tokio::runtime::{Handle, Runtime};
 
-static mut NO_OPINION_COUNT: usize = 0;
-
 async fn insert_plenar_speech_legis_init<'a>(
     pool: impl Executor<'a, Database = Postgres>,
     legis_init_id: Option<i32>,
@@ -240,24 +238,8 @@ async fn insert_plenar_speech<'a>(
     let opinion = match &plenar_speech.speech.opinion {
         somes_scraper::Opinion::Infavor => Some("Pro".to_string()),
         somes_scraper::Opinion::Against => Some("Contra".to_string()),
-        somes_scraper::Opinion::Other(text) => {
-            unsafe { NO_OPINION_COUNT += 1 };
-            info!(
-                "No opinion for speech: {:?}. 'Opinion': {text}, no opinion count: {}",
-                plenar_speech.speech.spoken_text_html_urls,
-                unsafe { NO_OPINION_COUNT }
-            );
-            Some(text.clone())
-        }
-        somes_scraper::Opinion::None => {
-            unsafe { NO_OPINION_COUNT += 1 };
-            info!(
-                "No opinion for speech: {:?}, no opinion_count: {}",
-                plenar_speech.speech.spoken_text_html_urls,
-                unsafe { NO_OPINION_COUNT }
-            );
-            None
-        }
+        somes_scraper::Opinion::Other(text) => Some(text.clone()),
+        somes_scraper::Opinion::None => None,
     };
 
     let plenar_speech_id = sqlx::query!(

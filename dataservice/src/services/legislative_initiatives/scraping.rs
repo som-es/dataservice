@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
-use somes_scraper::{AustriaScraper, LegislativeInitiative, legis_init::LegislativeInitiatives};
+use somes_scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative};
 use sqlx::PgPool;
 use tokio::{runtime::Handle, sync::mpsc::Sender};
 
-use crate::{LATEST_GP, ai_task::AiTask, legislative_initiatives::update_or_insert_legis_init_in_db};
+use crate::{
+    ai_task::AiTask, legislative_initiatives::update_or_insert_legis_init_in_db, LATEST_GP,
+};
 
 pub async fn scrape_new_legis_inits(
     pool: &PgPool,

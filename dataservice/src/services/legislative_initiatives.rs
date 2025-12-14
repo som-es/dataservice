@@ -10,15 +10,13 @@ mod scraping;
 use scraping::*;
 
 use somes_scraper::{
-    legis_init::LEGIS_IS_VOTEABLE_ON_DOKTYPES,
-    AustriaScraper, LegislativeInitiative,
+    legis_init::LEGIS_IS_VOTEABLE_ON_DOKTYPES, AustriaScraper, LegislativeInitiative,
 };
 use sqlx::{query, PgPool};
 use std::sync::{Arc, LazyLock};
 
 use crate::{
-    ai_task::AiTask, should_update::StoredUpdatedAt, today_and_time, Shutdown, GPS,
-    LATEST_GP,
+    ai_task::AiTask, should_update::StoredUpdatedAt, today_and_time, Shutdown, GPS, LATEST_GP,
 };
 
 use dotenvy_macro::dotenv;
