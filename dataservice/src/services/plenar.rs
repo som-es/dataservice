@@ -1,9 +1,7 @@
 use std::thread::JoinHandle;
 
 use crate::{scrape_untill_success, should_update::StoredUpdatedAt, Shutdown, GPS};
-use somes_scraper::{
-    plenar::PlenarInfo, AustriaScraper,
-};
+use somes_scraper::{plenar::PlenarInfo, AustriaScraper};
 use sqlx::PgPool;
 use tokio::runtime::Handle;
 
@@ -77,7 +75,6 @@ pub async fn plenar_info_once(pg_pool: &PgPool, only_latest: bool) {
         }
     }
 }
-
 
 impl StoredUpdatedAt for PlenarInfo {
     async fn stored_updated_at(&self, pg: &PgPool) -> Option<chrono::NaiveDateTime> {
@@ -170,7 +167,6 @@ pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool, only_latest: bool
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

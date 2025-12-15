@@ -120,7 +120,7 @@ impl VoteResult {
             gp: legis_init.gp.clone(),
             accepted: legis_init.accepted.map(|a| a.to_string()),
             created_at: legis_init.date,
-            appeared_at: Some(legis_init.created_at),
+            appeared_at: legis_init.created_at,
             updated_at: legis_init.updated_at,
             requires_simple_majority: legis_init.requires_simple_majority,
             pre_declined_type: legis_init

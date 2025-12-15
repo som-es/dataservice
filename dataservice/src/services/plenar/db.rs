@@ -1,8 +1,10 @@
 use combx::absence_matching;
-use somes_scraper::{AustriaScraper, Scraper, plenar::PlenarInfo};
+use somes_scraper::{plenar::PlenarInfo, AustriaScraper, Scraper};
 use sqlx::PgPool;
 
-use crate::plenar::{insert_call_to_order, insert_debate, insert_plenar_info, insert_plenar_speech};
+use crate::plenar::{
+    insert_call_to_order, insert_debate, insert_plenar_info, insert_plenar_speech,
+};
 
 pub async fn update_plenar_infos_in_db(plenar_info: &PlenarInfo, pg_pool: &PgPool) {
     log::info!("Updating plenar infos in database...");

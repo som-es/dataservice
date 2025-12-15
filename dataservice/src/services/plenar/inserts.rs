@@ -1,9 +1,12 @@
 use std::collections::HashSet;
 
 use log::warn;
-use somes_scraper::{PlenarSpeech, Reference, TextExtractor, call_to_order::CallToOrderInfo, plenar::{Debate, DebateInfo, PlenarInfo}, text_utils};
-use sqlx::{Executor, Postgres, postgres::PgQueryResult};
-
+use somes_scraper::{
+    call_to_order::CallToOrderInfo,
+    plenar::{Debate, DebateInfo, PlenarInfo},
+    text_utils, PlenarSpeech, Reference, TextExtractor,
+};
+use sqlx::{postgres::PgQueryResult, Executor, Postgres};
 
 pub async fn insert_plenar_speech_legis_init<'a>(
     pool: impl Executor<'a, Database = Postgres>,

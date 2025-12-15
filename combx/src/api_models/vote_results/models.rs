@@ -52,7 +52,7 @@ pub struct DbLegislativeInitiativeQuery {
     pub description: String,
     pub accepted: Option<String>,
     pub created_at: NaiveDate,
-    pub appeared_at: Option<NaiveDateTime>,
+    pub appeared_at: NaiveDateTime,
     pub updated_at: Option<NaiveDateTime>,
     pub requires_simple_majority: bool,
     pub pre_declined_type: Option<String>,

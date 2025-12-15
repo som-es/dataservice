@@ -1,4 +1,7 @@
-use somes_scraper::{AustriaScraper, plenar::{Plenar, PlenarInfo}};
+use somes_scraper::{
+    plenar::{Plenar, PlenarInfo},
+    AustriaScraper,
+};
 
 pub async fn scrape_new_plenar_infos(scraper: &AustriaScraper) -> crate::Result<Vec<PlenarInfo>> {
     let raw_plenar = scraper.post_plenar_payload().await?;
