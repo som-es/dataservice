@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 use reqwest::Client;
+use schemars::{JsonSchema, generate::SchemaSettings};
 use tokio::sync::RwLock;
 
 use crate::somai_models::*;
@@ -102,18 +103,30 @@ impl SomAiClient {
 
     // ===================== ENDPOINTS =====================
 
-    pub async fn make_llm_request(
+    pub async fn make_llm_request<T: JsonSchema>(
         &self,
         input: String,
         prompt: String,
         model: Option<String>,
         use_openai: bool,
+        use_json_schema: bool,
     ) -> Result<LLMResponse, reqwest::Error> {
+        let json_schema = if use_json_schema {
+            Some(
+                serde_json::to_value(&T::json_schema(
+                    &mut schemars::generate::SchemaGenerator::default(),
+                ))
+                .unwrap(),
+            )
+        } else {
+            None
+        };
         let req = LLMRequest {
             input,
-            prompt,
+            system: prompt,
             model,
             use_openai,
+            json_schema,
         };
         let resp = self
             .client
@@ -123,6 +136,38 @@ impl SomAiClient {
             .send()
             .await?;
         Ok(resp.json().await?)
+    }
+
+    pub async fn make_llm_request_with_schema<T: JsonSchema + serde::de::DeserializeOwned>(
+        &self,
+        input: String,
+        system: String,
+        model: Option<String>,
+        use_openai: bool,
+    ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
+        let mut schema_generator = SchemaSettings::draft07();
+        schema_generator.inline_subschemas = true;
+        let json_schema = Some(
+            serde_json::to_value(&T::json_schema(&mut schema_generator.into_generator())).unwrap(),
+        );
+
+        let req = LLMRequest {
+            input,
+            system,
+            model,
+            use_openai,
+            json_schema,
+        };
+        let resp = self
+            .client
+            .post(format!("{}/api/make_llm_request", self.base_url))
+            .header("Authorization", self.auth_header().await)
+            .json(&req)
+            .send()
+            .await?;
+        let response: LLMResponse = resp.json().await?;
+        let parsed: T = serde_json::from_str(&response.result)?;
+        Ok(parsed)
     }
 
     pub async fn summarize_input(
@@ -320,6 +365,9 @@ mod tests {
         let client = SomAiClient::new_local("http://127.0.0.1:8000")
             .await
             .unwrap();
+
+        // client.make_llm_request::<()>("".into(), "".into(), None, false, false);
+
         let topics = client
             .make_topics_predictions("Einen langen Antragstext, über das Thema Naturschutz:".into())
             .await

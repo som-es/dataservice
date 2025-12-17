@@ -3,11 +3,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LLMRequest {
     pub input: String,
-    pub prompt: String,
+    pub system: String,
     #[serde(default)]
     pub model: Option<String>,
     #[serde(default)]
     pub use_openai: bool,
+    pub json_schema: Option<serde_json::Value>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LLMResponse {

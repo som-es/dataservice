@@ -95,8 +95,6 @@ pub async fn ai_tasks_service(
                 let mut task_queue_guard = task_queue.write().await;
                 task_queue_guard.push(ai_task);
             }
-
-            sleep(std::time::Duration::from_millis(1)).await;
         }
     }
 }
@@ -107,7 +105,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ai_task_ordering() {
-        use super::{AiTask };
+        use super::AiTask;
         use std::future::Future;
         use std::pin::Pin;
 
@@ -117,7 +115,8 @@ mod tests {
             task_id: 1,
             db_entry_id: 1,
             task: Box::new(|_args| {
-                Box::pin(async move { Ok(()) }) as Pin<Box<dyn Future<Output = combx::Result<()>> + Send>>
+                Box::pin(async move { Ok(()) })
+                    as Pin<Box<dyn Future<Output = combx::Result<()>> + Send>>
             }),
         };
 
@@ -127,7 +126,8 @@ mod tests {
             task_id: 2,
             db_entry_id: 2,
             task: Box::new(|_args| {
-                Box::pin(async move { Ok(()) }) as Pin<Box<dyn Future<Output = combx::Result<()>> + Send>>
+                Box::pin(async move { Ok(()) })
+                    as Pin<Box<dyn Future<Output = combx::Result<()>> + Send>>
             }),
         };
 

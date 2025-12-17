@@ -33,6 +33,7 @@ base64 = "0.21.0"
 serde_plain = "1.0.2"
 ocrs = { workspace = true }
 clap = { version = "4.5.53", features = ["derive"] }
+schemars = { workspace = true }
 [dev-dependencies]
 rand = "0.9"
 
