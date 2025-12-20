@@ -1,4 +1,4 @@
-use combx::document_text::{combine_texts, extract_text_from_documents_html_first};
+use combx::{AiSummary, SummarizeOutput, document_text::{combine_texts, extract_text_from_documents_html_first}};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use somai_client::SomAiClient;
@@ -6,116 +6,28 @@ use somes_common_lib::Document;
 
 use crate::{OCR_ENGINE, ai_task::TaskArgs};
 
-#[derive(JsonSchema, Serialize, Deserialize, Debug)]
-pub struct EnforcementDates {
-    pub enforcement_start_date: String,
-    pub start_notes: Option<String>,
-    pub enforcement_end_date: Option<String>,
-    pub end_notes: Option<String>,
+
+pub async fn save_summarize_output(
+    pool: sqlx::PgPool,
+    summary: &AiSummary,
+) -> combx::Result<()> {
+
+    Ok(())
 }
 
-#[derive(JsonSchema, Serialize, Deserialize, Debug)]
-pub struct Keypoint {
-    pub point: String,
-    pub enforcement_start_end: Option<EnforcementDates>,
-    pub paragraph_references: Vec<EuroLawReference>,
-}
-
-#[derive(JsonSchema, Serialize, Deserialize, Debug)]
-pub enum ProposalComplexityScope {
-    Highest,
-    High,
-    Medium,
-    Low,
-    Lowest,
-}
-
-#[derive(JsonSchema, Serialize, Deserialize, Debug)]
-pub enum Tone {
-    Neutral,
-    Urgent,
-    Aggressive,
-    Optimistic,
-    Bureaucratic,
-}
-#[derive(JsonSchema, Serialize, Deserialize, Debug)]
-pub struct CriticalAnalysis {
-    pub arguments_for: Vec<String>,
-    pub arguments_against: Vec<String>,
-    pub tone: Tone,
-}
-
-#[derive(JsonSchema, Serialize, Deserialize, Debug)]
-pub struct TermDefinition {
-    pub term: String,
-    pub simple_definition: String,
-}
-
-#[derive(JsonSchema, Serialize, Deserialize, Debug)]
-pub struct Glossary {
-    pub difficult_terms: Vec<TermDefinition>,
-}
-
-#[derive(JsonSchema, Serialize, Deserialize, Debug)]
-pub struct FiscalAnalysis {
-    pub estimated_cost_per_year_in_million: Option<f64>,
-    pub estimated_cost_per_month_in_million: Option<f64>,
-    pub economic_burden: EconomicImpactLevel,
-}
-
-#[derive(JsonSchema, Serialize, Deserialize, Debug)]
-pub enum EconomicImpactLevel {
-    HighCost,
-    ModerateCost,
-    LowCost,
-    Neutral,
-    RevenueGenerating,
-    Unclear,
-}
-
-#[derive(JsonSchema, Serialize, Deserialize, Debug)]
-pub struct AiSummary {
-    pub short_title: String,
-    pub short_summary: String,
-    pub detailed_summary: String,
-    pub key_points: Vec<Keypoint>,
-    pub general_enforcement_start_end: Option<EnforcementDates>,
-    pub topics: Vec<String>,
-    pub general_political_questions: Vec<String>,
-    pub political_compass_questions: Vec<String>,
-    pub complexity_scope_of_proposal: ProposalComplexityScope,
-    pub critical_analysis: CriticalAnalysis,
-    pub glossary: Glossary,
-    pub fiscal_analysis: FiscalAnalysis,
-}
-
-#[derive(JsonSchema, Serialize, Deserialize, Debug)]
-#[serde(tag = "kind", content = "value")]
-pub enum LawPart {
-    Article(u32),
-    Paragraph(u32),
-    Literal(char),
-    Subsection(u32),
-    Point(String),
-}
-
-#[derive(JsonSchema, Serialize, Deserialize, Debug)]
-pub struct EuroLawReference {
-    pub full_unparsed_reference: String,
-    pub parsed_reference_parts: Vec<LawPart>,
-}
-
-#[derive(JsonSchema, Serialize, Deserialize, Debug)]
-pub struct SummarizeOutput {
-    pub summary: Option<AiSummary>,
-    pub abort_reason: AbortReason,
-}
-
-#[derive(JsonSchema, Serialize, Deserialize, Debug)]
-pub enum AbortReason {
-    NoDocumentsProvidedInContext,
-    None,
-}
+use sqlx::types::Json;
+// pub async fn test_query() {
+//     sqlx::query_as!(
+//     DbAiSummary,
+//     r#"
+//     SELECT
+//         id,
+//         full_summary AS "full_summary: Json<AiSummary>"
+//     FROM summaries
+//     "#
+// );
+// todo!()
+// }
 
 pub async fn summarize_laws(task_args: TaskArgs, docs: &[Document]) -> combx::Result<()> {
     // is emphasis already generated/set? -> skip

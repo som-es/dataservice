@@ -25,13 +25,15 @@ tesseract-rs = { workspace = true, optional = true }
 rten = { version = "0.22.0", default-features = false, optional = true }
 rten-imageproc = { version = "0.22.0", optional = true }
 rten-tensor = { version = "0.22.0", optional = true }
+schemars = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
 
 [features]
-default = ["tesseract"]
+default = ["utoipa", "ocrs", "ocr"]
 
 ocrs = ["dep:ocrs", "rten", "rten-imageproc", "rten-tensor"]
 utoipa = ["dep:utoipa"]
-tesseract = ["dep:tesseract-rs"]
+tesseract = ["dep:tesseract-rs", "ocr"]
+ocr = []

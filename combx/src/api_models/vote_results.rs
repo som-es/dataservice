@@ -16,9 +16,7 @@ use somes_scraper::{LegislativeInitiative, Opinion};
 use sqlx::{FromRow, PgPool, prelude::Type};
 
 use crate::{
-    FromScrapedType, OptionalTopic, Topic,
-    api_models::vote_results::hidden_vote_translation::translate_votes,
-    document_text::{TextDocument, combine_texts, extract_text_from_documents_html_first},
+    DbAiSummary, FromScrapedType, OptionalTopic, Topic, api_models::vote_results::hidden_vote_translation::translate_votes, document_text::{TextDocument, combine_texts, extract_text_from_documents_html_first}
 };
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
@@ -63,6 +61,7 @@ pub struct VoteResult {
     pub issued_by_dels: Vec<DbRelatedDelegate>,
     pub referenced_by_others_ids: Option<Vec<i32>>,
     pub references_to: Option<Vec<DbReference>>,
+    pub ai_summary: Option<DbAiSummary>,
     #[serde(default)]
     pub meilisearch_helper: Option<MeilisearchHelper>,
 }
@@ -85,6 +84,7 @@ pub struct OptionalVoteResult {
     pub issued_by_dels: Option<Vec<DbRelatedDelegate>>,
     pub referenced_by_others_ids: Option<Vec<i32>>,
     pub references: Option<Vec<DbReference>>,
+    pub ai_summary: Option<DbAiSummary>,
     #[serde(default)]
     pub meilisearch_helper: Option<MeilisearchHelper>,
 }
@@ -323,6 +323,7 @@ impl VoteResult {
         VoteResult {
             id: maybe_legis_init_id,
             legislative_initiative: db_legis_init,
+            ai_summary: None,
             votes,
             speeches,
             named_votes,

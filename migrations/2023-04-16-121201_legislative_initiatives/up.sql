@@ -16,7 +16,7 @@ create table legislative_initiatives (
     accepted varchar(10),
     -- rename this to handled_at
     created_at date not null default now(),
-    appeared_at timestamp,
+    appeared_at timestamp not null,
     updated_at timestamp,
     requires_simple_majority boolean not null default true,
     -- was_invisibly_declined boolean default false,
