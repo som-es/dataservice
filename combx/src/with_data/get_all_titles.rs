@@ -10,7 +10,6 @@ pub async fn get_all_titles(pg: &PgPool) -> HashSet<String> {
 
     let mut unique_titles = HashSet::<String>::new();
 
-    // Mag. Dr. Stefan, Dr. Hurensohn, Dipl.-Ing. Spannend
     for name in names {
         unique_titles.extend(
             name.name

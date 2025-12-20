@@ -1,7 +1,25 @@
 use image::DynamicImage;
+
+#[cfg(not(feature = "tesseract"))]
 use ocrs::{ImageSource, OcrEngine, OcrEngineParams};
+#[cfg(not(feature = "tesseract"))]
 use rten::{Model, ModelLoadError};
 
+#[cfg(feature = "tesseract")]
+pub fn image_to_text_tesseract(api: &tesseract_rs::TesseractAPI, img: image::DynamicImage) -> crate::Result<String> {
+    let img = img.grayscale();
+    api.set_image(img.as_bytes(), img.width() as i32, img.height() as i32, 1, img.width() as i32)?;
+    Ok(api.get_utf8_text()?)
+}
+
+#[cfg(feature = "tesseract")]
+pub fn init_ocr_engine_tesseract(model_dir: &str) -> tesseract_rs::Result<tesseract_rs::TesseractAPI> {
+    let api = tesseract_rs::TesseractAPI::new();
+    api.init(model_dir, "deu")?;
+    Ok(api)
+}
+
+#[cfg(not(feature = "tesseract"))]
 pub async fn download_ocr_models(model_dir: &str) -> crate::Result<()> {
     let detection_model_url = "https://ocrs-models.s3-accelerate.amazonaws.com/text-detection.rten";
     let recognition_model_url =
@@ -22,6 +40,7 @@ pub async fn download_ocr_models(model_dir: &str) -> crate::Result<()> {
     Ok(())
 }
 
+#[cfg(not(feature = "tesseract"))]
 pub fn init_ocr_engine(model_dir: &str) -> Result<OcrEngine, ModelLoadError> {
     let detection_model = Model::load_file(format!("{model_dir}/text-detection.rten"))?;
     let recognition_model = Model::load_file(format!("{model_dir}/text-recognition.rten"))?;
@@ -35,6 +54,7 @@ pub fn init_ocr_engine(model_dir: &str) -> Result<OcrEngine, ModelLoadError> {
     Ok(engine)
 }
 
+#[cfg(not(feature = "tesseract"))]
 pub fn image_to_text(img: DynamicImage, engine: &OcrEngine) -> crate::Result<String> {
     let img = img.into_rgb8();
     let img_source = ImageSource::from_bytes(img.as_raw(), img.dimensions())?;

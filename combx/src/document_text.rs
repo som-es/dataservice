@@ -1,10 +1,14 @@
 use std::{collections::HashMap, sync::Arc};
 
+#[cfg(not(feature = "tesseract"))]
 use ocrs::OcrEngine;
 use somes_common_lib::Document;
 use somes_scraper::{AustriaScraper, Scraper, TextExtractor};
 
-use crate::{extract_images_from_pdf, image_to_text, pdf};
+use crate::{extract_images_from_pdf, pdf};
+
+#[cfg(not(feature = "tesseract"))]
+use crate::image_to_text;
 
 #[derive(Debug)]
 pub struct TextDocument {
@@ -36,6 +40,9 @@ const TOTAL_PROMPT_LENGTH: usize = 125000;
 
 pub async fn extract_text_from_documents_html_first(
     documents: &[Document],
+    #[cfg(feature = "tesseract")]
+    ocr_engine: Option<tesseract_rs::TesseractAPI>,
+    #[cfg(not(feature = "tesseract"))]
     ocr_engine: Option<Arc<OcrEngine>>,
 ) -> Vec<TextDocument> {
     let mut results = Vec::with_capacity(documents.len());
@@ -119,14 +126,18 @@ pub async fn extract_text_from_documents_html_first(
     results
         .into_iter()
         .filter(|doc| {
+            let is_prompt_full = acc_text_length <= TOTAL_PROMPT_LENGTH;
             acc_text_length += doc.text.len();
-            acc_text_length <= TOTAL_PROMPT_LENGTH
+            is_prompt_full
         })
         .collect()
 }
 
 pub async fn extract_text_from_documents(
     documents: &[Document],
+    #[cfg(feature = "tesseract")]
+    ocr_engine: Option<tesseract_rs::TesseractAPI>,
+    #[cfg(not(feature = "tesseract"))]
     ocr_engine: Option<Arc<OcrEngine>>,
 ) -> Vec<TextDocument> {
     let mut results = Vec::with_capacity(documents.len());
@@ -144,6 +155,9 @@ pub async fn extract_text_from_documents(
 
 pub async fn extract_text_from_document(
     document: &Document,
+    #[cfg(feature = "tesseract")]
+    ocr_engine: Option<tesseract_rs::TesseractAPI>,
+    #[cfg(not(feature = "tesseract"))]
     ocr_engine: Option<Arc<OcrEngine>>,
 ) -> Option<String> {
     let document_url = document.document_url.as_ref()?;
@@ -158,6 +172,17 @@ pub async fn extract_text_from_document(
             }
         },
         "OriginalPDF" => {
+
+            #[cfg(feature = "tesseract")]
+            match extract_text_from_original_pdf_document_tesseract(document_url.as_str(), ocr_engine?).await
+            {
+                Ok(text) => Some(text),
+                Err(e) => {
+                    log::error!("Cannot process original document {document:?} because of {e:?}");
+                    None
+                }
+            }
+            #[cfg(not(feature = "tesseract"))]
             match extract_text_from_original_pdf_document(document_url.as_str(), ocr_engine?).await
             {
                 Ok(text) => Some(text),
@@ -187,12 +212,35 @@ pub async fn extract_text_from_pdf_document(_url: &str) -> crate::Result<String>
     Ok(text)
 }
 
+#[cfg(feature = "tesseract")]
+pub async fn extract_text_from_original_pdf_document_tesseract(
+    url: &str,
+    ocr_engine: tesseract_rs::TesseractAPI,
+) -> crate::Result<String> {
+    // TODO: store base url directly in the document url
+    let url = format!("{}{}", AustriaScraper::BASE_URL, url);
+    let contents = reqwest::get(&url).await?.bytes().await?;
+    let start = tokio::time::Instant::now();
+    let res = tokio::task::spawn_blocking(move || {
+        let images = extract_images_from_pdf(&contents)?;
+        images
+            .into_iter()
+            .rev()
+            .map(|(_, img)| pdf::image_to_text_tesseract(&ocr_engine, img))
+            .collect::<crate::Result<String>>()
+    })
+    .await?;
+    log::info!("image to text: {:?}", start.elapsed());
+    res
+}
+
+#[cfg(not(feature = "tesseract"))]
 pub async fn extract_text_from_original_pdf_document(
-    _url: &str,
+    url: &str,
     ocr_engine: Arc<OcrEngine>,
 ) -> crate::Result<String> {
     // TODO: store base url directly in the document url
-    let url = format!("{}{}", AustriaScraper::BASE_URL, _url);
+    let url = format!("{}{}", AustriaScraper::BASE_URL, url);
     let contents = reqwest::get(&url).await?.bytes().await?;
 
     let start = tokio::time::Instant::now();
@@ -293,5 +341,31 @@ der Abgeordnete";
         let text_documents = extract_text_from_documents_html_first(&documents, None).await;
         let input = combine_texts(&text_documents);
         dbg!(input);
+    }
+
+    #[cfg(feature = "tesseract")]
+    #[tokio::test]
+    async fn test_extract_text_from_original_pdf() {
+        let url = "/dokument/XXVIII/A/568/imfname_1722828.pdf";
+        let documents = vec![Document {
+            title: Some("Test Original PDF Document".to_string()),
+            document_type: Some("OriginalPDF".to_string()),
+            document_url: Some(url.to_string()),
+        }];
+
+        #[cfg(not(feature = "tesseract"))]
+        let ocr_engine = Arc::new(
+            crate::pdf::init_ocr_engine("/home/elftausend/.dataservice/").expect("Failed to initialize OCR engine"),
+        );
+
+        let api = crate::pdf::init_ocr_engine_tesseract("/usr/share/tessdata").unwrap();
+        let text = extract_text_from_original_pdf_document_tesseract(documents[0].document_url.as_deref().unwrap(), api).await.unwrap();
+
+        println!("text: {text}");
+
+        // extract_text_from_original_pdf_document(documents[0].document_url.as_deref().unwrap(), ocr_engine).await.unwrap();
+        // let text_documents =
+        //     extract_text_from_documents_html_first(&documents, Some(ocr_engine)).await;
+        // assert_eq!(text_documents.len(), 1);
     }
 }

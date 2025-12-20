@@ -1,4 +1,4 @@
-use combx::{download_ocr_models, GovProposal};
+use combx::GovProposal;
 use dataservice::{
     ai_task::{self, AiTask},
     connect_pg,
@@ -37,7 +37,8 @@ async fn main() {
         log::error!("Cannot create app data directory: {e:?}");
     }
 
-    if let Err(e) = download_ocr_models(&model_dir()).await {
+    #[cfg(not(feature = "tesseract"))]
+    if let Err(e) = combx::download_ocr_models(&model_dir()).await {
         log::error!("Cannot download ocr models: {e:?}");
     }
 

@@ -12,7 +12,7 @@ use crate::{
     Shutdown,
 };
 
-const MAX_CONCURRENT_TASKS: usize = 4;
+const MAX_CONCURRENT_TASKS: usize = 1; // mind context size for llama cpp
 
 pub async fn ai_task_handler(
     tasks: Arc<RwLock<BinaryHeap<AiTask>>>,

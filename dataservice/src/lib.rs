@@ -8,7 +8,6 @@ pub mod shutdown;
 
 use std::{cell::LazyCell, sync::Arc};
 
-use ::combx::init_ocr_engine;
 #[cfg(feature = "runner")]
 pub use services::*;
 
@@ -38,10 +37,17 @@ pub mod combx {
 //         .unwrap_or(10)
 // });
 
+#[cfg(not(feature = "tesseract"))]
 pub const OCR_ENGINE: LazyCell<Option<Arc<ocrs::OcrEngine>>> = LazyCell::new(|| {
-    init_ocr_engine(&model_dir())
+    ::combx::init_ocr_engine(&model_dir())
         .ok()
         .map(|engine| Arc::new(engine))
+});
+
+#[cfg(feature = "tesseract")]
+pub const OCR_ENGINE: LazyCell<Option<tesseract_rs::TesseractAPI>> = LazyCell::new(|| {
+    ::combx::init_ocr_engine_tesseract(&tessdata_dir())
+        .ok()
 });
 
 use dotenvy_macro::dotenv;
@@ -61,6 +67,10 @@ pub async fn setup_app_data() -> tokio::io::Result<()> {
 pub fn model_dir() -> String {
     let home = std::env::var("HOME").expect("HOME env var must be set");
     format!("{}/.dataservice", home)
+}
+
+pub fn tessdata_dir() -> String {
+    std::env::var("TESSDATA_DIR").expect("TESSDATA_DIR env var must be set")
 }
 
 pub const DATABASE_URL: &str = dotenv!("DATABASE_URL");

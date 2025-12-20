@@ -16,5 +16,6 @@ log = "0.4.27"
 reqwest = { version = "0.12", features = ["json", "blocking"] }
 tokio = { version = "1", features = ["tokio-macros", "macros", "rt", "rt-multi-thread", "signal"] }
 utoipa = { version = "5", features = ["chrono", "axum_extras"] }
-ocrs = "0.11.0"
 schemars = "1.1.0"
+ocrs = "0.11.0"
+tesseract-rs = { version = "0.1.20", features = ["build-tesseract"] }

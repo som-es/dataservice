@@ -20,13 +20,18 @@ optional_struct = "0.5"
 pdf-extract = "0.10.0"
 lopdf = "0.38.0"
 image = "0.25.9"
-ocrs = { workspace = true }
-rten = { version = "0.22.0", default-features = false }
-rten-imageproc = { version = "0.22.0" }
-rten-tensor = { version = "0.22.0" }
+ocrs = { workspace = true, optional = true }
+tesseract-rs = { workspace = true, optional = true }
+rten = { version = "0.22.0", default-features = false, optional = true }
+rten-imageproc = { version = "0.22.0", optional = true }
+rten-tensor = { version = "0.22.0", optional = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
 
 [features]
+default = ["tesseract"]
+
+ocrs = ["dep:ocrs", "rten", "rten-imageproc", "rten-tensor"]
 utoipa = ["dep:utoipa"]
+tesseract = ["dep:tesseract-rs"]
