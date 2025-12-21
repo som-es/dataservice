@@ -1,43 +1,50 @@
 use combx::{AiSummary, SummarizeOutput, document_text::{combine_texts, extract_text_from_documents_html_first}};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use somai_client::SomAiClient;
 use somes_common_lib::Document;
 
 use crate::{OCR_ENGINE, ai_task::TaskArgs};
 
 
-pub async fn save_summarize_output(
-    pool: sqlx::PgPool,
+pub async fn insert_ai_summary_sqlx(
+    pool: &sqlx::PgPool,
     summary: &AiSummary,
-) -> combx::Result<()> {
-
-    Ok(())
+) -> combx::Result<i32> {
+    let id = sqlx::query!(
+        "INSERT INTO summaries (
+            full_summary,
+            short_title,
+            short_summary,
+            detailed_summary,
+            complexity_scope_of_proposal,
+            model_used,
+            version,
+            generated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING id; 
+         ",
+        serde_json::to_value(summary)?,
+        summary.short_title,
+        summary.short_summary,
+        summary.detailed_summary,
+        format!("{:?}", summary.complexity_scope_of_proposal),
+        "GPT-OSS-120B",
+        "1",
+        chrono::Utc::now().naive_utc()
+    )
+    .fetch_one(pool)
+    .await?;    
+    Ok(id.id)
 }
-
-use sqlx::types::Json;
-// pub async fn test_query() {
-//     sqlx::query_as!(
-//     DbAiSummary,
-//     r#"
-//     SELECT
-//         id,
-//         full_summary AS "full_summary: Json<AiSummary>"
-//     FROM summaries
-//     "#
-// );
-// todo!()
-// }
 
 pub async fn summarize_laws(task_args: TaskArgs, docs: &[Document]) -> combx::Result<()> {
     // is emphasis already generated/set? -> skip
     let info = sqlx::query!(
-        "select ai_emphasis, is_emphasis_ai_generated from legislative_initiatives where id = $1",
+        "select id from legislative_initiative_summaries where legis_init_id = $1 limit 1",
         task_args.db_entry_id
     )
-    .fetch_one(&task_args.pg_pool)
+    .fetch_optional(&task_args.pg_pool)
     .await?;
-    if info.ai_emphasis.is_some() {
+    if info.is_some() {
         log::info!(
             "Skipping legis init emphasis summarization for id {}, already set.",
             task_args.db_entry_id
@@ -70,13 +77,19 @@ pub async fn summarize_laws(task_args: TaskArgs, docs: &[Document]) -> combx::Re
 
             let summary = summary_prompt2(&task_args.som_ai_client, input, &unique_topics).await?;
 
-    //         sqlx::query!(
-    //     "UPDATE legislative_initiatives SET ai_emphasis = $1, is_emphasis_ai_generated = true WHERE id = $2",
-    //     summary.short_summary,
-    //     task_args.db_entry_id
-    // )
-    // .execute(&task_args.pg_pool)
-    // .await?;
+            if let Some(summary) = summary.summary {
+                let summary_id = insert_ai_summary_sqlx(&task_args.pg_pool, &summary).await?;
+                sqlx::query!("insert into legislative_initiative_summaries (legis_init_id, summary_id) values ($1, $2)", task_args.db_entry_id, summary_id)
+                    .execute(&task_args.pg_pool)
+                    .await?;
+            } else {
+                log::error!(
+                    "No summary generated for legis init {}, documents: {:?}, abort reason: {:?}",
+                    task_args.db_entry_id,
+                    docs,
+                    summary.abort_reason
+                );
+            }
         }
         Err(e) => log::error!("cannot extract text input from {:?} because of {e:?}", docs),
     }
@@ -403,5 +416,34 @@ mod tests {
         let result = summary_prompt2(&somai_client, input, &unique_topics).await;
         assert!(result.is_ok());
         dbg!(result.unwrap());
+    }
+    
+    #[tokio::test]
+    async fn test_summary_prompt_xxviii_bi_28() {
+        let somai_client = SomAiClient::new_local("http://localhost:8000")
+            .await
+            .unwrap();
+
+        let docs = [
+            Document {
+                title: Some("Bürgerinitiative (gescanntes Original)".into()),
+                document_url: Some("/dokument/XXVIII/BI/28/imfname_1728360.pdf".into()),
+                document_type: Some("OriginalPDF".into()),
+            },
+        ];  
+
+        let pg_pool = combx::connect_pg().await;
+        let unique_topics = sqlx::query_scalar!(
+            "select topic_name as topic from unique_eurovoc_topics order by topic"
+        )
+        .fetch_all(&pg_pool)
+        .await
+        .unwrap();  
+
+        let input =
+            combine_texts(&extract_text_from_documents_html_first(&docs, OCR_ENGINE.clone()).await);
+        // let result = summary_prompt2(&somai_client, input, &unique_topics).await;
+        // assert!(result.is_ok());
+        // dbg!(result.unwrap());
     }
 }

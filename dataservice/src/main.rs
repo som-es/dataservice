@@ -31,7 +31,7 @@ struct Args {
 async fn main() {
     let args = Args::parse();
 
-    simple_logger::init_with_level(log::Level::Info).unwrap();
+    simple_logger::init_with_level(log::Level::Error).unwrap();
 
     if let Err(e) = setup_app_data().await {
         log::error!("Cannot create app data directory: {e:?}");

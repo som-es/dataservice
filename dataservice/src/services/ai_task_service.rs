@@ -40,6 +40,12 @@ pub async fn ai_task_handler(
 
         match maybe_task {
             Some(ai_task) => {
+                log::info!(
+                    "Starting AI task: db_entry_id: {}, task_id: {}, priority: {:?}",
+                    ai_task.db_entry_id,
+                    ai_task.task_id,
+                    ai_task.priority
+                );
                 let task_args = TaskArgs {
                     db_entry_id: ai_task.db_entry_id,
                     ai_task_input: ai_task.input,
@@ -63,6 +69,8 @@ pub async fn ai_tasks_service(
 ) {
     #[cfg(feature = "ai")]
     {
+        use std::collections::HashSet;
+
         let mut somai_client = None;
         while somai_client.is_none() {
             let temp_somai_client = SomAiClient::new_local("http://127.0.0.1:8000").await;
@@ -85,6 +93,8 @@ pub async fn ai_tasks_service(
             shutdown.clone(),
         ));
 
+        let mut unique_tasks = HashSet::new();
+
         while !shutdown.is_shutdown() {
             let Ok(ai_task) = ai_task_rx.try_recv() else {
                 sleep(std::time::Duration::from_millis(4)).await;
@@ -92,6 +102,15 @@ pub async fn ai_tasks_service(
             };
 
             {
+                // this guards against adding duplicate tasks during runtime. Especially high priority tasks that fail could block the queue otherwise
+                // -> the service should try to execute an (failed) ai task at least once per restart, preferably after recompilation / version change (maybe fixes were applied that solve failing ai tasks)
+                // -> this could also be fixed by storing ai task status in the db, but when to reattempt failed tasks then?
+                // -> task should determine if it should be reattempted or not based on its own logic
+                // mind that some tasks should be able to run multiple times (e.g. political stance analysis)
+                if unique_tasks.contains(&(ai_task.db_entry_id, ai_task.task_id)) {
+                    continue;
+                }
+                unique_tasks.insert((ai_task.db_entry_id, ai_task.task_id));
                 let mut task_queue_guard = task_queue.write().await;
                 task_queue_guard.push(ai_task);
             }
