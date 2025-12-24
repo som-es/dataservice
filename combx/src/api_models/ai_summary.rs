@@ -10,6 +10,7 @@ use utoipa::ToSchema;
 #[derive(
     Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type,
 )]
+#[sqlx(type_name = "db_ai_summary")]
 pub struct DbAiSummary {
     id: i32,
     full_summary: sqlx::types::Json<AiSummary>,

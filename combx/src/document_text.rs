@@ -116,7 +116,7 @@ pub async fn extract_text_from_documents_html_first(
     // move document called "Gesetzestext" to the front if exists
     if let Some(pos) = results
         .iter()
-        .position(|doc| doc.document.title.as_deref() == Some("Gesetzestext"))
+        .position(|doc| doc.document.title.as_deref().map(|x| x.contains("Gesetzestext")).unwrap_or_default())
     {
         let doc = results.remove(pos);
         results.insert(0, doc);

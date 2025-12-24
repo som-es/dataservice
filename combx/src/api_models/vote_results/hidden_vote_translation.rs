@@ -11,6 +11,11 @@ pub async fn translate_votes(
     pro_contra: &ProContra,
     gp: &str,
 ) -> Vec<DbVote> {
+    let party_name_to_party = parties
+        .values()
+        .map(|party| (party.name.clone(), party.clone()))
+        .collect::<HashMap<String, Party>>();
+
     let convert_to_vote = |code: &String, infavor| {
         let Some(party) = parties.get(code).cloned() else {
             log::error!("Party with code {code} not found in {gp} parties map: {parties:?}");
@@ -29,13 +34,35 @@ pub async fn translate_votes(
         pro_contra
             .contra
             .iter()
-            .flat_map(|code| convert_to_vote(code, false)),
+            .flat_map(|maybe_code| match convert_to_vote(maybe_code, false) {
+                Some(vote) => Some(vote),
+                None => {
+                    let party = party_name_to_party.get(maybe_code)?.to_owned();
+                    Some(DbVote {
+                        party: party.name,
+                        code: Some(party.code),
+                        fraction: party.fraction as i32,
+                        infavor: false,
+                    })
+                }
+            }),
     );
     votes.extend(
         pro_contra
             .pro
             .iter()
-            .flat_map(|code| convert_to_vote(code, true)),
+            .flat_map(|code| match convert_to_vote(code, true) {
+                Some(vote) => Some(vote),
+                None => {
+                    let party = party_name_to_party.get(code)?.to_owned();
+                    Some(DbVote {
+                        party: party.name,
+                        code: Some(party.code),
+                        fraction: party.fraction as i32,
+                        infavor: true,
+                    })
+                }
+            }),
     );
     votes
 }
@@ -55,4 +82,73 @@ pub async fn pg_gen_code_to_parties_with_date(
         .into_iter()
         .map(|party| (party.code.clone(), party))
         .collect::<HashMap<String, Party>>()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_translate_votes() {
+        let parties = vec![
+            Party {
+                code: "A".to_string(),
+                name: "Alpha".to_string(),
+                fraction: 1,
+                color: "#FF0000".to_string(),
+            },
+            Party {
+                code: "B".to_string(),
+                name: "Beta".to_string(),
+                fraction: 2,
+                color: "#00FF00".to_string(),
+            },
+        ]
+        .into_iter()
+        .map(|p| (p.code.clone(), p))
+        .collect::<HashMap<String, Party>>();
+
+        let pro_contra = ProContra {
+            pro: vec!["A".to_string()],
+            contra: vec!["B".to_string()],
+        };
+
+        let votes = translate_votes(&parties, &pro_contra, "gp1").await;
+
+        assert_eq!(votes.len(), 2);
+        assert!(votes.iter().any(|v| v.party == "Alpha" && v.infavor));
+        assert!(votes.iter().any(|v| v.party == "Beta" && !v.infavor)); 
+    }
+
+    #[tokio::test]
+    async fn test_translate_votes_with_party_name_thanks_parlament_gv_at() {
+        let parties = vec![
+            Party {
+                code: "A".to_string(),
+                name: "Alpha".to_string(),
+                fraction: 1,
+                color: "#FF0000".to_string(),
+            },
+            Party {
+                code: "B".to_string(),
+                name: "Beta".to_string(),
+                fraction: 2,
+                color: "#00FF00".to_string(),
+            },
+        ]
+        .into_iter()
+        .map(|p| (p.code.clone(), p))
+        .collect::<HashMap<String, Party>>();
+
+        let pro_contra = ProContra {
+            pro: vec!["Alpha".to_string()],
+            contra: vec!["Beta".to_string()],
+        };
+
+        let votes = translate_votes(&parties, &pro_contra, "gp1").await;
+
+        assert_eq!(votes.len(), 2);
+        assert!(votes.iter().any(|v| v.party == "Alpha" && v.infavor));
+        assert!(votes.iter().any(|v| v.party == "Beta" && !v.infavor)); 
+    }
 }
