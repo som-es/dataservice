@@ -27,6 +27,9 @@ pub mod notify_registrars;
 pub mod should_update;
 pub(crate) use should_update::*;
 
+#[cfg(feature = "runner")]
+pub mod ai_tasks;
+
 pub mod combx {
     pub use combx::*;
 }
@@ -45,10 +48,8 @@ pub const OCR_ENGINE: LazyCell<Option<Arc<ocrs::OcrEngine>>> = LazyCell::new(|| 
 });
 
 #[cfg(feature = "tesseract")]
-pub const OCR_ENGINE: LazyCell<Option<tesseract_rs::TesseractAPI>> = LazyCell::new(|| {
-    ::combx::init_ocr_engine_tesseract(&tessdata_dir())
-        .ok()
-});
+pub const OCR_ENGINE: LazyCell<Option<tesseract_rs::TesseractAPI>> =
+    LazyCell::new(|| ::combx::init_ocr_engine_tesseract(&tessdata_dir()).ok());
 
 use dotenvy_macro::dotenv;
 

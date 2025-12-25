@@ -16,7 +16,9 @@ use somes_scraper::{LegislativeInitiative, Opinion};
 use sqlx::{FromRow, PgPool, prelude::Type};
 
 use crate::{
-    DbAiSummary, FromScrapedType, OptionalTopic, Topic, api_models::vote_results::hidden_vote_translation::translate_votes, document_text::{TextDocument, combine_texts, extract_text_from_documents_html_first}
+    DbAiSummary, FromScrapedType, OptionalTopic, Topic,
+    api_models::vote_results::hidden_vote_translation::translate_votes,
+    document_text::{TextDocument, combine_texts, extract_text_from_documents_html_first},
 };
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;

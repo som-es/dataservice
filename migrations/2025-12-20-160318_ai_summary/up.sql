@@ -22,3 +22,21 @@ create table legislative_initiative_summaries (
     legis_init_id integer references legislative_initiatives(id) on delete cascade,
     summary_id integer references summaries(id) on delete cascade
 );
+
+create table ministerial_proposal_summaries (
+    id serial primary key,
+    ministerial_proposal_id integer references ministrial_proposals(id) on delete cascade,
+    summary_id integer references summaries(id) on delete cascade
+);
+
+create table decree_summaries (
+    id serial primary key,
+    decree_id integer references ministrial_decrees(id) on delete cascade,
+    summary_id integer references summaries(id) on delete cascade
+);
+
+create table speech_summaries (
+    id serial primary key,
+    speech_id integer references plenar_speeches(id) on delete cascade,
+    summary_id integer references summaries(id) on delete cascade
+);

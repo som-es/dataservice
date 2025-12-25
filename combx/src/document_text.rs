@@ -40,10 +40,8 @@ const TOTAL_PROMPT_LENGTH: usize = 125000;
 
 pub async fn extract_text_from_documents_html_first(
     documents: &[Document],
-    #[cfg(feature = "tesseract")]
-    ocr_engine: Option<tesseract_rs::TesseractAPI>,
-    #[cfg(not(feature = "tesseract"))]
-    ocr_engine: Option<Arc<OcrEngine>>,
+    #[cfg(feature = "tesseract")] ocr_engine: Option<tesseract_rs::TesseractAPI>,
+    #[cfg(not(feature = "tesseract"))] ocr_engine: Option<Arc<OcrEngine>>,
 ) -> Vec<TextDocument> {
     let mut results = Vec::with_capacity(documents.len());
     let mut grouped_documents = HashMap::<String, Vec<Document>>::new();
@@ -114,10 +112,13 @@ pub async fn extract_text_from_documents_html_first(
     results.sort_by(|a, b| b.text.len().cmp(&a.text.len()));
 
     // move document called "Gesetzestext" to the front if exists
-    if let Some(pos) = results
-        .iter()
-        .position(|doc| doc.document.title.as_deref().map(|x| x.contains("Gesetzestext")).unwrap_or_default())
-    {
+    if let Some(pos) = results.iter().position(|doc| {
+        doc.document
+            .title
+            .as_deref()
+            .map(|x| x.contains("Gesetzestext"))
+            .unwrap_or_default()
+    }) {
         let doc = results.remove(pos);
         results.insert(0, doc);
     }
@@ -135,10 +136,8 @@ pub async fn extract_text_from_documents_html_first(
 
 pub async fn extract_text_from_documents(
     documents: &[Document],
-    #[cfg(feature = "tesseract")]
-    ocr_engine: Option<tesseract_rs::TesseractAPI>,
-    #[cfg(not(feature = "tesseract"))]
-    ocr_engine: Option<Arc<OcrEngine>>,
+    #[cfg(feature = "tesseract")] ocr_engine: Option<tesseract_rs::TesseractAPI>,
+    #[cfg(not(feature = "tesseract"))] ocr_engine: Option<Arc<OcrEngine>>,
 ) -> Vec<TextDocument> {
     let mut results = Vec::with_capacity(documents.len());
     for document in documents {
@@ -155,10 +154,8 @@ pub async fn extract_text_from_documents(
 
 pub async fn extract_text_from_document(
     document: &Document,
-    #[cfg(feature = "tesseract")]
-    ocr_engine: Option<tesseract_rs::TesseractAPI>,
-    #[cfg(not(feature = "tesseract"))]
-    ocr_engine: Option<Arc<OcrEngine>>,
+    #[cfg(feature = "tesseract")] ocr_engine: Option<tesseract_rs::TesseractAPI>,
+    #[cfg(not(feature = "tesseract"))] ocr_engine: Option<Arc<OcrEngine>>,
 ) -> Option<String> {
     let document_url = document.document_url.as_ref()?;
     let document_type = document.document_type.as_ref()?;
@@ -172,9 +169,12 @@ pub async fn extract_text_from_document(
             }
         },
         "OriginalPDF" => {
-
             #[cfg(feature = "tesseract")]
-            match extract_text_from_original_pdf_document_tesseract(document_url.as_str(), ocr_engine?).await
+            match extract_text_from_original_pdf_document_tesseract(
+                document_url.as_str(),
+                ocr_engine?,
+            )
+            .await
             {
                 Ok(text) => Some(text),
                 Err(e) => {
@@ -355,11 +355,17 @@ der Abgeordnete";
 
         #[cfg(not(feature = "tesseract"))]
         let ocr_engine = Arc::new(
-            crate::pdf::init_ocr_engine("/home/elftausend/.dataservice/").expect("Failed to initialize OCR engine"),
+            crate::pdf::init_ocr_engine("/home/elftausend/.dataservice/")
+                .expect("Failed to initialize OCR engine"),
         );
 
         let api = crate::pdf::init_ocr_engine_tesseract("/usr/share/tessdata").unwrap();
-        let text = extract_text_from_original_pdf_document_tesseract(documents[0].document_url.as_deref().unwrap(), api).await.unwrap();
+        let text = extract_text_from_original_pdf_document_tesseract(
+            documents[0].document_url.as_deref().unwrap(),
+            api,
+        )
+        .await
+        .unwrap();
 
         println!("text: {text}");
 

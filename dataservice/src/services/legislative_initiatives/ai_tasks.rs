@@ -1,42 +1,12 @@
-use combx::{AiSummary, SummarizeOutput, document_text::{combine_texts, extract_text_from_documents_html_first}};
-use somai_client::SomAiClient;
 use somes_common_lib::Document;
 
-use crate::{OCR_ENGINE, ai_task::TaskArgs};
+use crate::{ai_task::TaskArgs, ai_tasks::{insert_ai_summary_sqlx, summarize_documents}};
 
-
-pub async fn insert_ai_summary_sqlx(
-    pool: &sqlx::PgPool,
-    summary: &AiSummary,
-) -> combx::Result<i32> {
-    let id = sqlx::query!(
-        "INSERT INTO summaries (
-            full_summary,
-            short_title,
-            short_summary,
-            detailed_summary,
-            complexity_scope_of_proposal,
-            model_used,
-            version,
-            generated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING id; 
-         ",
-        serde_json::to_value(summary)?,
-        summary.short_title,
-        summary.short_summary,
-        summary.detailed_summary,
-        format!("{:?}", summary.complexity_scope_of_proposal),
-        "GPT-OSS-120B",
-        "1",
-        chrono::Utc::now().naive_utc()
-    )
-    .fetch_one(pool)
-    .await?;    
-    Ok(id.id)
-}
-
-pub async fn summarize_laws(task_args: TaskArgs, docs: &[Document]) -> combx::Result<()> {
+pub async fn summarize_legis_init_documents(
+    task_args: TaskArgs,
+    docs: &[Document],
+    summarization_of: &str,
+) -> combx::Result<()> {
     // is emphasis already generated/set? -> skip
     let info = sqlx::query!(
         "select id from legislative_initiative_summaries where legis_init_id = $1 limit 1",
@@ -52,144 +22,30 @@ pub async fn summarize_laws(task_args: TaskArgs, docs: &[Document]) -> combx::Re
         return Ok(());
     }
 
-    let inner_docs = docs.to_vec();
-    match tokio::spawn(async move {
-        let engine = OCR_ENGINE.clone();
-        combine_texts(
-            &extract_text_from_documents_html_first(&inner_docs, engine).await,
-        )
-    })
-    .await
-    {
-        Ok(input) => {
-            if input.len() < 50 {
-                log::error!(
-            "Cannot summarize legis init {}, input is too short / empty for documents: {:?}",
-            task_args.db_entry_id, docs
-        );
-                return Ok(());
-            }
-            let unique_topics = sqlx::query_scalar!(
-                "select topic_name as topic from unique_eurovoc_topics order by topic"
-            )
-            .fetch_all(&task_args.pg_pool)
-            .await?;
-
-            let summary = summary_prompt2(&task_args.som_ai_client, input, &unique_topics).await?;
-
-            if let Some(summary) = summary.summary {
-                let summary_id = insert_ai_summary_sqlx(&task_args.pg_pool, &summary).await?;
-                sqlx::query!("insert into legislative_initiative_summaries (legis_init_id, summary_id) values ($1, $2)", task_args.db_entry_id, summary_id)
+    let summary = summarize_documents(&task_args, docs, summarization_of).await?;
+    if let Some(summary) = summary.summary {
+        let summary_id = insert_ai_summary_sqlx(&task_args.pg_pool, &summary).await?;
+        sqlx::query!("insert into legislative_initiative_summaries (legis_init_id, summary_id) values ($1, $2)", task_args.db_entry_id, summary_id)
                     .execute(&task_args.pg_pool)
                     .await?;
-            } else {
-                log::error!(
-                    "No summary generated for legis init {}, documents: {:?}, abort reason: {:?}",
-                    task_args.db_entry_id,
-                    docs,
-                    summary.abort_reason
-                );
-            }
-        }
-        Err(e) => log::error!("cannot extract text input from {:?} because of {e:?}", docs),
+    } else {
+        log::error!(
+            "No summary generated for legis init {}, documents: {:?}, abort reason: {:?}",
+            task_args.db_entry_id,
+            docs,
+            summary.abort_reason
+        );
     }
 
     Ok(())
 }
 
-async fn summary_prompt(
-    somai_client: &SomAiClient,
-    input: String,
-    topics: &[String],
-) -> combx::Result<SummarizeOutput> {
-    Ok(somai_client
-        .make_llm_request_with_schema::<SummarizeOutput>(input, format!("
-                    Du bist ein Experte für politische Zusammenfassungen und Analyse in Österreich für Laien. 
-                    Bitte fasse die beigefügten Dokumente, die zu einem Antrag, der im österreichischen Nationalrat behandelt wird, gehören, zusammen. 
-                    Diese Dokumente sollen dir helfen, den Antrag besser zu verstehen. 
-                    Generiere einen kurzen und bündigen Titel für den Antrag. => short_title
-                    Fasse einerseits den Antrag in 2, bei komplexeren Anträgen in maximal 3, Sätzen zusammen. => short_summary
-                    Fasse andererseits den Antrag in 3 bis maximal 8 Stichpunkten zusammen. => key_points
-                    Bei einfacheren Anträgen können es auch weniger Stichpunkte sein (auch weniger als 3).
-                    Dabei sollen die ersten Stichpunkte oberflächlicher sein. Weitere Stichpunkte sollen graduell Details ergänzen. 
-                    
-                    Falls unterschiedliche Bestimmungen zu unterschiedlichen Zeitpunkten in Kraft treten (start_date) oder anschließend außer Kraft treten bzw. auslaufen (end_date), gib dies bei den jeweiligen Stichpunkten an. => key_points.enforcement_start_end.start_date, key_points.enforcement_start_end.end_date
-                    Extrahiere das Datum des Inkrafttretens und des Auslaufens des Gesetzes, falls eindeutige, allgemein gültige Zeitpunkte vorhanden sind (Typischerweise nicht befüllen, sofern eine Spezifizierung nach Stichpunkten vorliegt). => general_enforcement_start_end
-                    Zusätzliche Hinweise zu den Daten können in start_notes und end_notes angegeben werden. => general_enforcement_start_end.start_notes, general_enforcement_start_end.end_notes
-
-                    Überlege dir, falls passend, kritische und politische Fragen zu dem Antrag. => general_political_questions
-
-                    Besonders brisante und gesellschaftlich spannende Anträge sollen für einen automatisierten politischen Kompass Test verwendet werden. Schreibe dazu Fragen auf, die durchschnittliche Bürger mit Ja/Nein beantworten können. => political_compass_questions
-
-                    Klassifiziere die behandelnden Themen des Antrags anhand der folgenden Liste, wähle bis zu 10 Themen: {topics:?} => topics
-
-                    Falls ein Glossar für schwierige Begriffe notwendig ist, achte darauf, dass die Definition direkt beginnt, ohne den eigentlichen zu definierenden Term anfangs zu wiederholen => glossary.difficult_terms.simple_definition 
-
-                    Wähle den finanziellen Umfang des Antrags anhand der folgenden Kategorien, setze dabei nicht zu hoch an!: HighCost, ModerateCost, LowCost, Neutral, RevenueGenerating, Unclear => fiscal_analysis.economic_burden
-                    Schätze die Kosten des Antrags in Millionen Euro pro Jahr oder pro Monat, falls möglich => fiscal_analysis.estimated_cost_per_year_in_million, fiscal_analysis.estimated_cost_per_month_in_million
-
-                    Falls z.B. keine Dokumente bereitgestellt wurden, die den Antrag beschreiben, brich den Vorgang ab und gib als Grund 'NoDocumentsProvidedInContext' an. => abort_reason
-
-                    Achte bei den produzierten Informationen auf Maschinenlesbarkeit.
-                    Halte dich allgemein an das folgende Datumsformat: YYYY-MM-DD -> Maschinenlesbar!
-                    Die Informationen müssen von einer durchschnittlichen Person (aus Österreich) verstanden werden können und barrierfrei sein. Antworte ausschließlich in deutscher Sprache.
-                    "), None, false)
-        .await?)
-}
-
-async fn summary_prompt2(
-    somai_client: &SomAiClient,
-    input: String,
-    topics: &[String],
-) -> combx::Result<SummarizeOutput> {
-    Ok(somai_client
-        .make_llm_request_with_schema::<SummarizeOutput>(
-            input,
-            format!("
-            Du bist ein Experte für die Analyse österreichischer Parlamentsanträge. Deine Aufgabe ist es, komplexe politische Dokumente für Laien verständlich aufzubereiten und in ein präzises JSON-Format zu strukturieren.
-
-### DEINE AUFGABEN:
-1.  **Zusammenfassung:** 
-    - Erstelle einen kurzen, sprechenden Titel, der das Thema des Antrags prägnant zusammenfasst (`short_title`).
-    - Erstelle eine ultrakurze Zusammenfassung (2-3 Sätze) für `short_summary`.
-    - Erstelle eine detailliertere Zusammenfassung für `detailed_summary`.
-2.  **Key Points:** Erstelle 3-8 Stichpunkte (`key_points`). Beginne oberflächlich und werde graduell detaillierter. 
-    - Prüfe für jeden Punkt, ob spezifische Inkrafttretensdaten (`enforcement_start_date`) oder Ablaufdaten (`enforcement_end_date`) im Text stehen.
-    - Paragrafen- oder Abschnittsverweise dürfen NICHT in `point` angegeben werden, ausschließlich in `paragraph_references`. 
-    - Gib den rohen Verweis an, z.B. '§ 5 Abs. 2 Z 3' und zerlege ihn in `parsed_reference_parts`. (Artikel => Article, Paragraph => Paragraph, Abs. => Subsection, Z. => Point, also § 5 Abs. 2 Z 3: Paragraph(5), Subsection(2), Point(3)) Falls eine Referenz z.B. über mehrere Subsections geht, gib alle Teile an. (Abs. 1-3 => Subsection(1), Subsection(2), Subsection(3), oder Abs. 1,4 => Subsection(1), Subsection(4))
-    - `paragraph_references` kann nur dann ausgefüllt werden, wenn ein Gesetzestext vorliegt. Diese Referenzen dienen der Nachvollziehbarkeit deiner Stichpunkte!
-3.  **Metadaten & Einordnung:**
-    - Klassifiziere das Thema anhand dieser Liste (max 10): {topics:?}
-    - Bestimme die Komplexität (`complexity_scope_of_proposal`) unter Verwendung der Enum-Werte: Highest, High, Medium, Low, Lowest.
-    - Extrahiere allgemeine Daten für `general_enforcement_start_end`, sofern sie für den gesamten Antrag gelten.
-4.  **Kritische Analyse:**
-    - Erstelle Pro- und Contra-Argumente (`arguments_for`, `arguments_against`).
-    - Bestimme den Tonfall des Antrags (`tone`) aus den Werten: Neutral, Urgent, Aggressive, Optimistic, Bureaucratic.
-5.  **Finanzielle Analyse (`fiscal_analysis`):**
-    - Schätze die Kosten in Millionen Euro (pro Jahr/Monat), falls Daten vorhanden sind.
-    - Wähle für `economic_burden` exakt einen dieser Werte: HighCost, ModerateCost, LowCost, Neutral, RevenueGenerating, Unclear.
-6.  **Gesellschaftliche Relevanz:**
-    - Formuliere kritische politische Fragen (`general_political_questions`).
-    - Erstelle Ja/Nein-Fragen für einen Polit-Kompass-Test (`political_compass_questions`).
-7.  **Glossar:** Erkläre schwierige Begriffe (`difficult_terms`). Die Definition muss direkt ohne Wiederholung des Begriffs starten.
-
-### FORMALE REGELN:
-- Sprache: Ausschließlich Deutsch.
-- Zielgruppe: Durchschnittliche Personen in Österreich (barrierefrei, einfach erklärt, keine Paragraphen).
-- Datumsformat: YYYY-MM-DD.
-- Jedes Datum muss maschinenlesbar sein und demnach im angegebenen Format sein. Zusätzliche Erläuterungen und Informationen können in `start_notes` und `end_notes` gegeben werden.
-- Falls KEINE relevanten Dokumente, die den Antrag beschreiben, im Kontext gefunden wurden: Setze `summary` auf null und `abort_reason` auf 'NoDocumentsProvidedInContext'. Ansonsten, falls `summary` NICHT null ist, ist `abort_reason` 'None'.
-- Halte dich strikt an die Feldnamen und Enum-Vorgaben des bereitgestellten JSON-Schemas.
-            "),
-            None,
-            false,
-        )
-        .await?)
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::OCR_ENGINE;
+    use combx::document_text::{combine_texts, extract_text_from_documents_html_first};
+    use somai_client::SomAiClient;
+
+    use crate::{OCR_ENGINE, ai_tasks::summary_prompt2};
 
     use super::*;
 
@@ -247,10 +103,9 @@ mod tests {
         .await
         .unwrap();
 
-        let input =
-            combine_texts(&extract_text_from_documents_html_first(&docs, None).await);
+        let input = combine_texts(&extract_text_from_documents_html_first(&docs, None).await);
 
-        let result = summary_prompt2(&somai_client, input, &unique_topics).await;
+        let result = summary_prompt2(&somai_client, input, &unique_topics, "Antrag/Gesetz").await;
         assert!(result.is_ok());
         dbg!(result.unwrap());
     }
@@ -261,16 +116,16 @@ mod tests {
             .await
             .unwrap();
 
-//                 id     | legislative_initiatives_id |         title          | document_type |                 document_url                  
-// -----------+----------------------------+------------------------+---------------+-----------------------------------------------
-//  291804716 |                   95729218 | Gesetzestext           | DigitalPDF    | /dokument/XXVIII/I/308/fname_1723244.pdf
-//  291804720 |                   95729218 | Erläuterungen         | DigitalPDF    | /dokument/XXVIII/I/308/fname_1723246.pdf
-//  291804717 |                   95729218 | Gesetzestext           | HTML          | /dokument/XXVIII/I/308/fnameorig_1723244.html
-//  291804721 |                   95729218 | Erläuterungen         | HTML          | /dokument/XXVIII/I/308/fnameorig_1723246.html
-//  291804723 |                   95729218 | Textgegenüberstellung | DigitalPDF    | /dokument/XXVIII/I/308/imfname_1723247.pdf
-//  291804722 |                   95729218 | Vorblatt und WFA       | DigitalPDF    | /dokument/XXVIII/I/308/imfname_1723248.pdf
-//  291804718 |                   95729218 | Anlage 1 zum NISG 2026 | DigitalPDF    | /dokument/XXVIII/I/308/imfname_1723249.pdf
-//  291804719 |                   95729218 | Anlage 2 zum NISG 2026 | DigitalPDF    | /dokument/XXVIII/I/308/imfname_1723250.pdf
+        //                 id     | legislative_initiatives_id |         title          | document_type |                 document_url
+        // -----------+----------------------------+------------------------+---------------+-----------------------------------------------
+        //  291804716 |                   95729218 | Gesetzestext           | DigitalPDF    | /dokument/XXVIII/I/308/fname_1723244.pdf
+        //  291804720 |                   95729218 | Erläuterungen         | DigitalPDF    | /dokument/XXVIII/I/308/fname_1723246.pdf
+        //  291804717 |                   95729218 | Gesetzestext           | HTML          | /dokument/XXVIII/I/308/fnameorig_1723244.html
+        //  291804721 |                   95729218 | Erläuterungen         | HTML          | /dokument/XXVIII/I/308/fnameorig_1723246.html
+        //  291804723 |                   95729218 | Textgegenüberstellung | DigitalPDF    | /dokument/XXVIII/I/308/imfname_1723247.pdf
+        //  291804722 |                   95729218 | Vorblatt und WFA       | DigitalPDF    | /dokument/XXVIII/I/308/imfname_1723248.pdf
+        //  291804718 |                   95729218 | Anlage 1 zum NISG 2026 | DigitalPDF    | /dokument/XXVIII/I/308/imfname_1723249.pdf
+        //  291804719 |                   95729218 | Anlage 2 zum NISG 2026 | DigitalPDF    | /dokument/XXVIII/I/308/imfname_1723250.pdf
         let docs = vec![
             Document {
                 title: Some("Gesetzestext".into()),
@@ -307,23 +162,23 @@ mod tests {
                 document_url: Some("/dokument/XXVIII/I/308/imfname_1723249.pdf".into()),
                 document_type: Some("DigitalPDF".into()),
             },
-            Document { 
+            Document {
                 title: Some("Anlage 2 zum NISG 2026".into()),
                 document_url: Some("/dokument/XXVIII/I/308/imfname_1723250.pdf".into()),
                 document_type: Some("DigitalPDF".into()),
             },
-        ]; 
+        ];
         let pg_pool = combx::connect_pg().await;
         let unique_topics = sqlx::query_scalar!(
             "select topic_name as topic from unique_eurovoc_topics order by topic"
         )
         .fetch_all(&pg_pool)
         .await
-        .unwrap();  
+        .unwrap();
         let input =
             combine_texts(&extract_text_from_documents_html_first(&docs, OCR_ENGINE.clone()).await);
 
-        let result = summary_prompt2(&somai_client, input, &unique_topics).await;
+        let result = summary_prompt2(&somai_client, input, &unique_topics, "Antrag/Gesetz").await;
         assert!(result.is_ok());
         dbg!(result.unwrap());
     }
@@ -370,7 +225,7 @@ mod tests {
                 document_url: Some("/dokument/XXVIII/I/269/imfname_1718391.pdf".into()),
                 document_type: Some("DigitalPDF".into()),
             },
-        ];  
+        ];
 
         let pg_pool = combx::connect_pg().await;
         let unique_topics = sqlx::query_scalar!(
@@ -378,30 +233,27 @@ mod tests {
         )
         .fetch_all(&pg_pool)
         .await
-        .unwrap();  
+        .unwrap();
 
-        let input =
-            combine_texts(&extract_text_from_documents_html_first(&docs, None).await);
-        let result = summary_prompt2(&somai_client, input, &unique_topics).await;
+        let input = combine_texts(&extract_text_from_documents_html_first(&docs, None).await);
+        let result = summary_prompt2(&somai_client, input, &unique_topics, "Antrag/Gesetz").await;
         assert!(result.is_ok());
         dbg!(result.unwrap());
     }
     // XXVIII/A/568
     // -----------+----------------------------+------------------------------------------------------------+---------------+--------------------------------------------
- // 291805810 |                   95143976 | Selbständiger Entschließungsantrag (gescanntes Original) | OriginalPDF   | /dokument/XXVIII/A/568/imfname_1722828.pdf
+    // 291805810 |                   95143976 | Selbständiger Entschließungsantrag (gescanntes Original) | OriginalPDF   | /dokument/XXVIII/A/568/imfname_1722828.pdf
     #[tokio::test]
     async fn test_summary_prompt_xxviii_a_568() {
         let somai_client = SomAiClient::new_local("http://localhost:8000")
             .await
             .unwrap();
 
-        let docs = [
-            Document {
-                title: Some("Selbständiger Entschließungsantrag (gescanntes Original)".into()),
-                document_url: Some("/dokument/XXVIII/A/568/imfname_1722828.pdf".into()),
-                document_type: Some("OriginalPDF".into()),
-            },
-        ];  
+        let docs = [Document {
+            title: Some("Selbständiger Entschließungsantrag (gescanntes Original)".into()),
+            document_url: Some("/dokument/XXVIII/A/568/imfname_1722828.pdf".into()),
+            document_type: Some("OriginalPDF".into()),
+        }];
 
         let pg_pool = combx::connect_pg().await;
         let unique_topics = sqlx::query_scalar!(
@@ -409,28 +261,27 @@ mod tests {
         )
         .fetch_all(&pg_pool)
         .await
-        .unwrap();  
+        .unwrap();
 
         let input =
             combine_texts(&extract_text_from_documents_html_first(&docs, OCR_ENGINE.clone()).await);
-        let result = summary_prompt2(&somai_client, input, &unique_topics).await;
+        let result =
+            summary_prompt2(&somai_client, input, &unique_topics, "Entschließungsantrag").await;
         assert!(result.is_ok());
         dbg!(result.unwrap());
     }
-    
+
     #[tokio::test]
     async fn test_summary_prompt_xxviii_bi_28() {
         let somai_client = SomAiClient::new_local("http://localhost:8000")
             .await
             .unwrap();
 
-        let docs = [
-            Document {
-                title: Some("Bürgerinitiative (gescanntes Original)".into()),
-                document_url: Some("/dokument/XXVIII/BI/28/imfname_1728360.pdf".into()),
-                document_type: Some("OriginalPDF".into()),
-            },
-        ];  
+        let docs = [Document {
+            title: Some("Bürgerinitiative (gescanntes Original)".into()),
+            document_url: Some("/dokument/XXVIII/BI/28/imfname_1728360.pdf".into()),
+            document_type: Some("OriginalPDF".into()),
+        }];
 
         let pg_pool = combx::connect_pg().await;
         let unique_topics = sqlx::query_scalar!(
@@ -438,7 +289,7 @@ mod tests {
         )
         .fetch_all(&pg_pool)
         .await
-        .unwrap();  
+        .unwrap();
 
         let input =
             combine_texts(&extract_text_from_documents_html_first(&docs, OCR_ENGINE.clone()).await);

@@ -21,6 +21,9 @@ use crate::{
 mod notify;
 pub use notify::*;
 
+mod ai_tasks;
+pub use ai_tasks::*;
+
 pub async fn scrape_new_ministrial_props(
     scraper: &AustriaScraper,
 ) -> crate::Result<Vec<MinistrialProposal>> {

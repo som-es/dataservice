@@ -107,7 +107,7 @@ pub async fn update_or_insert_legis_init_in_db(
             db_legis_init.has_reference,
             db_legis_init.is_voteable_on,
             db_legis_init.is_urgent,
-            db_legis_init.voting.map(|voting| voting.to_string()),
+            db_legis_init.voting.as_ref().map(|voting| voting.to_string()),
         )
         .fetch_one(&mut *tx)
         .await
@@ -136,6 +136,7 @@ pub async fn update_or_insert_legis_init_in_db(
                 };
 
             let documents = vote_result.documents.clone();
+            let voting = db_legis_init.voting.clone();
             let summarization_task = AiTask {
                 input: None,
                 priority,
@@ -143,8 +144,21 @@ pub async fn update_or_insert_legis_init_in_db(
                 db_entry_id: legis_init_id,
                 task: Box::new(move |task_args| {
                     Box::pin(async move {
-                        use crate::legislative_initiatives::ai_tasks;
-                        ai_tasks::summarize_laws(task_args, &documents).await
+                        use crate::legislative_initiatives::summarize_legis_init_documents;
+
+                        let summarization_of = match voting.as_deref() {
+                            Some("Law") => "Antrag/Gesetz",
+                            Some("Amendment") => "Abänderungsantrag",
+                            Some("Resolution") => "Entschließungsantrag",
+                            Some(other) => other,
+                            None => "Unbekannt",
+                        };
+                        summarize_legis_init_documents(
+                            task_args,
+                            &documents,
+                            summarization_of,
+                        )
+                        .await
                         // TODO: update meilisearch index on finish
                     })
                 }),

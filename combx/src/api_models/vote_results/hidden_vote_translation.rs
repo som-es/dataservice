@@ -30,23 +30,20 @@ pub async fn translate_votes(
         })
     };
     let mut votes = vec![];
-    votes.extend(
-        pro_contra
-            .contra
-            .iter()
-            .flat_map(|maybe_code| match convert_to_vote(maybe_code, false) {
-                Some(vote) => Some(vote),
-                None => {
-                    let party = party_name_to_party.get(maybe_code)?.to_owned();
-                    Some(DbVote {
-                        party: party.name,
-                        code: Some(party.code),
-                        fraction: party.fraction as i32,
-                        infavor: false,
-                    })
-                }
-            }),
-    );
+    votes.extend(pro_contra.contra.iter().flat_map(|maybe_code| {
+        match convert_to_vote(maybe_code, false) {
+            Some(vote) => Some(vote),
+            None => {
+                let party = party_name_to_party.get(maybe_code)?.to_owned();
+                Some(DbVote {
+                    party: party.name,
+                    code: Some(party.code),
+                    fraction: party.fraction as i32,
+                    infavor: false,
+                })
+            }
+        }
+    }));
     votes.extend(
         pro_contra
             .pro
@@ -117,7 +114,7 @@ mod tests {
 
         assert_eq!(votes.len(), 2);
         assert!(votes.iter().any(|v| v.party == "Alpha" && v.infavor));
-        assert!(votes.iter().any(|v| v.party == "Beta" && !v.infavor)); 
+        assert!(votes.iter().any(|v| v.party == "Beta" && !v.infavor));
     }
 
     #[tokio::test]
@@ -149,6 +146,6 @@ mod tests {
 
         assert_eq!(votes.len(), 2);
         assert!(votes.iter().any(|v| v.party == "Alpha" && v.infavor));
-        assert!(votes.iter().any(|v| v.party == "Beta" && !v.infavor)); 
+        assert!(votes.iter().any(|v| v.party == "Beta" && !v.infavor));
     }
 }

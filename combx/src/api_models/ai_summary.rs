@@ -7,9 +7,7 @@ use sqlx::{FromRow, Type};
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
-#[derive(
-    Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type,
-)]
+#[derive(Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type)]
 #[sqlx(type_name = "db_ai_summary")]
 pub struct DbAiSummary {
     id: i32,
@@ -59,10 +57,7 @@ impl utoipa::PartialSchema for DbAiSummary {
                         .build(),
                 ),
             )
-            .property(
-                "full_summary",
-                AiSummary::schema(),
-            )
+            .property("full_summary", AiSummary::schema())
             .property(
                 "short_title",
                 Schema::Object(
@@ -128,7 +123,6 @@ impl utoipa::PartialSchema for DbAiSummary {
 #[cfg(feature = "utoipa")]
 impl utoipa::ToSchema for DbAiSummary {}
 
-
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type, CompositeType,
@@ -141,9 +135,7 @@ pub struct EnforcementDates {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(
-    JsonSchema, Debug, PartialEq, Deserialize, Serialize, Clone, FromRow, CompositeType,
-)]
+#[derive(JsonSchema, Debug, PartialEq, Deserialize, Serialize, Clone, FromRow, CompositeType)]
 pub struct Keypoint {
     pub point: String,
     pub enforcement_start_end: Option<EnforcementDates>,
@@ -151,9 +143,7 @@ pub struct Keypoint {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(
-    JsonSchema, Debug, PartialEq, Deserialize, Serialize, Clone, Type,
-)]
+#[derive(JsonSchema, Debug, PartialEq, Deserialize, Serialize, Clone, Type)]
 pub enum ProposalComplexityScope {
     Highest,
     High,
@@ -163,9 +153,7 @@ pub enum ProposalComplexityScope {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(
-    JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, Type,
-)]
+#[derive(JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, Type)]
 pub enum Tone {
     Neutral,
     Urgent,
@@ -212,9 +200,7 @@ pub struct FiscalAnalysis {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(
-    JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, Type,
-)]
+#[derive(JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, Type)]
 pub enum EconomicImpactLevel {
     HighCost,
     ModerateCost,
@@ -225,9 +211,7 @@ pub enum EconomicImpactLevel {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(
-    JsonSchema, Debug, PartialEq, Deserialize, Serialize, Clone, FromRow, CompositeType,
-)]
+#[derive(JsonSchema, Debug, PartialEq, Deserialize, Serialize, Clone, FromRow, CompositeType)]
 pub struct AiSummary {
     pub short_title: String,
     pub short_summary: String,
@@ -244,9 +228,7 @@ pub struct AiSummary {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(
-    JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone,
-)]
+#[derive(JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone)]
 #[serde(tag = "kind", content = "value")]
 pub enum LawPart {
     Article(u32),
@@ -257,29 +239,22 @@ pub enum LawPart {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(
-    JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, CompositeType,
-)]
+#[derive(JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, CompositeType)]
 pub struct EuroLawReference {
     pub full_unparsed_reference: String,
     pub parsed_reference_parts: Vec<LawPart>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(
-    JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, CompositeType,
-)]
+#[derive(JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, CompositeType)]
 pub struct SummarizeOutput {
     pub summary: Option<AiSummary>,
     pub abort_reason: AbortReason,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(
-    JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, Type,
-)]
+#[derive(JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, Type)]
 pub enum AbortReason {
     NoDocumentsProvidedInContext,
     None,
 }
-
