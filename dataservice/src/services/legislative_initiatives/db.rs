@@ -55,10 +55,10 @@ pub async fn update_or_insert_legis_init_in_db(
                 INSERT INTO legislative_initiatives (
                     title, inr, emphasis, description, ityp, gp, accepted, created_at, appeared_at, updated_at,
                     requires_simple_majority, pre_declined_type, voted_by_name, plenary_session_id, doktyp, is_law,
-                    law_accepted, law_come_into_effect_date, law_expires_on_date, by_publication, has_reference, is_voteable_on,
+                    law_accepted, has_reference, is_voteable_on,
                     is_urgent, voting
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
                 ) ON CONFLICT (inr, ityp, gp)
                 DO UPDATE SET
                     title = EXCLUDED.title,
@@ -75,9 +75,6 @@ pub async fn update_or_insert_legis_init_in_db(
                     doktyp = EXCLUDED.doktyp,
                     is_law = EXCLUDED.is_law,
                     law_accepted = EXCLUDED.law_accepted,
-                    law_come_into_effect_date = EXCLUDED.law_come_into_effect_date,
-                    law_expires_on_date = EXCLUDED.law_expires_on_date,
-                    by_publication = EXCLUDED.by_publication,
                     has_reference = EXCLUDED.has_reference,
                     is_voteable_on = EXCLUDED.is_voteable_on,
                     is_urgent = EXCLUDED.is_urgent,
@@ -101,9 +98,6 @@ pub async fn update_or_insert_legis_init_in_db(
             db_legis_init.doktyp,
             db_legis_init.is_law,
             db_legis_init.law_accepted,
-            db_legis_init.law_come_into_effect_date,
-            db_legis_init.law_expires_on_date,
-            db_legis_init.by_publication,
             db_legis_init.has_reference,
             db_legis_init.is_voteable_on,
             db_legis_init.is_urgent,

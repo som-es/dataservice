@@ -24,6 +24,9 @@ pub use notify::*;
 mod ai_tasks;
 pub use ai_tasks::*;
 
+mod inserts;
+pub use inserts::*;
+
 pub async fn scrape_new_ministrial_props(
     scraper: &AustriaScraper,
 ) -> crate::Result<Vec<MinistrialProposal>> {
@@ -303,40 +306,34 @@ pub async fn update_ministrial_proposals_in_db2(
             .await?;
         }
 
+        let mut tx = pool.begin().await?;
         // Insert or update documents
-        for document in &gov_proposal.documents {
-            sqlx::query!(
-                r#"
-                INSERT INTO ministrial_proposals_documents (
-                    ministrial_proposal_id, title, document_type, document_url
-                )
-                VALUES ($1, $2, $3, $4)
-                ON CONFLICT (document_url, ministrial_proposal_id)
-                DO UPDATE SET
-                    title = EXCLUDED.title,
-                    document_type = EXCLUDED.document_type
-                "#,
-                ministrial_prop_id,
-                document.title,
-                document.document_type,
-                document.document_url
-            )
-            .execute(pool)
-            .await?;
+        if let Err(e) = insert_ministerial_documents_batch(
+            &mut tx,
+            &gov_proposal.documents,
+            ministrial_prop_id,
+        )
+        .await
+        {
+            log::error!(
+                "Error inserting documents for ministerial prop {ministrial_prop_id}: {e:?}"
+            );
         }
+        tx.commit().await?;
 
         #[cfg(feature = "ai")]
         if let Some(ai_task_tx) = &ai_task_tx {
             use crate::{ai_task::Priority, LATEST_GP};
 
-            let priority =
-                if gov_proposal.ministrial_proposal.created_at.date() >= today() - chrono::Duration::days(90) {
-                    Priority::Highest
-                } else if gov_proposal.ministrial_proposal.gp == LATEST_GP {
-                    Priority::High
-                } else {
-                    Priority::Lowest
-                };
+            let priority = if gov_proposal.ministrial_proposal.created_at.date()
+                >= today() - chrono::Duration::days(90)
+            {
+                Priority::Highest
+            } else if gov_proposal.ministrial_proposal.gp == LATEST_GP {
+                Priority::High
+            } else {
+                Priority::Lowest
+            };
 
             let documents = gov_proposal.documents.clone();
             let summarization_task = AiTask {
@@ -346,15 +343,14 @@ pub async fn update_ministrial_proposals_in_db2(
                 db_entry_id: ministrial_prop_id,
                 task: Box::new(move |task_args| {
                     Box::pin(async move {
-                        summarize_ministerial_proposal_documents(task_args, &documents)
-                            .await
+                        summarize_ministerial_proposal_documents(task_args, &documents).await
                         // TODO: update meilisearch index on finish
                     })
                 }),
             };
 
             if let Err(e) = ai_task_tx.send(summarization_task).await {
-                log::error!("Could not send AI task for legis init emphasis summarization: {e:?}");
+                log::error!("Could not send AI task for ministerial prop summarization: {e:?}");
             }
         }
     }

@@ -6,3 +6,4 @@ Cargo.lock
 caching
 *.png
 .env
+nohup.out

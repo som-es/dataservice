@@ -197,14 +197,12 @@ pub async fn extract_text_from_document(
 }
 
 pub async fn extract_text_from_html_document(url: &str) -> Option<String> {
-    let mut text_extractor = TextExtractor::new(AustriaScraper::BASE_URL);
+    let mut text_extractor = TextExtractor::new();
     text_extractor.extract_text_from_url(&url, None, true).await
 }
 
-pub async fn extract_text_from_pdf_document(_url: &str) -> crate::Result<String> {
-    // TODO: store base url directly in the document url
-    let url = format!("{}{}", AustriaScraper::BASE_URL, _url);
-    let contents = reqwest::get(&url).await?.bytes().await?;
+pub async fn extract_text_from_pdf_document(url: &str) -> crate::Result<String> {
+    let contents = reqwest::get(url).await?.bytes().await?;
 
     let text = tokio::task::spawn_blocking(move || pdf_extract::extract_text_from_mem(&contents))
         .await??;
@@ -217,9 +215,7 @@ pub async fn extract_text_from_original_pdf_document_tesseract(
     url: &str,
     ocr_engine: tesseract_rs::TesseractAPI,
 ) -> crate::Result<String> {
-    // TODO: store base url directly in the document url
-    let url = format!("{}{}", AustriaScraper::BASE_URL, url);
-    let contents = reqwest::get(&url).await?.bytes().await?;
+    let contents = reqwest::get(url).await?.bytes().await?;
     let start = tokio::time::Instant::now();
     let res = tokio::task::spawn_blocking(move || {
         let images = extract_images_from_pdf(&contents)?;
@@ -239,9 +235,7 @@ pub async fn extract_text_from_original_pdf_document(
     url: &str,
     ocr_engine: Arc<OcrEngine>,
 ) -> crate::Result<String> {
-    // TODO: store base url directly in the document url
-    let url = format!("{}{}", AustriaScraper::BASE_URL, url);
-    let contents = reqwest::get(&url).await?.bytes().await?;
+    let contents = reqwest::get(url).await?.bytes().await?;
 
     let start = tokio::time::Instant::now();
     let res = tokio::task::spawn_blocking(move || {

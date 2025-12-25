@@ -16,9 +16,8 @@ pub async fn translate_votes(
         .map(|party| (party.name.clone(), party.clone()))
         .collect::<HashMap<String, Party>>();
 
-    let convert_to_vote = |code: &String, infavor| {
+    let convert_code_to_vote = |code: &String, infavor| {
         let Some(party) = parties.get(code).cloned() else {
-            log::error!("Party with code {code} not found in {gp} parties map: {parties:?}");
             return None;
         };
 
@@ -29,18 +28,32 @@ pub async fn translate_votes(
             infavor,
         })
     };
+
+    let convert_party_name_to_vote = |name: &String, infavor| {
+        let Some(party) = party_name_to_party.get(name).cloned() else {
+            log::error!(
+                "Could not find party by name '{}' for gp '{}' for vote translation. Available parties: {:?}",
+                name,
+                gp,
+                parties
+            );
+            return None;
+        };
+
+        Some(DbVote {
+            party: party.name,
+            code: Some(party.code),
+            fraction: party.fraction as i32,
+            infavor,
+        })
+    };
+
     let mut votes = vec![];
     votes.extend(pro_contra.contra.iter().flat_map(|maybe_code| {
-        match convert_to_vote(maybe_code, false) {
+        match convert_code_to_vote(maybe_code, false) {
             Some(vote) => Some(vote),
             None => {
-                let party = party_name_to_party.get(maybe_code)?.to_owned();
-                Some(DbVote {
-                    party: party.name,
-                    code: Some(party.code),
-                    fraction: party.fraction as i32,
-                    infavor: false,
-                })
+                convert_party_name_to_vote(maybe_code, false)
             }
         }
     }));
@@ -48,16 +61,10 @@ pub async fn translate_votes(
         pro_contra
             .pro
             .iter()
-            .flat_map(|code| match convert_to_vote(code, true) {
+            .flat_map(|code| match convert_code_to_vote(code, true) {
                 Some(vote) => Some(vote),
                 None => {
-                    let party = party_name_to_party.get(code)?.to_owned();
-                    Some(DbVote {
-                        party: party.name,
-                        code: Some(party.code),
-                        fraction: party.fraction as i32,
-                        infavor: true,
-                    })
+                    convert_party_name_to_vote(code, true) 
                 }
             }),
     );

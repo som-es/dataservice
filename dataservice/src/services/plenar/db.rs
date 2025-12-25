@@ -10,7 +10,7 @@ pub async fn update_plenar_infos_in_db(plenar_info: &PlenarInfo, pg_pool: &PgPoo
     log::info!("Updating plenar infos in database...");
 
     // disable with setting
-    let mut text_extractor = somes_scraper::TextExtractor::new(AustriaScraper::BASE_URL);
+    let mut text_extractor = somes_scraper::TextExtractor::new();
 
     if !crate::should_update(plenar_info, pg_pool).await {
         return;

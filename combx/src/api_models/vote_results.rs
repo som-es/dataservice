@@ -134,20 +134,6 @@ impl VoteResult {
             doktyp: legis_init.doktyp.clone(),
             is_law: legis_init.is_law.clone(),
             law_accepted: legis_init.law_accepted.clone(),
-            law_come_into_effect_date: legis_init
-                .come_into_effect_info
-                .as_ref()
-                .map(|x| x.law_come_into_effect_date.clone())
-                .flatten(),
-            law_expires_on_date: legis_init
-                .come_into_effect_info
-                .as_ref()
-                .map(|x| x.law_expires_on_date.clone())
-                .flatten(),
-            by_publication: legis_init
-                .come_into_effect_info
-                .as_ref()
-                .map(|x| x.by_publication),
             has_reference: Some(
                 legis_init
                     .references
