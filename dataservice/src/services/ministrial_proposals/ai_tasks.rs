@@ -1,5 +1,8 @@
+use crate::{
+    ai_task::TaskArgs,
+    ai_tasks::{insert_ai_summary_sqlx, summarize_documents},
+};
 use somes_common_lib::Document;
-use crate::{ai_task::TaskArgs, ai_tasks::{insert_ai_summary_sqlx, summarize_documents}};
 
 pub async fn summarize_ministerial_proposal_documents(
     task_args: TaskArgs,

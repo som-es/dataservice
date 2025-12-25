@@ -120,7 +120,7 @@ pub async fn run_shut_latest_gp(
     mut shutdown: Shutdown,
     pg_pool: PgPool,
     new_legis_init: Sender<Option<(i32, LegislativeInitiative)>>,
-    ai_task_ts: Sender<AiTask>,
+    ai_task_tx: Sender<AiTask>,
     legis_init_sleep: u64,
     only_latest: bool,
     only_laws: bool,
@@ -128,7 +128,7 @@ pub async fn run_shut_latest_gp(
     #[cfg(feature = "legis_init_latest")]
     while !shutdown.is_shutdown() {
         let new_legis_init = new_legis_init.clone();
-        let ai_task_ts = ai_task_ts.clone();
+        let ai_task_ts = ai_task_tx.clone();
         tokio::select! {
             _ = shutdown.recv() => {
                 println!("shutting down");

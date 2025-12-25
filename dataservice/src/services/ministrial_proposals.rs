@@ -14,8 +14,8 @@ use somes_scraper::{
 use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{
-    services::scrape_untill_success, should_update::StoredUpdatedAt, today, today_and_time,
-    Shutdown, GPS,
+    ai_task::AiTask, services::scrape_untill_success, should_update::StoredUpdatedAt, today,
+    today_and_time, Shutdown, GPS,
 };
 
 mod notify;
@@ -56,6 +56,7 @@ pub async fn ministrial_proposal_once(
     only_latest: bool,
     pg_pool: &PgPool,
     new_ministrial_proposal_tx: Option<Sender<Option<(i32, GovProposal)>>>,
+    ai_task_tx: Sender<AiTask>,
 ) -> Vec<MinistrialProposal> {
     log::info!("Try scraping ministiral proposals");
     let mut scraper = AustriaScraper::default();
@@ -85,6 +86,7 @@ pub async fn ministrial_proposal_once(
             new_ministrial_props,
             new_ministrial_proposal_tx.clone(),
             gov_officials.clone(),
+            Some(ai_task_tx.clone()),
         )
         .await
         .unwrap();
@@ -128,6 +130,7 @@ pub async fn update_ministrial_proposals_in_db2(
     ministrial_props: Vec<MinistrialProposal>,
     new_ministrial_proposal_tx: Option<Sender<Option<(i32, GovProposal)>>>,
     gov_officials: Arc<HashMap<u64, Vec<GovOfficial>>>,
+    ai_task_tx: Option<Sender<AiTask>>,
 ) -> Result<(), sqlx::Error> {
     log::info!("Updating ministrial proposal in database...");
 
@@ -321,6 +324,39 @@ pub async fn update_ministrial_proposals_in_db2(
             .execute(pool)
             .await?;
         }
+
+        #[cfg(feature = "ai")]
+        if let Some(ai_task_tx) = &ai_task_tx {
+            use crate::{ai_task::Priority, LATEST_GP};
+
+            let priority =
+                if gov_proposal.ministrial_proposal.created_at.date() >= today() - chrono::Duration::days(90) {
+                    Priority::Highest
+                } else if gov_proposal.ministrial_proposal.gp == LATEST_GP {
+                    Priority::High
+                } else {
+                    Priority::Lowest
+                };
+
+            let documents = gov_proposal.documents.clone();
+            let summarization_task = AiTask {
+                input: None,
+                priority,
+                task_id: crate::hash!(),
+                db_entry_id: ministrial_prop_id,
+                task: Box::new(move |task_args| {
+                    Box::pin(async move {
+                        summarize_ministerial_proposal_documents(task_args, &documents)
+                            .await
+                        // TODO: update meilisearch index on finish
+                    })
+                }),
+            };
+
+            if let Err(e) = ai_task_tx.send(summarization_task).await {
+                log::error!("Could not send AI task for legis init emphasis summarization: {e:?}");
+            }
+        }
     }
 
     // without this, the mail sending service wouldn't be triggered if e.g. gov proposals list length  is lower than TOTAL_MINISTERIAL_PROP_SENT threshold
@@ -339,6 +375,7 @@ pub async fn run_shut_latest_gp(
     mut shutdown: Shutdown,
     pg_pool: PgPool,
     new_ministrial_proposal_tx: Sender<Option<(i32, GovProposal)>>,
+    ai_task_tx: Sender<AiTask>,
 ) {
     let legis_init_sleep = std::env::var("MINISTRIAL_PROPOSAL_LATEST_SLEEP")
         .unwrap_or_else(|_| "400".to_string())
@@ -352,6 +389,7 @@ pub async fn run_shut_latest_gp(
     #[cfg(feature = "ministerial_latest")]
     while !shutdown.is_shutdown() {
         let new_ministrial_proposal_tx = new_ministrial_proposal_tx.clone();
+        let ai_task_tx = ai_task_tx.clone();
         tokio::select! {
             _ = shutdown.recv() => {
                 println!("shutting down");
@@ -362,7 +400,7 @@ pub async fn run_shut_latest_gp(
                 let pg_pool = pg_pool.clone();
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting ministrial proposal (latest) scraper");
-                    ministrial_proposal_once(true, &pg_pool, Some(new_ministrial_proposal_tx)).await;
+                    ministrial_proposal_once(true, &pg_pool, Some(new_ministrial_proposal_tx), ai_task_tx).await;
                 }).await {
                     log::error!("Error in ministrial proposal (latest) scraper: {:?}", e);
                 }
@@ -374,7 +412,12 @@ pub async fn run_shut_latest_gp(
     }
 }
 
-pub async fn run_shut_every_gp(mut shutdown: Shutdown, pg_pool: PgPool, only_latest: bool) {
+pub async fn run_shut_every_gp(
+    mut shutdown: Shutdown,
+    pg_pool: PgPool,
+    only_latest: bool,
+    ai_task_tx: Sender<AiTask>,
+) {
     if only_latest {
         return;
     }
@@ -390,6 +433,7 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown, pg_pool: PgPool, only_lat
 
     #[cfg(feature = "ministerial")]
     while !shutdown.is_shutdown() {
+        let ai_task_tx = ai_task_tx.clone();
         tokio::select! {
             _ = shutdown.recv() => {
                 println!("shutting down");
@@ -401,7 +445,7 @@ pub async fn run_shut_every_gp(mut shutdown: Shutdown, pg_pool: PgPool, only_lat
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting ministrial proposal scraper");
 
-                    ministrial_proposal_once(false, &pg_pool, None).await;
+                    ministrial_proposal_once(false, &pg_pool, None, ai_task_tx).await;
                 }).await {
                     log::error!("Error in ministrial proposal scraper: {:?}", e);
                 }

@@ -1,6 +1,9 @@
 use somes_common_lib::Document;
 
-use crate::{ai_task::TaskArgs, ai_tasks::{insert_ai_summary_sqlx, summarize_documents}};
+use crate::{
+    ai_task::TaskArgs,
+    ai_tasks::{insert_ai_summary_sqlx, summarize_documents},
+};
 
 pub async fn summarize_legis_init_documents(
     task_args: TaskArgs,
@@ -45,7 +48,7 @@ mod tests {
     use combx::document_text::{combine_texts, extract_text_from_documents_html_first};
     use somai_client::SomAiClient;
 
-    use crate::{OCR_ENGINE, ai_tasks::summary_prompt2};
+    use crate::{ai_tasks::summary_prompt2, OCR_ENGINE};
 
     use super::*;
 

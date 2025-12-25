@@ -94,8 +94,16 @@ pub async fn run_services(state: &State, config: Config) {
             .await;
 
             let pool1 = pool.clone();
+
+            let inner_ai_task_tx = ai_task_tx.clone();
             let ministerial_proposals = async move {
-                services::ministrial_proposals::ministrial_proposal_once(false, &pool1, None).await
+                services::ministrial_proposals::ministrial_proposal_once(
+                    false,
+                    &pool1,
+                    None,
+                    inner_ai_task_tx.clone(),
+                )
+                .await
             };
             let pool1 = pool.clone();
             let decrees = async move {
@@ -117,14 +125,14 @@ pub async fn run_services(state: &State, config: Config) {
         }
         if config.force_fill {
             let pool1 = pool.clone();
-            let ai_task_tx = ai_task_tx.clone();
+            let inner_ai_task_tx = ai_task_tx.clone();
             let legis_inits = async move {
                 services::legislative_initiatives::legis_init_once(
                     true,
                     false,
                     &pool1,
                     None,
-                    ai_task_tx.clone(),
+                    inner_ai_task_tx.clone(),
                 )
                 .await;
             };
@@ -134,9 +142,16 @@ pub async fn run_services(state: &State, config: Config) {
                 services::plenar::plenar_info_once(&pool1, true).await;
             };
 
+            let ai_task_tx = ai_task_tx.clone();
             let pool1 = pool.clone();
             let ministerial_proposals = async move {
-                services::ministrial_proposals::ministrial_proposal_once(false, &pool1, None).await;
+                services::ministrial_proposals::ministrial_proposal_once(
+                    false,
+                    &pool1,
+                    None,
+                    ai_task_tx.clone(),
+                )
+                .await;
             };
             let pool1 = pool.clone();
             let decrees = async move {
@@ -215,12 +230,14 @@ pub async fn run_services(state: &State, config: Config) {
         tokio::spawn(services::ministrial_proposals::run_shut_every_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone(),
-            config.only_latest
+            config.only_latest,
+            ai_task_tx.clone(),
         )),
         tokio::spawn(services::ministrial_proposals::run_shut_latest_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone(),
-            new_ministrial_proposal_tx
+            new_ministrial_proposal_tx,
+            ai_task_tx.clone(),
         )),
         tokio::spawn(services::plenar::run_shut(
             Shutdown::new(state.notify_shutdown.subscribe()),

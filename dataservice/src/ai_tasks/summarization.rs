@@ -75,7 +75,7 @@ pub async fn summarize_documents(
                 summarization_of,
             )
             .await?;
-            return Ok(summary)
+            return Ok(summary);
         }
         Err(e) => log::error!("cannot extract text input from {:?} because of {e:?}", docs),
     }

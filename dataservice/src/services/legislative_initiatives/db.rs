@@ -153,12 +153,8 @@ pub async fn update_or_insert_legis_init_in_db(
                             Some(other) => other,
                             None => "Unbekannt",
                         };
-                        summarize_legis_init_documents(
-                            task_args,
-                            &documents,
-                            summarization_of,
-                        )
-                        .await
+                        summarize_legis_init_documents(task_args, &documents, summarization_of)
+                            .await
                         // TODO: update meilisearch index on finish
                     })
                 }),
