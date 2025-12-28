@@ -9,7 +9,9 @@ use sqlx::Type;
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
-use crate::{DbAiSummary, DbMinistrialProposalQueryMeta, FromScrapedType, Topic, VoteResult, today};
+use crate::{
+    DbAiSummary, DbMinistrialProposalQueryMeta, FromScrapedType, Topic, VoteResult, today,
+};
 
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

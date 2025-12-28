@@ -14,8 +14,7 @@ use somes_scraper::{
 use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{
-    ai_task::AiTask, services::scrape_untill_success, should_update::StoredUpdatedAt, today,
-    today_and_time, Shutdown, GPS,
+    GPS, Shutdown, ai_task::AiTask, services::scrape_untill_success, should_update::StoredUpdatedAt, today, today_and_time, topics::{TableType, TopicType, insert_topics_generic_batch}
 };
 
 mod notify;
@@ -26,6 +25,9 @@ pub use ai_tasks::*;
 
 mod inserts;
 pub use inserts::*;
+
+mod db;
+pub use db::*;
 
 pub async fn scrape_new_ministrial_props(
     scraper: &AustriaScraper,
@@ -258,6 +260,23 @@ pub async fn update_ministrial_proposals_in_db2(
             };
         }
 
+        let mut tx = pool.begin().await?;
+    
+        if let Err(e) = insert_topics_generic_batch(&mut tx, &gov_proposal.topics, ministrial_prop_id, TopicType::Standard, TableType::MinisterialProposal).await {
+            log::error!("Error inserting topics for legis init {ministrial_prop_id}: {e:?}");
+        }
+
+        if let Err(e) =
+            insert_topics_generic_batch(&mut tx, &gov_proposal.eurovoc_topics, ministrial_prop_id, TopicType::Eurovoc, TableType::MinisterialProposal).await
+        {
+            log::error!("Error inserting eurovoc topics for legis init {ministrial_prop_id}: {e:?}");
+        }
+        if let Err(e) =
+            insert_topics_generic_batch(&mut tx, &gov_proposal.other_keyword_topics, ministrial_prop_id, TopicType::OtherKeyword, TableType::MinisterialProposal).await
+        {
+            log::error!("Error inserting other keyword topics for legis init {ministrial_prop_id}: {e:?}");
+        }
+
         // Insert or update topics
         for topic in &gov_proposal.topics {
             sqlx::query!(
@@ -308,12 +327,9 @@ pub async fn update_ministrial_proposals_in_db2(
 
         let mut tx = pool.begin().await?;
         // Insert or update documents
-        if let Err(e) = insert_ministerial_documents_batch(
-            &mut tx,
-            &gov_proposal.documents,
-            ministrial_prop_id,
-        )
-        .await
+        if let Err(e) =
+            insert_ministerial_documents_batch(&mut tx, &gov_proposal.documents, ministrial_prop_id)
+                .await
         {
             log::error!(
                 "Error inserting documents for ministerial prop {ministrial_prop_id}: {e:?}"

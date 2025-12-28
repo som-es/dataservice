@@ -1,13 +1,11 @@
 mod documents;
 mod references;
-mod topics;
 mod votes;
 
 pub use documents::*;
 pub use references::*;
 use somes_scraper::RelatedDelegate;
 use sqlx::{Acquire, Postgres, Transaction};
-pub use topics::*;
 pub use votes::*;
 
 pub async fn insert_delegates_batch<'a>(

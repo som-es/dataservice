@@ -6,11 +6,9 @@ use tokio::sync::mpsc::Sender;
 use crate::{
     ai_task::AiTask,
     legislative_initiatives::inserts::{
-        insert_delegates_batch, insert_documents_batch, insert_eurovoc_topics_batch,
-        insert_named_vote_info, insert_named_votes, insert_other_keyword_topics_batch,
-        insert_references_batch, insert_topics_batch, insert_votes_batch,
+        insert_delegates_batch, insert_documents_batch, insert_named_vote_info, insert_named_votes, insert_references_batch, insert_votes_batch
     },
-    today,
+    today, topics::{TableType, TopicType, insert_topics_generic_batch},
 };
 
 pub async fn update_or_insert_legis_init_in_db(
@@ -241,27 +239,25 @@ pub async fn update_or_insert_legis_init_in_db(
         };
     }
 
-    if let Err(e) = insert_topics_batch(&mut tx, &vote_result.topics, legis_init_id).await {
+    if let Err(e) = insert_topics_generic_batch(&mut tx, &vote_result.topics, legis_init_id, TopicType::Standard, TableType::LegislativeInitiative).await {
         log::error!("Error inserting topics for legis init {legis_init_id}: {e:?}");
     }
 
     if let Err(e) =
-        insert_eurovoc_topics_batch(&mut tx, &vote_result.eurovoc_topics, legis_init_id).await
+        insert_topics_generic_batch(&mut tx, &vote_result.eurovoc_topics, legis_init_id, TopicType::Eurovoc, TableType::LegislativeInitiative).await
     {
         log::error!("Error inserting eurovoc topics for legis init {legis_init_id}: {e:?}");
+    }
+    if let Err(e) =
+        insert_topics_generic_batch(&mut tx, &vote_result.other_keyword_topics, legis_init_id, TopicType::OtherKeyword, TableType::LegislativeInitiative).await
+    {
+        log::error!("Error inserting other keyword topics for legis init {legis_init_id}: {e:?}");
     }
 
     if let Err(e) =
         insert_delegates_batch(&mut tx, &legis_init.related_delegates, legis_init_id).await
     {
         log::error!("Error inserting delegates for legis init {legis_init_id}: {e:?}");
-    }
-
-    if let Err(e) =
-        insert_other_keyword_topics_batch(&mut tx, &vote_result.other_keyword_topics, legis_init_id)
-            .await
-    {
-        log::error!("Error inserting other keyword topics for legis init {legis_init_id}: {e:?}");
     }
 
     if let Err(e) = insert_documents_batch(&mut tx, &vote_result.documents, legis_init_id).await {

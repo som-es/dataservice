@@ -52,9 +52,7 @@ pub async fn translate_votes(
     votes.extend(pro_contra.contra.iter().flat_map(|maybe_code| {
         match convert_code_to_vote(maybe_code, false) {
             Some(vote) => Some(vote),
-            None => {
-                convert_party_name_to_vote(maybe_code, false)
-            }
+            None => convert_party_name_to_vote(maybe_code, false),
         }
     }));
     votes.extend(
@@ -63,9 +61,7 @@ pub async fn translate_votes(
             .iter()
             .flat_map(|code| match convert_code_to_vote(code, true) {
                 Some(vote) => Some(vote),
-                None => {
-                    convert_party_name_to_vote(code, true) 
-                }
+                None => convert_party_name_to_vote(code, true),
             }),
     );
     votes
