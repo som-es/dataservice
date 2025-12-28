@@ -1,5 +1,3 @@
-use std::f32::consts::E;
-
 use combx::{
     document_text::{combine_texts, extract_text_from_documents_html_first},
     AiSummary, SummarizeOutput,
@@ -142,10 +140,13 @@ pub(crate) async fn summary_prompt2(
 1.  **Zusammenfassung:** 
     - Erstelle einen kurzen, sprechenden Titel, der das Thema des Antrags prägnant zusammenfasst (`short_title`).
     - Erstelle eine ultrakurze Zusammenfassung (2-3 Sätze) für `short_summary`.
-    - Erstelle eine detailliertere Zusammenfassung für `detailed_summary`.
+    - Erstelle eine detailliertere Zusammenfassung für `detailed_summary`. (2x bis 3x so lang wie `short_summary`)
+    - Erstelle eine noch detailliertere Zusammenfassung für `very_detailed_summary`. (3x bis 4x so lang wie `short_summary`)
+    - Wenn Paragraphenangaben vorhanden wären, lass sie weg. Keine Paragraphenangaben in `short_summary` oder `detailed_summary`, da sie Laien verwirren würden.
+    - Statt „Der Antrag fügte § 21 Abs. 23 hinzu ...“ formuliere lieber z.B. „Der Antrag fügt eine neue Regelung hinzu, die ...“.
 2.  **Key Points:** Erstelle 3-8 Stichpunkte (`key_points`). Beginne oberflächlich und werde graduell detaillierter. 
     - Prüfe für jeden Punkt, ob spezifische Inkrafttretensdaten (`enforcement_start_date`) oder Ablaufdaten (`enforcement_end_date`) im Text stehen.
-    - Paragrafen- oder Abschnittsverweise dürfen NICHT in `point` angegeben werden, ausschließlich in `paragraph_references`. 
+    - Paragrafen- oder Abschnittsangaben dürfen NICHT in `point` angegeben werden, ausschließlich in `paragraph_references`. Wenn Paragraphenangaben vorhanden wären, lass sie aus `point` weg => Keine Paragraphenangaben in den User-Facing-Elementen, da sie Laien verwirren würden.
     - Gib den rohen Verweis an, z.B. '§ 5 Abs. 2 Z 3' und zerlege ihn in `parsed_reference_parts`. (Artikel => Article, Paragraph => Paragraph, Abs. => Subsection, Z. => Point, also § 5 Abs. 2 Z 3: Paragraph(5), Subsection(2), Point(3)) Falls eine Referenz z.B. über mehrere Subsections geht, gib alle Teile an. (Abs. 1-3 => Subsection(1), Subsection(2), Subsection(3), oder Abs. 1,4 => Subsection(1), Subsection(4))
     - `paragraph_references` kann nur dann ausgefüllt werden, wenn ein Gesetzestext vorliegt. Diese Referenzen dienen der Nachvollziehbarkeit deiner Stichpunkte!
 3.  **Metadaten & Einordnung:**
@@ -161,11 +162,11 @@ pub(crate) async fn summary_prompt2(
 6.  **Gesellschaftliche Relevanz:**
     - Formuliere kritische politische Fragen (`general_political_questions`).
     - Erstelle Ja/Nein-Fragen für einen Polit-Kompass-Test (`political_compass_questions`).
-7.  **Glossar:** Erkläre schwierige Begriffe (`difficult_terms`). Die Definition muss direkt ohne Wiederholung des Begriffs starten.
+7.  **Glossar:** Erkläre schwierige Begriffe (`difficult_terms`). Erkläre lieber mehr Begriffe als zu wenige. Speichere den erklärten Begriff in `term` und die zugehörige Definition in `simple_definition` ab.
 
 ### FORMALE REGELN:
 - Sprache: Ausschließlich Deutsch.
-- Zielgruppe: Durchschnittliche Personen in Österreich (barrierefrei, einfach erklärt, keine Paragraphen).
+- Zielgruppe: Durchschnittliche Personen in Österreich (barrierefrei, einfach erklärt, keine Paragraphen, keine Paragraphen- und Absatzverweise in Texten).
 - Datumsformat: YYYY-MM-DD.
 - Jedes Datum muss maschinenlesbar sein und demnach im angegebenen Format sein. Zusätzliche Erläuterungen und Informationen können in `start_notes` und `end_notes` gegeben werden.
 - Falls KEINE relevanten Dokumente, die den Antrag beschreiben, im Kontext gefunden wurden: Setze `summary` auf null und `abort_reason` auf 'NoDocumentsProvidedInContext'. Ansonsten, falls `summary` NICHT null ist, ist `abort_reason` 'None'.

@@ -216,6 +216,7 @@ pub struct AiSummary {
     pub short_title: String,
     pub short_summary: String,
     pub detailed_summary: String,
+    pub very_detailed_summary: String,
     pub key_points: Vec<Keypoint>,
     pub general_enforcement_start_end: Option<EnforcementDates>,
     pub topics: Vec<String>,

@@ -68,32 +68,32 @@ mod tests {
         let docs = vec![
             Document {
                 title: Some("Gesetzestext".into()),
-                document_url: Some("/dokument/XXVIII/I/298/fname_1722547.pdf".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/298/fname_1722547.pdf".into()),
                 document_type: Some("DigitalPDF".into()),
             },
             Document {
                 title: Some("Erläuterungen".into()),
-                document_url: Some("/dokument/XXVIII/I/298/fname_1722549.pdf".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/298/fname_1722549.pdf".into()),
                 document_type: Some("DigitalPDF".into()),
             },
             Document {
                 title: Some("Gesetzestext".into()),
-                document_url: Some("/dokument/XXVIII/I/298/fnameorig_1722547.html".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/298/fnameorig_1722547.html".into()),
                 document_type: Some("HTML".into()),
             },
             Document {
                 title: Some("Erläuterungen".into()),
-                document_url: Some("/dokument/XXVIII/I/298/fnameorig_1722549.html".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/298/fnameorig_1722549.html".into()),
                 document_type: Some("HTML".into()),
             },
             Document {
                 title: Some("Textgegenüberstellung".into()),
-                document_url: Some("/dokument/XXVIII/I/298/imfname_1722550.pdf".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/298/imfname_1722550.pdf".into()),
                 document_type: Some("DigitalPDF".into()),
             },
             Document {
                 title: Some("Vorblatt und WFA".into()),
-                document_url: Some("/dokument/XXVIII/I/298/imfname_1722551.pdf".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/298/imfname_1722551.pdf".into()),
                 document_type: Some("DigitalPDF".into()),
             },
         ];
@@ -132,42 +132,42 @@ mod tests {
         let docs = vec![
             Document {
                 title: Some("Gesetzestext".into()),
-                document_url: Some("/dokument/XXVIII/I/308/fname_1723244.pdf".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/308/fname_1723244.pdf".into()),
                 document_type: Some("DigitalPDF".into()),
             },
             Document {
                 title: Some("Erläuterungen".into()),
-                document_url: Some("/dokument/XXVIII/I/308/fname_1723246.pdf".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/308/fname_1723246.pdf".into()),
                 document_type: Some("DigitalPDF".into()),
             },
             Document {
                 title: Some("Gesetzestext".into()),
-                document_url: Some("/dokument/XXVIII/I/308/fnameorig_1723244.html".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/308/fnameorig_1723244.html".into()),
                 document_type: Some("HTML".into()),
             },
             Document {
                 title: Some("Erläuterungen".into()),
-                document_url: Some("/dokument/XXVIII/I/308/fnameorig_1723246.html".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/308/fnameorig_1723246.html".into()),
                 document_type: Some("HTML".into()),
             },
             Document {
                 title: Some("Textgegenüberstellung".into()),
-                document_url: Some("/dokument/XXVIII/I/308/imfname_1723247.pdf".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/308/imfname_1723247.pdf".into()),
                 document_type: Some("DigitalPDF".into()),
             },
             Document {
                 title: Some("Vorblatt und WFA".into()),
-                document_url: Some("/dokument/XXVIII/I/308/imfname_1723248.pdf".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/308/imfname_1723248.pdf".into()),
                 document_type: Some("DigitalPDF".into()),
             },
             Document {
                 title: Some("Anlage 1 zum NISG 2026".into()),
-                document_url: Some("/dokument/XXVIII/I/308/imfname_1723249.pdf".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/308/imfname_1723249.pdf".into()),
                 document_type: Some("DigitalPDF".into()),
             },
             Document {
                 title: Some("Anlage 2 zum NISG 2026".into()),
-                document_url: Some("/dokument/XXVIII/I/308/imfname_1723250.pdf".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/308/imfname_1723250.pdf".into()),
                 document_type: Some("DigitalPDF".into()),
             },
         ];
@@ -195,37 +195,37 @@ mod tests {
         let docs = [
             Document {
                 title: Some("Gesetzestext".into()),
-                document_url: Some("/dokument/XXVIII/I/269/fname_1718387.pdf".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/269/fname_1718387.pdf".into()),
                 document_type: Some("DigitalPDF".into()),
             },
             Document {
                 title: Some("Erläuterungen".into()),
-                document_url: Some("/dokument/XXVIII/I/269/fname_1718389.pdf".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/269/fname_1718389.pdf".into()),
                 document_type: Some("DigitalPDF".into()),
             },
             Document {
                 title: Some("Textgegenüberstellung".into()),
-                document_url: Some("/dokument/XXVIII/I/269/fname_1718390.pdf".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/269/fname_1718390.pdf".into()),
                 document_type: Some("DigitalPDF".into()),
             },
             Document {
                 title: Some("Gesetzestext".into()),
-                document_url: Some("/dokument/XXVIII/I/269/fnameorig_1718387.html".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/269/fnameorig_1718387.html".into()),
                 document_type: Some("HTML".into()),
             },
             Document {
                 title: Some("Erläuterungen".into()),
-                document_url: Some("/dokument/XXVIII/I/269/fnameorig_1718389.html".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/269/fnameorig_1718389.html".into()),
                 document_type: Some("HTML".into()),
             },
             Document {
                 title: Some("Textgegenüberstellung".into()),
-                document_url: Some("/dokument/XXVIII/I/269/fnameorig_1718390.html".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/269/fnameorig_1718390.html".into()),
                 document_type: Some("HTML".into()),
             },
             Document {
                 title: Some("Vorblatt und WFA".into()),
-                document_url: Some("/dokument/XXVIII/I/269/imfname_1718391.pdf".into()),
+                document_url: Some("https://parlament.gv.at/dokument/XXVIII/I/269/imfname_1718391.pdf".into()),
                 document_type: Some("DigitalPDF".into()),
             },
         ];
@@ -254,7 +254,7 @@ mod tests {
 
         let docs = [Document {
             title: Some("Selbständiger Entschließungsantrag (gescanntes Original)".into()),
-            document_url: Some("/dokument/XXVIII/A/568/imfname_1722828.pdf".into()),
+            document_url: Some("https://parlament.gv.at/dokument/XXVIII/A/568/imfname_1722828.pdf".into()),
             document_type: Some("OriginalPDF".into()),
         }];
 
@@ -282,7 +282,7 @@ mod tests {
 
         let docs = [Document {
             title: Some("Bürgerinitiative (gescanntes Original)".into()),
-            document_url: Some("/dokument/XXVIII/BI/28/imfname_1728360.pdf".into()),
+            document_url: Some("https://parlament.gv.at/dokument/XXVIII/BI/28/imfname_1728360.pdf".into()),
             document_type: Some("OriginalPDF".into()),
         }];
 
@@ -299,5 +299,36 @@ mod tests {
         // let result = summary_prompt2(&somai_client, input, &unique_topics).await;
         // assert!(result.is_ok());
         // dbg!(result.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_summary_prompt_xxviii_aa_47() {
+        let somai_client = SomAiClient::new_local("http://localhost:8000")
+            .await
+            .unwrap();
+
+        /*
+           id     | legislative_initiatives_id |                  title                   | document_type |                             document_url                              
+-----------+----------------------------+------------------------------------------+---------------+-----------------------------------------------------------------------
+ 300238067 |                  101032523 | Abänderungsantrag (gescanntes Original) | OriginalPDF   | https://www.parlament.gv.at/dokument/XXVIII/AA/47/imfname_1730548.pdf 
+         */
+        let docs = [Document {
+            title: Some("Abänderungsantrag (gescanntes Original)".into()),
+            document_url: Some("https://www.parlament.gv.at/dokument/XXVIII/AA/47/imfname_1730548.pdf".into()),
+            document_type: Some("OriginalPDF".into()),
+        }];
+        let pg_pool = combx::connect_pg().await;
+
+        let unique_topics = sqlx::query_scalar!(
+            "select topic_name as topic from unique_eurovoc_topics order by topic"
+        )
+        .fetch_all(&pg_pool)
+        .await
+        .unwrap();  
+        let input =
+            combine_texts(&extract_text_from_documents_html_first(&docs, OCR_ENGINE.clone()).await);
+        let result = summary_prompt2(&somai_client, input, &unique_topics, "Abänderungsantrag").await;
+        assert!(result.is_ok());
+        dbg!(result.unwrap());
     }
 }

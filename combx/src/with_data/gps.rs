@@ -8,7 +8,7 @@ pub struct LegislativePeriod {
     pub start_date: NaiveDate,
 }
 
-pub async fn gps(pg: &PgPool) -> Result<Vec<LegislativePeriod>, Box<dyn std::error::Error>> {
+pub async fn gps(pg: &PgPool) -> sqlx::Result<Vec<LegislativePeriod>> {
     Ok(sqlx::query!(
         "SELECT legislative_period as gp, MIN(add_date) as start_date
             FROM plenar_infos

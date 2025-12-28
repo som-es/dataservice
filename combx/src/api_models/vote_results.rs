@@ -16,9 +16,8 @@ use somes_scraper::{LegislativeInitiative, Opinion};
 use sqlx::{FromRow, PgPool, prelude::Type};
 
 use crate::{
-    DbAiSummary, FromScrapedType, OptionalTopic, Topic,
+    DbAiSummary, FromScrapedType, Topic,
     api_models::vote_results::hidden_vote_translation::translate_votes,
-    document_text::{TextDocument, combine_texts, extract_text_from_documents_html_first},
 };
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
@@ -229,27 +228,6 @@ impl VoteResult {
                 document_url: Some(document.link), // store complete URL
             })
             .collect::<Vec<_>>();
-
-        if let Some(somai_client) = somai_client {
-            // let document_texts =
-            //     combine_texts(&extract_text_from_documents_html_first(&documents).await);
-            // if db_legis_init.emphasis.is_none()  {
-            //     db_legis_init.emphasis = Some(somai_client.make_emphasis_prediction(document_texts.clone()).await);
-            // }
-            if eurovoc_topics.is_empty() {
-                // check if there are already stored in db to avoid expensive model call?
-
-                // eurovoc_topics = somai_client
-                //     .make_topics_predictions(document_texts.clone())
-                //     .await
-                //     .unwrap()
-                //     .topics
-                //     .into_iter()
-                //     .map(|topic| Topic { topic })
-                //     .collect();
-                panic!()
-            }
-        }
 
         let mut speeches = legis_init
             .speeches

@@ -12,7 +12,7 @@ mod ai_tasks;
 pub use ai_tasks::*;
 
 use somes_scraper::{
-    legis_init::LEGIS_IS_VOTEABLE_ON_DOKTYPES, AustriaScraper, LegislativeInitiative,
+    legis_init::LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES, AustriaScraper, LegislativeInitiative,
 };
 use sqlx::{query, PgPool};
 use std::sync::{Arc, LazyLock};
@@ -68,7 +68,7 @@ pub async fn legis_init_once(
                 let scraper = Arc::new(scraper);
 
                 let searched_doktyps = if only_laws {
-                    Some(LEGIS_IS_VOTEABLE_ON_DOKTYPES.as_slice())
+                    Some(LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES.as_slice())
                 } else {
                     None
                 };
