@@ -77,7 +77,8 @@ pub async fn update_or_insert_legis_init_in_db(
                     is_voteable_on = EXCLUDED.is_voteable_on,
                     is_urgent = EXCLUDED.is_urgent,
                     voting = EXCLUDED.voting,
-                    updated_at = EXCLUDED.updated_at
+                    updated_at = EXCLUDED.updated_at,
+                    vote_date = EXCLUDED.vote_date
                 RETURNING id
             ",
             db_legis_init.title,
