@@ -122,7 +122,7 @@ pub async fn update_or_insert_legis_init_in_db(
             use crate::{ai_task::Priority, LATEST_GP};
 
             let priority =
-                if db_legis_init.appeared_at.date() >= today() - chrono::Duration::days(60) {
+                if db_legis_init.raw_data_created_at.date() >= today() - chrono::Duration::days(60) {
                     Priority::Highest
                 } else if db_legis_init.gp == LATEST_GP {
                     Priority::High
