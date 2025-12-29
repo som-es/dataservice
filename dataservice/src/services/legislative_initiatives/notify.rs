@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
 use combx::{DbVote, VoteResult};
-use image::{codecs::png::PngEncoder, ImageEncoder, PixelWithColorType, Rgb, Rgba};
+use image::{codecs::png::PngEncoder, ImageEncoder, PixelWithColorType, Rgba};
 use imageproc::{
     drawing::{draw_filled_circle_mut, draw_filled_rect_mut},
     rect::Rect,
 };
 use somes_common_lib::Delegate;
-use somes_scraper::{LegislativeInitiative, Party, Vote};
+use somes_scraper::Party;
 use sqlx::{query, PgPool};
 
 use crate::{

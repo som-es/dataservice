@@ -107,12 +107,12 @@ pub async fn legis_init_once(
 
 impl StoredUpdatedAt for LegislativeInitiative {
     async fn stored_updated_at(&self, pg: &PgPool) -> Option<chrono::NaiveDateTime> {
-        query!("select updated_at from legislative_initiatives where gp = $1 and ityp = $2 and inr = $3", self.gp, self.ityp, self.inr as i32)
+        query!("select raw_data_updated_at from legislative_initiatives where gp = $1 and ityp = $2 and inr = $3", self.gp, self.ityp, self.inr as i32)
             .fetch_optional(pg)
             .await
             .ok()
             .flatten()
-            .map(|x| x.updated_at).flatten()
+            .map(|x| x.raw_data_updated_at).flatten()
     }
 }
 

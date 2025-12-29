@@ -51,21 +51,21 @@ pub async fn update_or_insert_legis_init_in_db(
     let legis_init_id = match sqlx::query!(
             "
                 INSERT INTO legislative_initiatives (
-                    title, inr, emphasis, description, ityp, gp, accepted, created_at, appeared_at, updated_at,
+                    title, inr, emphasis, description, ityp, gp, accepted, nr_plenary_activity_date, raw_data_created_at, raw_data_updated_at,
                     requires_simple_majority, pre_declined_type, voted_by_name, plenary_session_id, doktyp, is_law,
-                    law_accepted, has_reference, is_voteable_on,
-                    is_urgent, voting
+                    law_accepted, has_reference, is_voteable_on, 
+                    is_urgent, voting, updated_at, vote_date
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
                 ) ON CONFLICT (inr, ityp, gp)
                 DO UPDATE SET
                     title = EXCLUDED.title,
                     emphasis = COALESCE(EXCLUDED.emphasis, legislative_initiatives.emphasis),
                     description = EXCLUDED.description,
                     accepted = EXCLUDED.accepted,
-                    created_at = EXCLUDED.created_at,
-                    appeared_at = EXCLUDED.appeared_at,
-                    updated_at = EXCLUDED.updated_at,
+                    nr_plenary_activity_date = EXCLUDED.nr_plenary_activity_date,
+                    raw_data_created_at = EXCLUDED.raw_data_created_at,
+                    raw_data_updated_at = EXCLUDED.raw_data_updated_at,
                     requires_simple_majority = EXCLUDED.requires_simple_majority,
                     pre_declined_type = EXCLUDED.pre_declined_type,
                     voted_by_name = EXCLUDED.voted_by_name,
@@ -76,7 +76,9 @@ pub async fn update_or_insert_legis_init_in_db(
                     has_reference = EXCLUDED.has_reference,
                     is_voteable_on = EXCLUDED.is_voteable_on,
                     is_urgent = EXCLUDED.is_urgent,
-                    voting = EXCLUDED.voting
+                    voting = EXCLUDED.voting,
+                    updated_at = EXCLUDED.updated_at,
+                    vote_date = EXCLUDED.vote_date
                 RETURNING id
             ",
             db_legis_init.title,
@@ -86,9 +88,9 @@ pub async fn update_or_insert_legis_init_in_db(
             db_legis_init.ityp,
             db_legis_init.gp,
             db_legis_init.accepted,
-            db_legis_init.created_at,
-            db_legis_init.appeared_at,
-            db_legis_init.updated_at,
+            db_legis_init.nr_plenary_activity_date,
+            db_legis_init.raw_data_created_at,
+            db_legis_init.raw_data_updated_at,
             db_legis_init.requires_simple_majority,
             db_legis_init.pre_declined_type,
             db_legis_init.voted_by_name,
@@ -100,6 +102,8 @@ pub async fn update_or_insert_legis_init_in_db(
             db_legis_init.is_voteable_on,
             db_legis_init.is_urgent,
             db_legis_init.voting.as_ref().map(|voting| voting.to_string()),
+            crate::today_and_time(),
+            db_legis_init.vote_date,
         )
         .fetch_one(&mut *tx)
         .await
@@ -119,7 +123,7 @@ pub async fn update_or_insert_legis_init_in_db(
             use crate::{ai_task::Priority, LATEST_GP};
 
             let priority =
-                if db_legis_init.appeared_at.date() >= today() - chrono::Duration::days(60) {
+                if db_legis_init.raw_data_created_at.date() >= today() - chrono::Duration::days(60) {
                     Priority::Highest
                 } else if db_legis_init.gp == LATEST_GP {
                     Priority::High
@@ -208,7 +212,7 @@ pub async fn update_or_insert_legis_init_in_db(
         .fetch_optional(&mut *tx)
         .await
         {
-            let diff = today() - legis_init.date;
+            let diff = today() - legis_init.nr_plenary_activity_date;
 
             let mut legis_init = legis_init.clone();
             legis_init.votes = show_votes;
