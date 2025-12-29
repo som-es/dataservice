@@ -213,51 +213,7 @@ pub async fn update_ministrial_proposals_in_db2(
         }
 
         if let Some(new_legis_init_tx) = &new_ministrial_proposal_tx {
-            if let Ok(info) = sqlx::query!(
-                "select * from ministrial_email_info where already_sent_id = $1",
-                ministrial_prop_id
-            )
-            .fetch_optional(pool)
-            .await
-            {
-                let diff = today() - gov_proposal.ministrial_proposal.created_at.date();
-
-                // this works, because the specific ministerial prop paths are sorted desc by inr
-                const TOTAL_MINISTERIAL_PROP_SENT: usize = 30;
-                if diff.num_days() <= *MINISTRIAL_PROP_STILL_SEND_DAYS
-                    && info.is_none()
-                    && i < TOTAL_MINISTERIAL_PROP_SENT
-                {
-                    log::info!("Sending fitting ministrial prop: {ministrial_prop_id}");
-                    if let Err(e) = new_legis_init_tx
-                        .send(Some((ministrial_prop_id, gov_proposal.clone())))
-                        .await
-                    {
-                        log::error!("could not send ministrial prop to mail notify service: {e:?}")
-                    } else {
-                        started_acc = true;
-                    }
-
-                    if let Err(e) = sqlx::query!(
-                        "insert into ministrial_email_info (already_sent_id) values ($1)",
-                        ministrial_prop_id
-                    )
-                    .execute(pool)
-                    .await
-                    {
-                        log::error!(
-                            "could not insert into ministrial email info for id {ministrial_prop_id}: {e:?}"
-                        );
-                    }
-                } else if started_acc {
-                    started_acc = false;
-
-                    // early triggering / stop accumulating
-                    if let Err(e) = new_legis_init_tx.send(None).await {
-                        log::error!("could not trigger mail sending service: {e:?}")
-                    }
-                }
-            };
+            check_and_send_ministrial_email(pool, &mut started_acc, i, &gov_proposal, ministrial_prop_id, new_legis_init_tx).await;
         }
 
         let mut tx = pool.begin().await?;
@@ -381,6 +337,54 @@ pub async fn update_ministrial_proposals_in_db2(
     }
 
     Ok(())
+}
+
+async fn check_and_send_ministrial_email(pool: &sqlx::Pool<sqlx::Postgres>, started_acc: &mut bool, i: usize, gov_proposal: &GovProposal, ministrial_prop_id: i32, new_gov_prop_tx: &Sender<Option<(i32, GovProposal)>>) {
+    if let Ok(info) = sqlx::query!(
+        "select * from ministrial_email_info where already_sent_id = $1",
+        ministrial_prop_id
+    )
+    .fetch_optional(pool)
+    .await
+    {
+        let diff = today() - gov_proposal.ministrial_proposal.created_at.date();
+
+        // this works, because the specific ministerial prop paths are sorted desc by inr
+        const TOTAL_MINISTERIAL_PROP_SENT: usize = 30;
+        if diff.num_days() <= *MINISTRIAL_PROP_STILL_SEND_DAYS
+            && info.is_none()
+            && i < TOTAL_MINISTERIAL_PROP_SENT
+        {
+            log::info!("Sending fitting ministrial prop: {ministrial_prop_id}");
+            if let Err(e) = new_gov_prop_tx
+                .send(Some((ministrial_prop_id, gov_proposal.clone())))
+                .await
+            {
+                log::error!("could not send ministrial prop to mail notify service: {e:?}")
+            } else {
+                *started_acc = true;
+            }
+
+            if let Err(e) = sqlx::query!(
+                "insert into ministrial_email_info (already_sent_id) values ($1)",
+                ministrial_prop_id
+            )
+            .execute(pool)
+            .await
+            {
+                log::error!(
+                    "could not insert into ministrial email info for id {ministrial_prop_id}: {e:?}"
+                );
+            }
+        } else if *started_acc {
+            *started_acc = false;
+
+            // early triggering / stop accumulating
+            if let Err(e) = new_gov_prop_tx.send(None).await {
+                log::error!("could not trigger mail sending service: {e:?}")
+            }
+        }
+    }
 }
 
 pub async fn run_shut_latest_gp(

@@ -267,7 +267,7 @@ mod tests {
     async fn test_namentlich_name_matching_xxv_i_1() {
         let scraper = AustriaScraper::default();
         let init = scraper.get_legis_init("/gegenstand/XXV/I/1").await.unwrap();
-        println!("date: {:?}", init.date);
+        println!("date: {:?}", init.nr_plenary_activity_date);
         assert!(init.hidden_votes_info.voted_by_name);
         let pro_contra = init
             .hidden_votes_info
@@ -277,7 +277,7 @@ mod tests {
             .unwrap();
 
         let pg = connect_pg().await;
-        let active_delegates = active_delegates_at_date(&pg, init.date)
+        let active_delegates = active_delegates_at_date(&pg, init.nr_plenary_activity_date)
             .await
             .unwrap()
             .into_iter()
@@ -299,7 +299,7 @@ mod tests {
             .get_legis_init("/gegenstand/XXVI/I/514")
             .await
             .unwrap();
-        println!("date: {:?}", init.date);
+        println!("date: {:?}", init.nr_plenary_activity_date);
         assert!(init.hidden_votes_info.voted_by_name);
         println!("hidden_vot_infos: {:?}", init.hidden_votes_info);
         let pro_contra = init
@@ -310,7 +310,7 @@ mod tests {
             .unwrap();
 
         let pg = connect_pg().await;
-        let active_delegates = active_delegates_at_date(&pg, init.date)
+        let active_delegates = active_delegates_at_date(&pg, init.nr_plenary_activity_date)
             .await
             .unwrap()
             .into_iter()

@@ -1,7 +1,5 @@
 use std::collections::HashMap;
-
 use combx::GovProposal;
-use somes_scraper::ministrial_proposals::MinistrialProposal;
 use sqlx::{query, PgPool};
 
 use crate::{

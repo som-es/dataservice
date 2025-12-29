@@ -120,9 +120,10 @@ impl VoteResult {
             ityp: legis_init.ityp.clone(),
             gp: legis_init.gp.clone(),
             accepted: legis_init.accepted.map(|a| a.to_string()),
-            created_at: legis_init.date,
-            appeared_at: legis_init.created_at,
-            updated_at: legis_init.updated_at,
+            nr_plenary_activity_date: legis_init.nr_plenary_activity_date,
+            vote_date: legis_init.vote_date,
+            raw_data_created_at: legis_init.created_at,
+            raw_data_updated_at: legis_init.updated_at,
             requires_simple_majority: legis_init.requires_simple_majority,
             pre_declined_type: legis_init
                 .hidden_votes_info
@@ -144,6 +145,8 @@ impl VoteResult {
             is_urgent: legis_init.is_urgent,
             is_emphasis_ai_generated: false,
             voting: legis_init.voting.map(|voting| voting.to_string()),
+            created_at: None,
+            updated_at: None,
             // law_come_into_effect_date: legis_init.come_into_effect_info.map(|x| x.law_come_into_effect_date.clone()),
         };
 
@@ -159,7 +162,7 @@ impl VoteResult {
             .collect::<Vec<_>>();
 
         let code_to_parties = db_enhancer
-            .gen_code_to_parties_with_date(&db_legis_init.created_at, &db_legis_init.gp)
+            .gen_code_to_parties_with_date(&db_legis_init.nr_plenary_activity_date, &db_legis_init.gp)
             .await;
 
         if legis_init.votes.is_empty()
@@ -191,7 +194,7 @@ impl VoteResult {
 
                 let named_votes = match &voted_by_name_data.delegates_pro_contra {
                     Some(pro_contra) => db_enhancer
-                        .create_db_named_votes(pro_contra, legis_init.date, &legis_init.gp)
+                        .create_db_named_votes(pro_contra, legis_init.nr_plenary_activity_date, &legis_init.gp)
                         .await
                         .ok(),
                     None => None,
@@ -209,7 +212,7 @@ impl VoteResult {
             .into_iter()
             .map(|topic| Topic { topic })
             .collect::<Vec<_>>();
-        let mut eurovoc_topics = legis_init
+        let eurovoc_topics = legis_init
             .eurovoc_topics
             .into_iter()
             .map(|topic| Topic { topic })
