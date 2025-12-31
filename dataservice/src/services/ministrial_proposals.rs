@@ -14,7 +14,12 @@ use somes_scraper::{
 use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{
-    GPS, Shutdown, ai_task::AiTask, services::scrape_untill_success, should_update::StoredUpdatedAt, today, today_and_time, topics::{TableType, TopicType, insert_topics_generic_batch}
+    ai_task::AiTask,
+    services::scrape_untill_success,
+    should_update::StoredUpdatedAt,
+    today, today_and_time,
+    topics::{insert_topics_generic_batch, TableType, TopicType},
+    Shutdown, GPS,
 };
 
 mod notify;
@@ -213,24 +218,57 @@ pub async fn update_ministrial_proposals_in_db2(
         }
 
         if let Some(new_legis_init_tx) = &new_ministrial_proposal_tx {
-            check_and_send_ministrial_email(pool, &mut started_acc, i, &gov_proposal, ministrial_prop_id, new_legis_init_tx).await;
+            check_and_send_ministrial_email(
+                pool,
+                &mut started_acc,
+                i,
+                &gov_proposal,
+                ministrial_prop_id,
+                new_legis_init_tx,
+                true,
+            )
+            .await;
         }
 
         let mut tx = pool.begin().await?;
-    
-        if let Err(e) = insert_topics_generic_batch(&mut tx, &gov_proposal.topics, ministrial_prop_id, TopicType::Standard, TableType::MinisterialProposal).await {
+
+        if let Err(e) = insert_topics_generic_batch(
+            &mut tx,
+            &gov_proposal.topics,
+            ministrial_prop_id,
+            TopicType::Standard,
+            TableType::MinisterialProposal,
+        )
+        .await
+        {
             log::error!("Error inserting topics for legis init {ministrial_prop_id}: {e:?}");
         }
 
-        if let Err(e) =
-            insert_topics_generic_batch(&mut tx, &gov_proposal.eurovoc_topics, ministrial_prop_id, TopicType::Eurovoc, TableType::MinisterialProposal).await
+        if let Err(e) = insert_topics_generic_batch(
+            &mut tx,
+            &gov_proposal.eurovoc_topics,
+            ministrial_prop_id,
+            TopicType::Eurovoc,
+            TableType::MinisterialProposal,
+        )
+        .await
         {
-            log::error!("Error inserting eurovoc topics for legis init {ministrial_prop_id}: {e:?}");
+            log::error!(
+                "Error inserting eurovoc topics for legis init {ministrial_prop_id}: {e:?}"
+            );
         }
-        if let Err(e) =
-            insert_topics_generic_batch(&mut tx, &gov_proposal.other_keyword_topics, ministrial_prop_id, TopicType::OtherKeyword, TableType::MinisterialProposal).await
+        if let Err(e) = insert_topics_generic_batch(
+            &mut tx,
+            &gov_proposal.other_keyword_topics,
+            ministrial_prop_id,
+            TopicType::OtherKeyword,
+            TableType::MinisterialProposal,
+        )
+        .await
         {
-            log::error!("Error inserting other keyword topics for legis init {ministrial_prop_id}: {e:?}");
+            log::error!(
+                "Error inserting other keyword topics for legis init {ministrial_prop_id}: {e:?}"
+            );
         }
 
         // Insert or update topics
@@ -307,6 +345,9 @@ pub async fn update_ministrial_proposals_in_db2(
                 Priority::Lowest
             };
 
+            let inner_gov_proposal = gov_proposal.clone();
+            let inner_gov_prop_mail_tx = new_ministrial_proposal_tx.clone();
+            let pool = pool.clone();
             let documents = gov_proposal.documents.clone();
             let summarization_task = AiTask {
                 input: None,
@@ -315,7 +356,23 @@ pub async fn update_ministrial_proposals_in_db2(
                 db_entry_id: ministrial_prop_id,
                 task: Box::new(move |task_args| {
                     Box::pin(async move {
-                        summarize_ministerial_proposal_documents(task_args, &documents).await
+                        let ai_summary =
+                            summarize_ministerial_proposal_documents(task_args, &documents).await?;
+                        let mut inner_gov_proposal = inner_gov_proposal;
+                        inner_gov_proposal.ai_summary = ai_summary;
+                        if let Some(gov_prop_mail_tx) = inner_gov_prop_mail_tx {
+                            check_and_send_ministrial_email(
+                                &pool,
+                                &mut started_acc,
+                                i,
+                                &inner_gov_proposal,
+                                ministrial_prop_id,
+                                &gov_prop_mail_tx,
+                                false,
+                            )
+                            .await;
+                        }
+                        Ok(())
                         // TODO: update meilisearch index on finish
                     })
                 }),
@@ -339,7 +396,24 @@ pub async fn update_ministrial_proposals_in_db2(
     Ok(())
 }
 
-async fn check_and_send_ministrial_email(pool: &sqlx::Pool<sqlx::Postgres>, started_acc: &mut bool, i: usize, gov_proposal: &GovProposal, ministrial_prop_id: i32, new_gov_prop_tx: &Sender<Option<(i32, GovProposal)>>) {
+async fn check_and_send_ministrial_email(
+    pool: &sqlx::Pool<sqlx::Postgres>,
+    started_acc: &mut bool,
+    i: usize,
+    gov_proposal: &GovProposal,
+    ministrial_prop_id: i32,
+    new_gov_prop_tx: &Sender<Option<(i32, GovProposal)>>,
+    mind_acc: bool,
+) {
+    if gov_proposal.eurovoc_topics.is_empty()
+        && gov_proposal
+            .ai_summary
+            .as_ref()
+            .map(|ai_summary| ai_summary.full_summary.topics.is_empty())
+            .unwrap_or_default()
+    {
+        return;
+    }
     if let Ok(info) = sqlx::query!(
         "select * from ministrial_email_info where already_sent_id = $1",
         ministrial_prop_id
@@ -351,9 +425,9 @@ async fn check_and_send_ministrial_email(pool: &sqlx::Pool<sqlx::Postgres>, star
 
         // this works, because the specific ministerial prop paths are sorted desc by inr
         const TOTAL_MINISTERIAL_PROP_SENT: usize = 30;
-        if diff.num_days() <= *MINISTRIAL_PROP_STILL_SEND_DAYS
+        if (!mind_acc || i < TOTAL_MINISTERIAL_PROP_SENT)
+            && diff.num_days() <= *MINISTRIAL_PROP_STILL_SEND_DAYS
             && info.is_none()
-            && i < TOTAL_MINISTERIAL_PROP_SENT
         {
             log::info!("Sending fitting ministrial prop: {ministrial_prop_id}");
             if let Err(e) = new_gov_prop_tx
@@ -380,6 +454,11 @@ async fn check_and_send_ministrial_email(pool: &sqlx::Pool<sqlx::Postgres>, star
             *started_acc = false;
 
             // early triggering / stop accumulating
+            if let Err(e) = new_gov_prop_tx.send(None).await {
+                log::error!("could not trigger mail sending service: {e:?}")
+            }
+        }
+        if !mind_acc {
             if let Err(e) = new_gov_prop_tx.send(None).await {
                 log::error!("could not trigger mail sending service: {e:?}")
             }

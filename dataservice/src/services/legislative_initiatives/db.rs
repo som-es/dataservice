@@ -6,9 +6,11 @@ use tokio::sync::mpsc::Sender;
 use crate::{
     ai_task::AiTask,
     legislative_initiatives::inserts::{
-        insert_delegates_batch, insert_documents_batch, insert_named_vote_info, insert_named_votes, insert_references_batch, insert_votes_batch
+        insert_delegates_batch, insert_documents_batch, insert_named_vote_info, insert_named_votes,
+        insert_references_batch, insert_votes_batch,
     },
-    today, topics::{TableType, TopicType, insert_topics_generic_batch},
+    today,
+    topics::{insert_topics_generic_batch, TableType, TopicType},
 };
 
 pub async fn update_or_insert_legis_init_in_db(
@@ -122,14 +124,15 @@ pub async fn update_or_insert_legis_init_in_db(
         if db_legis_init.is_voteable_on {
             use crate::{ai_task::Priority, LATEST_GP};
 
-            let priority =
-                if db_legis_init.raw_data_created_at.date() >= today() - chrono::Duration::days(60) {
-                    Priority::Highest
-                } else if db_legis_init.gp == LATEST_GP {
-                    Priority::High
-                } else {
-                    Priority::Lowest
-                };
+            let priority = if db_legis_init.raw_data_created_at.date()
+                >= today() - chrono::Duration::days(60)
+            {
+                Priority::Highest
+            } else if db_legis_init.gp == LATEST_GP {
+                Priority::High
+            } else {
+                Priority::Lowest
+            };
 
             let documents = vote_result.documents.clone();
             let voting = db_legis_init.voting.clone();
@@ -243,17 +246,37 @@ pub async fn update_or_insert_legis_init_in_db(
         };
     }
 
-    if let Err(e) = insert_topics_generic_batch(&mut tx, &vote_result.topics, legis_init_id, TopicType::Standard, TableType::LegislativeInitiative).await {
+    if let Err(e) = insert_topics_generic_batch(
+        &mut tx,
+        &vote_result.topics,
+        legis_init_id,
+        TopicType::Standard,
+        TableType::LegislativeInitiative,
+    )
+    .await
+    {
         log::error!("Error inserting topics for legis init {legis_init_id}: {e:?}");
     }
 
-    if let Err(e) =
-        insert_topics_generic_batch(&mut tx, &vote_result.eurovoc_topics, legis_init_id, TopicType::Eurovoc, TableType::LegislativeInitiative).await
+    if let Err(e) = insert_topics_generic_batch(
+        &mut tx,
+        &vote_result.eurovoc_topics,
+        legis_init_id,
+        TopicType::Eurovoc,
+        TableType::LegislativeInitiative,
+    )
+    .await
     {
         log::error!("Error inserting eurovoc topics for legis init {legis_init_id}: {e:?}");
     }
-    if let Err(e) =
-        insert_topics_generic_batch(&mut tx, &vote_result.other_keyword_topics, legis_init_id, TopicType::OtherKeyword, TableType::LegislativeInitiative).await
+    if let Err(e) = insert_topics_generic_batch(
+        &mut tx,
+        &vote_result.other_keyword_topics,
+        legis_init_id,
+        TopicType::OtherKeyword,
+        TableType::LegislativeInitiative,
+    )
+    .await
     {
         log::error!("Error inserting other keyword topics for legis init {legis_init_id}: {e:?}");
     }

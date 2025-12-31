@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use combx::GovProposal;
 use sqlx::{query, PgPool};
+use std::collections::HashMap;
 
 use crate::{
     email::{send_mail, MAILER},
@@ -79,10 +79,16 @@ pub(crate) fn send_new_ministrial_prop_info_mail(
             else {
                 continue;
             };
+            let description = ministrial_prop
+                .ai_summary
+                .as_ref()
+                .map(|summary| &summary.short_title)
+                .unwrap_or(&ministrial_prop.ministrial_proposal.description);
+
             let ministrial_prop_html_entry = crate::email::MINISTRIAL_PROP_ENTRY_TEMPLATE
                 .replace(
                     "{*PROPOSAL_DESCRIPTION*}",
-                    &ministrial_prop.ministrial_proposal.description,
+                    &description,
                 )
                 .replace(
                     "{*PROPOSAL_MINISTRY*}",
@@ -121,7 +127,7 @@ pub(crate) fn send_new_ministrial_prop_info_mail(
         log::info!("Sending composed new ministrial prop mail to {mail_to}");
         let content = crate::email::MINISTRIAL_PROP_EMAIL_TEMPLATE
             .replace("{*MINISTRIAL_PROPS*}", &ministrial_props_html);
-        println!("content: {content}");
+        // println!("content: {content}");
         if let Err(e) = send_mail(
             &MAILER,
             &mail_to,

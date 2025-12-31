@@ -49,9 +49,3 @@ pub fn send_mail(
     mailer.send(&email)?;
     Ok(())
 }
-
-#[test]
-fn test_send_mail() {
-    // send_otp_mail("robin.pautsch@it.htl-hl.ac.at", "A12 3Z2 HAC").unwrap()
-    // send_mail("", "tolle_id_zum_verifizieren");
-}

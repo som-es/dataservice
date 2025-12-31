@@ -10,15 +10,15 @@ use utoipa::ToSchema;
 #[derive(Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type)]
 #[sqlx(type_name = "db_ai_summary")]
 pub struct DbAiSummary {
-    id: i32,
-    full_summary: sqlx::types::Json<AiSummary>,
-    short_title: String,
-    short_summary: String,
-    detailed_summary: String,
-    complexity_scope_of_proposal: String,
-    model_used: String,
-    version: String,
-    generated_at: chrono::NaiveDateTime,
+    pub id: i32,
+    pub full_summary: sqlx::types::Json<AiSummary>,
+    pub short_title: String,
+    pub short_summary: String,
+    pub detailed_summary: String,
+    pub complexity_scope_of_proposal: String,
+    pub model_used: String,
+    pub version: String,
+    pub generated_at: chrono::NaiveDateTime,
 }
 
 impl ToCompositeType for DbAiSummary {

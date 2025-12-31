@@ -64,7 +64,7 @@ pub async fn insert_topics_generic_batch<'a>(
              SELECT * FROM UNNEST($1::text[]) 
              ON CONFLICT (topic_name) DO NOTHING"
         );
-        
+
         sqlx::query(&unique_sql)
             .bind(&topic_names)
             .execute(&mut *sp)

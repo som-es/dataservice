@@ -8,7 +8,7 @@ create table summaries (
     complexity_scope_of_proposal text not null,
     model_used text not null,
     version text not null,
-    generated_at timestamp default NOW()
+    generated_at timestamp not null default NOW()
 );
 
 create table generated_eurovoc_topics (

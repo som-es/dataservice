@@ -162,7 +162,10 @@ impl VoteResult {
             .collect::<Vec<_>>();
 
         let code_to_parties = db_enhancer
-            .gen_code_to_parties_with_date(&db_legis_init.nr_plenary_activity_date, &db_legis_init.gp)
+            .gen_code_to_parties_with_date(
+                &db_legis_init.nr_plenary_activity_date,
+                &db_legis_init.gp,
+            )
             .await;
 
         if legis_init.votes.is_empty()
@@ -194,7 +197,11 @@ impl VoteResult {
 
                 let named_votes = match &voted_by_name_data.delegates_pro_contra {
                     Some(pro_contra) => db_enhancer
-                        .create_db_named_votes(pro_contra, legis_init.nr_plenary_activity_date, &legis_init.gp)
+                        .create_db_named_votes(
+                            pro_contra,
+                            legis_init.nr_plenary_activity_date,
+                            &legis_init.gp,
+                        )
                         .await
                         .ok(),
                     None => None,
