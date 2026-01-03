@@ -77,16 +77,16 @@ pub async fn plenar_info_once(pg_pool: &PgPool, only_latest: bool) {
 }
 
 impl StoredUpdatedAt for PlenarInfo {
-    async fn stored_updated_at(&self, pg: &PgPool) -> Option<chrono::NaiveDateTime> {
+    async fn stored_updated_at(&self, pg: &PgPool) -> Option<chrono::DateTime<chrono::Utc>> {
         sqlx::query!(
-            "select updated_at from plenar_infos where inr = $1",
+            "select raw_data_updated_at from plenar_infos where inr = $1",
             self.inr as i32
         )
         .fetch_optional(pg)
         .await
         .ok()
         .flatten()
-        .map(|x| x.updated_at)
+        .map(|x| x.raw_data_updated_at)
         .flatten()
     }
 }

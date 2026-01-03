@@ -10,7 +10,7 @@ create table ministrial_issuer (
 
 CREATE TABLE division_interest_score (
     id SERIAL PRIMARY KEY,
-    timestamp TIMESTAMP DEFAULT NOW(), 
+    timestamp TIMESTAMPTZ DEFAULT NOW(), 
     score REAL NOT NULL,
     delegate_id INTEGER NOT NULL,
     CONSTRAINT fk_delegate

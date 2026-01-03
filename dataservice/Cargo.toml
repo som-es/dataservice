@@ -35,6 +35,7 @@ ocrs = { workspace = true, optional = true }
 clap = { version = "4.5.53", features = ["derive"] }
 schemars = { workspace = true }
 tesseract-rs = { workspace = true, optional = true }
+chrono-tz = {workspace = true}
 [dev-dependencies]
 rand = "0.9"
 

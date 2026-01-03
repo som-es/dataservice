@@ -12,8 +12,8 @@ pub async fn save_dates(pg_pool: &PgPool, only_latest: bool) -> crate::Result<()
     let mut date_filter = DateFilter::default();
     if only_latest {
         date_filter.daterange = Some(DateRange {
-            from: Some(today_and_time().checked_sub_months(Months::new(1)).unwrap()),
-            to: Some(today_and_time().checked_add_months(Months::new(1)).unwrap()),
+            from: Some(today_and_time().naive_local().checked_sub_months(Months::new(1)).unwrap()),
+            to: Some(today_and_time().naive_local().checked_add_months(Months::new(1)).unwrap()),
         });
     }
     let dates = scraper.post_dates_payload(&date_filter).await?;

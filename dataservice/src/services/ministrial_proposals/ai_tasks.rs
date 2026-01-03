@@ -1,13 +1,16 @@
+use sqlx::types::Json;
+
 use crate::{
     ai_task::TaskArgs,
     ai_tasks::{insert_ai_summary_sqlx, summarize_documents},
 };
+use combx::{AiSummary, DbAiSummary};
 use somes_common_lib::Document;
 
 pub async fn summarize_ministerial_proposal_documents(
     task_args: TaskArgs,
     docs: &[Document],
-) -> combx::Result<()> {
+) -> combx::Result<Option<DbAiSummary>> {
     // is emphasis already generated/set? -> skip
     let info = sqlx::query!(
         "select id from ministerial_proposal_summaries where ministerial_proposal_id = $1 limit 1",
@@ -20,7 +23,7 @@ pub async fn summarize_ministerial_proposal_documents(
             "Skipping ministerial proposal summarization for id {}, already set.",
             task_args.db_entry_id
         );
-        return Ok(());
+        return Ok(None);
     }
 
     let summary = summarize_documents(&task_args, docs, "Ministerialentwurf").await?;
@@ -29,6 +32,24 @@ pub async fn summarize_ministerial_proposal_documents(
         sqlx::query!("insert into ministerial_proposal_summaries (ministerial_proposal_id, summary_id) values ($1, $2)", task_args.db_entry_id, summary_id)
                     .execute(&task_args.pg_pool)
                     .await?;
+
+        let db_ai_summary = sqlx::query_as!(
+            DbAiSummary,
+            r#"select 
+                id,
+        full_summary as "full_summary: Json<AiSummary>",
+        short_title,
+        short_summary,
+        detailed_summary,
+        complexity_scope_of_proposal,
+        model_used,
+        version,
+        generated_at from summaries where id = $1"#,
+            summary_id
+        )
+        .fetch_one(&task_args.pg_pool)
+        .await?;
+        Ok(Some(db_ai_summary))
     } else {
         log::error!(
             "No summary generated for ministerial proposal {}, documents: {:?}, abort reason: {:?}",
@@ -36,9 +57,8 @@ pub async fn summarize_ministerial_proposal_documents(
             docs,
             summary.abort_reason
         );
+        Ok(None)
     }
-
-    Ok(())
 }
 
 #[cfg(test)]

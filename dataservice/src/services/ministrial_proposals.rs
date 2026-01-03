@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
-use chrono::Months;
+use chrono::{Months, Utc};
 use combx::{create_gov_officials_map, FromScrapedType, GovProposal};
 use dotenvy_macro::dotenv;
 use somes_scraper::{
@@ -14,7 +14,12 @@ use somes_scraper::{
 use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{
-    GPS, Shutdown, ai_task::AiTask, services::scrape_untill_success, should_update::StoredUpdatedAt, today, today_and_time, topics::{TableType, TopicType, insert_topics_generic_batch}
+    ai_task::AiTask,
+    services::scrape_untill_success,
+    should_update::StoredUpdatedAt,
+    today, today_and_time,
+    topics::{insert_topics_generic_batch, TableType, TopicType},
+    Shutdown, GPS,
 };
 
 mod notify;
@@ -73,7 +78,7 @@ pub async fn ministrial_proposal_once(
         scraper.scrape_info.gp = vec![gp.into()];
         if only_latest {
             // this seems to not work! - Minsterial Props and NRSITZ do not have date filtering???
-            scraper.scrape_info.date_start = today_and_time().checked_sub_months(Months::new(3))
+            scraper.scrape_info.date_start = today_and_time().naive_local().checked_sub_months(Months::new(3))
         }
 
         let new_ministrial_props = scrape_untill_success::<Vec<_>, _>(|| async {
@@ -114,9 +119,9 @@ const MINISTRIAL_PROP_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| {
 use sqlx::{postgres::PgPool, query};
 
 impl StoredUpdatedAt for MinistrialProposal {
-    async fn stored_updated_at(&self, pg: &PgPool) -> Option<chrono::NaiveDateTime> {
+    async fn stored_updated_at(&self, pg: &PgPool) -> Option<chrono::DateTime<Utc>> {
         query!(
-            "select updated_at from ministrial_proposals where gp = $1 and ityp = $2 and inr = $3",
+            "select raw_data_updated_at from ministrial_proposals where gp = $1 and ityp = $2 and inr = $3",
             self.gp,
             self.ityp,
             self.inr as i32
@@ -125,7 +130,7 @@ impl StoredUpdatedAt for MinistrialProposal {
         .await
         .ok()
         .flatten()
-        .map(|x| x.updated_at)
+        .map(|x| x.raw_data_updated_at)
         .flatten()
     }
 }
@@ -154,24 +159,26 @@ pub async fn update_ministrial_proposals_in_db2(
         let ministrial_prop_id = sqlx::query!(
             r#"
             INSERT INTO ministrial_proposals (
-                title, inr, emphasis, description, ityp, gp, created_at, updated_at,
-                due_to, ressort, ressort_shortform, legis_init_gp, legis_init_inr, legis_init_ityp, has_vote_result
+                title, inr, emphasis, description, ityp, gp, raw_data_created_at, raw_data_updated_at,
+                due_to, ressort, ressort_shortform, legis_init_gp, legis_init_inr, legis_init_ityp, has_vote_result,
+                updated_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             ON CONFLICT (inr, ityp, gp)
             DO UPDATE SET
                 title = EXCLUDED.title,
                 emphasis = EXCLUDED.emphasis,
                 description = EXCLUDED.description,
-                created_at = EXCLUDED.created_at,
-                updated_at = EXCLUDED.updated_at,
+                raw_data_created_at = EXCLUDED.raw_data_created_at,
+                raw_data_updated_at = EXCLUDED.raw_data_updated_at,
                 due_to = EXCLUDED.due_to,
                 ressort = EXCLUDED.ressort,
                 ressort_shortform = EXCLUDED.ressort_shortform,
                 legis_init_gp = EXCLUDED.legis_init_gp,
                 legis_init_inr = EXCLUDED.legis_init_inr,
                 legis_init_ityp = EXCLUDED.legis_init_ityp,
-                has_vote_result = EXCLUDED.has_vote_result
+                has_vote_result = EXCLUDED.has_vote_result,
+                updated_at = EXCLUDED.updated_at
             RETURNING id
             "#,
             gov_proposal.ministrial_proposal.title,
@@ -189,6 +196,7 @@ pub async fn update_ministrial_proposals_in_db2(
             gov_proposal.ministrial_proposal.legis_init_inr,
             gov_proposal.ministrial_proposal.legis_init_ityp,
             gov_proposal.ministrial_proposal.has_vote_result,
+            crate::today_and_time(),
         )
         .fetch_one(pool)
         .await?
@@ -213,24 +221,57 @@ pub async fn update_ministrial_proposals_in_db2(
         }
 
         if let Some(new_legis_init_tx) = &new_ministrial_proposal_tx {
-            check_and_send_ministrial_email(pool, &mut started_acc, i, &gov_proposal, ministrial_prop_id, new_legis_init_tx).await;
+            check_and_send_ministrial_email(
+                pool,
+                &mut started_acc,
+                i,
+                &gov_proposal,
+                ministrial_prop_id,
+                new_legis_init_tx,
+                true,
+            )
+            .await;
         }
 
         let mut tx = pool.begin().await?;
-    
-        if let Err(e) = insert_topics_generic_batch(&mut tx, &gov_proposal.topics, ministrial_prop_id, TopicType::Standard, TableType::MinisterialProposal).await {
+
+        if let Err(e) = insert_topics_generic_batch(
+            &mut tx,
+            &gov_proposal.topics,
+            ministrial_prop_id,
+            TopicType::Standard,
+            TableType::MinisterialProposal,
+        )
+        .await
+        {
             log::error!("Error inserting topics for legis init {ministrial_prop_id}: {e:?}");
         }
 
-        if let Err(e) =
-            insert_topics_generic_batch(&mut tx, &gov_proposal.eurovoc_topics, ministrial_prop_id, TopicType::Eurovoc, TableType::MinisterialProposal).await
+        if let Err(e) = insert_topics_generic_batch(
+            &mut tx,
+            &gov_proposal.eurovoc_topics,
+            ministrial_prop_id,
+            TopicType::Eurovoc,
+            TableType::MinisterialProposal,
+        )
+        .await
         {
-            log::error!("Error inserting eurovoc topics for legis init {ministrial_prop_id}: {e:?}");
+            log::error!(
+                "Error inserting eurovoc topics for legis init {ministrial_prop_id}: {e:?}"
+            );
         }
-        if let Err(e) =
-            insert_topics_generic_batch(&mut tx, &gov_proposal.other_keyword_topics, ministrial_prop_id, TopicType::OtherKeyword, TableType::MinisterialProposal).await
+        if let Err(e) = insert_topics_generic_batch(
+            &mut tx,
+            &gov_proposal.other_keyword_topics,
+            ministrial_prop_id,
+            TopicType::OtherKeyword,
+            TableType::MinisterialProposal,
+        )
+        .await
         {
-            log::error!("Error inserting other keyword topics for legis init {ministrial_prop_id}: {e:?}");
+            log::error!(
+                "Error inserting other keyword topics for legis init {ministrial_prop_id}: {e:?}"
+            );
         }
 
         // Insert or update topics
@@ -297,7 +338,7 @@ pub async fn update_ministrial_proposals_in_db2(
         if let Some(ai_task_tx) = &ai_task_tx {
             use crate::{ai_task::Priority, LATEST_GP};
 
-            let priority = if gov_proposal.ministrial_proposal.created_at.date()
+            let priority = if gov_proposal.ministrial_proposal.raw_data_created_at
                 >= today() - chrono::Duration::days(90)
             {
                 Priority::Highest
@@ -307,6 +348,9 @@ pub async fn update_ministrial_proposals_in_db2(
                 Priority::Lowest
             };
 
+            let inner_gov_proposal = gov_proposal.clone();
+            let inner_gov_prop_mail_tx = new_ministrial_proposal_tx.clone();
+            let pool = pool.clone();
             let documents = gov_proposal.documents.clone();
             let summarization_task = AiTask {
                 input: None,
@@ -315,7 +359,23 @@ pub async fn update_ministrial_proposals_in_db2(
                 db_entry_id: ministrial_prop_id,
                 task: Box::new(move |task_args| {
                     Box::pin(async move {
-                        summarize_ministerial_proposal_documents(task_args, &documents).await
+                        let ai_summary =
+                            summarize_ministerial_proposal_documents(task_args, &documents).await?;
+                        let mut inner_gov_proposal = inner_gov_proposal;
+                        inner_gov_proposal.ai_summary = ai_summary;
+                        if let Some(gov_prop_mail_tx) = inner_gov_prop_mail_tx {
+                            check_and_send_ministrial_email(
+                                &pool,
+                                &mut started_acc,
+                                i,
+                                &inner_gov_proposal,
+                                ministrial_prop_id,
+                                &gov_prop_mail_tx,
+                                false,
+                            )
+                            .await;
+                        }
+                        Ok(())
                         // TODO: update meilisearch index on finish
                     })
                 }),
@@ -339,7 +399,24 @@ pub async fn update_ministrial_proposals_in_db2(
     Ok(())
 }
 
-async fn check_and_send_ministrial_email(pool: &sqlx::Pool<sqlx::Postgres>, started_acc: &mut bool, i: usize, gov_proposal: &GovProposal, ministrial_prop_id: i32, new_gov_prop_tx: &Sender<Option<(i32, GovProposal)>>) {
+async fn check_and_send_ministrial_email(
+    pool: &sqlx::Pool<sqlx::Postgres>,
+    started_acc: &mut bool,
+    i: usize,
+    gov_proposal: &GovProposal,
+    ministrial_prop_id: i32,
+    new_gov_prop_tx: &Sender<Option<(i32, GovProposal)>>,
+    mind_acc: bool,
+) {
+    if gov_proposal.eurovoc_topics.is_empty()
+        && gov_proposal
+            .ai_summary
+            .as_ref()
+            .map(|ai_summary| ai_summary.full_summary.topics.is_empty())
+            .unwrap_or(true)
+    {
+        return;
+    }
     if let Ok(info) = sqlx::query!(
         "select * from ministrial_email_info where already_sent_id = $1",
         ministrial_prop_id
@@ -347,13 +424,13 @@ async fn check_and_send_ministrial_email(pool: &sqlx::Pool<sqlx::Postgres>, star
     .fetch_optional(pool)
     .await
     {
-        let diff = today() - gov_proposal.ministrial_proposal.created_at.date();
+        let diff = today().to_utc() - gov_proposal.ministrial_proposal.raw_data_created_at;
 
         // this works, because the specific ministerial prop paths are sorted desc by inr
         const TOTAL_MINISTERIAL_PROP_SENT: usize = 30;
-        if diff.num_days() <= *MINISTRIAL_PROP_STILL_SEND_DAYS
+        if (!mind_acc || i < TOTAL_MINISTERIAL_PROP_SENT)
+            && diff.num_days() <= *MINISTRIAL_PROP_STILL_SEND_DAYS
             && info.is_none()
-            && i < TOTAL_MINISTERIAL_PROP_SENT
         {
             log::info!("Sending fitting ministrial prop: {ministrial_prop_id}");
             if let Err(e) = new_gov_prop_tx
@@ -380,6 +457,11 @@ async fn check_and_send_ministrial_email(pool: &sqlx::Pool<sqlx::Postgres>, star
             *started_acc = false;
 
             // early triggering / stop accumulating
+            if let Err(e) = new_gov_prop_tx.send(None).await {
+                log::error!("could not trigger mail sending service: {e:?}")
+            }
+        }
+        if !mind_acc {
             if let Err(e) = new_gov_prop_tx.send(None).await {
                 log::error!("could not trigger mail sending service: {e:?}")
             }
@@ -500,37 +582,37 @@ mod tests {
                 path: "/gegenstand/XXVIII/ME/1".into(),
                 ressort: "wenig".into(),
                 ressort_shortform: "nix".into(),
-                due_to: today(),
+                due_to: today().date_naive(),
             },
             GegenstandInfo {
                 path: "/gegenstand/XXVIII/ME/15".into(),
                 ressort: "wenig".into(),
                 ressort_shortform: "nix".into(),
-                due_to: today(),
+                due_to: today().date_naive(),
             },
             GegenstandInfo {
                 path: "/gegenstand/XXVIII/ME/32".into(),
                 ressort: "wenig".into(),
                 ressort_shortform: "nix".into(),
-                due_to: today(),
+                due_to: today().date_naive(),
             },
             GegenstandInfo {
                 path: "/gegenstand/XXVIII/ME/101".into(),
                 ressort: "wenig".into(),
                 ressort_shortform: "nix".into(),
-                due_to: today(),
+                due_to: today().date_naive(),
             },
             GegenstandInfo {
                 path: "/gegenstand/XXVIII/ME/10".into(),
                 ressort: "wenig".into(),
                 ressort_shortform: "nix".into(),
-                due_to: today(),
+                due_to: today().date_naive(),
             },
             GegenstandInfo {
                 path: "/gegenstand/XXVIII/ME/40".into(),
                 ressort: "wenig".into(),
                 ressort_shortform: "nix".into(),
-                due_to: today(),
+                due_to: today().date_naive(),
             },
         ];
         sort_ministerial_prop_paths_desc(&mut paths);

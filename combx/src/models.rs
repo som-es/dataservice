@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use optional_struct::optional_struct;
 use serde_derive::{Deserialize, Serialize};
 
@@ -94,8 +94,10 @@ pub struct DbMinistrialProposalQueryMeta {
     pub emphasis: Option<String>,
     pub title: String,
     pub description: String,
-    pub created_at: NaiveDateTime,
-    pub updated_at: Option<NaiveDateTime>,
+    pub raw_data_created_at: DateTime<Utc>,
+    pub raw_data_updated_at: Option<DateTime<Utc>>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
     pub due_to: NaiveDate,
     pub ressort: String,
     pub ressort_shortform: String,

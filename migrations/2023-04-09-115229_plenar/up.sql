@@ -2,8 +2,10 @@
 CREATE TABLE IF NOT EXISTS plenar_infos (
     -- use serial id -> add inr, and UNIQUE of (inr, ityp, gp)
     id serial primary key,
-    add_date timestamp not null,
-    updated_at timestamp,
+    raw_data_created_at timestamptz not null,
+    raw_data_updated_at timestamptz,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz,
     inr int not null,
     title varchar(255) not null,
     description varchar(255) not null,

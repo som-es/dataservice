@@ -86,7 +86,7 @@ pub async fn update_plenar_infos_in_db(plenar_info: &PlenarInfo, pg_pool: &PgPoo
         let matching = absence_matching(
             pg_pool,
             absences,
-            plenar_info.date.date(),
+            plenar_info.created_at.date_naive(),
             plenar_info.gp.clone(),
         )
         .await;

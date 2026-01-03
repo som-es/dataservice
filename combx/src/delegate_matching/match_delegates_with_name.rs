@@ -344,12 +344,13 @@ mod tests {
                 // println!("plenar_info: {plenar_info:?}");
 
                 let pg = connect_pg().await;
-                let active_delegates = active_delegates_at_date(&pg, plenar_info.date.date())
-                    .await
-                    .unwrap()
-                    .into_iter()
-                    .map(|delegate| (delegate.name, delegate.id as usize))
-                    .collect::<HashSet<_>>();
+                let active_delegates =
+                    active_delegates_at_date(&pg, plenar_info.created_at.date_naive())
+                        .await
+                        .unwrap()
+                        .into_iter()
+                        .map(|delegate| (delegate.name, delegate.id as usize))
+                        .collect::<HashSet<_>>();
 
                 let res = match_delegate_names_with_delegate_ids(
                     &active_delegates,
@@ -393,7 +394,7 @@ mod tests {
         println!("plenar_info: {plenar_info:?}");
 
         let pg = connect_pg().await;
-        let active_delegates = active_delegates_at_date(&pg, plenar_info.date.date())
+        let active_delegates = active_delegates_at_date(&pg, plenar_info.created_at.date_naive())
             .await
             .unwrap()
             .into_iter()

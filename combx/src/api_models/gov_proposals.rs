@@ -52,9 +52,9 @@ impl GovProposal {
                         .iter()
                         .find(|role| {
                             role.ministry == ministerial_proposal.gegenstand_info.ressort
-                                && ministerial_proposal.created_at.date() >= role.start_date
+                                && ministerial_proposal.created_at.date_naive() >= role.start_date
                                 && role.end_date.unwrap_or(today())
-                                    >= ministerial_proposal.created_at.date()
+                                    >= ministerial_proposal.created_at.date_naive()
                         })
                         .is_some()
                 })
@@ -74,8 +74,8 @@ impl GovProposal {
             description: ministerial_proposal.description,
             inr: ministerial_proposal.inr as i32,
             emphasis: ministerial_proposal.emphasis,
-            created_at: ministerial_proposal.created_at,
-            updated_at: ministerial_proposal.updated_at,
+            raw_data_created_at: ministerial_proposal.created_at,
+            raw_data_updated_at: ministerial_proposal.updated_at,
             due_to: ministerial_proposal.gegenstand_info.due_to,
             ressort: ministerial_proposal.gegenstand_info.ressort,
             ressort_shortform: ministerial_proposal.gegenstand_info.ressort_shortform,
@@ -83,6 +83,8 @@ impl GovProposal {
             legis_init_inr: ministerial_proposal.legis_init_inr.map(|x| x as i32),
             legis_init_ityp: ministerial_proposal.legis_init_ityp,
             has_vote_result: ministerial_proposal.legis_init_inr.is_some(),
+            created_at: None,
+            updated_at: None,
         };
         GovProposal {
             id: Some(ministerial_proposal.id as i32),

@@ -26,6 +26,7 @@ pub async fn notify_on_new_ministrial_props(
         .collect::<HashMap<_, _>>();
 
     loop {
+        // accumulation is not required for ministerial proposal (they are mostly released on seperate occasions)
         let mut acc_ministrial_props = Vec::new();
         loop {
             let new_ministrial_prop = new_ministrial_prop_rx.recv().await;
@@ -152,14 +153,19 @@ mod tests {
                 "Bundesministerium für Arbeit, Soziales, Gesundheit, Pflege und Konsumentenschutz"
                     .into(),
             ressort_shortform: "kp".into(),
-            due_to: today(),
+            due_to: today().date_naive(),
         }).await.unwrap();
         let gov_officials = Arc::new(create_gov_officials_map().await);
         let gov_proposal =
             GovProposal::from_ministerial_proposal(ministerial_proposal, gov_officials);
         println!("gov proposal: {gov_proposal:?}");
         let gov_proposals = [&(0, gov_proposal)];
-        send_new_ministrial_prop_info_mail("", &gov_proposals, &simple_gov_officials).unwrap();
+        send_new_ministrial_prop_info_mail(
+            "flurl.nagy@gmail.com",
+            &gov_proposals,
+            &simple_gov_officials,
+        )
+        .unwrap();
         loop {}
     }
 }
