@@ -1,4 +1,4 @@
-use chrono::Days;
+use chrono::{Days, Utc};
 use tokio::{runtime::Handle, sync::mpsc::Sender};
 mod db;
 pub mod notify;
@@ -60,7 +60,7 @@ pub async fn legis_init_once(
                         100
                     };
                     scraper.scrape_info.date_start =
-                        today_and_time().checked_sub_days(Days::new(days));
+                        today_and_time().naive_local().checked_sub_days(Days::new(days));
                 } else {
                     scraper.scrape_info.date_start = None;
                 }
@@ -106,7 +106,7 @@ pub async fn legis_init_once(
 }
 
 impl StoredUpdatedAt for LegislativeInitiative {
-    async fn stored_updated_at(&self, pg: &PgPool) -> Option<chrono::NaiveDateTime> {
+    async fn stored_updated_at(&self, pg: &PgPool) -> Option<chrono::DateTime<Utc>> {
         query!("select raw_data_updated_at from legislative_initiatives where gp = $1 and ityp = $2 and inr = $3", self.gp, self.ityp, self.inr as i32)
             .fetch_optional(pg)
             .await

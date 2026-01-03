@@ -1,4 +1,5 @@
 use chrono::NaiveDate;
+use chrono_tz::Europe::Vienna;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
@@ -9,8 +10,9 @@ pub struct LegislativePeriod {
 }
 
 pub async fn gps(pg: &PgPool) -> sqlx::Result<Vec<LegislativePeriod>> {
+    use chrono::TimeZone;
     Ok(sqlx::query!(
-        "SELECT legislative_period as gp, MIN(add_date) as start_date
+        "SELECT legislative_period as gp, MIN(raw_data_created_at) as start_date
             FROM plenar_infos
             GROUP BY gp 
             HAVING COUNT(*) > 1
@@ -22,7 +24,9 @@ pub async fn gps(pg: &PgPool) -> sqlx::Result<Vec<LegislativePeriod>> {
     .into_iter()
     .map(|gp| LegislativePeriod {
         gp: gp.gp,
-        start_date: gp.start_date.unwrap().date(),
+        start_date: Vienna
+            .from_utc_datetime(&gp.start_date.unwrap().naive_utc())
+            .date_naive(),
     })
     .collect())
 }

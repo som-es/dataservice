@@ -124,7 +124,7 @@ pub async fn update_or_insert_legis_init_in_db(
         if db_legis_init.is_voteable_on {
             use crate::{ai_task::Priority, LATEST_GP};
 
-            let priority = if db_legis_init.raw_data_created_at.date()
+            let priority = if db_legis_init.raw_data_created_at
                 >= today() - chrono::Duration::days(60)
             {
                 Priority::Highest
@@ -215,7 +215,8 @@ pub async fn update_or_insert_legis_init_in_db(
         .fetch_optional(&mut *tx)
         .await
         {
-            let diff = today() - legis_init.nr_plenary_activity_date;
+            // TODO: use proper timezone handling for nr_plenary_activity_date
+            let diff = today().date_naive() - legis_init.nr_plenary_activity_date;
 
             let mut legis_init = legis_init.clone();
             legis_init.votes = show_votes;
@@ -298,7 +299,7 @@ pub async fn update_or_insert_legis_init_in_db(
             values ($1) on conflict(legis_init_id) do update set
             updated_at = $2",
         legis_init_id,
-        crate::today_and_time().and_utc()
+        crate::today_and_time()
     )
     .execute(&mut *tx)
     .await

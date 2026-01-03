@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use optional_struct::*;
 use serde::{Deserialize, Serialize};
 use somes_macro::CompositeType;
@@ -53,10 +53,10 @@ pub struct DbLegislativeInitiativeQuery {
     pub accepted: Option<String>,
     pub nr_plenary_activity_date: NaiveDate,
     pub vote_date: Option<NaiveDate>,
-    pub raw_data_created_at: NaiveDateTime,
-    pub raw_data_updated_at: Option<NaiveDateTime>,
-    pub created_at: Option<NaiveDateTime>,
-    pub updated_at: Option<NaiveDateTime>,
+    pub raw_data_created_at: DateTime<Utc>,
+    pub raw_data_updated_at: Option<DateTime<Utc>>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
     pub requires_simple_majority: bool,
     pub pre_declined_type: Option<String>,
     pub voted_by_name: bool,

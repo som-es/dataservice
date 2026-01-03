@@ -1,3 +1,4 @@
+use chrono::Local;
 use combx::{
     document_text::{combine_texts, extract_text_from_documents_html_first},
     AiSummary, SummarizeOutput,
@@ -31,7 +32,7 @@ pub async fn insert_ai_summary_sqlx(
         format!("{:?}", summary.complexity_scope_of_proposal),
         "GPT-OSS-120B",
         "1",
-        chrono::Utc::now().naive_utc()
+        Local::now()
     )
     .fetch_one(pool)
     .await?;

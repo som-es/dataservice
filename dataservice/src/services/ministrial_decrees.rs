@@ -17,7 +17,7 @@ pub async fn save_ministrial_decrees(pages: u32, pg_pool: &PgPool) {
         0,
         LegislativePeriod {
             gp: "".into(),
-            start_date: today(),
+            start_date: today().date_naive(),
         },
     );
 

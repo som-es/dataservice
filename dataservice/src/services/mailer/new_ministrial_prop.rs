@@ -153,7 +153,7 @@ mod tests {
                 "Bundesministerium für Arbeit, Soziales, Gesundheit, Pflege und Konsumentenschutz"
                     .into(),
             ressort_shortform: "kp".into(),
-            due_to: today(),
+            due_to: today().date_naive(),
         }).await.unwrap();
         let gov_officials = Arc::new(create_gov_officials_map().await);
         let gov_proposal =

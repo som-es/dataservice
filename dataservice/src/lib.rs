@@ -12,7 +12,7 @@ use std::{cell::LazyCell, sync::Arc};
 pub use services::*;
 
 #[cfg(feature = "runner")]
-use chrono::NaiveDate;
+use chrono::{DateTime, Local, NaiveDate};
 #[cfg(feature = "runner")]
 pub use db::*;
 #[cfg(feature = "runner")]
@@ -85,14 +85,14 @@ pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + S
 
 #[cfg(feature = "runner")]
 #[inline]
-pub fn today() -> NaiveDate {
-    chrono::Local::now().date_naive()
+pub fn today() -> DateTime<Local> {
+    chrono::Local::now()
 }
 
 #[cfg(feature = "runner")]
 #[inline]
-pub fn today_and_time() -> chrono::NaiveDateTime {
-    chrono::Local::now().naive_local()
+pub fn today_and_time() -> chrono::DateTime<Local> {
+    chrono::Local::now()
 }
 
 pub async fn connect_pg() -> PgPool {

@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use somes_scraper::LastUpdated;
 use sqlx::PgPool;
 
@@ -8,7 +8,7 @@ fn mind_update_time() -> bool {
 }
 
 pub(crate) trait StoredUpdatedAt {
-    async fn stored_updated_at(&self, pg: &PgPool) -> Option<NaiveDateTime>;
+    async fn stored_updated_at(&self, pg: &PgPool) -> Option<DateTime<Utc>>;
 }
 
 pub(crate) async fn should_update<T: StoredUpdatedAt + LastUpdated>(data: &T, pg: &PgPool) -> bool {

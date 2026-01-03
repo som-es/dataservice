@@ -1,3 +1,4 @@
+use chrono::{DateTime, Local, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use somes_common_lib::ToCompositeType;
@@ -18,7 +19,7 @@ pub struct DbAiSummary {
     pub complexity_scope_of_proposal: String,
     pub model_used: String,
     pub version: String,
-    pub generated_at: chrono::NaiveDateTime,
+    pub generated_at: DateTime<Utc>,
 }
 
 impl ToCompositeType for DbAiSummary {

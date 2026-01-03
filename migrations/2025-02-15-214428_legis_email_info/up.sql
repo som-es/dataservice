@@ -3,13 +3,13 @@
 create table legis_email_info(
     id serial primary key,
     already_sent_id int not null,
-    marked_on timestamp default now(),
-    foreign key (already_sent_id) references legislative_initiatives(id)
+    marked_on timestamptz default now(),
+    foreign key (already_sent_id) references legislative_initiatives(id) on delete cascade
 );
 
 create table ministrial_email_info(
     id serial primary key,
     already_sent_id int not null,
-    marked_on timestamp default now(),
-    foreign key (already_sent_id) references ministrial_proposals(id)
+    marked_on timestamptz default now(),
+    foreign key (already_sent_id) references ministrial_proposals(id) on delete cascade
 );
