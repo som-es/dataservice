@@ -1,4 +1,4 @@
-use chrono::{DateTime, Local, Utc};
+use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use somes_common_lib::ToCompositeType;
@@ -23,6 +23,19 @@ pub struct DbAiSummary {
 }
 
 impl ToCompositeType for DbAiSummary {
+    fn field_orders() -> Vec<&'static str> {
+        vec![
+            "id",
+            "full_summary",
+            "short_title",
+            "short_summary",
+            "detailed_summary",
+            "complexity_scope_of_proposal",
+            "model_used",
+            "version",
+            "generated_at",
+        ]
+    }
     fn type_name() -> &'static str {
         "db_ai_summary"
     }
@@ -37,7 +50,7 @@ impl ToCompositeType for DbAiSummary {
             complexity_scope_of_proposal VARCHAR,
             model_used VARCHAR,
             version VARCHAR,
-            generated_at TIMESTAMP
+            generated_at TIMESTAMPTZ
         );"
         .to_string()
     }

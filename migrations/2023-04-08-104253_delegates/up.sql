@@ -24,5 +24,7 @@ create table delegates (
     gender varchar(1),
     is_active boolean,
     birthdate date,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz,
     FOREIGN KEY (id) REFERENCES contacts(id)
 );

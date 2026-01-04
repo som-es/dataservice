@@ -1,4 +1,4 @@
-use chrono::NaiveDate;
+use chrono::{DateTime, NaiveDate, Utc};
 use optional_struct::*;
 use serde::{Deserialize, Serialize};
 use somes_common_lib::Document;
@@ -32,6 +32,8 @@ pub struct Decree {
     pub eli: String,
     pub document_url: String,
     pub documents: Vec<Document>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 impl<T: DecreeEnhancer> FromScrapedType<T> for Decree {
@@ -89,6 +91,8 @@ impl Decree {
                     document_type: Some(doc.ftype.to_string()),
                 })
                 .collect(),
+            created_at: None,
+            updated_at: None,
         }
     }
 }

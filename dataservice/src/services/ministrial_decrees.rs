@@ -71,7 +71,8 @@ pub async fn insert_ministrial_decree(
                 part = EXCLUDED.part,
                 document_url = EXCLUDED.document_url,
                 eli = EXCLUDED.eli,
-                gp = EXCLUDED.gp
+                gp = EXCLUDED.gp,
+                updated_at = NOW()
             RETURNING id;
             ",
             gov_official_id,

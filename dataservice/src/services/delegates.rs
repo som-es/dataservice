@@ -127,6 +127,8 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &PgPool) {
             gender: delegate.gender.to_string_opt(),
             is_active: Some(delegate.is_active),
             birthdate: delegate.birthdate.clone(),
+            created_at: None,
+            updated_at: None,
         };
 
         if let Err(e) = sqlx::query!(
@@ -157,7 +159,8 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &PgPool) {
                     seat_col = EXCLUDED.seat_col,
                     gender = EXCLUDED.gender,
                     is_active = EXCLUDED.is_active,
-                    birthdate = EXCLUDED.birthdate
+                    birthdate = EXCLUDED.birthdate,
+                    updated_at = NOW()
             ",
             db_delegate.id,
             db_delegate.name,

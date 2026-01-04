@@ -48,6 +48,8 @@ pub struct DbDelegate {
     pub gender: Option<String>,
     pub is_active: Option<bool>,
     pub birthdate: Option<NaiveDate>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

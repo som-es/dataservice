@@ -8,6 +8,8 @@ create table ministrial_decrees(
     title varchar(16384) not null,
     short_title varchar(1024) not null,
     publication_date date not null,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz,
     part varchar(255) not null,
     emphasis varchar(16384),
     eli varchar(1024),
