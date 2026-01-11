@@ -1,12 +1,13 @@
 mod enhancer;
 mod hidden_vote_translation;
 mod models;
+mod filtering;
 pub use models::*;
-use somes_macro::CompositeType;
+use somes_macro::{CompositeType, MeilisearchFilter};
+use somes_meilisearch_filter::{FilterOp, FilterArgument};
 mod named_votes;
 
 use std::sync::Arc;
-
 pub use enhancer::*;
 use optional_struct::optional_struct;
 use serde::{Deserialize, Serialize};
@@ -14,11 +15,13 @@ use somai_client::SomAiClient;
 use somes_common_lib::Document;
 use somes_scraper::{LegislativeInitiative, Opinion};
 use sqlx::{FromRow, PgPool, prelude::Type};
+pub use filtering::*;
 
 use crate::{
-    DbAiSummary, FromScrapedType, Topic,
+    FromScrapedType, Topic,
     api_models::vote_results::hidden_vote_translation::translate_votes,
 };
+use crate::models::*;
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
@@ -37,6 +40,7 @@ use utoipa::ToSchema;
     Ord,
     CompositeType,
     Type,
+    MeilisearchFilter,
 )]
 #[sqlx(type_name = "meilisearch_helper")]
 pub struct MeilisearchHelper {
@@ -46,17 +50,22 @@ pub struct MeilisearchHelper {
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    Debug, Deserialize, Default, PartialEq, Serialize, Clone, FromRow, Type, CompositeType,
+    Debug, Deserialize, Default, PartialEq, Serialize, Clone, FromRow, Type, CompositeType, MeilisearchFilter
 )]
 pub struct VoteResult {
+    #[filter(make_vec)]
     pub id: Option<i32>,
+
     pub legislative_initiative: DbLegislativeInitiativeQuery,
     pub votes: Vec<DbVote>,
     pub speeches: Vec<DbSpeechWithLink>,
+
+    #[filter(skip)]
     pub named_votes: Option<DbNamedVotes>,
     pub topics: Vec<Topic>,
     pub eurovoc_topics: Vec<Topic>,
     pub other_keyword_topics: Vec<Topic>,
+    #[filter(skip)]
     pub documents: Vec<Document>,
     pub absences: Option<Vec<i32>>,
     pub issued_by_dels: Vec<DbRelatedDelegate>,
@@ -69,17 +78,20 @@ pub struct VoteResult {
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Default, Type, CompositeType,
+    Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Default, Type, CompositeType, MeilisearchFilter
 )]
 pub struct OptionalVoteResult {
+    #[filter(make_vec)]
     pub id: Option<i32>,
     pub legislative_initiative: Option<DbLegislativeInitiativeQuery>,
     pub votes: Option<Vec<DbVote>>,
     pub speeches: Option<Vec<DbSpeechWithLink>>,
+    #[filter(skip)]
     pub named_votes: Option<DbNamedVotes>,
     pub topics: Option<Vec<Topic>>,
     pub eurovoc_topics: Option<Vec<Topic>>,
     pub other_keyword_topics: Option<Vec<Topic>>,
+    #[filter(skip)]
     pub documents: Option<Vec<Document>>,
     pub absences: Option<Vec<i32>>,
     pub issued_by_dels: Option<Vec<DbRelatedDelegate>>,

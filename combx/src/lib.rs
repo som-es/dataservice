@@ -10,6 +10,7 @@ pub mod document_text;
 mod gov_officials;
 pub use gov_officials::*;
 mod pdf;
+mod filtering;
 pub use pdf::*;
 
 use sqlx::{PgPool, postgres::PgPoolOptions};

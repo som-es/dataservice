@@ -2,23 +2,34 @@ use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use somes_common_lib::ToCompositeType;
-use somes_macro::CompositeType;
+use somes_macro::{CompositeType, MeilisearchFilter};
+use somes_meilisearch_filter::{FilterArgument, FilterOp};
 use sqlx::{FromRow, Type};
+use sqlx::types::Json;
 
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
-#[derive(Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type)]
+#[derive(Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type, MeilisearchFilter)]
 #[sqlx(type_name = "db_ai_summary")]
 pub struct DbAiSummary {
+    #[filter(make_vec, make_optional)]
     pub id: i32,
-    pub full_summary: sqlx::types::Json<AiSummary>,
+    #[filter(make_optional)]
+    pub full_summary: Json<AiSummary>,
+    #[filter(make_optional)]
     pub short_title: String,
+    #[filter(make_optional)]
     pub short_summary: String,
+    #[filter(make_optional)]
     pub detailed_summary: String,
+    #[filter(make_vec, make_optional)]
     pub complexity_scope_of_proposal: String,
+    #[filter(make_vec, make_optional)]
     pub model_used: String,
+    #[filter(make_vec, make_optional)]
     pub version: String,
+    #[filter(make_optional)]
     pub generated_at: DateTime<Utc>,
 }
 
@@ -225,20 +236,45 @@ pub enum EconomicImpactLevel {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(JsonSchema, Debug, PartialEq, Deserialize, Serialize, Clone, FromRow, CompositeType)]
+#[derive(JsonSchema, Debug, PartialEq, Deserialize, Serialize, Clone, FromRow, CompositeType, MeilisearchFilter)]
 pub struct AiSummary {
+    #[filter(make_optional)]
     pub short_title: String,
+
+    #[filter(make_optional)]
     pub short_summary: String,
+
+    #[filter(make_optional)]
     pub detailed_summary: String,
+
+    #[filter(make_optional)]
     pub very_detailed_summary: String,
+
+    #[filter(skip)]
     pub key_points: Vec<Keypoint>,
+
+    #[filter(skip)]
     pub general_enforcement_start_end: Option<EnforcementDates>,
+
+    #[filter(make_optional)]
     pub topics: Vec<String>,
+
+    #[filter(make_optional)]
     pub general_political_questions: Vec<String>,
+
+    #[filter(make_optional)]
     pub political_compass_questions: Vec<String>,
+
+    #[filter(skip)]
     pub complexity_scope_of_proposal: ProposalComplexityScope,
+
+    #[filter(skip)]
     pub critical_analysis: CriticalAnalysis,
+
+    #[filter(skip)]
     pub glossary: Glossary,
+
+    #[filter(skip)]
     pub fiscal_analysis: FiscalAnalysis,
 }
 

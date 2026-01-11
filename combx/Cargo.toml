@@ -15,6 +15,7 @@ utoipa = { workspace = true, optional = true }
 reqwest = { workspace = true }
 somai-client = { path = "../somai-client" }
 somes-common-lib = { path = "../../somes/somes-common-lib" }
+somes-meilisearch-filter = { path = "../../somes/somes-meilisearch-filter" }
 somes-macro = { path = "../../somes/somes-macro" }
 optional_struct = "0.5"
 pdf-extract = "0.10.0"
@@ -30,6 +31,7 @@ tokio = { workspace = true }
 chrono-tz = {workspace = true}
 
 [dev-dependencies]
+serde_qs = "0.15"
 
 [features]
 default = ["utoipa", "ocrs", "ocr"]

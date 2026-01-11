@@ -2,6 +2,8 @@ use chrono::{DateTime, NaiveDate, Utc};
 use optional_struct::*;
 use serde::{Deserialize, Serialize};
 use somes_common_lib::Document;
+use somes_macro::MeilisearchFilter;
+use somes_meilisearch_filter::{FilterArgument, FilterOp};
 use somes_scraper::Thing;
 use sqlx::FromRow;
 use std::sync::Arc;
@@ -18,19 +20,24 @@ use utoipa::ToSchema;
 
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, MeilisearchFilter)]
 pub struct Decree {
+    #[filter(make_vec)]
     pub gov_official_id: Option<i32>,
+    #[filter(make_vec)]
     pub ris_id: String,
+    #[filter(make_vec)]
     pub ministrial_issuer: String,
     pub title: String,
     pub short_title: String,
     pub publication_date: NaiveDate,
     pub part: String,
     pub emphasis: Option<String>,
+    #[filter(make_vec)]
     pub gp: Option<String>,
     pub eli: String,
     pub document_url: String,
+    #[filter(skip)]
     pub documents: Vec<Document>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,

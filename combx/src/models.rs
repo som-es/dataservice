@@ -1,8 +1,9 @@
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use optional_struct::optional_struct;
 use serde_derive::{Deserialize, Serialize};
+use somes_meilisearch_filter::{FilterArgument, FilterOp};
 
-use somes_macro::CompositeType;
+use somes_macro::{CompositeType, MeilisearchFilter};
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
@@ -86,7 +87,7 @@ pub struct DbMinistrialProposal {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, FromRow, Type, CompositeType)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, FromRow, Type, CompositeType, MeilisearchFilter)]
 // #[diesel(table_name = ministrial_proposals)]
 pub struct DbMinistrialProposalQueryMeta {
     pub id: i32,
@@ -236,7 +237,7 @@ pub struct DbParty {
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord, CompositeType, Type,
+    Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord, CompositeType, Type, MeilisearchFilter
 )]
 pub struct Topic {
     pub topic: String,
