@@ -78,7 +78,9 @@ pub async fn ministrial_proposal_once(
         scraper.scrape_info.gp = vec![gp.into()];
         if only_latest {
             // this seems to not work! - Minsterial Props and NRSITZ do not have date filtering???
-            scraper.scrape_info.date_start = today_and_time().naive_local().checked_sub_months(Months::new(3))
+            scraper.scrape_info.date_start = today_and_time()
+                .naive_local()
+                .checked_sub_months(Months::new(3))
         }
 
         let new_ministrial_props = scrape_untill_success::<Vec<_>, _>(|| async {

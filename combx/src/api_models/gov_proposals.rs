@@ -6,8 +6,8 @@ use std::{collections::HashMap, sync::Arc};
 use optional_struct::optional_struct;
 use serde::{Deserialize, Serialize};
 use somes_common_lib::Document;
-use somes_meilisearch_filter::{FilterOp, FilterArgument};
 use somes_macro::{CompositeType, MeilisearchFilter};
+use somes_meilisearch_filter::{FilterArgument, FilterOp};
 use somes_scraper::{GovOfficial, ministrial_proposals::MinistrialProposal};
 use sqlx::Type;
 #[cfg(feature = "utoipa")]
@@ -30,7 +30,7 @@ pub struct GovProposal {
     pub ministrial_proposal: DbMinistrialProposalQueryMeta,
     pub vote_result: Option<OptionalVoteResult>,
 
-    // #[filter(make_optional)]
+    #[filter(make_optional)]
     pub topics: Vec<Topic>,
     #[filter(make_optional)]
     pub eurovoc_topics: Vec<Topic>,

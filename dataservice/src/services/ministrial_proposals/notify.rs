@@ -88,7 +88,12 @@ pub(crate) fn send_new_ministrial_prop_info_mail(
 
             // let proposal_date = Vienna
             use chrono::TimeZone;
-            let proposal_date = Vienna.from_utc_datetime(&ministrial_prop.ministrial_proposal.raw_data_created_at.naive_utc());
+            let proposal_date = Vienna.from_utc_datetime(
+                &ministrial_prop
+                    .ministrial_proposal
+                    .raw_data_created_at
+                    .naive_utc(),
+            );
 
             let ministrial_prop_html_entry = crate::email::MINISTRIAL_PROP_ENTRY_TEMPLATE
                 .replace("{*PROPOSAL_DESCRIPTION*}", &description)
@@ -98,10 +103,7 @@ pub(crate) fn send_new_ministrial_prop_info_mail(
                 )
                 .replace(
                     "{*PROPOSAL_DATE*}",
-                    &proposal_date
-                        .date_naive()
-                        .format("%d.%m.%Y")
-                        .to_string(),
+                    &proposal_date.date_naive().format("%d.%m.%Y").to_string(),
                 )
                 .replace("{*PROPOSAL_GP*}", &ministrial_prop.ministrial_proposal.gp)
                 .replace("{*PROPOSAL_GOV_OFFICIAL_NAME*}", &gov_official.name)

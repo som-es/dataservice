@@ -1,27 +1,26 @@
 mod enhancer;
+mod filtering;
 mod hidden_vote_translation;
 mod models;
-mod filtering;
 pub use models::*;
 use somes_macro::{CompositeType, MeilisearchFilter};
-use somes_meilisearch_filter::{FilterOp, FilterArgument};
+use somes_meilisearch_filter::{FilterArgument, FilterOp};
 mod named_votes;
 
-use std::sync::Arc;
 pub use enhancer::*;
+pub use filtering::*;
 use optional_struct::optional_struct;
 use serde::{Deserialize, Serialize};
 use somai_client::SomAiClient;
 use somes_common_lib::Document;
 use somes_scraper::{LegislativeInitiative, Opinion};
 use sqlx::{FromRow, PgPool, prelude::Type};
-pub use filtering::*;
+use std::sync::Arc;
 
-use crate::{
-    FromScrapedType, Topic,
-    api_models::vote_results::hidden_vote_translation::translate_votes,
-};
 use crate::models::*;
+use crate::{
+    FromScrapedType, Topic, api_models::vote_results::hidden_vote_translation::translate_votes,
+};
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
@@ -50,7 +49,16 @@ pub struct MeilisearchHelper {
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    Debug, Deserialize, Default, PartialEq, Serialize, Clone, FromRow, Type, CompositeType, MeilisearchFilter
+    Debug,
+    Deserialize,
+    Default,
+    PartialEq,
+    Serialize,
+    Clone,
+    FromRow,
+    Type,
+    CompositeType,
+    MeilisearchFilter,
 )]
 pub struct VoteResult {
     #[filter(make_vec)]
@@ -78,7 +86,16 @@ pub struct VoteResult {
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Default, Type, CompositeType, MeilisearchFilter
+    Debug,
+    Deserialize,
+    Serialize,
+    PartialEq,
+    Clone,
+    FromRow,
+    Default,
+    Type,
+    CompositeType,
+    MeilisearchFilter,
 )]
 pub struct OptionalVoteResult {
     #[filter(make_vec)]

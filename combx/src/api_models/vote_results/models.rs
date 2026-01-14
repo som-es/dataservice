@@ -41,7 +41,16 @@ pub struct DbLegislativeInitiative {
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    PartialEq, Debug, Clone, Serialize, Deserialize, FromRow, Default, CompositeType, Type, MeilisearchFilter
+    PartialEq,
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    FromRow,
+    Default,
+    CompositeType,
+    Type,
+    MeilisearchFilter,
 )]
 #[sqlx(type_name = "db_legislative_initiative_query")]
 pub struct DbLegislativeInitiativeQuery {
@@ -114,7 +123,9 @@ pub struct DbLegislativeInitiativeQuery {
 
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type, MeilisearchFilter)]
+#[derive(
+    PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type, MeilisearchFilter,
+)]
 #[sqlx(type_name = "db_vote")]
 pub struct DbVote {
     pub party: String,
@@ -135,7 +146,9 @@ pub struct DbVoteIns {
 
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type, MeilisearchFilter)]
+#[derive(
+    PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type, MeilisearchFilter,
+)]
 #[sqlx(type_name = "db_speech_with_link")]
 pub struct DbSpeechWithLink {
     #[filter(make_optional)]
@@ -241,7 +254,18 @@ pub struct DbPartyNamedVoteCount {
 
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, CompositeType, Type, MeilisearchFilter)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    CompositeType,
+    Type,
+    MeilisearchFilter,
+)]
 #[sqlx(type_name = "db_reference")]
 pub struct DbReference {
     pub gp: String,
@@ -251,7 +275,18 @@ pub struct DbReference {
 
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, CompositeType, Type, MeilisearchFilter)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    CompositeType,
+    Type,
+    MeilisearchFilter,
+)]
 #[sqlx(type_name = "db_related_delegate")]
 pub struct DbRelatedDelegate {
     pub text: Option<String>,

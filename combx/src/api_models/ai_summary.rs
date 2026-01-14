@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use somes_common_lib::ToCompositeType;
 use somes_macro::{CompositeType, MeilisearchFilter};
 use somes_meilisearch_filter::{FilterArgument, FilterOp};
-use sqlx::{FromRow, Type};
 use sqlx::types::Json;
+use sqlx::{FromRow, Type};
 
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
@@ -236,7 +236,17 @@ pub enum EconomicImpactLevel {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(JsonSchema, Debug, PartialEq, Deserialize, Serialize, Clone, FromRow, CompositeType, MeilisearchFilter)]
+#[derive(
+    JsonSchema,
+    Debug,
+    PartialEq,
+    Deserialize,
+    Serialize,
+    Clone,
+    FromRow,
+    CompositeType,
+    MeilisearchFilter,
+)]
 pub struct AiSummary {
     #[filter(make_optional)]
     pub short_title: String,

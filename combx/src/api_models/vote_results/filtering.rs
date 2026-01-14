@@ -2,7 +2,9 @@ use somes_meilisearch_filter::*;
 
 use crate::{OptionalVoteResultFilter, filtering::to_topics_filter};
 
-pub fn meilisearch_filters_vote_result(vote_result_filter: OptionalVoteResultFilter) -> Vec<String> {
+pub fn meilisearch_filters_vote_result(
+    vote_result_filter: OptionalVoteResultFilter,
+) -> Vec<String> {
     let mut filter_conditions = vec![];
     let legis_init_filters = to_meilisearch_filters(
         &vote_result_filter

@@ -59,8 +59,9 @@ pub async fn legis_init_once(
                     } else {
                         100
                     };
-                    scraper.scrape_info.date_start =
-                        today_and_time().naive_local().checked_sub_days(Days::new(days));
+                    scraper.scrape_info.date_start = today_and_time()
+                        .naive_local()
+                        .checked_sub_days(Days::new(days));
                 } else {
                     scraper.scrape_info.date_start = None;
                 }

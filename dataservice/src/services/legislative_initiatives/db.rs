@@ -124,15 +124,14 @@ pub async fn update_or_insert_legis_init_in_db(
         if db_legis_init.is_voteable_on {
             use crate::{ai_task::Priority, LATEST_GP};
 
-            let priority = if db_legis_init.raw_data_created_at
-                >= today() - chrono::Duration::days(60)
-            {
-                Priority::Highest
-            } else if db_legis_init.gp == LATEST_GP {
-                Priority::High
-            } else {
-                Priority::Lowest
-            };
+            let priority =
+                if db_legis_init.raw_data_created_at >= today() - chrono::Duration::days(60) {
+                    Priority::Highest
+                } else if db_legis_init.gp == LATEST_GP {
+                    Priority::High
+                } else {
+                    Priority::Lowest
+                };
 
             let documents = vote_result.documents.clone();
             let voting = db_legis_init.voting.clone();
