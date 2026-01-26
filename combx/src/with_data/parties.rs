@@ -1,6 +1,31 @@
+use std::collections::HashMap;
+
 use chrono::NaiveDate;
 use somes_scraper::Party;
 use sqlx::PgPool;
+
+pub async fn all_parties_per_gp(pg: &PgPool) -> sqlx::Result<HashMap<String, Vec<Party>>> {
+    let parties = sqlx::query!("select gp, code, fraction, name, color from parties",)
+        .fetch_all(pg)
+        .await?;
+
+    let mut parties_per_gp = HashMap::<String, Vec<Party>>::new();
+
+    for party in parties {
+        let typed_party = Party {
+            name: party.name,
+            code: party.code,
+            color: party.color,
+            fraction: party.fraction as u32,
+        };
+        parties_per_gp
+            .entry(party.gp)
+            .and_modify(|parties| parties.push(typed_party.clone()))
+            .or_insert(vec![typed_party]);
+    }
+
+    Ok(parties_per_gp)
+}
 
 pub async fn all_parties_at_gp(pg: &PgPool, gp: &str) -> sqlx::Result<Vec<Party>> {
     let parties = sqlx::query!(

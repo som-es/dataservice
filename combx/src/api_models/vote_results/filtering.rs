@@ -24,13 +24,14 @@ pub fn meilisearch_filters_vote_result(
     );
     filter_conditions.extend(top_level_filters);
 
-    filter_conditions.extend(to_topics_filter(
+    let topics_filter = to_topics_filter(
         vote_result_filter
             .eurovoc_topics
             .unwrap_or_default()
             .as_slice(),
         "eurovoc_topics",
-    ));
+    );
+    filter_conditions.extend(topics_filter);
 
     filter_conditions.extend(to_topics_filter(
         vote_result_filter
