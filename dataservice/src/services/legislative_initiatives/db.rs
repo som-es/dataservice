@@ -167,6 +167,32 @@ pub async fn update_or_insert_legis_init_in_db(
         return;
     }
 
+    if let Some(vote_date) = db_legis_init.vote_date {
+        if should_update && (today().date_naive() - vote_date).abs().num_days() > 30 {
+            let exists: bool = sqlx::query_scalar!(
+                r#"
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM pg_matviews
+                    WHERE
+                    matviewname = 'latest_legislative_initiatives'
+                )
+                "#
+            )
+            .fetch_one(pool)
+            .await.unwrap_or_default().unwrap_or_default();
+            
+            if exists {
+                if let Err(e) = sqlx::query("REFRESH MATERIALIZED VIEW latest_legislative_initiatives")
+                    .execute(pool)
+                    .await {
+                        log::error!("Could not refresh latest legislative initiatives view: {e:?}")
+                    }
+            }
+        }
+    }
+ 
+
     if let Some(refs) = vote_result.references_to.as_ref() {
         if let Err(e) = insert_references_batch(&mut tx, refs, legis_init_id).await {
             log::error!("Could not insert references for legis init {legis_init_id}: {e:?}")
