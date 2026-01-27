@@ -4,13 +4,10 @@ use sqlx::PgPool;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    ai_task::AiTask,
-    legislative_initiatives::inserts::{
+    ai_task::AiTask, enforce_ai_run, legislative_initiatives::inserts::{
         insert_delegates_batch, insert_documents_batch, insert_named_vote_info, insert_named_votes,
         insert_references_batch, insert_votes_batch,
-    },
-    today,
-    topics::{insert_topics_generic_batch, TableType, TopicType},
+    }, today, topics::{TableType, TopicType, insert_topics_generic_batch}
 };
 
 pub async fn update_or_insert_legis_init_in_db(
@@ -20,7 +17,8 @@ pub async fn update_or_insert_legis_init_in_db(
     ai_task_tx: Option<Sender<AiTask>>,
 ) {
     let start = tokio::time::Instant::now();
-    if !crate::should_update(legis_init, pool).await {
+    let should_update = crate::should_update(legis_init, pool).await;
+    if !enforce_ai_run() && !should_update {
         log::info!("No need to update!");
         return;
     }
@@ -162,6 +160,11 @@ pub async fn update_or_insert_legis_init_in_db(
                 log::error!("Could not send AI task for legis init emphasis summarization: {e:?}");
             }
         }
+    }
+
+    if enforce_ai_run() && !should_update {
+        log::info!("No need to update further!");
+        return;
     }
 
     if let Some(refs) = vote_result.references_to.as_ref() {

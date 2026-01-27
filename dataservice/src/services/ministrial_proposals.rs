@@ -14,12 +14,7 @@ use somes_scraper::{
 use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{
-    ai_task::AiTask,
-    services::scrape_untill_success,
-    should_update::StoredUpdatedAt,
-    today, today_and_time,
-    topics::{insert_topics_generic_batch, TableType, TopicType},
-    Shutdown, GPS,
+    GPS, Shutdown, ai_task::AiTask, enforce_ai_run, services::scrape_untill_success, should_update::StoredUpdatedAt, today, today_and_time, topics::{TableType, TopicType, insert_topics_generic_batch}
 };
 
 mod notify;
@@ -148,7 +143,8 @@ pub async fn update_ministrial_proposals_in_db2(
 
     let mut started_acc = false;
     for (i, ministrial_prop) in ministrial_props.into_iter().enumerate() {
-        if !crate::should_update(&ministrial_prop, pool).await {
+        let should_update = crate::should_update(&ministrial_prop, pool).await;
+        if !enforce_ai_run() && !should_update {
             continue;
         }
 
@@ -205,6 +201,63 @@ pub async fn update_ministrial_proposals_in_db2(
         .id;
         if i % 10 == 0 {
             log::info!("{i} insertion dur: {:?}", start.elapsed());
+        }
+
+        #[cfg(feature = "ai")]
+        if let Some(ai_task_tx) = &ai_task_tx {
+            use crate::{ai_task::Priority, LATEST_GP};
+
+            let priority = if gov_proposal.ministrial_proposal.raw_data_created_at
+                >= today() - chrono::Duration::days(90)
+            {
+                Priority::Highest
+            } else if gov_proposal.ministrial_proposal.gp == LATEST_GP {
+                Priority::High
+            } else {
+                Priority::Lowest
+            };
+
+            let inner_gov_proposal = gov_proposal.clone();
+            let inner_gov_prop_mail_tx = new_ministrial_proposal_tx.clone();
+            let pool = pool.clone();
+            let documents = gov_proposal.documents.clone();
+            let summarization_task = AiTask {
+                input: None,
+                priority,
+                task_id: crate::hash!(),
+                db_entry_id: ministrial_prop_id,
+                task: Box::new(move |task_args| {
+                    Box::pin(async move {
+                        let ai_summary =
+                            summarize_ministerial_proposal_documents(task_args, &documents).await?;
+                        let mut inner_gov_proposal = inner_gov_proposal;
+                        inner_gov_proposal.ai_summary = ai_summary;
+                        if let Some(gov_prop_mail_tx) = inner_gov_prop_mail_tx {
+                            check_and_send_ministrial_email(
+                                &pool,
+                                &mut started_acc,
+                                i,
+                                &inner_gov_proposal,
+                                ministrial_prop_id,
+                                &gov_prop_mail_tx,
+                                false,
+                            )
+                            .await;
+                        }
+                        Ok(())
+                        // TODO: update meilisearch index on finish
+                    })
+                }),
+            };
+
+            if let Err(e) = ai_task_tx.send(summarization_task).await {
+                log::error!("Could not send AI task for ministerial prop summarization: {e:?}");
+            }
+        }
+
+        if enforce_ai_run() && !should_update {
+            log::info!("No need to update further!");
+            continue;
         }
 
         for issuer_id in &gov_proposal.ministerial_issuers {
@@ -334,59 +387,7 @@ pub async fn update_ministrial_proposals_in_db2(
                 "Error inserting documents for ministerial prop {ministrial_prop_id}: {e:?}"
             );
         }
-        tx.commit().await?;
-
-        #[cfg(feature = "ai")]
-        if let Some(ai_task_tx) = &ai_task_tx {
-            use crate::{ai_task::Priority, LATEST_GP};
-
-            let priority = if gov_proposal.ministrial_proposal.raw_data_created_at
-                >= today() - chrono::Duration::days(90)
-            {
-                Priority::Highest
-            } else if gov_proposal.ministrial_proposal.gp == LATEST_GP {
-                Priority::High
-            } else {
-                Priority::Lowest
-            };
-
-            let inner_gov_proposal = gov_proposal.clone();
-            let inner_gov_prop_mail_tx = new_ministrial_proposal_tx.clone();
-            let pool = pool.clone();
-            let documents = gov_proposal.documents.clone();
-            let summarization_task = AiTask {
-                input: None,
-                priority,
-                task_id: crate::hash!(),
-                db_entry_id: ministrial_prop_id,
-                task: Box::new(move |task_args| {
-                    Box::pin(async move {
-                        let ai_summary =
-                            summarize_ministerial_proposal_documents(task_args, &documents).await?;
-                        let mut inner_gov_proposal = inner_gov_proposal;
-                        inner_gov_proposal.ai_summary = ai_summary;
-                        if let Some(gov_prop_mail_tx) = inner_gov_prop_mail_tx {
-                            check_and_send_ministrial_email(
-                                &pool,
-                                &mut started_acc,
-                                i,
-                                &inner_gov_proposal,
-                                ministrial_prop_id,
-                                &gov_prop_mail_tx,
-                                false,
-                            )
-                            .await;
-                        }
-                        Ok(())
-                        // TODO: update meilisearch index on finish
-                    })
-                }),
-            };
-
-            if let Err(e) = ai_task_tx.send(summarization_task).await {
-                log::error!("Could not send AI task for ministerial prop summarization: {e:?}");
-            }
-        }
+        tx.commit().await?; 
     }
 
     // without this, the mail sending service wouldn't be triggered if e.g. gov proposals list length  is lower than TOTAL_MINISTERIAL_PROP_SENT threshold

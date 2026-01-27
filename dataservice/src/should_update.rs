@@ -3,6 +3,11 @@ use somes_scraper::LastUpdated;
 use sqlx::PgPool;
 
 #[inline]
+pub(crate) fn enforce_ai_run() -> bool {
+    std::env::var("ENFORCE_AI_RUN").unwrap_or("true".into()) == "true"
+}
+
+#[inline]
 fn mind_update_time() -> bool {
     std::env::var("MIND_UPDATE_TIME").unwrap_or("true".into()) == "true"
 }
