@@ -4,6 +4,7 @@ use crate::{OptionalVoteResultFilter, filtering::to_topics_filter};
 
 pub fn meilisearch_filters_vote_result(
     vote_result_filter: OptionalVoteResultFilter,
+    prefix: Option<String>,
 ) -> Vec<String> {
     let mut filter_conditions = vec![];
     let legis_init_filters = to_meilisearch_filters(
@@ -13,14 +14,17 @@ pub fn meilisearch_filters_vote_result(
             .map(|x| x.filter_arguments())
             .unwrap_or_default(),
         &FilterOptions {
-            prefix: Some("legislative_initiative".to_string()),
+            prefix: Some(build_prefix("legislative_initiative", prefix.as_deref())),
             ..Default::default()
         },
     );
     filter_conditions.extend(legis_init_filters);
     let top_level_filters = to_meilisearch_filters(
         &vote_result_filter.filter_arguments(),
-        &FilterOptions::default(),
+        &FilterOptions {
+            prefix: prefix.clone(),
+            ..Default::default()
+        },
     );
     filter_conditions.extend(top_level_filters);
 
@@ -29,7 +33,7 @@ pub fn meilisearch_filters_vote_result(
             .eurovoc_topics
             .unwrap_or_default()
             .as_slice(),
-        "eurovoc_topics",
+        &build_prefix("eurovoc_topics", prefix.as_deref()),
     );
     filter_conditions.extend(topics_filter);
 
@@ -38,12 +42,12 @@ pub fn meilisearch_filters_vote_result(
             .other_keyword_topics
             .unwrap_or_default()
             .as_slice(),
-        "other_keyword_topics",
+        &build_prefix("other_keyword_topics", prefix.as_deref()),
     ));
 
     filter_conditions.extend(to_topics_filter(
         vote_result_filter.topics.unwrap_or_default().as_slice(),
-        "topics",
+        &build_prefix("topics", prefix.as_deref()),
     ));
 
     filter_conditions.extend(to_meilisearch_filters(
@@ -53,7 +57,7 @@ pub fn meilisearch_filters_vote_result(
             .map(|ai_summary| ai_summary.filter_arguments())
             .unwrap_or_default(),
         &FilterOptions {
-            prefix: Some("ai_summary".into()),
+            prefix: Some(build_prefix("ai_summary", prefix.as_deref())),
             ..Default::default()
         },
     ));
@@ -67,7 +71,7 @@ pub fn meilisearch_filters_vote_result(
             .flatten()
             .collect::<Vec<_>>(),
         &FilterOptions {
-            prefix: Some("issued_by_dels".into()),
+            prefix: Some(build_prefix("issued_by_dels", prefix.as_deref())),
             combine_op: CombineOp::Or,
         },
     ));

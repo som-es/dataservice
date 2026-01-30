@@ -3,7 +3,7 @@ use somes_meilisearch_filter::*;
 
 pub fn to_topics_filter(topics: &[TopicFilter], prefix: &str) -> Option<String> {
     if topics.is_empty() {
-        return None
+        return None;
     }
     let topics = topics
         .iter()

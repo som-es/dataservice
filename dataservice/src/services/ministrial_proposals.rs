@@ -14,7 +14,13 @@ use somes_scraper::{
 use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{
-    GPS, Shutdown, ai_task::AiTask, enforce_ai_run, services::scrape_untill_success, should_update::StoredUpdatedAt, today, today_and_time, topics::{TableType, TopicType, insert_topics_generic_batch}
+    ai_task::AiTask,
+    enforce_ai_run,
+    services::scrape_untill_success,
+    should_update::StoredUpdatedAt,
+    today, today_and_time,
+    topics::{insert_topics_generic_batch, TableType, TopicType},
+    Shutdown, GPS,
 };
 
 mod notify;
@@ -387,7 +393,7 @@ pub async fn update_ministrial_proposals_in_db2(
                 "Error inserting documents for ministerial prop {ministrial_prop_id}: {e:?}"
             );
         }
-        tx.commit().await?; 
+        tx.commit().await?;
     }
 
     // without this, the mail sending service wouldn't be triggered if e.g. gov proposals list length  is lower than TOTAL_MINISTERIAL_PROP_SENT threshold

@@ -4,10 +4,14 @@ use sqlx::PgPool;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    ai_task::AiTask, enforce_ai_run, legislative_initiatives::inserts::{
+    ai_task::AiTask,
+    enforce_ai_run,
+    legislative_initiatives::inserts::{
         insert_delegates_batch, insert_documents_batch, insert_named_vote_info, insert_named_votes,
         insert_references_batch, insert_votes_batch,
-    }, today, topics::{TableType, TopicType, insert_topics_generic_batch}
+    },
+    today,
+    topics::{insert_topics_generic_batch, TableType, TopicType},
 };
 
 pub async fn update_or_insert_legis_init_in_db(
@@ -180,18 +184,21 @@ pub async fn update_or_insert_legis_init_in_db(
                 "#
             )
             .fetch_one(pool)
-            .await.unwrap_or_default().unwrap_or_default();
-            
+            .await
+            .unwrap_or_default()
+            .unwrap_or_default();
+
             if exists {
-                if let Err(e) = sqlx::query("REFRESH MATERIALIZED VIEW latest_legislative_initiatives")
-                    .execute(pool)
-                    .await {
-                        log::error!("Could not refresh latest legislative initiatives view: {e:?}")
-                    }
+                if let Err(e) =
+                    sqlx::query("REFRESH MATERIALIZED VIEW latest_legislative_initiatives")
+                        .execute(pool)
+                        .await
+                {
+                    log::error!("Could not refresh latest legislative initiatives view: {e:?}")
+                }
             }
         }
     }
- 
 
     if let Some(refs) = vote_result.references_to.as_ref() {
         if let Err(e) = insert_references_batch(&mut tx, refs, legis_init_id).await {

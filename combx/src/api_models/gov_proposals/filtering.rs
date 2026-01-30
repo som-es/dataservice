@@ -5,17 +5,37 @@ use crate::{
     meilisearch_filters_vote_result,
 };
 
-pub fn meilisearch_filters_gov_props(gov_prop_filter: OptionalGovProposalFilter) -> Vec<String> {
+pub fn meilisearch_filters_gov_props(
+    gov_prop_filter: OptionalGovProposalFilter,
+    prefix: Option<&str>,
+) -> Vec<String> {
     let mut filter_conditions = vec![];
+    let prefix = prefix.map(|prefix| prefix.to_string());
 
     let top_level_filters = to_meilisearch_filters(
         &gov_prop_filter.filter_arguments(),
-        &FilterOptions::default(),
+        &FilterOptions {
+            prefix: prefix.clone(),
+            ..Default::default()
+        },
     );
     filter_conditions.extend(top_level_filters);
 
+    if let Some(ministrial_proposal) = gov_prop_filter.ministrial_proposal {
+        filter_conditions.extend(to_meilisearch_filters(
+            &ministrial_proposal.filter_arguments(),
+            &FilterOptions {
+                prefix: Some(build_prefix("ministrial_proposal", prefix.as_deref())),
+                ..Default::default()
+            },
+        ));
+    }
+
     if let Some(vote_result_filter) = gov_prop_filter.vote_result {
-        filter_conditions.extend(meilisearch_filters_vote_result(vote_result_filter));
+        filter_conditions.extend(meilisearch_filters_vote_result(
+            vote_result_filter,
+            Some(build_prefix("vote_result", prefix.as_deref())),
+        ));
     }
 
     filter_conditions.extend(to_topics_filter(
@@ -23,7 +43,7 @@ pub fn meilisearch_filters_gov_props(gov_prop_filter: OptionalGovProposalFilter)
             .eurovoc_topics
             .unwrap_or_default()
             .as_slice(),
-        "eurovoc_topics",
+        &build_prefix("eurovoc_topics", prefix.as_deref()),
     ));
 
     filter_conditions.extend(to_topics_filter(
@@ -31,12 +51,12 @@ pub fn meilisearch_filters_gov_props(gov_prop_filter: OptionalGovProposalFilter)
             .other_keyword_topics
             .unwrap_or_default()
             .as_slice(),
-        "other_keyword_topics",
+        &build_prefix("other_keyword_topics", prefix.as_deref()),
     ));
 
     filter_conditions.extend(to_topics_filter(
         gov_prop_filter.topics.unwrap_or_default().as_slice(),
-        "topics",
+        &build_prefix("topics", prefix.as_deref()),
     ));
 
     filter_conditions.extend(to_meilisearch_filters(
@@ -46,7 +66,7 @@ pub fn meilisearch_filters_gov_props(gov_prop_filter: OptionalGovProposalFilter)
             .map(|ai_summary| ai_summary.filter_arguments())
             .unwrap_or_default(),
         &FilterOptions {
-            prefix: Some("ai_summary".into()),
+            prefix: Some(build_prefix("ai_summary", prefix.as_deref())),
             ..Default::default()
         },
     ));

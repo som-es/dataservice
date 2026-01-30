@@ -92,23 +92,34 @@ pub struct DbMinistrialProposal {
 )]
 // #[diesel(table_name = ministrial_proposals)]
 pub struct DbMinistrialProposalQueryMeta {
+    #[filter(make_optional)]
     pub id: i32,
+    #[filter(make_optional)]
     pub ityp: String,
+    #[filter(make_optional)]
     pub gp: String,
+    #[filter(make_optional)]
     pub inr: i32,
     pub emphasis: Option<String>,
+    #[filter(make_optional)]
     pub title: String,
+    #[filter(make_optional)]
     pub description: String,
+    #[filter(make_optional)]
     pub raw_data_created_at: DateTime<Utc>,
     pub raw_data_updated_at: Option<DateTime<Utc>>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
+    #[filter(make_optional)]
     pub due_to: NaiveDate,
+    #[filter(make_optional)]
     pub ressort: String,
+    #[filter(make_optional)]
     pub ressort_shortform: String,
     pub legis_init_gp: Option<String>,
     pub legis_init_inr: Option<i32>,
     pub legis_init_ityp: Option<String>,
+    #[filter(make_optional)]
     pub has_vote_result: bool,
 }
 
