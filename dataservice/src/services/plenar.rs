@@ -14,6 +14,8 @@ pub use db::*;
 mod inserts;
 pub use inserts::*;
 
+const MAX_TASKS: usize = 4;
+
 pub async fn plenar_info_once(pg_pool: &PgPool, only_latest: bool) {
     log::info!("Try scraping plenar info");
 
@@ -41,8 +43,8 @@ pub async fn plenar_info_once(pg_pool: &PgPool, only_latest: bool) {
                 let mut handles: Vec<JoinHandle<()>> = vec![];
 
                 for plenar_info in new_plenar_infos.into_iter() {
-                    if handles.len() > 32 {
-                        log::info!("awaiting 32 plenar handles");
+                    if handles.len() > MAX_TASKS {
+                        log::info!("awaiting {MAX_TASKS} plenar handles");
                         for handle in handles.drain(..) {
                             if let Err(e) = handle.join() {
                                 log::error!("could not await plenar info handle: {e:?}");
@@ -173,12 +175,13 @@ mod tests {
     use std::{collections::HashSet, io::Read};
 
     use chrono::NaiveDateTime;
+    use combx::GPS;
     use rand::Rng;
     use somes_scraper::{plenar::Plenar, AustriaScraper, Scraper, TextExtractor};
 
     use crate::{
         connect_pg,
-        plenar::{insert_plenar_info, update_plenar_infos_in_db},
+        plenar::{insert_plenar_info, scrape_new_plenar_infos, update_plenar_infos_in_db},
     };
 
     #[test]
@@ -241,5 +244,40 @@ mod tests {
         let pool = connect_pg().await;
 
         update_plenar_infos_in_db(&res, &pool).await;
+    }
+
+    #[tokio::test]
+    async fn test_speeches_links_sum() {
+        // simple_logger::init_with_level(log::Level::Info).unwrap();
+        let mut scraper: AustriaScraper = AustriaScraper::default();
+        let mut full_count = 0;
+        for gp in GPS {
+            scraper.scrape_info.gp = vec![gp.into()];
+            let start = tokio::time::Instant::now();
+            println!("Scraping plenar infos for GP: {gp}");
+            let plenars = scrape_new_plenar_infos(&scraper).await.unwrap();
+            let duration = start.elapsed();
+            println!(
+                "Scraped {} plenar infos for GP: {gp} in {:?}",
+                plenars.len(),
+                duration
+            );
+            for plenar in plenars {
+                let count: u32 = plenar
+                    .debates
+                    .iter()
+                    .map(|debate| {
+                        debate
+                            .speeches
+                            .iter()
+                            .map(|speech| speech.speech.spoken_text_html_urls.len() as u32)
+                            .sum::<u32>()
+                    })
+                    .sum();
+                full_count += count;
+            }
+            println!("current count: {full_count}");
+        }
+        log::info!("full_count: {full_count}");
     }
 }

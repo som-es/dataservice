@@ -155,7 +155,6 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &PgPool) {
                     constituency = EXCLUDED.constituency,
                     council = EXCLUDED.council,
                     seat_row = EXCLUDED.seat_row,
-                    -- seat_row = 3,
                     seat_col = EXCLUDED.seat_col,
                     gender = EXCLUDED.gender,
                     is_active = EXCLUDED.is_active,

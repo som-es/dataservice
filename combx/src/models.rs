@@ -96,7 +96,7 @@ pub struct DbMinistrialProposalQueryMeta {
     pub id: i32,
     #[filter(make_optional)]
     pub ityp: String,
-    #[filter(make_optional)]
+    #[filter(make_optional, make_vec)]
     pub gp: String,
     #[filter(make_optional)]
     pub inr: i32,
@@ -112,9 +112,9 @@ pub struct DbMinistrialProposalQueryMeta {
     pub updated_at: Option<DateTime<Utc>>,
     #[filter(make_optional)]
     pub due_to: NaiveDate,
-    #[filter(make_optional)]
+    #[filter(make_optional, make_vec)]
     pub ressort: String,
-    #[filter(make_optional)]
+    #[filter(make_optional, make_vec)]
     pub ressort_shortform: String,
     pub legis_init_gp: Option<String>,
     pub legis_init_inr: Option<i32>,

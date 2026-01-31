@@ -71,7 +71,7 @@ pub async fn update_plenar_infos_in_db(plenar_info: &PlenarInfo, pg_pool: &PgPoo
             )
             .await
             {
-                log::warn!(
+                log::error!(
                         "Error inserting plenar speech: '{e}'. Error occured for plenar speech: {plenar_speech:?}"
                     );
             }
