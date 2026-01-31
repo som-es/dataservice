@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use somes_scraper::{
     plenar::{Plenar, PlenarInfo},
     AustriaScraper,
@@ -6,8 +8,7 @@ use somes_scraper::{
 pub async fn scrape_new_plenar_infos(scraper: &AustriaScraper) -> crate::Result<Vec<PlenarInfo>> {
     let raw_plenar = scraper.post_plenar_payload().await?;
     let plenar_paths = scraper.plenar_paths(raw_plenar)?;
-
-    let mut new_plenar_infos = Vec::new();
+    let mut new_plenar_infos = HashSet::new();
 
     for plenar_path in &plenar_paths {
         let Ok(plenar_info) = scraper.get_plenar(&plenar_path).await else {
@@ -15,8 +16,8 @@ pub async fn scrape_new_plenar_infos(scraper: &AustriaScraper) -> crate::Result<
             continue;
         };
 
-        new_plenar_infos.push(plenar_info);
+        new_plenar_infos.insert(plenar_info);
     }
 
-    Ok(new_plenar_infos)
+    Ok(new_plenar_infos.into_iter().collect())
 }

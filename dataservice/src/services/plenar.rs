@@ -14,7 +14,7 @@ pub use db::*;
 mod inserts;
 pub use inserts::*;
 
-const MAX_TASKS: usize = 4;
+const MAX_TASKS: usize = 1;
 
 pub async fn plenar_info_once(pg_pool: &PgPool, only_latest: bool) {
     log::info!("Try scraping plenar info");
@@ -81,8 +81,9 @@ pub async fn plenar_info_once(pg_pool: &PgPool, only_latest: bool) {
 impl StoredUpdatedAt for PlenarInfo {
     async fn stored_updated_at(&self, pg: &PgPool) -> Option<chrono::DateTime<chrono::Utc>> {
         sqlx::query!(
-            "select raw_data_updated_at from plenar_infos where inr = $1",
-            self.inr as i32
+            "select raw_data_updated_at from plenar_infos where inr = $1 and legislative_period = $2",
+            self.inr as i32,
+            self.gp,
         )
         .fetch_optional(pg)
         .await
@@ -172,11 +173,14 @@ pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool, only_latest: bool
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, io::Read};
+    use std::{
+        collections::{HashMap, HashSet},
+        io::Read,
+    };
 
     use chrono::NaiveDateTime;
     use combx::GPS;
-    use rand::Rng;
+    use rand::{rand_core::le, Rng};
     use somes_scraper::{plenar::Plenar, AustriaScraper, Scraper, TextExtractor};
 
     use crate::{
@@ -251,6 +255,7 @@ mod tests {
         // simple_logger::init_with_level(log::Level::Info).unwrap();
         let mut scraper: AustriaScraper = AustriaScraper::default();
         let mut full_count = 0;
+        let mut unique_links = HashMap::new();
         for gp in GPS {
             scraper.scrape_info.gp = vec![gp.into()];
             let start = tokio::time::Instant::now();
@@ -262,6 +267,7 @@ mod tests {
                 plenars.len(),
                 duration
             );
+
             for plenar in plenars {
                 let count: u32 = plenar
                     .debates
@@ -270,14 +276,84 @@ mod tests {
                         debate
                             .speeches
                             .iter()
-                            .map(|speech| speech.speech.spoken_text_html_urls.len() as u32)
+                            .map(|speech| {
+                                let mut url_here = HashSet::new();
+                                for url in &speech.speech.spoken_text_html_urls {
+                                    if url_here.contains(&url.document_url) {
+                                        println!("Url collision: {:?}", speech.speech.spoken_text_html_urls)
+                                    }
+                                    url_here.insert(url.document_url.clone());
+                                    if !url.document_url.starts_with("http") {
+                                        println!("no HTTP URL: {}", url.document_url);
+                                    }
+                                    if url.document_url.is_empty() {
+                                        println!("empty URL in speech: {:?}", speech);
+                                    }
+                                    
+                                    if let Some(col_speech) = unique_links.get(&url.document_url)  {
+                                        // println!("collision of speeches!: {col_speech:?} collided with {speech:?} - {}", plenar.inr);
+                                        // println!();
+                                    }
+                                    if url.document_url == "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/32/C_-_16_55_19_00810278.html#350" {
+                                        println!("speech: {speech:?} - {:?} - {}", debate.info, plenar.inr);
+                                    }
+                                    unique_links.insert(url.document_url.clone(), (speech.clone(), plenar.inr));
+                                }
+                                speech.speech.spoken_text_html_urls.len() as u32
+                            })
                             .sum::<u32>()
                     })
                     .sum();
                 full_count += count;
             }
             println!("current count: {full_count}");
+            println!("current unique_links count: {}", unique_links.len());
         }
-        log::info!("full_count: {full_count}");
+        println!("full_count: {full_count}");
+        println!("unique_links count: {}", unique_links.len());
+    }
+
+    #[tokio::test]
+    async fn test_xxii_nrsitz_12_db_insertion() {
+        unsafe { std::env::set_var("MIND_UPDATE_TIME", "false") };
+        unsafe { std::env::set_var("DISABLE_SPEECH_TEXT", "false") };
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper: AustriaScraper = AustriaScraper::default();
+        let res = scraper
+            .get_plenar("/gegenstand/XXII/NRSITZ/12")
+            .await
+            .unwrap();
+
+        let pool = connect_pg().await;
+
+        update_plenar_infos_in_db(&res, &pool).await; 
+    }
+
+    #[tokio::test]
+    async fn test_xxviii_nrsitz_32() {
+        let scraper: AustriaScraper = AustriaScraper::default();
+        let res = scraper
+            .get_plenar("/gegenstand/XXVIII/NRSITZ/32")
+            .await
+            .unwrap();
+
+        let mut unique_links = HashMap::new();
+        for debate in res.debates {
+            println!("debate: {:?}", debate.info);
+            println!();
+            for speech in debate.speeches {
+                for url in &speech.speech.spoken_text_html_urls {
+                    if let Some(col_speech) = unique_links.get(&url.document_url) {
+                        println!(
+                            "collision of speeches!: {col_speech:?} collided with {speech:?} ",
+                        );
+                        println!();
+                    }
+                    unique_links.insert(url.document_url.clone(), (speech.clone()));
+                }
+
+                println!("speech: {speech:?}");
+            }
+        }
     }
 }
