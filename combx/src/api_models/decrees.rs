@@ -24,18 +24,24 @@ use utoipa::ToSchema;
 pub struct Decree {
     #[filter(make_vec)]
     pub gov_official_id: Option<i32>,
-    #[filter(make_vec)]
+    #[filter(make_optional, make_vec)]
     pub ris_id: String,
-    #[filter(make_vec)]
+    #[filter(make_optional, make_vec)]
     pub ministrial_issuer: String,
+    #[filter(make_optional)]
     pub title: String,
+    #[filter(make_optional)]
     pub short_title: String,
+    #[filter(make_optional)]
     pub publication_date: NaiveDate,
+    #[filter(make_optional)]
     pub part: String,
     pub emphasis: Option<String>,
     #[filter(make_vec)]
     pub gp: Option<String>,
+    #[filter(make_optional)]
     pub eli: String,
+    #[filter(make_optional)]
     pub document_url: String,
     #[filter(skip)]
     pub documents: Vec<Document>,
