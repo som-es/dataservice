@@ -1,4 +1,6 @@
+use combx::{AiSummary, DbAiSummary};
 use somes_common_lib::Document;
+use sqlx::types::Json;
 
 use crate::{
     ai_task::TaskArgs,
@@ -9,7 +11,7 @@ pub async fn summarize_legis_init_documents(
     task_args: TaskArgs,
     docs: &[Document],
     summarization_of: &str,
-) -> combx::Result<()> {
+) -> combx::Result<Option<DbAiSummary>> {
     // is emphasis already generated/set? -> skip
     let info = sqlx::query!(
         "select id from legislative_initiative_summaries where legis_init_id = $1 limit 1",
@@ -22,7 +24,7 @@ pub async fn summarize_legis_init_documents(
             "Skipping legis init emphasis summarization for id {}, already set.",
             task_args.db_entry_id
         );
-        return Ok(());
+        return Ok(None);
     }
 
     let summary = summarize_documents(&task_args, docs, summarization_of).await?;
@@ -31,6 +33,24 @@ pub async fn summarize_legis_init_documents(
         sqlx::query!("insert into legislative_initiative_summaries (legis_init_id, summary_id) values ($1, $2)", task_args.db_entry_id, summary_id)
                     .execute(&task_args.pg_pool)
                     .await?;
+        let db_ai_summary = sqlx::query_as!(
+            DbAiSummary,
+            r#"select 
+                    id,
+            full_summary as "full_summary: Json<AiSummary>",
+            short_title,
+            short_summary,
+            detailed_summary,
+            complexity_scope_of_proposal,
+            model_used,
+            version,
+            generated_at from summaries where id = $1"#,
+            summary_id
+        )
+        .fetch_one(&task_args.pg_pool)
+        .await?;
+
+        return Ok(Some(db_ai_summary));
     } else {
         log::error!(
             "No summary generated for legis init {}, documents: {:?}, abort reason: {:?}",
@@ -40,7 +60,7 @@ pub async fn summarize_legis_init_documents(
         );
     }
 
-    Ok(())
+    Ok(None)
 }
 
 #[cfg(test)]

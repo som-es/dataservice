@@ -18,7 +18,8 @@ use sqlx::{query, PgPool};
 use std::sync::{Arc, LazyLock};
 
 use crate::{
-    ai_task::AiTask, should_update::StoredUpdatedAt, today_and_time, Shutdown, GPS, LATEST_GP,
+    ai_task::AiTask, should_update::StoredUpdatedAt, today_and_time, AppState, Shutdown, GPS,
+    LATEST_GP,
 };
 
 use dotenvy_macro::dotenv;
@@ -32,7 +33,7 @@ pub(self) const LEGIS_INIT_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| {
 pub async fn legis_init_once(
     only_latest: bool,
     only_laws: bool,
-    pg_pool: &PgPool,
+    pg_pool: &AppState,
     new_legis_init: Option<Sender<Option<(i32, LegislativeInitiative)>>>,
     ai_task_ts: Sender<AiTask>,
 ) -> Vec<LegislativeInitiative> {
@@ -119,7 +120,7 @@ impl StoredUpdatedAt for LegislativeInitiative {
 
 pub async fn run_shut_latest_gp(
     mut shutdown: Shutdown,
-    pg_pool: PgPool,
+    app_state: AppState,
     new_legis_init: Sender<Option<(i32, LegislativeInitiative)>>,
     ai_task_tx: Sender<AiTask>,
     legis_init_sleep: u64,
@@ -137,11 +138,11 @@ pub async fn run_shut_latest_gp(
                 break;
             }
             _ = async {
-                let pg_pool = pg_pool.clone();
+                let app_state = app_state.clone();
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative (latest) scraper");
 
-                    legis_init_once(only_latest, only_laws, &pg_pool, Some(new_legis_init.clone()), ai_task_ts.clone()).await;
+                    legis_init_once(only_latest, only_laws, &app_state, Some(new_legis_init.clone()), ai_task_ts.clone()).await;
 
                     // triggers the email service
                     let res = new_legis_init.send(None).await;
@@ -163,7 +164,7 @@ pub async fn run_shut_latest_gp(
 
 pub async fn run_shut_every_gp(
     mut shutdown: Shutdown,
-    pg_pool: PgPool,
+    app_state: AppState,
     ai_task_tx: Sender<AiTask>,
     only_latest: bool,
 ) {
@@ -190,11 +191,11 @@ pub async fn run_shut_every_gp(
                 break;
             }
             _ = async {
-                let pg_pool = pg_pool.clone();
+                let app_state = app_state.clone();
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative scraper");
 
-                    legis_init_once(false, false, &pg_pool, None, ai_task_ts.clone()).await;
+                    legis_init_once(false, false, &app_state, None, ai_task_ts.clone()).await;
                 }).await {
                     log::error!("Error in legislative initiative scraper: {:?}", e);
                 }
@@ -211,6 +212,7 @@ mod tests {
     use std::sync::Arc;
 
     use chrono::{NaiveDate, NaiveDateTime};
+    use rand::rand_core::le;
     use somes_scraper::{legis_init::LegislativeInitiatives, AustriaScraper};
     use sqlx::postgres::PgPoolOptions;
 
@@ -276,8 +278,14 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_or_insert_legis_init_in_db(&pool, &res, None, None)
-            .await;
+        let app_state = crate::AppState {
+            pg_pool: pool,
+            redis_client: None,
+        };
+        crate::legislative_initiatives::update_or_insert_legis_init_in_db(
+            &app_state, &res, None, None,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -289,8 +297,14 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_or_insert_legis_init_in_db(&pool, &res, None, None)
-            .await;
+        let app_state = crate::AppState {
+            pg_pool: pool,
+            redis_client: None,
+        };
+        crate::legislative_initiatives::update_or_insert_legis_init_in_db(
+            &app_state, &res, None, None,
+        )
+        .await;
 
         // println!("s: {:?}", scraper.scrape_info.gp);
 
@@ -307,8 +321,14 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_or_insert_legis_init_in_db(&pool, &res, None, None)
-            .await;
+        let app_state = crate::AppState {
+            pg_pool: pool,
+            redis_client: None,
+        };
+        crate::legislative_initiatives::update_or_insert_legis_init_in_db(
+            &app_state, &res, None, None,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -320,8 +340,14 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_or_insert_legis_init_in_db(&pool, &res, None, None)
-            .await;
+        let app_state = crate::AppState {
+            pg_pool: pool,
+            redis_client: None,
+        };
+        crate::legislative_initiatives::update_or_insert_legis_init_in_db(
+            &app_state, &res, None, None,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -333,8 +359,14 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_or_insert_legis_init_in_db(&pool, &res, None, None)
-            .await;
+        let app_state = crate::AppState {
+            pg_pool: pool,
+            redis_client: None,
+        };
+        crate::legislative_initiatives::update_or_insert_legis_init_in_db(
+            &app_state, &res, None, None,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -347,8 +379,14 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_or_insert_legis_init_in_db(&pool, &res, None, None)
-            .await;
+        let app_state = crate::AppState {
+            pg_pool: pool,
+            redis_client: None,
+        };
+        crate::legislative_initiatives::update_or_insert_legis_init_in_db(
+            &app_state, &res, None, None,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -361,8 +399,14 @@ mod tests {
             .unwrap();
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_or_insert_legis_init_in_db(&pool, &res, None, None)
-            .await;
+        let app_state = crate::AppState {
+            pg_pool: pool,
+            redis_client: None,
+        };
+        crate::legislative_initiatives::update_or_insert_legis_init_in_db(
+            &app_state, &res, None, None,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -377,8 +421,14 @@ mod tests {
         log::info!("legis init: {res:?}");
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_or_insert_legis_init_in_db(&pool, &res, None, None)
-            .await;
+        let app_state = crate::AppState {
+            pg_pool: pool,
+            redis_client: None,
+        };
+        crate::legislative_initiatives::update_or_insert_legis_init_in_db(
+            &app_state, &res, None, None,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -393,7 +443,13 @@ mod tests {
         log::info!("legis init: {res:?}");
 
         let pool = connect_pg().await;
-        crate::legislative_initiatives::update_or_insert_legis_init_in_db(&pool, &res, None, None)
-            .await;
+        let app_state = crate::AppState {
+            pg_pool: pool,
+            redis_client: None,
+        };
+        crate::legislative_initiatives::update_or_insert_legis_init_in_db(
+            &app_state, &res, None, None,
+        )
+        .await;
     }
 }

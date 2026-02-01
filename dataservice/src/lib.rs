@@ -75,10 +75,17 @@ pub fn tessdata_dir() -> String {
 }
 
 pub const DATABASE_URL: &str = dotenv!("DATABASE_URL");
+pub const REDIS_URL: &str = dotenv!("REDIS_URL");
 pub const LATEST_GP: &str = dotenv!("LATEST_GP");
 pub const GPS: [&str; 9] = [
     LATEST_GP, "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
 ];
+
+#[derive(Clone)]
+pub struct AppState {
+    pub pg_pool: PgPool,
+    pub redis_client: Option<redis::Client>,
+}
 
 #[cfg(feature = "runner")]
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;

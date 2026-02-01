@@ -1,6 +1,6 @@
 use combx::{PostgresEnhancer, VoteResult};
+use redis::AsyncCommands;
 use somes_scraper::LegislativeInitiative;
-use sqlx::PgPool;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
@@ -12,14 +12,16 @@ use crate::{
     },
     today,
     topics::{insert_topics_generic_batch, TableType, TopicType},
+    AppState,
 };
 
 pub async fn update_or_insert_legis_init_in_db(
-    pool: &PgPool,
+    app_state: &AppState,
     legis_init: &LegislativeInitiative,
     new_legis_init: Option<Sender<Option<(i32, LegislativeInitiative)>>>,
     ai_task_tx: Option<Sender<AiTask>>,
 ) {
+    let pool = &app_state.pg_pool;
     let start = tokio::time::Instant::now();
     let should_update = crate::should_update(legis_init, pool).await;
     if !enforce_ai_run() && !should_update {
@@ -42,7 +44,7 @@ pub async fn update_or_insert_legis_init_in_db(
         vote_result_start.elapsed()
     );
 
-    let db_legis_init = vote_result.legislative_initiative;
+    let db_legis_init = vote_result.legislative_initiative.clone();
 
     let mut tx = match pool.begin().await {
         Ok(t) => t,
@@ -121,6 +123,14 @@ pub async fn update_or_insert_legis_init_in_db(
 
     vote_result.id = Some(legis_init_id);
 
+    if should_update {
+        if let Some(client) = &app_state.redis_client {
+            if let Err(e) = notify_vote_result_update(&vote_result, client).await {
+                log::error!("Could not notify for vote result update!: {e:?}");
+            }
+        }
+    }
+
     #[cfg(feature = "ai")]
     if let Some(ai_task_tx) = &ai_task_tx {
         if db_legis_init.is_voteable_on {
@@ -137,6 +147,8 @@ pub async fn update_or_insert_legis_init_in_db(
 
             let documents = vote_result.documents.clone();
             let voting = db_legis_init.voting.clone();
+            let redis_client = app_state.redis_client.clone();
+            let vote_result = vote_result.clone();
             let summarization_task = AiTask {
                 input: None,
                 priority,
@@ -153,9 +165,20 @@ pub async fn update_or_insert_legis_init_in_db(
                             Some(other) => other,
                             None => "Unbekannt",
                         };
-                        summarize_legis_init_documents(task_args, &documents, summarization_of)
-                            .await
-                        // TODO: update meilisearch index on finish
+                        let ai_summary =
+                            summarize_legis_init_documents(task_args, &documents, summarization_of)
+                                .await?;
+                        if ai_summary.is_none() {
+                            return Ok(());
+                        }
+                        let mut vote_result = vote_result;
+                        vote_result.ai_summary = ai_summary;
+                        if let Some(client) = &redis_client {
+                            if let Err(e) = notify_vote_result_update(&vote_result, client).await {
+                                log::error!("Could not notify for vote result update!: {e:?}");
+                            }
+                        }
+                        Ok(())
                     })
                 }),
             };
@@ -346,4 +369,16 @@ pub async fn update_or_insert_legis_init_in_db(
         log::error!("Cannot commit legis init transaction: {e:?}");
     }
     log::info!("Insertion duration for legis init: {:?}", start.elapsed());
+}
+
+async fn notify_vote_result_update(
+    vote_result: &VoteResult,
+    client: &redis::Client,
+) -> combx::Result<()> {
+    let mut con = client.get_multiplexed_async_connection().await?;
+    let vote_result = serde_json::to_string(vote_result)?;
+    let _: () = con
+        .xadd("vote_results", "*", &[("data", vote_result)])
+        .await?;
+    Ok(())
 }

@@ -289,7 +289,6 @@ mod tests {
                                     if url.document_url.is_empty() {
                                         println!("empty URL in speech: {:?}", speech);
                                     }
-                                    
                                     if let Some(col_speech) = unique_links.get(&url.document_url)  {
                                         // println!("collision of speeches!: {col_speech:?} collided with {speech:?} - {}", plenar.inr);
                                         // println!();
@@ -326,7 +325,7 @@ mod tests {
 
         let pool = connect_pg().await;
 
-        update_plenar_infos_in_db(&res, &pool).await; 
+        update_plenar_infos_in_db(&res, &pool).await;
     }
 
     #[tokio::test]

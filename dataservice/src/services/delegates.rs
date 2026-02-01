@@ -4,7 +4,7 @@ use combx::{create_gov_officials_map, DbContact, DbDelegate, DbMandate};
 use somes_scraper::{delegates::DelegateScraper, AustriaScraper, Delegate, GovOfficial, Mandate};
 use sqlx::{postgres::PgQueryResult, query, PgPool};
 
-use crate::{services::scrape_untill_success, Shutdown};
+use crate::{services::scrape_untill_success, AppState, Shutdown};
 
 async fn scrape_new_delegates_bs() -> crate::Result<Vec<Delegate>> {
     let scraper = AustriaScraper::default();
@@ -56,8 +56,10 @@ pub async fn delegate_count(conn: &PgPool) -> Option<i64> {
         .ok()
 }
 
-async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &PgPool) {
+async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &AppState) {
     let gov_officials = create_gov_officials_map().await;
+
+    let pg_pool = &pg_pool.pg_pool;
 
     log::info!("Updating delegates in database...");
     for delegate in new_delegates {
@@ -384,7 +386,10 @@ pub async fn insert_mandate(
     //     .execute(conn)
 }
 
-pub async fn delegates_once(prev_delegates: &HashSet<Delegate>, pg_pool: PgPool) -> Vec<Delegate> {
+pub async fn delegates_once(
+    prev_delegates: &HashSet<Delegate>,
+    pg_pool: AppState,
+) -> Vec<Delegate> {
     log::info!("Scraping all delegates...");
 
     let new_delegates_bs =
@@ -409,7 +414,7 @@ pub async fn delegates_once(prev_delegates: &HashSet<Delegate>, pg_pool: PgPool)
     new_delegates
 }
 
-pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool) {
+pub async fn run_shut(mut shutdown: Shutdown, pg_pool: AppState) {
     let prev_delegates = HashSet::new();
 
     while !shutdown.is_shutdown() {

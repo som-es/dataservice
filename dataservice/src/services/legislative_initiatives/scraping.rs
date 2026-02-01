@@ -5,11 +5,12 @@ use sqlx::PgPool;
 use tokio::{runtime::Handle, sync::mpsc::Sender};
 
 use crate::{
-    ai_task::AiTask, legislative_initiatives::update_or_insert_legis_init_in_db, LATEST_GP,
+    ai_task::AiTask, legislative_initiatives::update_or_insert_legis_init_in_db, AppState,
+    LATEST_GP,
 };
 
 pub async fn scrape_new_legis_inits(
-    pool: &PgPool,
+    pool: &AppState,
     scraper: Arc<AustriaScraper>,
     gp: &str,
     new_legis_init: Option<Sender<Option<(i32, LegislativeInitiative)>>>,

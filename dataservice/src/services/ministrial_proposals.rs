@@ -20,7 +20,7 @@ use crate::{
     should_update::StoredUpdatedAt,
     today, today_and_time,
     topics::{insert_topics_generic_batch, TableType, TopicType},
-    Shutdown, GPS,
+    AppState, Shutdown, GPS,
 };
 
 mod notify;
@@ -65,7 +65,7 @@ pub async fn scrape_new_ministrial_props(
 
 pub async fn ministrial_proposal_once(
     only_latest: bool,
-    pg_pool: &PgPool,
+    pg_pool: &AppState,
     new_ministrial_proposal_tx: Option<Sender<Option<(i32, GovProposal)>>>,
     ai_task_tx: Sender<AiTask>,
 ) -> Vec<MinistrialProposal> {
@@ -139,25 +139,38 @@ impl StoredUpdatedAt for MinistrialProposal {
 }
 
 pub async fn update_ministrial_proposals_in_db2(
-    pool: &PgPool,
+    app_state: &AppState,
     ministrial_props: Vec<MinistrialProposal>,
     new_ministrial_proposal_tx: Option<Sender<Option<(i32, GovProposal)>>>,
     gov_officials: Arc<HashMap<u64, Vec<GovOfficial>>>,
     ai_task_tx: Option<Sender<AiTask>>,
 ) -> Result<(), sqlx::Error> {
-    log::info!("Updating {} ministrial proposal in database...", ministrial_props.len());
+    log::info!(
+        "Updating {} ministrial proposal in database...",
+        ministrial_props.len()
+    );
+
+    let pool = &app_state.pg_pool;
 
     let mut started_acc = false;
     for (i, ministrial_prop) in ministrial_props.into_iter().enumerate() {
         let should_update = crate::should_update(&ministrial_prop, pool).await;
         if !enforce_ai_run() && !should_update {
-            log::info!("No need to update ministrial proposal: {}/ME/{}", ministrial_prop.gp, ministrial_prop.inr);
+            log::info!(
+                "No need to update ministrial proposal: {}/ME/{}",
+                ministrial_prop.gp,
+                ministrial_prop.inr
+            );
             continue;
         }
 
         let gov_proposal =
             GovProposal::from_scraped_type((), (ministrial_prop, gov_officials.clone())).await;
-        log::info!("{i} Processing ministrial proposal: {}/ME/{}", gov_proposal.ministrial_proposal.gp, gov_proposal.ministrial_proposal.inr);
+        log::info!(
+            "{i} Processing ministrial proposal: {}/ME/{}",
+            gov_proposal.ministrial_proposal.gp,
+            gov_proposal.ministrial_proposal.inr
+        );
         // log::info!("inserting single ministrial prop");
 
         let start = Instant::now();
@@ -274,7 +287,11 @@ pub async fn update_ministrial_proposals_in_db2(
             continue;
         }
 
-        log::info!("Continue updating ministrial proposal related data for proposal {}/ME/{}", gov_proposal.ministrial_proposal.gp, gov_proposal.ministrial_proposal.inr);
+        log::info!(
+            "Continue updating ministrial proposal related data for proposal {}/ME/{}",
+            gov_proposal.ministrial_proposal.gp,
+            gov_proposal.ministrial_proposal.inr
+        );
 
         for issuer_id in &gov_proposal.ministerial_issuers {
             sqlx::query!(
@@ -442,7 +459,7 @@ async fn check_and_send_ministrial_email(
 
 pub async fn run_shut_latest_gp(
     mut shutdown: Shutdown,
-    pg_pool: PgPool,
+    app_state: AppState,
     new_ministrial_proposal_tx: Sender<Option<(i32, GovProposal)>>,
     ai_task_tx: Sender<AiTask>,
 ) {
@@ -466,10 +483,10 @@ pub async fn run_shut_latest_gp(
                 break;
             }
             _ = async {
-                let pg_pool = pg_pool.clone();
+                let app_state = app_state.clone();
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting ministrial proposal (latest) scraper");
-                    ministrial_proposal_once(true, &pg_pool, Some(new_ministrial_proposal_tx), ai_task_tx).await;
+                    ministrial_proposal_once(true, &app_state, Some(new_ministrial_proposal_tx), ai_task_tx).await;
                 }).await {
                     log::error!("Error in ministrial proposal (latest) scraper: {:?}", e);
                 }
@@ -483,7 +500,7 @@ pub async fn run_shut_latest_gp(
 
 pub async fn run_shut_every_gp(
     mut shutdown: Shutdown,
-    pg_pool: PgPool,
+    app_state: AppState,
     only_latest: bool,
     ai_task_tx: Sender<AiTask>,
 ) {
@@ -510,11 +527,11 @@ pub async fn run_shut_every_gp(
                 break;
             }
             _ = async {
-                let pg_pool = pg_pool.clone();
+                let app_state = app_state.clone();
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting ministrial proposal scraper");
 
-                    ministrial_proposal_once(false, &pg_pool, None, ai_task_tx).await;
+                    ministrial_proposal_once(false, &app_state, None, ai_task_tx).await;
                 }).await {
                     log::error!("Error in ministrial proposal scraper: {:?}", e);
                 }

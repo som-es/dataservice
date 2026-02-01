@@ -3,7 +3,7 @@ use dataservice::{
     ai_task::{self, AiTask},
     connect_pg,
     delegates::delegate_count,
-    model_dir, services, setup_app_data, Shutdown,
+    model_dir, services, setup_app_data, AppState, Shutdown, REDIS_URL,
 };
 use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
@@ -76,30 +76,48 @@ pub async fn run_services(state: &State, config: Config) {
     let (ai_task_tx, ai_task_rx) = tokio::sync::mpsc::channel::<AiTask>(16536 * 22);
 
     let pool = connect_pg().await;
+    let redis_client = redis::Client::open(REDIS_URL);
+
+    match &redis_client {
+        Ok(client) => {
+            if client.get_connection().is_err() {
+                log::error!("Could not establish redis database connection!");
+            }
+        }
+        Err(e) => {
+            log::error!("Could not create redis client: {e}");
+        }
+    }
+    let redis_client = redis_client.ok();
+    let app_state = AppState {
+        pg_pool: pool.clone(),
+        redis_client,
+    };
+
     {
         if delegate_count(&pool).await == Some(0) {
             log::info!("Delegates are 0, start scraping ...");
             let hs = std::collections::HashSet::new();
-            let _res = services::delegates::delegates_once(&hs, pool.clone()).await;
+            let _res = services::delegates::delegates_once(&hs, app_state.clone()).await;
             services::parties::parties_once(&pool).await;
 
             services::plenar::plenar_info_once(&pool, false).await;
             services::legislative_initiatives::legis_init_once(
                 false,
                 true,
-                &pool,
+                &app_state,
                 None,
                 ai_task_tx.clone(),
             )
             .await;
 
-            let pool1 = pool.clone();
+            let app_state1 = app_state.clone();
 
             let inner_ai_task_tx = ai_task_tx.clone();
             let ministerial_proposals = async move {
                 services::ministrial_proposals::ministrial_proposal_once(
                     false,
-                    &pool1,
+                    &app_state1,
                     None,
                     inner_ai_task_tx.clone(),
                 )
@@ -124,13 +142,13 @@ pub async fn run_services(state: &State, config: Config) {
             .unwrap();
         }
         if config.force_fill {
-            let pool1 = pool.clone();
+            let app_state1 = app_state.clone();
             let inner_ai_task_tx = ai_task_tx.clone();
             let legis_inits = async move {
                 services::legislative_initiatives::legis_init_once(
                     true,
                     false,
-                    &pool1,
+                    &app_state1,
                     None,
                     inner_ai_task_tx.clone(),
                 )
@@ -143,11 +161,11 @@ pub async fn run_services(state: &State, config: Config) {
             };
 
             let ai_task_tx = ai_task_tx.clone();
-            let pool1 = pool.clone();
+            let app_state1 = app_state.clone();
             let ministerial_proposals = async move {
                 services::ministrial_proposals::ministrial_proposal_once(
                     false,
-                    &pool1,
+                    &app_state1,
                     None,
                     ai_task_tx.clone(),
                 )
@@ -205,13 +223,13 @@ pub async fn run_services(state: &State, config: Config) {
         // services::proposals::run(),
         tokio::spawn(services::legislative_initiatives::run_shut_every_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
-            pool.clone(),
+            app_state.clone(),
             ai_task_tx.clone(),
             config.only_latest,
         )),
         tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
-            pool.clone(),
+            app_state.clone(),
             new_vote_result_tx.clone(),
             ai_task_tx.clone(),
             latest_legis_init_sleep + 500,
@@ -220,7 +238,7 @@ pub async fn run_services(state: &State, config: Config) {
         )),
         tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
-            pool.clone(),
+            app_state.clone(),
             new_vote_result_tx.clone(),
             ai_task_tx.clone(),
             latest_legis_init_sleep - 40,
@@ -229,13 +247,13 @@ pub async fn run_services(state: &State, config: Config) {
         )),
         tokio::spawn(services::ministrial_proposals::run_shut_every_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
-            pool.clone(),
+            app_state.clone(),
             config.only_latest,
             ai_task_tx.clone(),
         )),
         tokio::spawn(services::ministrial_proposals::run_shut_latest_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
-            pool.clone(),
+            app_state.clone(),
             new_ministrial_proposal_tx,
             ai_task_tx.clone(),
         )),
@@ -250,7 +268,7 @@ pub async fn run_services(state: &State, config: Config) {
         )),
         tokio::spawn(services::delegates::run_shut(
             Shutdown::new(state.notify_shutdown.subscribe()),
-            pool.clone()
+            app_state.clone()
         )),
         tokio::spawn(services::parties::run_shut(
             Shutdown::new(state.notify_shutdown.subscribe()),
