@@ -79,9 +79,9 @@ pub async fn ministrial_proposal_once(
         scraper.scrape_info.gp = vec![gp.into()];
         if only_latest {
             // this seems to not work! - Minsterial Props and NRSITZ do not have date filtering???
-            scraper.scrape_info.date_start = today_and_time()
-                .naive_local()
-                .checked_sub_months(Months::new(3))
+            // scraper.scrape_info.date_start = today_and_time()
+            //     .naive_local()
+            //     .checked_sub_months(Months::new(3))
         }
 
         let new_ministrial_props = scrape_untill_success::<Vec<_>, _>(|| async {
@@ -145,17 +145,19 @@ pub async fn update_ministrial_proposals_in_db2(
     gov_officials: Arc<HashMap<u64, Vec<GovOfficial>>>,
     ai_task_tx: Option<Sender<AiTask>>,
 ) -> Result<(), sqlx::Error> {
-    log::info!("Updating ministrial proposal in database...");
+    log::info!("Updating {} ministrial proposal in database...", ministrial_props.len());
 
     let mut started_acc = false;
     for (i, ministrial_prop) in ministrial_props.into_iter().enumerate() {
         let should_update = crate::should_update(&ministrial_prop, pool).await;
         if !enforce_ai_run() && !should_update {
+            log::info!("No need to update ministrial proposal: {}/ME/{}", ministrial_prop.gp, ministrial_prop.inr);
             continue;
         }
 
         let gov_proposal =
             GovProposal::from_scraped_type((), (ministrial_prop, gov_officials.clone())).await;
+        log::info!("{i} Processing ministrial proposal: {}/ME/{}", gov_proposal.ministrial_proposal.gp, gov_proposal.ministrial_proposal.inr);
         // log::info!("inserting single ministrial prop");
 
         let start = Instant::now();
@@ -256,6 +258,12 @@ pub async fn update_ministrial_proposals_in_db2(
                 }),
             };
 
+            log::info!(
+                "Sending AI task for ministerial prop summarization: {ministrial_prop_id} / {}/ME/{} with priority {priority:?}",
+                gov_proposal.ministrial_proposal.gp,
+                gov_proposal.ministrial_proposal.inr
+            );
+
             if let Err(e) = ai_task_tx.send(summarization_task).await {
                 log::error!("Could not send AI task for ministerial prop summarization: {e:?}");
             }
@@ -265,6 +273,8 @@ pub async fn update_ministrial_proposals_in_db2(
             log::info!("No need to update further!");
             continue;
         }
+
+        log::info!("Continue updating ministrial proposal related data for proposal {}/ME/{}", gov_proposal.ministrial_proposal.gp, gov_proposal.ministrial_proposal.inr);
 
         for issuer_id in &gov_proposal.ministerial_issuers {
             sqlx::query!(
@@ -333,54 +343,6 @@ pub async fn update_ministrial_proposals_in_db2(
             log::error!(
                 "Error inserting other keyword topics for legis init {ministrial_prop_id}: {e:?}"
             );
-        }
-
-        // Insert or update topics
-        for topic in &gov_proposal.topics {
-            sqlx::query!(
-                r#"
-                INSERT INTO topics_ministrial_proposals (topic, ministrial_proposal_id)
-                VALUES ($1, $2)
-                ON CONFLICT (ministrial_proposal_id, topic)
-                DO UPDATE SET topic = EXCLUDED.topic
-                "#,
-                topic.topic,
-                ministrial_prop_id
-            )
-            .execute(pool)
-            .await?;
-        }
-
-        // Insert or update eurovoc topics
-        for topic in &gov_proposal.eurovoc_topics {
-            sqlx::query!(
-                r#"
-                INSERT INTO eurovoc_topics_ministrial_proposals (topic, ministrial_proposal_id)
-                VALUES ($1, $2)
-                ON CONFLICT (ministrial_proposal_id, topic)
-                DO UPDATE SET topic = EXCLUDED.topic
-                "#,
-                topic.topic,
-                ministrial_prop_id
-            )
-            .execute(pool)
-            .await?;
-        }
-
-        // Insert or update other keyword topics
-        for topic in &gov_proposal.other_keyword_topics {
-            sqlx::query!(
-                r#"
-                INSERT INTO other_keyword_topics_ministrial_proposals (topic, ministrial_proposal_id)
-                VALUES ($1, $2)
-                ON CONFLICT (ministrial_proposal_id, topic)
-                DO UPDATE SET topic = EXCLUDED.topic
-                "#,
-                topic.topic,
-                ministrial_prop_id
-            )
-            .execute(pool)
-            .await?;
         }
 
         let mut tx = pool.begin().await?;

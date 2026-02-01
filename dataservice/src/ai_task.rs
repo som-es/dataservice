@@ -2,7 +2,7 @@ use std::{fmt::Debug, future::Future, pin::Pin, sync::Arc};
 
 use sqlx::PgPool;
 
-#[derive(PartialEq, Debug, Clone, Eq, PartialOrd, Ord)]
+#[derive(PartialEq, Debug, Clone, Eq, PartialOrd, Ord, Copy)]
 pub enum Priority {
     Highest = 10,
     High = 8,
