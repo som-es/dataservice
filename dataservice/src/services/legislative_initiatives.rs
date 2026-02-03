@@ -183,7 +183,7 @@ pub async fn run_shut_every_gp(
 
     #[cfg(feature = "legis_init")]
     while !shutdown.is_shutdown() {
-        let ai_task_ts = ai_task_tx.clone();
+        let ai_task_tx = ai_task_tx.clone();
         tokio::select! {
             _ = shutdown.recv() => {
                 println!("shutting down");
@@ -195,7 +195,7 @@ pub async fn run_shut_every_gp(
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative scraper");
 
-                    legis_init_once(false, false, &app_state, None, ai_task_ts.clone()).await;
+                    legis_init_once(false, false, &app_state, None, ai_task_tx.clone()).await;
                 }).await {
                     log::error!("Error in legislative initiative scraper: {:?}", e);
                 }

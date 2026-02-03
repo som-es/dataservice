@@ -1,10 +1,9 @@
-use combx::{AiSummary, DbAiSummary};
+use combx::DbAiSummary;
 use somes_common_lib::Document;
-use sqlx::types::Json;
 
 use crate::{
     ai_task::TaskArgs,
-    ai_tasks::{insert_ai_summary_sqlx, summarize_documents},
+    ai_tasks::summarize_and_save,
 };
 
 pub async fn summarize_legis_init_documents(
@@ -27,40 +26,12 @@ pub async fn summarize_legis_init_documents(
         return Ok(None);
     }
 
-    let summary = summarize_documents(&task_args, docs, summarization_of).await?;
-    if let Some(summary) = summary.summary {
-        let summary_id = insert_ai_summary_sqlx(&task_args.pg_pool, &summary).await?;
+    summarize_and_save(task_args, docs, summarization_of, |task_args: TaskArgs, summary_id: i32| async move {
         sqlx::query!("insert into legislative_initiative_summaries (legis_init_id, summary_id) values ($1, $2)", task_args.db_entry_id, summary_id)
-                    .execute(&task_args.pg_pool)
-                    .await?;
-        let db_ai_summary = sqlx::query_as!(
-            DbAiSummary,
-            r#"select 
-                    id,
-            full_summary as "full_summary: Json<AiSummary>",
-            short_title,
-            short_summary,
-            detailed_summary,
-            complexity_scope_of_proposal,
-            model_used,
-            version,
-            generated_at from summaries where id = $1"#,
-            summary_id
-        )
-        .fetch_one(&task_args.pg_pool)
-        .await?;
-
-        return Ok(Some(db_ai_summary));
-    } else {
-        log::error!(
-            "No summary generated for legis init {}, documents: {:?}, abort reason: {:?}",
-            task_args.db_entry_id,
-            docs,
-            summary.abort_reason
-        );
-    }
-
-    Ok(None)
+            .execute(&task_args.pg_pool)
+            .await?;
+        Ok(())
+    }).await
 }
 
 #[cfg(test)]

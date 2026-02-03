@@ -6,10 +6,11 @@ use combx::{
 };
 use somes_scraper::{decree::RisScraper, AustriaScraper, Thing};
 use sqlx::PgPool;
+use tokio::sync::mpsc::Sender;
 
-use crate::{today, Shutdown};
+use crate::{ai_task::AiTask, today, Shutdown};
 
-pub async fn save_ministrial_decrees(pages: u32, pg_pool: &PgPool) {
+pub async fn save_ministrial_decrees(pages: u32, pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) {
     let scraper = AustriaScraper::default();
 
     let mut all_gps = gps(pg_pool).await.unwrap();
@@ -31,7 +32,9 @@ pub async fn save_ministrial_decrees(pages: u32, pg_pool: &PgPool) {
         };
 
         for decree in decrees {
-            if let Err(e) = insert_ministrial_decree(decree, pg_pool, all_gps.clone()).await {
+            if let Err(e) =
+                insert_ministrial_decree(decree, pg_pool, all_gps.clone(), &ai_task_tx).await
+            {
                 log::error!("Cannot insert decree: {e:?}");
             }
         }
@@ -42,6 +45,7 @@ pub async fn insert_ministrial_decree(
     decree: Thing,
     pg_pool: &PgPool,
     all_gps: Arc<[LegislativePeriod]>,
+    ai_task_tx: &Sender<AiTask>,
 ) -> crate::Result<()> {
     let decree =
         combx::Decree::from_scraped_type(PostgresEnhancer(pg_pool.clone()), (decree, all_gps))
@@ -89,6 +93,50 @@ pub async fn insert_ministrial_decree(
         .fetch_one(pg_pool)
         .await?;
 
+        #[cfg(feature = "ai")]
+        {
+            use crate::{ai_task::Priority, LATEST_GP};
+
+            let priority = if decree.publication_date
+                >= (today() - chrono::Duration::days(90)).date_naive()
+            {
+                Priority::Highest
+            } else if decree.gp.as_deref() == Some(LATEST_GP) {
+                Priority::High
+            } else {
+                Priority::Lowest
+            };
+
+            let inner_gov_proposal = decree.clone();
+            let pool = pg_pool.clone();
+            let documents = decree.documents.clone();
+            let summarization_task = AiTask {
+                input: None,
+                priority,
+                task_id: crate::hash!(),
+                db_entry_id: decree_id.id,
+                task: Box::new(move |task_args| {
+                    Box::pin(async move {
+                        let ai_summary =
+                            crate::ministrial_proposals::summarize_ministerial_proposal_documents(task_args, &documents).await?;
+                        
+                        Ok(())
+                        // TODO: update meilisearch index on finish
+                    })
+                }),
+            };
+
+            log::info!(
+                "Sending AI task for ministerial decree summarization: {} ({:?}) with priority {priority:?}",
+                decree_id.id,
+                decree.gp,
+            );
+
+            if let Err(e) = ai_task_tx.send(summarization_task).await {
+                log::error!("Could not send AI task for ministerial decree summarization: {e:?}");
+            }
+        }
+
         for document in &decree.documents {
             sqlx::query!(
                 "
@@ -117,7 +165,12 @@ pub async fn insert_ministrial_decree(
     Ok(())
 }
 
-pub async fn run_shut_pages(mut shutdown: Shutdown, pg_pool: PgPool, pages: u32) {
+pub async fn run_shut_pages(
+    mut shutdown: Shutdown,
+    pg_pool: PgPool,
+    pages: u32,
+    ai_task_tx: Sender<AiTask>,
+) {
     let decree_sleep = std::env::var("DECREE_SLEEP")
         .unwrap_or_else(|_| "1000".to_string())
         .parse()
@@ -130,6 +183,7 @@ pub async fn run_shut_pages(mut shutdown: Shutdown, pg_pool: PgPool, pages: u32)
 
     #[cfg(feature = "decrees")]
     while !shutdown.is_shutdown() {
+        let ai_task_tx = ai_task_tx.clone();
         tokio::select! {
             _ = shutdown.recv() => {
                 println!("shutting down");
@@ -140,7 +194,7 @@ pub async fn run_shut_pages(mut shutdown: Shutdown, pg_pool: PgPool, pages: u32)
                 let pg_pool = pg_pool.clone();
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting Decree Scraper");
-                    save_ministrial_decrees(pages, &pg_pool).await;
+                    save_ministrial_decrees(pages, &pg_pool, ai_task_tx).await;
                 }).await {
                     log::error!("Error in Decree Scraper: {:?}", e);
                 }

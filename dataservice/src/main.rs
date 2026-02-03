@@ -124,10 +124,12 @@ pub async fn run_services(state: &State, config: Config) {
                 .await
             };
             let pool1 = pool.clone();
+            let inner_ai_task_tx = ai_task_tx.clone();
             let decrees = async move {
                 services::ministrial_decrees::save_ministrial_decrees(
                     decree_pages() as u32,
                     &pool1,
+                    inner_ai_task_tx,
                 )
                 .await;
             };
@@ -160,22 +162,24 @@ pub async fn run_services(state: &State, config: Config) {
                 services::plenar::plenar_info_once(&pool1, true).await;
             };
 
-            let ai_task_tx = ai_task_tx.clone();
+            let inner_ai_task_tx = ai_task_tx.clone();
             let app_state1 = app_state.clone();
             let ministerial_proposals = async move {
                 services::ministrial_proposals::ministrial_proposal_once(
                     false,
                     &app_state1,
                     None,
-                    ai_task_tx.clone(),
+                    inner_ai_task_tx.clone(),
                 )
                 .await;
             };
+            let inner_ai_task_tx = ai_task_tx.clone();
             let pool1 = pool.clone();
             let decrees = async move {
                 services::ministrial_decrees::save_ministrial_decrees(
                     decree_pages() as u32,
                     &pool1,
+                    inner_ai_task_tx,
                 )
                 .await;
             };
@@ -277,7 +281,8 @@ pub async fn run_services(state: &State, config: Config) {
         tokio::spawn(services::ministrial_decrees::run_shut_pages(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone(),
-            decree_pages() as u32
+            decree_pages() as u32,
+            ai_task_tx.clone(),
         )),
         tokio::spawn(services::mailer::notify_on_new_vote_results_service(
             Shutdown::new(state.notify_shutdown.subscribe()),
