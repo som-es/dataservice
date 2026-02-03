@@ -1,10 +1,7 @@
 use combx::DbAiSummary;
 use somes_common_lib::Document;
 
-use crate::{
-    ai_task::TaskArgs,
-    ai_tasks::summarize_and_save,
-};
+use crate::{ai_task::TaskArgs, ai_tasks::summarize_and_save};
 
 pub async fn summarize_legis_init_documents(
     task_args: TaskArgs,

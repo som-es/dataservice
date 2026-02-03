@@ -10,6 +10,8 @@ use tokio::sync::mpsc::Sender;
 
 use crate::{ai_task::AiTask, today, Shutdown};
 
+mod ai_tasks;
+
 pub async fn save_ministrial_decrees(pages: u32, pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) {
     let scraper = AustriaScraper::default();
 
@@ -97,17 +99,16 @@ pub async fn insert_ministrial_decree(
         {
             use crate::{ai_task::Priority, LATEST_GP};
 
-            let priority = if decree.publication_date
-                >= (today() - chrono::Duration::days(90)).date_naive()
-            {
-                Priority::Highest
-            } else if decree.gp.as_deref() == Some(LATEST_GP) {
-                Priority::High
-            } else {
-                Priority::Lowest
-            };
+            let priority =
+                if decree.publication_date >= (today() - chrono::Duration::days(90)).date_naive() {
+                    Priority::Highest
+                } else if decree.gp.as_deref() == Some(LATEST_GP) {
+                    Priority::High
+                } else {
+                    Priority::Lowest
+                };
 
-            let inner_gov_proposal = decree.clone();
+            let inner_decree = decree.clone();
             let pool = pg_pool.clone();
             let documents = decree.documents.clone();
             let summarization_task = AiTask {
@@ -117,9 +118,11 @@ pub async fn insert_ministrial_decree(
                 db_entry_id: decree_id.id,
                 task: Box::new(move |task_args| {
                     Box::pin(async move {
-                        let ai_summary =
-                            crate::ministrial_proposals::summarize_ministerial_proposal_documents(task_args, &documents).await?;
-                        
+                        use crate::ministrial_decrees::ai_tasks::summarize_decrees_documents;
+
+                        let _ai_summary =
+                            summarize_decrees_documents(task_args, &documents).await?;
+
                         Ok(())
                         // TODO: update meilisearch index on finish
                     })

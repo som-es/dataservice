@@ -32,6 +32,7 @@ chrono-tz = {workspace = true}
 
 [dev-dependencies]
 serde_qs = "0.15"
+simple_logger = { version="5"}
 
 [features]
 default = ["utoipa", "ocrs", "ocr"]

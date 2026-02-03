@@ -368,4 +368,26 @@ der Abgeordnete";
         //     extract_text_from_documents_html_first(&documents, Some(ocr_engine)).await;
         // assert_eq!(text_documents.len(), 1);
     }
+
+    #[tokio::test]
+    async fn test_extract_text_from_html_ris() {
+        // enable simple logger
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        // Document {
+        //             title: "Html",
+        //             link: "https://www.ris.bka.gv.at/Dokumente/BgblAuth/BGBLA_2026_II_18/BGBLA_2026_II_18.html",
+        //             ftype: HTML,
+        //         },
+        let documents = vec![Document {
+            title: Some("Html".to_string()),
+            document_type: Some("HTML".to_string()),
+            document_url: Some(
+                "https://www.ris.bka.gv.at/Dokumente/BgblAuth/BGBLA_2026_II_18/BGBLA_2026_II_18.html"
+                    .to_string(),
+            ),
+        }];
+        let text_documents =
+            extract_text_from_html_document(documents[0].document_url.as_deref().unwrap()).await;
+        dbg!(text_documents);
+    }
 }

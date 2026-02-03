@@ -1,11 +1,10 @@
 mod summarization;
-use combx::{DbAiSummary, AiSummary};
+use combx::{AiSummary, DbAiSummary};
 use somes_common_lib::Document;
-pub use summarization::*;
 use sqlx::types::Json;
+pub use summarization::*;
 
 use crate::ai_task::TaskArgs;
-
 
 pub(crate) async fn summarize_and_save(
     task_args: TaskArgs,

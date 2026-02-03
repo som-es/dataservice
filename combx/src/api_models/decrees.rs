@@ -9,7 +9,7 @@ use sqlx::FromRow;
 use std::sync::Arc;
 
 use crate::{
-    FromScrapedType, api_models::decrees::enhancer::DecreeEnhancer,
+    DbAiSummary, DbAiSummaryFilter, FromScrapedType, api_models::decrees::enhancer::DecreeEnhancer,
     with_data::gps::LegislativePeriod,
 };
 
@@ -47,6 +47,7 @@ pub struct Decree {
     pub documents: Vec<Document>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
+    pub ai_summary: Option<DbAiSummary>,
 }
 
 impl<T: DecreeEnhancer> FromScrapedType<T> for Decree {
@@ -106,6 +107,7 @@ impl Decree {
                 .collect(),
             created_at: None,
             updated_at: None,
+            ai_summary: None,
         }
     }
 }

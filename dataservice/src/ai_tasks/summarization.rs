@@ -134,7 +134,7 @@ pub(crate) async fn summary_prompt2(
         .make_llm_request_with_schema::<SummarizeOutput>(
             input,
             format!("
-            Du bist ein Experte für die Analyse österreichischer Parlamentdaten (Anträge). Deine Aufgabe ist es, komplexe politische Dokumente für Laien verständlich aufzubereiten und in ein präzises JSON-Format zu strukturieren.
+            Du bist ein Experte für die Analyse österreichischer Parlamentsdaten (Anträge) und RIS-Einträge (z.B. Verordnungen). Deine Aufgabe ist es, komplexe politische Dokumente für Laien verständlich aufzubereiten und in ein präzises JSON-Format zu strukturieren.
             In diesem Fall analysierst du Dokumente, die zu folgendem Typ gehören: {summarization_of}.
 
 ### DEINE AUFGABEN:
