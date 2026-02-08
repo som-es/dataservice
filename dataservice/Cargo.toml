@@ -17,7 +17,7 @@ log = { workspace = true }
 dotenvy = { version = "0.15.7", optional=true}
 reqwest = {workspace=true, optional=true}
 
-somes-common-lib = {path = "../../somes/somes-common-lib"}
+somes-common-lib = {workspace = true }
 combx = { path = "../combx" }
 simple_logger = { version="5", optional = true}
 utoipa = { workspace = true, optional = true }
@@ -48,7 +48,7 @@ rand = "0.9"
 default = ["runner", "ministerial", "ministerial_latest", "legis_init", "legis_init_latest", "ai", "tesseract", "decrees", "dates", "plenar_latest"]
 #default = ["runner", "legis_init"]
 models = ["dotenvy", "chrono", "ocrs"] # remove ocrs again
-runner = ["models", "chrono", "reqwest", "simple_logger", "tokio", "dotenvy"] 
+runner = ["models", "chrono", "reqwest", "simple_logger", "tokio", "dotenvy"]
 utoipa = ["dep:utoipa", "combx/utoipa"]
 tesseract = ["dep:tesseract-rs", "combx/tesseract"]
 

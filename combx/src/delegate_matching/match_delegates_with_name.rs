@@ -83,8 +83,9 @@ pub fn match_delegate_name_with_delegate_id<'a, I: Iterator<Item = &'a (String, 
                 name = name[..has_title_idx].to_string()
             }
 
-            let name_split = name.split(' ').collect::<Vec<_>>();
 
+            let name_split = name.split(' ').collect::<Vec<_>>();
+            
             let mut deep_split_matched = false;
             let mut split_names_are_the_same = true;
 
@@ -188,9 +189,8 @@ pub fn match_delegate_names_with_delegate_ids(
         })
         // .inspect(|x| println!("done"))
         .filter_map(|(del_name, x)| {
-            // println!("del_name: {del_name}");
             let res = x[0].clone();
-            // println!("res: {res:?}");
+            
             if res.lev == 0 {
                 // println!("removed");
                 prot_delegate_names_not_sure_if_matched_correctly.remove(del_name);
@@ -206,7 +206,7 @@ pub fn match_delegate_names_with_delegate_ids(
         })
         .collect::<Vec<_>>();
 
-    // println!("find not: {find_not_sure_if_matched_correctly:?}");
+    println!("find not: {find_not_sure_if_matched_correctly:?}");
 
     let mut find_not_sure_if_matched_correctly_final = find_not_sure_if_matched_correctly.clone();
 
@@ -225,17 +225,21 @@ pub fn match_delegate_names_with_delegate_ids(
                 ),
             )
         })
-        .map(|(del_name, x)| {
+        .flat_map(|(del_name, x)| {
             let res = x[0].clone();
-            // println!("del_name: {del_name}, res: {res:?}");
-            prot_delegate_names_not_sure_if_matched_correctly.remove(&del_name);
-            assert!(
-                find_not_sure_if_matched_correctly_final
-                    .remove(&(res.matched_with.clone(), res.delegate_id))
+            if res.similiarity_score > 8 {
+                return None;
+            }
+            println!(
+                "other matched delegate: del_name: {del_name:?} res: {:?}",
+                res
             );
-            res
+            prot_delegate_names_not_sure_if_matched_correctly.remove(&del_name);
+            let x = find_not_sure_if_matched_correctly_final
+                    .remove(&(res.matched_with.clone(), res.delegate_id));
+            assert!(x);
+            Some(res)
         })
-        // .inspect(|x| println!("done"))
         .collect::<Vec<_>>();
 
     // println!("other_matched: {other_matched_delegates:?}");
@@ -284,11 +288,114 @@ mod tests {
             .map(|delegate| (delegate.name, delegate.id as usize))
             .collect::<HashSet<_>>();
 
+        let delegate_names = pro_contra
+            .pro
+            .iter()
+            .chain(pro_contra.contra.iter())
+            .cloned()
+            .collect::<Vec<_>>();
         let res =
-            match_delegate_names_with_delegate_ids(&active_delegates, &pro_contra.pro, &init.gp);
-
+            match_delegate_names_with_delegate_ids(&active_delegates, &delegate_names, &init.gp);
         // let res = res.correctly_matched.into_iter().filter(|x| x.lev > 0).collect::<Vec<_>>();
+        // assert_eq!(res.not_matchable.len(), 0);
+        assert_eq!(res.lev_or_deep_split_matched.len(), 2);
         println!("res: {:?}", res.lev_or_deep_split_matched);
+    }
+
+    // gegenstand/XXV/UEA/133
+    #[tokio::test]
+    async fn test_namentlich_name_matching_xxv_uea_133() {
+        let scraper = AustriaScraper::default();
+        let init = scraper
+            .get_legis_init("/gegenstand/XXV/UEA/133")
+            .await
+            .unwrap();
+        println!("date: {:?}", init.nr_plenary_activity_date);
+        assert!(init.hidden_votes_info.voted_by_name);
+        let pro_contra = init
+            .hidden_votes_info
+            .voted_by_name_data
+            .unwrap()
+            .delegates_pro_contra
+            .unwrap();
+
+        let pg = connect_pg().await;
+        let active_delegates = active_delegates_at_date(&pg, init.nr_plenary_activity_date)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|delegate| (delegate.name, delegate.id as usize))
+            .collect::<HashSet<_>>();
+
+        let delegate_names = pro_contra
+            .pro
+            .iter()
+            .chain(pro_contra.contra.iter())
+            .cloned()
+            .collect::<Vec<_>>();
+        let res =
+            match_delegate_names_with_delegate_ids(&active_delegates, &delegate_names, &init.gp);
+        // let res = res.correctly_matched.into_iter().filter(|x| x.lev > 0).collect::<Vec<_>>();
+        // assert_eq!(res.not_matchable.len(), 0);
+        // assert_eq!(res.lev_or_deep_split_matched.len(), 2);
+        // println!("res: {:?}", res.lev_or_deep_split_matched);
+    }
+
+    #[tokio::test]
+    async fn test_named_vote_matching_xxv() {
+        let mut scraper = AustriaScraper::default();
+        scraper.scrape_info.gp = vec!["XXV".to_string()];
+        let legis_inits = scraper
+            .post_legis_payload(Some(
+                &somes_scraper::legis_init::LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES,
+            ))
+            .await
+            .unwrap();
+        let legis_init_paths = scraper.legis_paths(legis_inits).unwrap();
+
+        for path in legis_init_paths {
+            let init = scraper.get_legis_init(&path).await.unwrap();
+
+            if !init.hidden_votes_info.voted_by_name {
+                continue;
+            }
+
+            println!("path: {path:?} date: {:?}", init.nr_plenary_activity_date);
+            assert!(init.hidden_votes_info.voted_by_name);
+
+            let Some(pro_contra) = init
+                .hidden_votes_info
+                .voted_by_name_data
+                .unwrap()
+                .delegates_pro_contra
+            else {
+                continue;
+            };
+
+            let pg = connect_pg().await;
+            let active_delegates = active_delegates_at_date(&pg, init.nr_plenary_activity_date)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|delegate| (delegate.name, delegate.id as usize))
+                .collect::<HashSet<_>>();
+
+            let delegate_names = pro_contra
+                .pro
+                .iter()
+                .chain(pro_contra.contra.iter())
+                .cloned()
+                .collect::<Vec<_>>();
+            let res = match_delegate_names_with_delegate_ids(
+                &active_delegates,
+                &delegate_names,
+                &init.gp,
+            );
+            // let res = res.correctly_matched.into_iter().filter(|x| x.lev > 0).collect::<Vec<_>>();
+            // assert_eq!(res.not_matchable.len(), 0);
+            // assert_eq!(res.lev_or_deep_split_matched.len(), 1);
+            // println!("res: {:?}", res.lev_or_deep_split_matched);
+        }
     }
 
     #[tokio::test]

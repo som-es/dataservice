@@ -262,14 +262,14 @@ mod tests {
         let text = text.unwrap();
         println!("Extracted text: {}", &text[..300.min(text.len())]);
         let should = "
-  Dieser Text wurde elektronisch übermittelt. Abweichungen vom Original sind möglich. 
+  Dieser Text wurde elektronisch übermittelt. Abweichungen vom Original sind möglich.
 
-468/A(E) XXVIII. GP 
+468/A(E) XXVIII. GP
 
-Eingebracht am 24.09.2025 
-Dieser Text wurde elektronisch übermittelt. Abweichungen vom Original sind möglich. 
- Parlamentarische Materialien 
-  ENTSCHLIESSUNGSANTRAG 
+Eingebracht am 24.09.2025
+Dieser Text wurde elektronisch übermittelt. Abweichungen vom Original sind möglich.
+ Parlamentarische Materialien
+  ENTSCHLIESSUNGSANTRAG
 
 der Abgeordnete";
         assert!(text.contains(should));

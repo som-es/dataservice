@@ -44,7 +44,11 @@ use utoipa::ToSchema;
 #[sqlx(type_name = "meilisearch_helper")]
 pub struct MeilisearchHelper {
     #[serde(default)]
+    #[filter(make_optional)]
     pub votes: Vec<String>,
+    #[serde(default)]
+    #[filter(make_optional)]
+    pub issuer_parties: Vec<String>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

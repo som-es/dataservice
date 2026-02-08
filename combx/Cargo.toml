@@ -14,9 +14,12 @@ log = { workspace = true }
 utoipa = { workspace = true, optional = true }
 reqwest = { workspace = true }
 somai-client = { path = "../somai-client" }
-somes-common-lib = { path = "../../somes/somes-common-lib" }
-somes-meilisearch-filter = { path = "../../somes/somes-meilisearch-filter" }
-somes-macro = { path = "../../somes/somes-macro" }
+# somes-common-lib = { path = "../../somes/somes-common-lib" }
+somes-common-lib = {workspace = true }
+# somes-meilisearch-filter = { path = "../../somes/somes-meilisearch-filter" }
+somes-meilisearch-filter = {branch="sveltev5", git = "https://github.com/som-es/somes" }
+# somes-macro = { path = "../../somes/somes-macro" }
+somes-macro = { branch="sveltev5", git = "https://github.com/som-es/somes"}
 optional_struct = "0.5"
 pdf-extract = "0.10.0"
 lopdf = "0.38.0"

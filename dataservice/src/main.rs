@@ -29,6 +29,7 @@ struct Args {
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 1024)]
 async fn main() {
+    let _ = dotenvy::dotenv().ok();
     let args = Args::parse();
 
     simple_logger::init_with_level(log::Level::Info).unwrap();
