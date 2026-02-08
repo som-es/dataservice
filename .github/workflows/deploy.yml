@@ -1,0 +1,37 @@
+name: Build and Run Docker Image
+
+on:
+  push:
+    branches:
+      - deploy
+
+jobs:
+  build-and-run:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker BuildKit
+        run: |
+          export DOCKER_BUILDKIT=1
+
+      - name: Build Docker image
+        run: |
+          docker build --ssh default -t dataservice:latest .
+
+      - name: Stop existing container (if any)
+        run: |
+          if [ "$(docker ps -aq -f name=dataservice_container)" ]; then
+            docker stop dataservice_container
+            docker rm dataservice_container
+          fi
+
+      - name: Run newest container
+        run: |
+          docker run -d \
+            --name dataservice_container \
+            -v scrape_cache:/app/caching \
+            -e TESSDATA_DIR=/usr/share/tessdata \
+            dataservice:latest
