@@ -8,9 +8,9 @@ members = [
 [workspace.dependencies]
 sqlx = { version="0.8", features = ["postgres", "runtime-tokio", "chrono", "tls-rustls"] }
 # somes-scraper = { path = "../scraper" }
-somes-scraper = { git = "https://github.com/som-es/scraper" }
+somes-scraper = { git = "ssh://git@github.com/som-es/scraper" }
 # somes-common-lib = {path = "../../somes/somes-common-lib"}
-somes-common-lib = { branch="sveltev5", git = "https://github.com/som-es/somes" }
+somes-common-lib = { branch="sveltev5", git = "ssh://git@github.com/som-es/somes" }
 chrono = "0.4.41"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_derive = "1.0.219"
