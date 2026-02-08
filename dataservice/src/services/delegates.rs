@@ -77,9 +77,9 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &AppState) 
 
         if let Err(e) = sqlx::query!(
             "
-            insert into contacts values ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+            insert into contacts values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 on conflict (id)
-                DO UPDATE SET 
+                DO UPDATE SET
                     mail = EXCLUDED.mail,
                     phone_number = EXCLUDED.phone_number,
                     twitter_url = EXCLUDED.twitter_url,
@@ -120,6 +120,15 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &AppState) 
         let db_delegate = DbDelegate {
             id: delegate.id as i32,
             name: delegate.name.clone(),
+            prev_name: delegate
+                .prev_name_info
+                .as_ref()
+                .map(|prev_name| prev_name.prev_name.clone()),
+            prev_name_till: delegate
+                .prev_name_info
+                .as_ref()
+                .map(|prev_name| prev_name.till)
+                .flatten(),
             party: delegate.party.clone(),
             image_url: delegate.image_url.clone(),
             constituency: delegate.constituency.clone(),
@@ -136,22 +145,26 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &AppState) 
         if let Err(e) = sqlx::query!(
             "
                 INSERT INTO delegates (
-                    id, 
-                    name, 
-                    party, 
-                    image_url, 
-                    constituency, 
-                    council, 
-                    seat_row, 
-                    seat_col, 
-                    gender, 
-                    is_active, 
-                    birthdate
+                    id,
+                    name,
+                    party,
+                    image_url,
+                    constituency,
+                    council,
+                    seat_row,
+                    seat_col,
+                    gender,
+                    is_active,
+                    birthdate,
+                    prev_name,
+                    prev_name_till
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
-                ) ON CONFLICT (id) 
-                DO UPDATE SET 
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+                ) ON CONFLICT (id)
+                DO UPDATE SET
                     name = EXCLUDED.name,
+                    prev_name = EXCLUDED.prev_name,
+                    prev_name_till = EXCLUDED.prev_name_till,
                     party = EXCLUDED.party,
                     image_url = EXCLUDED.image_url,
                     constituency = EXCLUDED.constituency,
@@ -173,7 +186,9 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &AppState) 
             db_delegate.seat_col,
             db_delegate.gender,
             db_delegate.is_active,
-            db_delegate.birthdate
+            db_delegate.birthdate,
+            db_delegate.prev_name,
+            db_delegate.prev_name_till,
         )
         .execute(pg_pool)
         .await
@@ -258,7 +273,7 @@ pub async fn insert_delegate_division(
     sqlx::query!(
         "
         insert into delegates_divisions(delegate_id, division) values ($1, $2)
-        ON CONFLICT (delegate_id, division) 
+        ON CONFLICT (delegate_id, division)
         do nothing
         ",
         delegate_id,
@@ -339,10 +354,10 @@ pub async fn insert_mandate(
     sqlx::query!(
         "
             INSERT INTO mandates (
-                delegate_id, 
-                name, 
-                party, 
-                start_date, 
+                delegate_id,
+                name,
+                party,
+                start_date,
                 end_date,
                 is_nr,
                 is_gov_official,
@@ -352,8 +367,8 @@ pub async fn insert_mandate(
                 ministry
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
-            ) ON CONFLICT (delegate_id, name, start_date) 
-            DO UPDATE SET 
+            ) ON CONFLICT (delegate_id, name, start_date)
+            DO UPDATE SET
                 is_nr = EXCLUDED.is_nr,
                 is_gov_official = EXCLUDED.is_gov_official,
                 function = EXCLUDED.function,
