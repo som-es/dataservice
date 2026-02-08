@@ -5,7 +5,7 @@ use somes_scraper::ProContra;
 use sqlx::PgPool;
 
 use crate::{
-    DbNamedVote, LevResult, match_delegate_names_with_delegate_ids,
+    DbDelegate, DbNamedVote, LevResult, match_delegate_names_with_delegate_ids,
     with_data::active_delegates_at_date,
 };
 
@@ -47,8 +47,8 @@ pub async fn pg_create_db_named_votes(
         lev: 0,
         similiarity_score: 0,
         searched_with: None,
-        matched_with: v.0,
-        delegate_id: v.1 as i32,
+        matched_with: v.name,
+        delegate_id: v.id as i32,
         manually_matched: Some(false),
     });
 
@@ -61,7 +61,7 @@ pub async fn pg_create_db_named_votes(
 pub struct VotedByNameResult {
     pro: Vec<LevResult>,
     contra: Vec<LevResult>,
-    absent: HashSet<(String, usize)>,
+    absent: HashSet<DbDelegate>,
 }
 
 pub async fn match_all_named_votes(
@@ -74,16 +74,16 @@ pub async fn match_all_named_votes(
         .await
         .unwrap()
         .into_iter()
-        .map(|delegate| (delegate.name, delegate.id as usize))
-        // .inspect(|x| println!("{x:?}"))
         .collect::<HashSet<_>>();
 
-    let pro_res = match_delegate_names_with_delegate_ids(&active_delegates, &votes.pro, gp);
+    let pro_res =
+        match_delegate_names_with_delegate_ids(&active_delegates, &votes.pro, gp, voted_on);
     let mut pro = pro_res.correctly_matched;
     pro.extend_from_slice(&pro_res.lev_or_deep_split_matched);
     println!("lev_or_deep_pro: {:?}", pro_res.lev_or_deep_split_matched);
 
-    let contra_res = match_delegate_names_with_delegate_ids(&active_delegates, &votes.contra, gp);
+    let contra_res =
+        match_delegate_names_with_delegate_ids(&active_delegates, &votes.contra, gp, voted_on);
     let mut contra = contra_res.correctly_matched;
     contra.extend_from_slice(&contra_res.lev_or_deep_split_matched);
 

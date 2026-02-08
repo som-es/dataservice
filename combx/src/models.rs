@@ -34,7 +34,7 @@ pub struct DbProposalQuery {
     pub updated_at: Option<NaiveDateTime>,
 }
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone, Serialize, Deserialize)]
 // #[diesel(table_name = delegates)]
 // #[diesel(primary_key(id))]
 pub struct DbDelegate {

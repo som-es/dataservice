@@ -34,7 +34,6 @@ pub async fn absence_matching<'a>(
         .await
         .unwrap()
         .into_iter()
-        .map(|delegate| (delegate.name, delegate.id as usize))
         .collect::<HashSet<_>>();
 
     match_delegate_names_with_delegate_ids(
@@ -45,6 +44,7 @@ pub async fn absence_matching<'a>(
             .map(reverse_name)
             .collect::<Vec<_>>(),
         &gp,
+        plenar_date,
     )
 }
 
@@ -74,7 +74,6 @@ mod tests {
             .await
             .unwrap()
             .into_iter()
-            .map(|delegate| (delegate.name, delegate.id as usize))
             .collect::<HashSet<_>>();
 
         let res = match_delegate_names_with_delegate_ids(
@@ -88,10 +87,12 @@ mod tests {
                 .map(reverse_name)
                 .collect::<Vec<_>>(),
             &plenar_info.gp,
+            plenar_info.created_at.date_naive(),
         );
 
         println!("res: {:?}", res.correctly_matched);
         println!("res: {:?}", res.lev_or_deep_split_matched);
+        assert!(res.lev_or_deep_split_matched.is_empty())
     }
 
     // /gegenstand/XXVII/NRSITZ/243
@@ -111,7 +112,6 @@ mod tests {
             .await
             .unwrap()
             .into_iter()
-            .map(|delegate| (delegate.name, delegate.id as usize))
             .collect::<HashSet<_>>();
 
         let res = match_delegate_names_with_delegate_ids(
@@ -125,9 +125,11 @@ mod tests {
                 .map(reverse_name)
                 .collect::<Vec<_>>(),
             &plenar_info.gp,
+            plenar_info.created_at.date_naive(),
         );
 
         println!("res: {:?}", res.correctly_matched);
         println!("res: {:?}", res.lev_or_deep_split_matched);
+        assert!(res.lev_or_deep_split_matched.is_empty());
     }
 }
