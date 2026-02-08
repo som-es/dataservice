@@ -32,6 +32,7 @@ ENV DISABLE_SPEECH_TEXT=false
 ENV MIND_UPDATE_TIME=true
 ENV ENFORCE_AI_RUN=true
 
+RUN --mount=type=ssh cargo update
 RUN --mount=type=ssh cargo build --release
 #CMD cargo build --release && ./target/release/dataservice/
 CMD ["./target/release/dataservice"]

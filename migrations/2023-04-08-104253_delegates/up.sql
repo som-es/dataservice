@@ -15,6 +15,8 @@ create table contacts(
 create table delegates (
     id INT primary key not null,
     name varchar(255) not null,
+    prev_name varchar(255),
+    prev_name_till date,
     party varchar(100),
     image_url varchar(300),
     constituency varchar(200),

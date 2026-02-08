@@ -40,6 +40,8 @@ pub struct DbProposalQuery {
 pub struct DbDelegate {
     pub id: i32,
     pub name: String,
+    pub prev_name: Option<String>,
+    pub prev_name_till: Option<NaiveDate>,
     pub party: Option<String>,
     pub image_url: Option<String>,
     pub constituency: Option<String>,
