@@ -1,4 +1,5 @@
 use chrono::{Days, Utc};
+use combx::VoteResult;
 use tokio::{runtime::Handle, sync::mpsc::Sender};
 mod db;
 pub mod notify;
@@ -118,13 +119,13 @@ impl StoredUpdatedAt for LegislativeInitiative {
     }
 }
 
-impl CompareHash for LegislativeInitiative {
+impl CompareHash for VoteResult {
     async fn stored_hash(&self, pg: &PgPool) -> Option<u64> {
         query_scalar!(
             "select hash from legislative_initiatives where gp = $1 and ityp = $2 and inr = $3",
-            self.gp,
-            self.ityp,
-            self.inr as i32
+            self.legislative_initiative.gp,
+            self.legislative_initiative.ityp,
+            self.legislative_initiative.inr as i32
         )
         .fetch_one(pg)
         .await

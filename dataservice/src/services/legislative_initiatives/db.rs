@@ -22,17 +22,6 @@ pub async fn update_or_insert_legis_init_in_db(
 ) {
     let pool = &app_state.pg_pool;
     let start = tokio::time::Instant::now();
-    let (should_update, hash) = crate::should_update_by_hash(legis_init, pool).await;
-    if !enforce_ai_run() && !should_update {
-        log::info!("No need to update!");
-        return;
-    }
-    log::info!(
-        "ADD legislative initiative: {} {} {}",
-        legis_init.gp,
-        legis_init.ityp,
-        legis_init.inr
-    );
 
     let vote_result_start = tokio::time::Instant::now();
     let mut vote_result =
@@ -43,6 +32,18 @@ pub async fn update_or_insert_legis_init_in_db(
         vote_result_start.elapsed()
     );
 
+    let (should_update, hash) = crate::should_update_by_hash(&vote_result, pool).await;
+
+    if !enforce_ai_run() && !should_update {
+        log::info!("No need to update!");
+        return;
+    }
+    log::info!(
+        "ADD legislative initiative: {} {} {}",
+        legis_init.gp,
+        legis_init.ityp,
+        legis_init.inr
+    );
     let db_legis_init = vote_result.legislative_initiative.clone();
 
     let mut tx = match pool.begin().await {

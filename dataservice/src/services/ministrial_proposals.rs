@@ -138,13 +138,13 @@ impl StoredUpdatedAt for MinistrialProposal {
     }
 }
 
-impl CompareHash for MinistrialProposal {
+impl CompareHash for GovProposal {
     async fn stored_hash(&self, pg: &PgPool) -> Option<u64> {
         sqlx::query_scalar!(
             "select hash from ministrial_proposals where gp = $1 and ityp = $2 and inr = $3",
-            self.gp,
-            self.ityp,
-            self.inr as i32
+            self.ministrial_proposal.gp,
+            self.ministrial_proposal.ityp,
+            self.ministrial_proposal.inr as i32
         )
         .fetch_one(pg)
         .await
@@ -171,18 +171,19 @@ pub async fn update_ministrial_proposals_in_db2(
     let mut started_acc = false;
     for (i, ministrial_prop) in ministrial_props.into_iter().enumerate() {
         // let should_update = crate::should_update_by_time(&ministrial_prop, pool).await;
-        let (should_update, hash) = crate::should_update_by_hash(&ministrial_prop, pool).await;
+        let gov_proposal =
+            GovProposal::from_scraped_type((), (ministrial_prop, gov_officials.clone())).await;
+
+        let (should_update, hash) = crate::should_update_by_hash(&gov_proposal, pool).await;
         if !enforce_ai_run() && !should_update {
             log::info!(
                 "No need to update ministrial proposal: {}/ME/{}",
-                ministrial_prop.gp,
-                ministrial_prop.inr
+                gov_proposal.ministrial_proposal.gp,
+                gov_proposal.ministrial_proposal.inr
             );
             continue;
         }
 
-        let gov_proposal =
-            GovProposal::from_scraped_type((), (ministrial_prop, gov_officials.clone())).await;
         log::info!(
             "{i} Processing ministrial proposal: {}/ME/{}",
             gov_proposal.ministrial_proposal.gp,

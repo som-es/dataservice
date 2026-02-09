@@ -51,6 +51,7 @@ pub struct DbLegislativeInitiative {
     CompositeType,
     Type,
     MeilisearchFilter,
+    Hash,
 )]
 #[sqlx(type_name = "db_legislative_initiative_query")]
 pub struct DbLegislativeInitiativeQuery {
@@ -126,7 +127,7 @@ pub struct DbLegislativeInitiativeQuery {
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type, MeilisearchFilter,
+    PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type, MeilisearchFilter, Hash,
 )]
 #[sqlx(type_name = "db_vote")]
 pub struct DbVote {
@@ -149,7 +150,7 @@ pub struct DbVoteIns {
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type, MeilisearchFilter,
+    PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type, MeilisearchFilter, Hash,
 )]
 #[sqlx(type_name = "db_speech_with_link")]
 pub struct DbSpeechWithLink {
@@ -164,7 +165,7 @@ pub struct DbSpeechWithLink {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type, Hash)]
 #[sqlx(type_name = "db_named_vote")]
 pub struct DbNamedVote {
     pub id: i32,
@@ -197,7 +198,7 @@ pub struct OptionalDbNamedVote {
 
 // #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type, Hash)]
 #[sqlx(type_name = "db_named_vote_info")]
 pub struct DbNamedVoteInfo {
     pub pro_count: i32,
@@ -217,7 +218,7 @@ pub struct OptionalDbNamedVoteInfo {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type, Hash)]
 #[sqlx(type_name = "db_named_votes")]
 pub struct DbNamedVotes {
     pub named_vote_info: DbNamedVoteInfo,

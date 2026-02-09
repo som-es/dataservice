@@ -40,6 +40,7 @@ use utoipa::ToSchema;
     CompositeType,
     Type,
     MeilisearchFilter,
+    Hash,
 )]
 #[sqlx(type_name = "meilisearch_helper")]
 pub struct MeilisearchHelper {
@@ -63,6 +64,7 @@ pub struct MeilisearchHelper {
     Type,
     CompositeType,
     MeilisearchFilter,
+    Hash,
 )]
 pub struct VoteResult {
     #[filter(make_vec)]
@@ -98,6 +100,7 @@ pub struct VoteResult {
     FromRow,
     Default,
     Type,
+    Hash,
     CompositeType,
     MeilisearchFilter,
 )]

@@ -13,15 +13,13 @@ use sqlx::Type;
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
-use crate::{
-    DbAiSummary, DbMinistrialProposalQueryMeta, FromScrapedType, Topic, VoteResult, today,
-};
+use crate::{DbAiSummary, DbMinistrialProposalQueryMeta, FromScrapedType, Topic, today};
 
 use crate::models::*;
 
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Debug, Deserialize, Serialize, Clone, Type, CompositeType, MeilisearchFilter)]
+#[derive(Debug, Deserialize, Serialize, Clone, Hash, Type, CompositeType, MeilisearchFilter)]
 pub struct GovProposal {
     #[filter(make_vec)]
     pub id: Option<i32>,

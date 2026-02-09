@@ -91,7 +91,16 @@ pub struct DbMinistrialProposal {
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    PartialEq, Debug, Clone, Serialize, Deserialize, FromRow, Type, CompositeType, MeilisearchFilter,
+    PartialEq,
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    FromRow,
+    Type,
+    CompositeType,
+    MeilisearchFilter,
+    Hash,
 )]
 // #[diesel(table_name = ministrial_proposals)]
 pub struct DbMinistrialProposalQueryMeta {
@@ -264,6 +273,7 @@ pub struct DbParty {
     CompositeType,
     Type,
     MeilisearchFilter,
+    Hash,
 )]
 pub struct Topic {
     pub topic: String,
