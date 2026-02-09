@@ -119,6 +119,8 @@ pub struct DbLegislativeInitiativeQuery {
 
     #[filter(make_vec)]
     pub voting: Option<String>,
+
+    pub hash: Option<i64>,
 }
 
 #[optional_struct]

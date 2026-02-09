@@ -180,6 +180,7 @@ impl VoteResult {
             voting: legis_init.voting.map(|voting| voting.to_string()),
             created_at: None,
             updated_at: None,
+            hash: None,
             // law_come_into_effect_date: legis_init.come_into_effect_info.map(|x| x.law_come_into_effect_date.clone()),
         };
 
