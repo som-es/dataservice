@@ -11,7 +11,9 @@ use somes_scraper::{decree::RisScraper, AustriaScraper, Thing};
 use sqlx::PgPool;
 use tokio::sync::mpsc::Sender;
 
-use crate::{ai_task::AiTask, should_update_by_hash, today, AppState, CompareHash, Shutdown};
+use crate::{
+    ai_task::AiTask, enforce_ai_run, should_update_by_hash, today, AppState, CompareHash, Shutdown,
+};
 
 mod ai_tasks;
 
@@ -58,12 +60,6 @@ impl CompareHash for Decree {
         .flatten()
         .map(|hash| hash as u64)
     }
-
-    fn hash_of(&self) -> u64 {
-        let mut hasher = std::hash::DefaultHasher::new();
-        self.hash(&mut hasher);
-        hasher.finish()
-    }
 }
 
 pub async fn insert_ministrial_decree(
@@ -78,6 +74,10 @@ pub async fn insert_ministrial_decree(
             .await;
 
     let (should_update, hash) = should_update_by_hash(&decree, pg_pool).await;
+    if !enforce_ai_run() && !should_update {
+        log::info!("No need to update decree: {}", decree.ris_id);
+        return Ok(());
+    }
 
     if let Some(gov_official_id) = decree.gov_official_id {
         let decree_id = sqlx::query!(
@@ -175,6 +175,11 @@ pub async fn insert_ministrial_decree(
             if let Err(e) = ai_task_tx.send(summarization_task).await {
                 log::error!("Could not send AI task for ministerial decree summarization: {e:?}");
             }
+        }
+
+        if enforce_ai_run() && !should_update {
+            log::info!("No need to update further!");
+            return Ok(());
         }
 
         for document in &decree.documents {

@@ -28,5 +28,6 @@ create table delegates (
     birthdate date,
     created_at timestamptz not null default now(),
     updated_at timestamptz,
+    hash bigint,
     FOREIGN KEY (id) REFERENCES contacts(id)
 );

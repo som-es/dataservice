@@ -20,7 +20,7 @@ use crate::{
     should_update::StoredUpdatedAt,
     today, today_and_time,
     topics::{insert_topics_generic_batch, TableType, TopicType},
-    AppState, Shutdown, GPS,
+    AppState, CompareHash, Shutdown, GPS,
 };
 
 mod notify;
@@ -138,6 +138,22 @@ impl StoredUpdatedAt for MinistrialProposal {
     }
 }
 
+impl CompareHash for MinistrialProposal {
+    async fn stored_hash(&self, pg: &PgPool) -> Option<u64> {
+        sqlx::query_scalar!(
+            "select hash from ministrial_proposals where gp = $1 and ityp = $2 and inr = $3",
+            self.gp,
+            self.ityp,
+            self.inr as i32
+        )
+        .fetch_one(pg)
+        .await
+        .ok()
+        .flatten()
+        .map(|hash| hash as u64)
+    }
+}
+
 pub async fn update_ministrial_proposals_in_db2(
     app_state: &AppState,
     ministrial_props: Vec<MinistrialProposal>,
@@ -154,7 +170,8 @@ pub async fn update_ministrial_proposals_in_db2(
 
     let mut started_acc = false;
     for (i, ministrial_prop) in ministrial_props.into_iter().enumerate() {
-        let should_update = crate::should_update_by_time(&ministrial_prop, pool).await;
+        // let should_update = crate::should_update_by_time(&ministrial_prop, pool).await;
+        let (should_update, hash) = crate::should_update_by_hash(&ministrial_prop, pool).await;
         if !enforce_ai_run() && !should_update {
             log::info!(
                 "No need to update ministrial proposal: {}/ME/{}",
@@ -180,9 +197,9 @@ pub async fn update_ministrial_proposals_in_db2(
             INSERT INTO ministrial_proposals (
                 title, inr, emphasis, description, ityp, gp, raw_data_created_at, raw_data_updated_at,
                 due_to, ressort, ressort_shortform, legis_init_gp, legis_init_inr, legis_init_ityp, has_vote_result,
-                updated_at
+                updated_at, hash
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             ON CONFLICT (inr, ityp, gp)
             DO UPDATE SET
                 title = EXCLUDED.title,
@@ -197,7 +214,8 @@ pub async fn update_ministrial_proposals_in_db2(
                 legis_init_inr = EXCLUDED.legis_init_inr,
                 legis_init_ityp = EXCLUDED.legis_init_ityp,
                 has_vote_result = EXCLUDED.has_vote_result,
-                updated_at = EXCLUDED.updated_at
+                updated_at = EXCLUDED.updated_at,
+                hash = EXCLUDED.hash
             RETURNING id
             "#,
             gov_proposal.ministrial_proposal.title,
@@ -216,6 +234,7 @@ pub async fn update_ministrial_proposals_in_db2(
             gov_proposal.ministrial_proposal.legis_init_ityp,
             gov_proposal.ministrial_proposal.has_vote_result,
             crate::today_and_time(),
+            hash as i64
         )
         .fetch_one(pool)
         .await?

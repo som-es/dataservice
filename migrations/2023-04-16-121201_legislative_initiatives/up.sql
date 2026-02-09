@@ -29,6 +29,7 @@ create table legislative_initiatives (
     is_voteable_on boolean not null default false,
     is_urgent boolean not null default false,
     voting varchar(255),
+    hash bigint,
     foreign key (plenary_session_id) references plenar_infos(id),
     UNIQUE (inr, ityp, gp)
 );

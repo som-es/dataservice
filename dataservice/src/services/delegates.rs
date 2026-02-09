@@ -4,7 +4,9 @@ use combx::{create_gov_officials_map, DbContact, DbDelegate, DbMandate};
 use somes_scraper::{delegates::DelegateScraper, AustriaScraper, Delegate, GovOfficial, Mandate};
 use sqlx::{postgres::PgQueryResult, query, PgPool};
 
-use crate::{services::scrape_untill_success, AppState, Shutdown};
+use crate::{
+    services::scrape_untill_success, should_update_by_hash, AppState, CompareHash, Shutdown,
+};
 
 async fn scrape_new_delegates_bs() -> crate::Result<Vec<Delegate>> {
     let scraper = AustriaScraper::default();
@@ -48,6 +50,16 @@ async fn scrape_new_delegates(prev_delegates: &HashSet<Delegate>) -> crate::Resu
     Ok(delegates)
 }
 
+impl CompareHash for Delegate {
+    async fn stored_hash(&self, pg: &PgPool) -> Option<u64> {
+        sqlx::query_scalar!("select hash from delegates where id = $1", self.id as i32)
+            .fetch_one(pg)
+            .await
+            .ok()
+            .flatten()
+            .map(|hash| hash as u64)
+    }
+}
 pub async fn delegate_count(conn: &PgPool) -> Option<i64> {
     query!("select COUNT(*) from delegates")
         .fetch_one(conn)
@@ -63,6 +75,13 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &AppState) 
 
     log::info!("Updating delegates in database...");
     for delegate in new_delegates {
+        let (should_update, hash) = should_update_by_hash(delegate, pg_pool).await;
+
+        if !should_update {
+            log::info!("No need to update delegate {}", delegate.id);
+            continue;
+        }
+
         let db_contact = DbContact {
             id: delegate.id as i32,
             mail: delegate.contact.mail.clone(),
@@ -140,6 +159,7 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &AppState) 
             birthdate: delegate.birthdate.clone(),
             created_at: None,
             updated_at: None,
+            hash: Some(hash as i64),
         };
 
         if let Err(e) = sqlx::query!(
@@ -157,9 +177,10 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &AppState) 
                     is_active,
                     birthdate,
                     prev_name,
-                    prev_name_till
+                    prev_name_till,
+                    hash
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
                 ) ON CONFLICT (id)
                 DO UPDATE SET
                     name = EXCLUDED.name,
@@ -174,7 +195,8 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &AppState) 
                     gender = EXCLUDED.gender,
                     is_active = EXCLUDED.is_active,
                     birthdate = EXCLUDED.birthdate,
-                    updated_at = NOW()
+                    updated_at = NOW(),
+                    hash = EXCLUDED.hash
             ",
             db_delegate.id,
             db_delegate.name,
@@ -189,6 +211,7 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &AppState) 
             db_delegate.birthdate,
             db_delegate.prev_name,
             db_delegate.prev_name_till,
+            hash as i64
         )
         .execute(pg_pool)
         .await

@@ -14,12 +14,12 @@ pub use ai_tasks::*;
 use somes_scraper::{
     legis_init::LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES, AustriaScraper, LegislativeInitiative,
 };
-use sqlx::{query, PgPool};
+use sqlx::{query, query_scalar, PgPool};
 use std::sync::{Arc, LazyLock};
 
 use crate::{
-    ai_task::AiTask, should_update::StoredUpdatedAt, today_and_time, AppState, Shutdown, GPS,
-    LATEST_GP,
+    ai_task::AiTask, should_update::StoredUpdatedAt, today_and_time, AppState, CompareHash,
+    Shutdown, GPS, LATEST_GP,
 };
 
 use dotenvy_macro::dotenv;
@@ -115,6 +115,22 @@ impl StoredUpdatedAt for LegislativeInitiative {
             .ok()
             .flatten()
             .map(|x| x.raw_data_updated_at).flatten()
+    }
+}
+
+impl CompareHash for LegislativeInitiative {
+    async fn stored_hash(&self, pg: &PgPool) -> Option<u64> {
+        query_scalar!(
+            "select hash from legislative_initiatives where gp = $1 and ityp = $2 and inr = $3",
+            self.gp,
+            self.ityp,
+            self.inr as i32
+        )
+        .fetch_one(pg)
+        .await
+        .ok()
+        .flatten()
+        .map(|x| x as u64)
     }
 }
 

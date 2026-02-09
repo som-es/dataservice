@@ -1,3 +1,5 @@
+use std::hash::Hasher;
+
 use chrono::{DateTime, Utc};
 use redis::AsyncCommands;
 use serde::Serialize;
@@ -29,9 +31,13 @@ pub(crate) trait StoredUpdatedAt {
     async fn stored_updated_at(&self, pg: &PgPool) -> Option<DateTime<Utc>>;
 }
 
-pub(crate) trait CompareHash {
+pub(crate) trait CompareHash: std::hash::Hash {
     async fn stored_hash(&self, pg: &PgPool) -> Option<u64>;
-    fn hash_of(&self) -> u64;
+    fn hash_of(&self) -> u64 {
+        let mut hasher = std::hash::DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
+    }
 }
 
 pub(crate) async fn should_update_by_hash<T: CompareHash>(data: &T, pg: &PgPool) -> (bool, u64) {

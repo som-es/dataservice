@@ -53,6 +53,7 @@ pub struct DbDelegate {
     pub birthdate: Option<NaiveDate>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
+    pub hash: Option<i64>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

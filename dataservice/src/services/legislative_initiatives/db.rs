@@ -22,7 +22,7 @@ pub async fn update_or_insert_legis_init_in_db(
 ) {
     let pool = &app_state.pg_pool;
     let start = tokio::time::Instant::now();
-    let should_update = crate::should_update_by_time(legis_init, pool).await;
+    let (should_update, hash) = crate::should_update_by_hash(legis_init, pool).await;
     if !enforce_ai_run() && !should_update {
         log::info!("No need to update!");
         return;
@@ -59,9 +59,9 @@ pub async fn update_or_insert_legis_init_in_db(
                     title, inr, emphasis, description, ityp, gp, accepted, nr_plenary_activity_date, raw_data_created_at, raw_data_updated_at,
                     requires_simple_majority, pre_declined_type, voted_by_name, plenary_session_id, doktyp, is_law,
                     law_accepted, has_reference, is_voteable_on,
-                    is_urgent, voting, updated_at, vote_date
+                    is_urgent, voting, updated_at, vote_date, hash
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24
                 ) ON CONFLICT (inr, ityp, gp)
                 DO UPDATE SET
                     title = EXCLUDED.title,
@@ -83,7 +83,8 @@ pub async fn update_or_insert_legis_init_in_db(
                     is_urgent = EXCLUDED.is_urgent,
                     voting = EXCLUDED.voting,
                     updated_at = EXCLUDED.updated_at,
-                    vote_date = EXCLUDED.vote_date
+                    vote_date = EXCLUDED.vote_date,
+                    hash = EXCLUDED.hash
                 RETURNING id
             ",
             db_legis_init.title,
@@ -109,6 +110,7 @@ pub async fn update_or_insert_legis_init_in_db(
             db_legis_init.voting.as_ref().map(|voting| voting.to_string()),
             crate::today_and_time(),
             db_legis_init.vote_date,
+            hash as i64,
         )
         .fetch_one(&mut *tx)
         .await
