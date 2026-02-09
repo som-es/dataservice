@@ -15,6 +15,7 @@ create table ministrial_decrees(
     eli varchar(1024),
     document_url varchar(1024),
     gp varchar(255),
+    hash bigint,
     unique(ris_id),
     foreign key (gov_official_id) references delegates(id)
 );

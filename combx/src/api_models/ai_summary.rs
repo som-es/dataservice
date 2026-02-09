@@ -10,7 +10,9 @@ use sqlx::{FromRow, Type};
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
-#[derive(Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type, MeilisearchFilter)]
+#[derive(
+    Hash, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type, MeilisearchFilter,
+)]
 #[sqlx(type_name = "db_ai_summary")]
 pub struct DbAiSummary {
     #[filter(make_vec, make_optional)]
@@ -150,7 +152,7 @@ impl utoipa::ToSchema for DbAiSummary {}
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type, CompositeType,
+    JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type, CompositeType,
 )]
 pub struct EnforcementDates {
     pub enforcement_start_date: String,
@@ -160,7 +162,9 @@ pub struct EnforcementDates {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(JsonSchema, Debug, PartialEq, Deserialize, Serialize, Clone, FromRow, CompositeType)]
+#[derive(
+    JsonSchema, Hash, Debug, PartialEq, Deserialize, Serialize, Clone, FromRow, CompositeType,
+)]
 pub struct Keypoint {
     pub point: String,
     pub enforcement_start_end: Option<EnforcementDates>,
@@ -168,7 +172,7 @@ pub struct Keypoint {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(JsonSchema, Debug, PartialEq, Deserialize, Serialize, Clone, Type)]
+#[derive(JsonSchema, Hash, Debug, PartialEq, Deserialize, Serialize, Clone, Type)]
 pub enum ProposalComplexityScope {
     Highest,
     High,
@@ -178,7 +182,7 @@ pub enum ProposalComplexityScope {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, Type)]
+#[derive(JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone, Type)]
 pub enum Tone {
     Neutral,
     Urgent,
@@ -189,7 +193,7 @@ pub enum Tone {
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type, CompositeType,
+    JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type, CompositeType,
 )]
 pub struct CriticalAnalysis {
     pub arguments_for: Vec<String>,
@@ -199,7 +203,7 @@ pub struct CriticalAnalysis {
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type, CompositeType,
+    JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type, CompositeType,
 )]
 pub struct TermDefinition {
     pub term: String,
@@ -208,7 +212,7 @@ pub struct TermDefinition {
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type, CompositeType,
+    JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type, CompositeType,
 )]
 pub struct Glossary {
     pub difficult_terms: Vec<TermDefinition>,
@@ -224,8 +228,14 @@ pub struct FiscalAnalysis {
     pub economic_burden: EconomicImpactLevel,
 }
 
+impl std::hash::Hash for FiscalAnalysis {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.economic_burden.hash(state);
+    }
+}
+
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, Type)]
+#[derive(JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone, Type)]
 pub enum EconomicImpactLevel {
     HighCost,
     ModerateCost,
@@ -246,6 +256,7 @@ pub enum EconomicImpactLevel {
     FromRow,
     CompositeType,
     MeilisearchFilter,
+    Hash,
 )]
 pub struct AiSummary {
     #[filter(make_optional)]
@@ -289,7 +300,7 @@ pub struct AiSummary {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone)]
+#[derive(JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone)]
 #[serde(tag = "kind", content = "value")]
 pub enum LawPart {
     Article(u32),
@@ -300,21 +311,25 @@ pub enum LawPart {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, CompositeType)]
+#[derive(
+    JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, CompositeType,
+)]
 pub struct EuroLawReference {
     pub full_unparsed_reference: String,
     pub parsed_reference_parts: Vec<LawPart>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, CompositeType)]
+#[derive(
+    JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, CompositeType,
+)]
 pub struct SummarizeOutput {
     pub summary: Option<AiSummary>,
     pub abort_reason: AbortReason,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(JsonSchema, Debug, Deserialize, PartialEq, Serialize, Clone, Type)]
+#[derive(JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone, Type)]
 pub enum AbortReason {
     NoDocumentsProvidedInContext,
     None,

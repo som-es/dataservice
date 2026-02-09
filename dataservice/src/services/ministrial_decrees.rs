@@ -1,21 +1,24 @@
-use std::sync::Arc;
+use std::{
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
 
 use combx::{
     with_data::gps::{gps, LegislativePeriod},
-    FromScrapedType, PostgresEnhancer,
+    Decree, FromScrapedType, PostgresEnhancer,
 };
 use somes_scraper::{decree::RisScraper, AustriaScraper, Thing};
 use sqlx::PgPool;
 use tokio::sync::mpsc::Sender;
 
-use crate::{ai_task::AiTask, today, Shutdown};
+use crate::{ai_task::AiTask, should_update_by_hash, today, AppState, CompareHash, Shutdown};
 
 mod ai_tasks;
 
-pub async fn save_ministrial_decrees(pages: u32, pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) {
+pub async fn save_ministrial_decrees(pages: u32, app_state: AppState, ai_task_tx: Sender<AiTask>) {
     let scraper = AustriaScraper::default();
 
-    let mut all_gps = gps(pg_pool).await.unwrap();
+    let mut all_gps = gps(&app_state.pg_pool).await.unwrap();
     all_gps.insert(
         0,
         LegislativePeriod {
@@ -35,7 +38,7 @@ pub async fn save_ministrial_decrees(pages: u32, pg_pool: &PgPool, ai_task_tx: S
 
         for decree in decrees {
             if let Err(e) =
-                insert_ministrial_decree(decree, pg_pool, all_gps.clone(), &ai_task_tx).await
+                insert_ministrial_decree(decree, &app_state, all_gps.clone(), &ai_task_tx).await
             {
                 log::error!("Cannot insert decree: {e:?}");
             }
@@ -43,33 +46,57 @@ pub async fn save_ministrial_decrees(pages: u32, pg_pool: &PgPool, ai_task_tx: S
     }
 }
 
+impl CompareHash for Decree {
+    async fn stored_hash(&self, pg: &PgPool) -> Option<u64> {
+        sqlx::query_scalar!(
+            "select hash from ministrial_decrees where ris_id = $1",
+            self.ris_id
+        )
+        .fetch_one(pg)
+        .await
+        .ok()
+        .flatten()
+        .map(|hash| hash as u64)
+    }
+
+    fn hash_of(&self) -> u64 {
+        let mut hasher = std::hash::DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
+    }
+}
+
 pub async fn insert_ministrial_decree(
     decree: Thing,
-    pg_pool: &PgPool,
+    app_state: &AppState,
     all_gps: Arc<[LegislativePeriod]>,
     ai_task_tx: &Sender<AiTask>,
 ) -> crate::Result<()> {
+    let pg_pool = &app_state.pg_pool;
     let decree =
         combx::Decree::from_scraped_type(PostgresEnhancer(pg_pool.clone()), (decree, all_gps))
             .await;
+
+    let (should_update, hash) = should_update_by_hash(&decree, pg_pool).await;
 
     if let Some(gov_official_id) = decree.gov_official_id {
         let decree_id = sqlx::query!(
             "
             INSERT INTO ministrial_decrees (
-                gov_official_id, 
-                ris_id, 
-                ministrial_issuer, 
-                title, 
-                short_title, 
-                publication_date, 
+                gov_official_id,
+                ris_id,
+                ministrial_issuer,
+                title,
+                short_title,
+                publication_date,
                 part,
                 document_url,
                 eli,
-                gp
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                gp,
+                hash
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             ON CONFLICT (ris_id) DO UPDATE
-            SET 
+            SET
                 gov_official_id = EXCLUDED.gov_official_id,
                 title = EXCLUDED.title,
                 short_title = EXCLUDED.short_title,
@@ -78,7 +105,8 @@ pub async fn insert_ministrial_decree(
                 document_url = EXCLUDED.document_url,
                 eli = EXCLUDED.eli,
                 gp = EXCLUDED.gp,
-                updated_at = NOW()
+                updated_at = NOW(),
+                hash = EXCLUDED.hash
             RETURNING id;
             ",
             gov_official_id,
@@ -91,9 +119,18 @@ pub async fn insert_ministrial_decree(
             decree.document_url,
             decree.eli,
             decree.gp,
+            hash as i64,
         )
         .fetch_one(pg_pool)
         .await?;
+
+        if should_update {
+            if let Some(client) = &app_state.redis_client {
+                if let Err(e) = crate::notify_update_streamed("decrees", &decree, client).await {
+                    log::error!("Could not notify for decree update!: {e:?}");
+                }
+            }
+        }
 
         #[cfg(feature = "ai")]
         {
@@ -144,13 +181,13 @@ pub async fn insert_ministrial_decree(
             sqlx::query!(
                 "
                 INSERT INTO ministrial_decrees_documents (
-                    ministrial_decree_id, 
-                    title, 
-                    document_type, 
+                    ministrial_decree_id,
+                    title,
+                    document_type,
                     document_url
                 ) VALUES ($1, $2, $3, $4)
                 ON CONFLICT (ministrial_decree_id, document_url) DO UPDATE
-                SET 
+                SET
                     title = EXCLUDED.title,
                     document_type = EXCLUDED.document_type,
                     document_url = EXCLUDED.document_url;
@@ -170,7 +207,7 @@ pub async fn insert_ministrial_decree(
 
 pub async fn run_shut_pages(
     mut shutdown: Shutdown,
-    pg_pool: PgPool,
+    app_state: AppState,
     pages: u32,
     ai_task_tx: Sender<AiTask>,
 ) {
@@ -194,10 +231,10 @@ pub async fn run_shut_pages(
                 break;
             }
             _ = async {
-                let pg_pool = pg_pool.clone();
+                let app_state = app_state.clone();
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting Decree Scraper");
-                    save_ministrial_decrees(pages, &pg_pool, ai_task_tx).await;
+                    save_ministrial_decrees(pages, app_state, ai_task_tx).await;
                 }).await {
                     log::error!("Error in Decree Scraper: {:?}", e);
                 }

@@ -12,7 +12,7 @@ pub async fn update_plenar_infos_in_db(plenar_info: &PlenarInfo, pg_pool: &PgPoo
     // disable with setting
     let mut text_extractor = somes_scraper::TextExtractor::new();
 
-    if !crate::should_update(plenar_info, pg_pool).await {
+    if !crate::should_update_by_time(plenar_info, pg_pool).await {
         return;
     }
 

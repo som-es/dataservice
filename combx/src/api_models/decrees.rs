@@ -20,7 +20,7 @@ use utoipa::ToSchema;
 
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow, MeilisearchFilter)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, FromRow, MeilisearchFilter)]
 pub struct Decree {
     #[filter(make_vec)]
     pub gov_official_id: Option<i32>,

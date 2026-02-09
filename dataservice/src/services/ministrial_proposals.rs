@@ -154,7 +154,7 @@ pub async fn update_ministrial_proposals_in_db2(
 
     let mut started_acc = false;
     for (i, ministrial_prop) in ministrial_props.into_iter().enumerate() {
-        let should_update = crate::should_update(&ministrial_prop, pool).await;
+        let should_update = crate::should_update_by_time(&ministrial_prop, pool).await;
         if !enforce_ai_run() && !should_update {
             log::info!(
                 "No need to update ministrial proposal: {}/ME/{}",
@@ -223,6 +223,15 @@ pub async fn update_ministrial_proposals_in_db2(
         if i % 10 == 0 {
             log::info!("{i} insertion dur: {:?}", start.elapsed());
         }
+        if should_update {
+            if let Some(client) = &app_state.redis_client {
+                if let Err(e) =
+                    crate::notify_update_streamed("gov_proposals", &gov_proposal, client).await
+                {
+                    log::error!("Could not notify for gov prop update!: {e:?}");
+                }
+            }
+        }
 
         #[cfg(feature = "ai")]
         if let Some(ai_task_tx) = &ai_task_tx {
@@ -241,6 +250,7 @@ pub async fn update_ministrial_proposals_in_db2(
             let inner_gov_proposal = gov_proposal.clone();
             let inner_gov_prop_mail_tx = new_ministrial_proposal_tx.clone();
             let pool = pool.clone();
+            let redis_client = app_state.redis_client.clone();
             let documents = gov_proposal.documents.clone();
             let summarization_task = AiTask {
                 input: None,
@@ -251,20 +261,36 @@ pub async fn update_ministrial_proposals_in_db2(
                     Box::pin(async move {
                         let ai_summary =
                             summarize_ministerial_proposal_documents(task_args, &documents).await?;
+
+                        if ai_summary.is_none() {
+                            return Ok(());
+                        }
+
                         let mut inner_gov_proposal = inner_gov_proposal;
                         inner_gov_proposal.ai_summary = ai_summary;
-                        if let Some(gov_prop_mail_tx) = inner_gov_prop_mail_tx {
-                            check_and_send_ministrial_email(
-                                &pool,
-                                &mut started_acc,
-                                i,
-                                &inner_gov_proposal,
-                                ministrial_prop_id,
-                                &gov_prop_mail_tx,
-                                false,
-                            )
-                            .await;
-                        }
+                        // if let Some(gov_prop_mail_tx) = inner_gov_prop_mail_tx {
+                        //     check_and_send_ministrial_email(
+                        //         &pool,
+                        //         &mut started_acc,
+                        //         i,
+                        //         &inner_gov_proposal,
+                        //         ministrial_prop_id,
+                        //         &gov_prop_mail_tx,
+                        //         false,
+                        //     )
+                        //     .await;
+                        // }
+
+                        let Some(redis_client) = redis_client else {
+                            return Ok(());
+                        };
+
+                        crate::notify_update_streamed(
+                            "gov_proposals",
+                            &inner_gov_proposal,
+                            &redis_client,
+                        )
+                        .await?;
                         Ok(())
                         // TODO: update meilisearch index on finish
                     })

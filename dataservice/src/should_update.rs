@@ -1,6 +1,19 @@
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
+use redis::AsyncCommands;
+use serde::Serialize;
 use somes_scraper::LastUpdated;
 use sqlx::PgPool;
+
+pub(crate) async fn notify_update_streamed<T: Serialize>(
+    stream_id: &str,
+    data: &T,
+    client: &redis::Client,
+) -> combx::Result<()> {
+    let mut con = client.get_multiplexed_async_connection().await?;
+    let vote_result = serde_json::to_string(data)?;
+    let _: () = con.xadd(stream_id, "*", &[("data", vote_result)]).await?;
+    Ok(())
+}
 
 #[inline]
 pub(crate) fn enforce_ai_run() -> bool {
@@ -16,7 +29,26 @@ pub(crate) trait StoredUpdatedAt {
     async fn stored_updated_at(&self, pg: &PgPool) -> Option<DateTime<Utc>>;
 }
 
-pub(crate) async fn should_update<T: StoredUpdatedAt + LastUpdated>(data: &T, pg: &PgPool) -> bool {
+pub(crate) trait CompareHash {
+    async fn stored_hash(&self, pg: &PgPool) -> Option<u64>;
+    fn hash_of(&self) -> u64;
+}
+
+pub(crate) async fn should_update_by_hash<T: CompareHash>(data: &T, pg: &PgPool) -> (bool, u64) {
+    let hash = data.hash_of();
+    if !mind_update_time() {
+        return (true, hash);
+    }
+    let Some(stored_last_hash) = data.stored_hash(pg).await else {
+        return (true, hash);
+    };
+    (stored_last_hash != hash, hash)
+}
+
+pub(crate) async fn should_update_by_time<T: StoredUpdatedAt + LastUpdated>(
+    data: &T,
+    pg: &PgPool,
+) -> bool {
     if !mind_update_time() {
         return true;
     }

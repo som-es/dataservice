@@ -1,5 +1,4 @@
 use combx::{PostgresEnhancer, VoteResult};
-use redis::AsyncCommands;
 use somes_scraper::LegislativeInitiative;
 use tokio::sync::mpsc::Sender;
 
@@ -10,7 +9,7 @@ use crate::{
         insert_delegates_batch, insert_documents_batch, insert_named_vote_info, insert_named_votes,
         insert_references_batch, insert_votes_batch,
     },
-    today,
+    notify_update_streamed, today,
     topics::{insert_topics_generic_batch, TableType, TopicType},
     AppState,
 };
@@ -23,7 +22,7 @@ pub async fn update_or_insert_legis_init_in_db(
 ) {
     let pool = &app_state.pg_pool;
     let start = tokio::time::Instant::now();
-    let should_update = crate::should_update(legis_init, pool).await;
+    let should_update = crate::should_update_by_time(legis_init, pool).await;
     if !enforce_ai_run() && !should_update {
         log::info!("No need to update!");
         return;
@@ -59,7 +58,7 @@ pub async fn update_or_insert_legis_init_in_db(
                 INSERT INTO legislative_initiatives (
                     title, inr, emphasis, description, ityp, gp, accepted, nr_plenary_activity_date, raw_data_created_at, raw_data_updated_at,
                     requires_simple_majority, pre_declined_type, voted_by_name, plenary_session_id, doktyp, is_law,
-                    law_accepted, has_reference, is_voteable_on, 
+                    law_accepted, has_reference, is_voteable_on,
                     is_urgent, voting, updated_at, vote_date
                 ) VALUES (
                     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
@@ -125,7 +124,7 @@ pub async fn update_or_insert_legis_init_in_db(
 
     if should_update {
         if let Some(client) = &app_state.redis_client {
-            if let Err(e) = notify_vote_result_update(&vote_result, client).await {
+            if let Err(e) = notify_update_streamed("vote_results", &vote_result, client).await {
                 log::error!("Could not notify for vote result update!: {e:?}");
             }
         }
@@ -174,7 +173,9 @@ pub async fn update_or_insert_legis_init_in_db(
                         let mut vote_result = vote_result;
                         vote_result.ai_summary = ai_summary;
                         if let Some(client) = &redis_client {
-                            if let Err(e) = notify_vote_result_update(&vote_result, client).await {
+                            if let Err(e) =
+                                notify_update_streamed("vote_results", &vote_result, client).await
+                            {
                                 log::error!("Could not notify for vote result update!: {e:?}");
                             }
                         }
@@ -369,16 +370,4 @@ pub async fn update_or_insert_legis_init_in_db(
         log::error!("Cannot commit legis init transaction: {e:?}");
     }
     log::info!("Insertion duration for legis init: {:?}", start.elapsed());
-}
-
-async fn notify_vote_result_update(
-    vote_result: &VoteResult,
-    client: &redis::Client,
-) -> combx::Result<()> {
-    let mut con = client.get_multiplexed_async_connection().await?;
-    let vote_result = serde_json::to_string(vote_result)?;
-    let _: () = con
-        .xadd("vote_results", "*", &[("data", vote_result)])
-        .await?;
-    Ok(())
 }
