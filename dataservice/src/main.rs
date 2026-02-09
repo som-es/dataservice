@@ -124,12 +124,12 @@ pub async fn run_services(state: &State, config: Config) {
                 )
                 .await
             };
-            let pool1 = pool.clone();
+            let app_state1 = app_state.clone();
             let inner_ai_task_tx = ai_task_tx.clone();
             let decrees = async move {
                 services::ministrial_decrees::save_ministrial_decrees(
                     decree_pages() as u32,
-                    &pool1,
+                    app_state1,
                     inner_ai_task_tx,
                 )
                 .await;
@@ -175,11 +175,11 @@ pub async fn run_services(state: &State, config: Config) {
                 .await;
             };
             let inner_ai_task_tx = ai_task_tx.clone();
-            let pool1 = pool.clone();
+            let app_state1 = app_state.clone();
             let decrees = async move {
                 services::ministrial_decrees::save_ministrial_decrees(
                     decree_pages() as u32,
-                    &pool1,
+                    app_state1,
                     inner_ai_task_tx,
                 )
                 .await;
@@ -281,7 +281,7 @@ pub async fn run_services(state: &State, config: Config) {
         )),
         tokio::spawn(services::ministrial_decrees::run_shut_pages(
             Shutdown::new(state.notify_shutdown.subscribe()),
-            pool.clone(),
+            app_state.clone(),
             decree_pages() as u32,
             ai_task_tx.clone(),
         )),
