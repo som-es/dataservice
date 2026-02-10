@@ -3,7 +3,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use somes_common_lib::ToCompositeType;
 use somes_macro::{CompositeType, MeilisearchFilter};
-use somes_meilisearch_filter::{FilterArgument, FilterOp};
+use somes_meilisearch_filter::{
+    FilterArgument, FilterOp, FilterOptions, build_prefix, to_meilisearch_filters,
+};
 use sqlx::types::Json;
 use sqlx::{FromRow, Type};
 
@@ -33,6 +35,39 @@ pub struct DbAiSummary {
     pub version: String,
     #[filter(make_optional)]
     pub generated_at: DateTime<Utc>,
+}
+
+pub fn meilisearch_filters_ai_summary(
+    ai_summary_filter: Option<DbAiSummaryFilter>,
+    prefix: Option<String>,
+) -> Vec<String> {
+    let mut filter_conditions = vec![];
+
+    if let Some(ai_summary_filter) = &ai_summary_filter {
+        filter_conditions.extend(to_meilisearch_filters(
+            &ai_summary_filter
+                .full_summary
+                .as_ref()
+                .map(|x| x.filter_arguments())
+                .unwrap_or_default(),
+            &FilterOptions {
+                prefix: Some(build_prefix("full_summary", prefix.as_deref())),
+                ..Default::default()
+            },
+        ));
+    }
+
+    filter_conditions.extend(to_meilisearch_filters(
+        &ai_summary_filter
+            .as_ref()
+            .map(|x| x.filter_arguments())
+            .unwrap_or_default(),
+        &FilterOptions {
+            prefix: prefix.clone(),
+            ..Default::default()
+        },
+    ));
+    filter_conditions
 }
 
 impl ToCompositeType for DbAiSummary {

@@ -1,6 +1,8 @@
 use somes_meilisearch_filter::*;
 
-use crate::{OptionalVoteResultFilter, filtering::to_topics_filter};
+use crate::{
+    OptionalVoteResultFilter, filtering::to_topics_filter, meilisearch_filters_ai_summary,
+};
 
 pub fn meilisearch_filters_vote_result(
     vote_result_filter: OptionalVoteResultFilter,
@@ -50,16 +52,9 @@ pub fn meilisearch_filters_vote_result(
         &build_prefix("topics", prefix.as_deref()),
     ));
 
-    filter_conditions.extend(to_meilisearch_filters(
-        &vote_result_filter
-            .ai_summary
-            .as_ref()
-            .map(|ai_summary| ai_summary.filter_arguments())
-            .unwrap_or_default(),
-        &FilterOptions {
-            prefix: Some(build_prefix("ai_summary", prefix.as_deref())),
-            ..Default::default()
-        },
+    filter_conditions.extend(meilisearch_filters_ai_summary(
+        vote_result_filter.ai_summary,
+        Some("ai_summary".into()),
     ));
 
     filter_conditions.extend(to_meilisearch_filters(

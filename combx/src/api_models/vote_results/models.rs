@@ -127,7 +127,16 @@ pub struct DbLegislativeInitiativeQuery {
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
-    PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type, MeilisearchFilter, Hash,
+    PartialEq,
+    Eq,
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    CompositeType,
+    Type,
+    MeilisearchFilter,
+    Hash,
 )]
 #[sqlx(type_name = "db_vote")]
 pub struct DbVote {
