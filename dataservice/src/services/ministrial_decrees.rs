@@ -5,7 +5,7 @@ use std::{
 
 use combx::{
     with_data::gps::{gps, LegislativePeriod},
-    Decree, FromScrapedType, PostgresEnhancer,
+    Decree, FromScrapedType, Index, PostgresEnhancer,
 };
 use somes_scraper::{decree::RisScraper, AustriaScraper, Thing};
 use sqlx::PgPool;
@@ -69,7 +69,7 @@ pub async fn insert_ministrial_decree(
     ai_task_tx: &Sender<AiTask>,
 ) -> crate::Result<()> {
     let pg_pool = &app_state.pg_pool;
-    let decree =
+    let mut decree =
         combx::Decree::from_scraped_type(PostgresEnhancer(pg_pool.clone()), (decree, all_gps))
             .await;
 
@@ -124,9 +124,12 @@ pub async fn insert_ministrial_decree(
         .fetch_one(pg_pool)
         .await?;
 
+        decree.id = Some(decree_id.id);
+
         if should_update {
             if let Some(client) = &app_state.redis_client {
-                if let Err(e) = crate::notify_update_streamed("decrees", &decree, client).await {
+                if let Err(e) = crate::notify_update_streamed(Index::Decrees, &decree, client).await
+                {
                     log::error!("Could not notify for decree update!: {e:?}");
                 }
             }

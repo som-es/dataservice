@@ -13,7 +13,9 @@ use sqlx::Type;
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
-use crate::{DbAiSummary, DbMinistrialProposalQueryMeta, FromScrapedType, Topic, today};
+use crate::{
+    CombinedData, DbAiSummary, DbMinistrialProposalQueryMeta, FromScrapedType, Topic, today,
+};
 
 use crate::models::*;
 
@@ -38,6 +40,13 @@ pub struct GovProposal {
     #[filter(skip)]
     pub documents: Vec<Document>,
     pub ai_summary: Option<DbAiSummary>,
+}
+
+impl CombinedData for GovProposal {
+    #[inline]
+    fn id(&self) -> u64 {
+        self.id.unwrap() as u64
+    }
 }
 
 impl<T> FromScrapedType<T> for GovProposal {

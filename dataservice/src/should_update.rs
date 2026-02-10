@@ -1,16 +1,18 @@
 use std::hash::Hasher;
 
 use chrono::{DateTime, Utc};
+use combx::Index;
 use redis::AsyncCommands;
 use serde::Serialize;
 use somes_scraper::LastUpdated;
 use sqlx::PgPool;
 
 pub(crate) async fn notify_update_streamed<T: Serialize>(
-    stream_id: &str,
+    index: Index,
     data: &T,
     client: &redis::Client,
 ) -> combx::Result<()> {
+    let stream_id = index.as_str();
     let mut con = client.get_multiplexed_async_connection().await?;
     let vote_result = serde_json::to_string(data)?;
     let _: () = con.xadd(stream_id, "*", &[("data", vote_result)]).await?;

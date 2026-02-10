@@ -1,4 +1,4 @@
-use combx::{PostgresEnhancer, VoteResult};
+use combx::{Index, PostgresEnhancer, VoteResult};
 use somes_scraper::LegislativeInitiative;
 use tokio::sync::mpsc::Sender;
 
@@ -127,7 +127,7 @@ pub async fn update_or_insert_legis_init_in_db(
 
     if should_update {
         if let Some(client) = &app_state.redis_client {
-            if let Err(e) = notify_update_streamed("vote_results", &vote_result, client).await {
+            if let Err(e) = notify_update_streamed(Index::VoteResults, &vote_result, client).await {
                 log::error!("Could not notify for vote result update!: {e:?}");
             }
         }
@@ -177,7 +177,8 @@ pub async fn update_or_insert_legis_init_in_db(
                         vote_result.ai_summary = ai_summary;
                         if let Some(client) = &redis_client {
                             if let Err(e) =
-                                notify_update_streamed("vote_results", &vote_result, client).await
+                                notify_update_streamed(Index::VoteResults, &vote_result, client)
+                                    .await
                             {
                                 log::error!("Could not notify for vote result update!: {e:?}");
                             }

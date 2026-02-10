@@ -9,8 +9,8 @@ use sqlx::FromRow;
 use std::sync::Arc;
 
 use crate::{
-    DbAiSummary, DbAiSummaryFilter, FromScrapedType, api_models::decrees::enhancer::DecreeEnhancer,
-    with_data::gps::LegislativePeriod,
+    CombinedData, DbAiSummary, DbAiSummaryFilter, FromScrapedType,
+    api_models::decrees::enhancer::DecreeEnhancer, with_data::gps::LegislativePeriod,
 };
 
 mod enhancer;
@@ -22,6 +22,8 @@ use utoipa::ToSchema;
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, FromRow, MeilisearchFilter)]
 pub struct Decree {
+    #[filter(make_vec)]
+    pub id: Option<i32>,
     #[filter(make_vec)]
     pub gov_official_id: Option<i32>,
     #[filter(make_optional, make_vec)]
@@ -58,6 +60,13 @@ impl<T: DecreeEnhancer> FromScrapedType<T> for Decree {
     }
 }
 
+impl CombinedData for Decree {
+    #[inline]
+    fn id(&self) -> u64 {
+        self.id.unwrap() as u64
+    }
+}
+
 impl Decree {
     pub async fn from_thing(
         db_enhancer: impl DecreeEnhancer,
@@ -85,6 +94,7 @@ impl Decree {
             .map(|x| x.delegate_id);
 
         Decree {
+            id: None,
             gov_official_id,
             ris_id: decree.id,
             ministrial_issuer: decree.issuer,

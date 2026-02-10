@@ -226,14 +226,20 @@ pub async fn run_shut_every_gp(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{
+        hash::{DefaultHasher, Hash, Hasher},
+        sync::Arc,
+    };
 
     use chrono::{NaiveDate, NaiveDateTime};
+    use combx::{PostgresEnhancer, VoteResult};
     use rand::rand_core::le;
-    use somes_scraper::{legis_init::LegislativeInitiatives, AustriaScraper};
+    use somes_scraper::{
+        legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative,
+    };
     use sqlx::postgres::PgPoolOptions;
 
-    use crate::{connect_pg, DATABASE_URL};
+    use crate::{connect_pg, CompareHash, DATABASE_URL};
 
     #[test]
     fn test_date_time_parse() {
@@ -468,5 +474,38 @@ mod tests {
             &app_state, &res, None, None,
         )
         .await;
+    }
+
+    // check hashes of XXIII AA 95
+    #[tokio::test]
+    async fn test_compare_hashes() {
+        let scraper = AustriaScraper::default();
+        let mut hasher = DefaultHasher::new();
+        let legis_init = scraper
+            .get_legis_init("/gegenstand/XXIII/AA/95")
+            .await
+            .unwrap();
+        legis_init.hash(&mut hasher);
+        let hash = hasher.finish();
+        let data = serde_json::to_string(&legis_init).unwrap();
+        println!("data: {data}");
+        dbg!(hash);
+
+        // dbg!(&legis_init);
+
+        let pool = connect_pg().await;
+        let vote_result =
+            VoteResult::from_legis_init(PostgresEnhancer(pool.clone()), legis_init, None).await;
+        let data = serde_json::to_string(&vote_result).unwrap();
+        println!("data: {data}");
+
+        // 13891749994034791878
+        dbg!(vote_result.hash_of());
+        dbg!(vote_result.hash_of());
+        dbg!(vote_result.hash_of());
+        dbg!(vote_result.hash_of());
+
+        // let (should_update, hash) = crate::should_update_by_hash(&vote_result, &pool).await;
+        // assert!(!should_update, "Hashes should be the same, but they are not. Hash in db: {hash:?}");
     }
 }

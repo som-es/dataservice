@@ -1,8 +1,10 @@
 mod delegate_matching;
+pub mod index;
 pub mod models;
 use chrono::NaiveDate;
 pub use delegate_matching::*;
 use dotenvy_macro::dotenv;
+pub use index::*;
 pub use models::*;
 pub mod api_models;
 pub use api_models::*;
@@ -25,6 +27,10 @@ pub const SOMAI_API_SECRET: &str = dotenv!("SOMAI_API_SECRET");
 pub const GPS: [&str; 9] = [
     LATEST_GP, "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
 ];
+
+pub trait CombinedData {
+    fn id(&self) -> u64;
+}
 
 pub async fn connect_pg() -> PgPool {
     PgPoolOptions::new()

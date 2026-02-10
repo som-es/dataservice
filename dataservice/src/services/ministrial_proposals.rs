@@ -246,7 +246,8 @@ pub async fn update_ministrial_proposals_in_db2(
         if should_update {
             if let Some(client) = &app_state.redis_client {
                 if let Err(e) =
-                    crate::notify_update_streamed("gov_proposals", &gov_proposal, client).await
+                    crate::notify_update_streamed(combx::Index::GovProposals, &gov_proposal, client)
+                        .await
                 {
                     log::error!("Could not notify for gov prop update!: {e:?}");
                 }
@@ -306,7 +307,7 @@ pub async fn update_ministrial_proposals_in_db2(
                         };
 
                         crate::notify_update_streamed(
-                            "gov_proposals",
+                            combx::Index::GovProposals,
                             &inner_gov_proposal,
                             &redis_client,
                         )

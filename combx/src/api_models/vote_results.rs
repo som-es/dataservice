@@ -17,7 +17,7 @@ use somes_scraper::{LegislativeInitiative, Opinion};
 use sqlx::{FromRow, PgPool, prelude::Type};
 use std::sync::Arc;
 
-use crate::models::*;
+use crate::{CombinedData, models::*};
 use crate::{
     FromScrapedType, Topic, api_models::vote_results::hidden_vote_translation::translate_votes,
 };
@@ -124,6 +124,13 @@ pub struct OptionalVoteResult {
     pub ai_summary: Option<DbAiSummary>,
     #[serde(default)]
     pub meilisearch_helper: Option<MeilisearchHelper>,
+}
+
+impl CombinedData for OptionalVoteResult {
+    #[inline]
+    fn id(&self) -> u64 {
+        self.id.unwrap() as u64
+    }
 }
 
 impl<T: VoteResultEnhancer> FromScrapedType<T> for VoteResult {
@@ -375,6 +382,7 @@ mod tests {
 
     use somai_client::SomAiClient;
     use somes_common_lib::Document;
+    use somes_scraper::{AustriaScraper, legis_init::LegislativeInitiatives};
 
     use crate::document_text::{combine_texts, extract_text_from_documents_html_first};
 
