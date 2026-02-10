@@ -29,6 +29,8 @@ pub const GPS: [&str; 9] = [
 ];
 
 pub trait CombinedData {
+    const INDEX: Index;
+    const PRIMARY_KEY: &str;
     fn id(&self) -> u64;
 }
 

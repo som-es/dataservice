@@ -127,6 +127,8 @@ pub struct OptionalVoteResult {
 }
 
 impl CombinedData for OptionalVoteResult {
+    const INDEX: crate::Index = crate::Index::VoteResults;
+    const PRIMARY_KEY: &str = "id";
     #[inline]
     fn id(&self) -> u64 {
         self.id.unwrap() as u64

@@ -61,6 +61,8 @@ impl<T: DecreeEnhancer> FromScrapedType<T> for Decree {
 }
 
 impl CombinedData for Decree {
+    const INDEX: crate::Index = crate::Index::Decrees;
+    const PRIMARY_KEY: &str = "decree.ris_id";
     #[inline]
     fn id(&self) -> u64 {
         self.id.unwrap() as u64

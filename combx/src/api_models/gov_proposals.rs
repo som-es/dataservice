@@ -43,10 +43,13 @@ pub struct GovProposal {
 }
 
 impl CombinedData for GovProposal {
+    const INDEX: crate::Index = crate::Index::GovProposals;
+    const PRIMARY_KEY: &str = "gov_proposal.ministrial_proposal.id";
     #[inline]
     fn id(&self) -> u64 {
         self.id.unwrap() as u64
     }
+    
 }
 
 impl<T> FromScrapedType<T> for GovProposal {
