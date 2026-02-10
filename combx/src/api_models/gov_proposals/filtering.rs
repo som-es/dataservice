@@ -2,7 +2,7 @@ use somes_meilisearch_filter::*;
 
 use crate::{
     OptionalGovProposalFilter, OptionalVoteResultFilter, filtering::to_topics_filter,
-    meilisearch_filters_vote_result,
+    meilisearch_filters_ai_summary, meilisearch_filters_vote_result,
 };
 
 pub fn meilisearch_filters_gov_props(
@@ -59,16 +59,9 @@ pub fn meilisearch_filters_gov_props(
         &build_prefix("topics", prefix.as_deref()),
     ));
 
-    filter_conditions.extend(to_meilisearch_filters(
-        &gov_prop_filter
-            .ai_summary
-            .as_ref()
-            .map(|ai_summary| ai_summary.filter_arguments())
-            .unwrap_or_default(),
-        &FilterOptions {
-            prefix: Some(build_prefix("ai_summary", prefix.as_deref())),
-            ..Default::default()
-        },
+    filter_conditions.extend(meilisearch_filters_ai_summary(
+        gov_prop_filter.ai_summary,
+        Some("gov_proposal.ai_summary".into()),
     ));
 
     filter_conditions
