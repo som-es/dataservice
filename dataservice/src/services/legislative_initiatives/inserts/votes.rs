@@ -19,7 +19,7 @@ pub async fn insert_votes_batch<'a>(
 
     let res = sqlx::query!(
         "
-            INSERT INTO votes (party, fraction, infavor, legislative_initiatives_id) 
+            INSERT INTO votes (party, fraction, infavor, legislative_initiatives_id)
             SELECT * FROM UNNEST($1::text[], $2::int4[], $3::bool[], $4::int4[])
             ON CONFLICT (legislative_initiatives_id, party)
             DO UPDATE SET fraction = EXCLUDED.fraction, infavor = EXCLUDED.infavor
@@ -87,6 +87,13 @@ pub async fn insert_named_votes<'a>(
     named_votes: &[DbNamedVote],
     named_vote_info_id: i32,
 ) -> sqlx::Result<()> {
+    sqlx::query!(
+        "delete from named_votes where named_vote_info_id = $1",
+        named_vote_info_id
+    )
+    .execute(&mut **tx)
+    .await?;
+
     for named_vote in named_votes {
         if let Err(e) = sqlx::query!(
             "
@@ -164,7 +171,7 @@ pub async fn insert_named_votes_batched<'a>(
                 searched_with, matched_with, delegate_id, manually_matched, named_vote_info_id
             )
             SELECT * FROM UNNEST(
-                $1::bool[], $2::bool[], $3::int4[], $4::int4[], 
+                $1::bool[], $2::bool[], $3::int4[], $4::int4[],
                 $5::text[], $6::text[], $7::int4[], $8::bool[], $9::int4[]
             )
             ON CONFLICT (delegate_id, named_vote_info_id)
