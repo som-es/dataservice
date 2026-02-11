@@ -4,8 +4,16 @@ pub use postgres::*;
 use std::collections::HashMap;
 
 use crate::{DbLegislativeInitiativeQuery, DbNamedVote, DbSpeechWithLink, enhancer::Enhancer};
-use chrono::NaiveDate;
+use chrono::{DateTime, NaiveDate, Utc};
 use somes_scraper::{LegislativeInitiative, Party, ProContra};
+
+#[derive(Debug, Default)]
+pub struct LegisInitInfo {
+    pub id: Option<i32>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
+    pub hash: Option<i64>,
+}
 
 pub trait VoteResultEnhancer: Enhancer {
     fn retrieve_plenary_session_id(
@@ -23,10 +31,12 @@ pub trait VoteResultEnhancer: Enhancer {
         voted_on: NaiveDate,
         gp: &str,
     ) -> impl Future<Output = Result<Vec<DbNamedVote>, Self::Error>>;
-    fn maybe_get_legis_init_id(
+    fn maybe_get_legis_init_info(
         &self,
-        legis_init: &DbLegislativeInitiativeQuery,
-    ) -> impl Future<Output = Option<i32>>;
+        inr: i32,
+        ityp: &str,
+        gp: &str,
+    ) -> impl Future<Output = LegisInitInfo>;
 
     fn get_plenar_speeches(
         &self,

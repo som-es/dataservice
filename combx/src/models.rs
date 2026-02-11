@@ -100,6 +100,7 @@ pub struct DbMinistrialProposal {
     Type,
     CompositeType,
     MeilisearchFilter,
+    Default,
     Hash,
 )]
 // #[diesel(table_name = ministrial_proposals)]

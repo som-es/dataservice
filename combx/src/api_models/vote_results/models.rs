@@ -174,16 +174,23 @@ pub struct DbSpeechWithLink {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type, Hash)]
+#[derive(
+    PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type, MeilisearchFilter, Hash,
+)]
 #[sqlx(type_name = "db_named_vote")]
 pub struct DbNamedVote {
+    #[filter(make_optional)]
     pub id: i32,
     pub infavor: Option<bool>,
     pub was_absent: Option<bool>,
+    #[filter(make_optional)]
     pub lev: i64,
+    #[filter(make_optional)]
     pub similiarity_score: i64,
     pub searched_with: Option<String>,
+    #[filter(make_optional)]
     pub matched_with: String,
+    #[filter(make_optional)]
     pub delegate_id: i32,
     // pub named_vote_info_id: i32,
     pub manually_matched: Option<bool>,
@@ -207,12 +214,18 @@ pub struct OptionalDbNamedVote {
 
 // #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type, Hash)]
+#[derive(
+    PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, MeilisearchFilter, Type, Hash,
+)]
 #[sqlx(type_name = "db_named_vote_info")]
 pub struct DbNamedVoteInfo {
+    #[filter(make_optional)]
     pub pro_count: i32,
+    #[filter(make_optional)]
     pub contra_count: i32,
+    #[filter(make_optional)]
     pub given_vote_sum: i32,
+    #[filter(make_optional)]
     pub invalid_count: i32,
 }
 
@@ -227,9 +240,12 @@ pub struct OptionalDbNamedVoteInfo {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, Type, Hash)]
+#[derive(
+    PartialEq, Debug, Clone, Serialize, Deserialize, CompositeType, MeilisearchFilter, Type, Hash,
+)]
 #[sqlx(type_name = "db_named_votes")]
 pub struct DbNamedVotes {
+    #[filter(make_optional)]
     pub named_vote_info: DbNamedVoteInfo,
     pub named_votes: Option<Vec<DbNamedVote>>,
 }

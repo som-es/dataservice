@@ -171,7 +171,7 @@ pub async fn update_ministrial_proposals_in_db2(
     let mut started_acc = false;
     for (i, ministrial_prop) in ministrial_props.into_iter().enumerate() {
         // let should_update = crate::should_update_by_time(&ministrial_prop, pool).await;
-        let gov_proposal =
+        let mut gov_proposal =
             GovProposal::from_scraped_type((), (ministrial_prop, gov_officials.clone())).await;
 
         let (should_update, hash) = crate::should_update_by_hash(&gov_proposal, pool).await;
@@ -243,16 +243,8 @@ pub async fn update_ministrial_proposals_in_db2(
         if i % 10 == 0 {
             log::info!("{i} insertion dur: {:?}", start.elapsed());
         }
-        if should_update {
-            if let Some(client) = &app_state.redis_client {
-                if let Err(e) =
-                    crate::notify_update_streamed(combx::Index::GovProposals, &gov_proposal, client)
-                        .await
-                {
-                    log::error!("Could not notify for gov prop update!: {e:?}");
-                }
-            }
-        }
+
+        gov_proposal.id = Some(ministrial_prop_id); 
 
         #[cfg(feature = "ai")]
         if let Some(ai_task_tx) = &ai_task_tx {
@@ -419,7 +411,19 @@ pub async fn update_ministrial_proposals_in_db2(
                 "Error inserting documents for ministerial prop {ministrial_prop_id}: {e:?}"
             );
         }
+
         tx.commit().await?;
+        
+        if should_update {
+            if let Some(client) = &app_state.redis_client {
+                if let Err(e) =
+                    crate::notify_update_streamed(combx::Index::GovProposals, &gov_proposal, client)
+                        .await
+                {
+                    log::error!("Could not notify for gov prop update!: {e:?}");
+                }
+            }
+        }
     }
 
     // without this, the mail sending service wouldn't be triggered if e.g. gov proposals list length  is lower than TOTAL_MINISTERIAL_PROP_SENT threshold

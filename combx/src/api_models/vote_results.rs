@@ -74,7 +74,6 @@ pub struct VoteResult {
     pub votes: Vec<DbVote>,
     pub speeches: Vec<DbSpeechWithLink>,
 
-    #[filter(skip)]
     pub named_votes: Option<DbNamedVotes>,
     pub topics: Vec<Topic>,
     pub eurovoc_topics: Vec<Topic>,
@@ -110,7 +109,6 @@ pub struct OptionalVoteResult {
     pub legislative_initiative: Option<DbLegislativeInitiativeQuery>,
     pub votes: Option<Vec<DbVote>>,
     pub speeches: Option<Vec<DbSpeechWithLink>>,
-    #[filter(skip)]
     pub named_votes: Option<DbNamedVotes>,
     pub topics: Option<Vec<Topic>>,
     pub eurovoc_topics: Option<Vec<Topic>>,
@@ -127,6 +125,15 @@ pub struct OptionalVoteResult {
 }
 
 impl CombinedData for OptionalVoteResult {
+    const INDEX: crate::Index = crate::Index::VoteResults;
+    const PRIMARY_KEY: &str = "id";
+    #[inline]
+    fn id(&self) -> u64 {
+        self.id.unwrap() as u64
+    }
+}
+
+impl CombinedData for VoteResult {
     const INDEX: crate::Index = crate::Index::VoteResults;
     const PRIMARY_KEY: &str = "id";
     #[inline]
@@ -154,6 +161,15 @@ impl VoteResult {
         somai_client: Option<Arc<SomAiClient>>,
     ) -> Self {
         let plenary_session_id = db_enhancer.retrieve_plenary_session_id(&legis_init).await;
+
+        let LegisInitInfo {
+            id,
+            created_at: _,
+            updated_at: _,
+            hash: _,
+        } = db_enhancer
+            .maybe_get_legis_init_info(legis_init.inr as i32, &legis_init.ityp, &legis_init.gp)
+            .await;
 
         let db_legis_init = DbLegislativeInitiativeQuery {
             id: 0,
@@ -315,35 +331,31 @@ impl VoteResult {
             })
             .collect::<Vec<_>>();
 
-        // IMPORTANT: others must not rely on this id (anymore)! (e.g. Meilisearch ID/primary key)
-        let maybe_legis_init_id = db_enhancer.maybe_get_legis_init_id(&db_legis_init).await;
+        let (absences, referenced_by_others_ids) = if let Some(maybe_legis_init_id) = id {
+            if let Ok(plenar_speeches) = db_enhancer
+                .get_plenar_speeches(&db_legis_init, maybe_legis_init_id)
+                .await
+            {
+                speeches = plenar_speeches;
+            }
 
-        let (absences, referenced_by_others_ids) =
-            if let Some(maybe_legis_init_id) = maybe_legis_init_id {
-                if let Ok(plenar_speeches) = db_enhancer
-                    .get_plenar_speeches(&db_legis_init, maybe_legis_init_id)
-                    .await
-                {
-                    speeches = plenar_speeches;
-                }
+            let absences = db_enhancer
+                .get_absences_from_legis_init(maybe_legis_init_id)
+                .await
+                .ok();
 
-                let absences = db_enhancer
-                    .get_absences_from_legis_init(maybe_legis_init_id)
-                    .await
-                    .ok();
+            let referenced_by_other_ids = db_enhancer
+                .get_referenced_by_other_ids(&db_legis_init)
+                .await
+                .ok();
 
-                let referenced_by_other_ids = db_enhancer
-                    .get_referenced_by_other_ids(&db_legis_init)
-                    .await
-                    .ok();
-
-                (absences, referenced_by_other_ids)
-            } else {
-                (None, None)
-            };
+            (absences, referenced_by_other_ids)
+        } else {
+            (None, None)
+        };
 
         VoteResult {
-            id: maybe_legis_init_id,
+            id,
             legislative_initiative: db_legis_init,
             ai_summary: None,
             votes,

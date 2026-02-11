@@ -476,6 +476,30 @@ mod tests {
         .await;
     }
 
+    #[tokio::test]
+    async fn test_legis_init_empty_gp_scrape_xxviii_a_437() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let scraper: AustriaScraper = AustriaScraper::default();
+        let res = scraper
+            .get_legis_init("/gegenstand/XXVIII/A/437")
+            .await
+            .unwrap();
+
+        log::info!("legis init: {res:?}");
+
+        let pool = connect_pg().await;
+        let app_state = crate::AppState {
+            pg_pool: pool,
+            redis_client: None,
+        };
+        crate::legislative_initiatives::update_or_insert_legis_init_in_db(
+            &app_state, &res, None, None,
+        )
+        .await;
+    }
+
+
+
     // check hashes of XXIII AA 95
     #[tokio::test]
     async fn test_compare_hashes() {

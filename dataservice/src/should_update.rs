@@ -7,7 +7,7 @@ use serde::Serialize;
 use somes_scraper::LastUpdated;
 use sqlx::PgPool;
 
-pub(crate) async fn notify_update_streamed<T: Serialize>(
+pub async fn notify_update_streamed<T: Serialize>(
     index: Index,
     data: &T,
     client: &redis::Client,

@@ -25,7 +25,7 @@ pub mod ai_task;
 pub mod email;
 pub mod notify_registrars;
 pub mod should_update;
-pub(crate) use should_update::*;
+pub use should_update::*;
 
 #[cfg(feature = "runner")]
 pub mod ai_tasks;

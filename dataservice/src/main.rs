@@ -237,7 +237,7 @@ pub async fn run_services(state: &State, config: Config) {
             app_state.clone(),
             new_vote_result_tx.clone(),
             ai_task_tx.clone(),
-            latest_legis_init_sleep + 500,
+            latest_legis_init_sleep + 5000,
             ONLY_LATEST,
             false, // also fetches everything that isn't a law
         )),

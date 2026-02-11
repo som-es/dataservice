@@ -5,7 +5,7 @@ use somes_scraper::{LegislativeInitiative, Party, ProContra};
 use sqlx::PgPool;
 
 use crate::{
-    DbLegislativeInitiativeQuery, DbNamedVote, DbSpeechWithLink,
+    DbLegislativeInitiativeQuery, DbNamedVote, DbSpeechWithLink, LegisInitInfo,
     api_models::vote_results::{
         enhancer::VoteResultEnhancer, hidden_vote_translation::pg_gen_code_to_parties_with_date,
         named_votes::pg_create_db_named_votes,
@@ -38,11 +38,13 @@ impl VoteResultEnhancer for PostgresEnhancer {
         pg_create_db_named_votes(self.source(), votes, voted_on, gp)
     }
 
-    fn maybe_get_legis_init_id(
+    fn maybe_get_legis_init_info(
         &self,
-        legis_init: &DbLegislativeInitiativeQuery,
-    ) -> impl Future<Output = Option<i32>> {
-        pg_maybe_get_legis_init_id(self.source(), legis_init)
+        inr: i32,
+        ityp: &str,
+        gp: &str,
+    ) -> impl Future<Output = LegisInitInfo> {
+        pg_maybe_get_legis_init_id(self.source(), inr, ityp, gp)
     }
 
     fn get_plenar_speeches(
@@ -121,19 +123,21 @@ pub async fn pg_retrieve_plenary_session_id(
 
 pub async fn pg_maybe_get_legis_init_id(
     pool: &PgPool,
-    db_legis_init: &DbLegislativeInitiativeQuery,
-) -> Option<i32> {
-    sqlx::query!(
-        "select id from legislative_initiatives where inr = $1 and ityp = $2 and gp = $3",
-        db_legis_init.inr,
-        db_legis_init.ityp,
-        db_legis_init.gp
+    inr: i32,
+    ityp: &str,
+    gp: &str,
+) -> LegisInitInfo {
+    sqlx::query_as!(LegisInitInfo,
+        "select id, updated_at, created_at, hash from legislative_initiatives where inr = $1 and ityp = $2 and gp = $3",
+        inr,
+        ityp,
+        gp
     )
     .fetch_optional(pool)
     .await
     .ok()
     .flatten()
-    .map(|x| x.id)
+    .unwrap_or_default()
 }
 
 pub async fn pg_get_absences_from_legis_init(
