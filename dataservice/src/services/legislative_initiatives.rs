@@ -48,48 +48,47 @@ pub async fn legis_init_once(
         let pg_pool = pg_pool.clone();
         let new_legis_init = new_legis_init.clone();
         let ai_task_ts = ai_task_ts.clone();
-        let handle = tokio::task::spawn_blocking(move || {
-            Handle::current().block_on(async move {
-                let mut scraper = AustriaScraper::default();
-                log::info!("LEGIS INIT once GP: {gp}");
-                scraper.scrape_info.gp = vec![gp.into()];
-                if only_latest {
-                    let days = if only_laws {
-                        // this number is a magic number -> maybe reason it with average completion time + n or something
-                        // could still be possible that very old (+1001 days old) newly completed legis inits are never sent as email!
-                        333
-                    } else {
-                        100
-                    };
-                    scraper.scrape_info.date_start = today_and_time()
-                        .naive_local()
-                        .checked_sub_days(Days::new(days));
-                } else {
-                    scraper.scrape_info.date_start = None;
-                }
 
-                let scraper = Arc::new(scraper);
-
-                let searched_doktyps = if only_laws {
-                    Some(LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES.as_slice())
+        let handle = tokio::spawn(async move {
+            let mut scraper = AustriaScraper::default();
+            log::info!("LEGIS INIT once GP: {gp}");
+            scraper.scrape_info.gp = vec![gp.into()];
+            if only_latest {
+                let days = if only_laws {
+                    // this number is a magic number -> maybe reason it with average completion time + n or something
+                    // could still be possible that very old (+1001 days old) newly completed legis inits are never sent as email!
+                    333
                 } else {
-                    None
+                    100
                 };
+                scraper.scrape_info.date_start = today_and_time()
+                    .naive_local()
+                    .checked_sub_days(Days::new(days));
+            } else {
+                scraper.scrape_info.date_start = None;
+            }
 
-                if let Err(e) = scrape_new_legis_inits(
-                    &pg_pool,
-                    scraper.clone(),
-                    gp,
-                    new_legis_init,
-                    ai_task_ts,
-                    searched_doktyps,
-                )
-                .await
-                {
-                    log::error!("could not scrape and insert legis inits: {e}");
-                }
-                log::info!("finished scraping LEGIS INIT once GP: {gp}");
-            })
+            let scraper = Arc::new(scraper);
+
+            let searched_doktyps = if only_laws {
+                Some(LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES.as_slice())
+            } else {
+                None
+            };
+
+            if let Err(e) = scrape_new_legis_inits(
+                &pg_pool,
+                scraper.clone(),
+                gp,
+                new_legis_init,
+                ai_task_ts,
+                searched_doktyps,
+            )
+            .await
+            {
+                log::error!("could not scrape and insert legis inits: {e}");
+            }
+            log::info!("finished scraping LEGIS INIT once GP: {gp}");
         });
         handles.push(handle);
         if only_latest {
@@ -99,9 +98,7 @@ pub async fn legis_init_once(
 
     for handle in handles {
         if let Err(e) = handle.await {
-            if e.is_panic() {
-                log::error!("join error: {e:?}");
-            }
+            log::error!("join error: {e:?}");
         }
     }
     // new_legis_inits
@@ -497,8 +494,6 @@ mod tests {
         )
         .await;
     }
-
-
 
     // check hashes of XXIII AA 95
     #[tokio::test]

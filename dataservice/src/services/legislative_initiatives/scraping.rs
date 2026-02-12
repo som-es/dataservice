@@ -50,8 +50,7 @@ pub async fn scrape_new_legis_inits(
         let new_legis_init = new_legis_init.clone();
         let ai_task_tx = ai_task_tx.clone();
 
-        handles.push(tokio::task::spawn_blocking(move || {
-            Handle::current().block_on(async move {
+        handles.push(tokio::task::spawn(async move {
                 // skipping legis inits that can't be processed right now
                 // mainly many I and A
                 // https://www.parlament.gv.at/gegenstand/XXVII/I/1494
@@ -68,7 +67,6 @@ pub async fn scrape_new_legis_inits(
                     Some(ai_task_tx),
                 )
                 .await;
-            })
         }));
     }
     for handle in handles.drain(..) {

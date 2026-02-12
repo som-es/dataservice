@@ -123,7 +123,7 @@ pub async fn update_or_insert_legis_init_in_db(
             }
         };
 
-    vote_result.id = Some(legis_init_id); 
+    vote_result.id = Some(legis_init_id);
 
     #[cfg(feature = "ai")]
     if let Some(ai_task_tx) = &ai_task_tx {
@@ -142,7 +142,11 @@ pub async fn update_or_insert_legis_init_in_db(
             let documents = vote_result.documents.clone();
             let voting = db_legis_init.voting.clone();
             let redis_client = app_state.redis_client.clone();
-            let (gp, ityp, inr) = (vote_result.legislative_initiative.gp.clone(), vote_result.legislative_initiative.ityp.clone(), vote_result.legislative_initiative.inr);
+            let (gp, ityp, inr) = (
+                vote_result.legislative_initiative.gp.clone(),
+                vote_result.legislative_initiative.ityp.clone(),
+                vote_result.legislative_initiative.inr,
+            );
             let summarization_task = AiTask {
                 input: None,
                 priority,
@@ -169,8 +173,9 @@ pub async fn update_or_insert_legis_init_in_db(
                             use combx::DbLegislativeInitiativeQuery;
 
                             // could use patching approach in the future
-                            if let Err(e) =
-                                notify_update_streamed(Index::VoteResults, &VoteResult {
+                            if let Err(e) = notify_update_streamed(
+                                Index::VoteResults,
+                                &VoteResult {
                                     id: Some(legis_init_id),
                                     ai_summary,
                                     legislative_initiative: DbLegislativeInitiativeQuery {
@@ -181,8 +186,10 @@ pub async fn update_or_insert_legis_init_in_db(
                                         ..Default::default()
                                     },
                                     ..Default::default()
-                                }, client)
-                                    .await
+                                },
+                                client,
+                            )
+                            .await
                             {
                                 log::error!("Could not notify for vote result update!: {e:?}");
                             }
@@ -358,7 +365,6 @@ pub async fn update_or_insert_legis_init_in_db(
     if let Err(e) = insert_documents_batch(&mut tx, &vote_result.documents, legis_init_id).await {
         log::error!("Error inserting documents for legis init {legis_init_id}: {e:?}");
     }
- 
 
     if let Err(e) = sqlx::query!(
         "insert into
@@ -378,7 +384,7 @@ pub async fn update_or_insert_legis_init_in_db(
     if let Err(e) = tx.commit().await {
         log::error!("Cannot commit legis init transaction: {e:?}");
     }
-    
+
     if should_update {
         if let Some(client) = &app_state.redis_client {
             // could use patching approach in the future

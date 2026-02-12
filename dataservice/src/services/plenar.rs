@@ -19,60 +19,56 @@ const MAX_TASKS: usize = 1;
 pub async fn plenar_info_once(pg_pool: &PgPool, only_latest: bool) {
     log::info!("Try scraping plenar info");
 
-    let tok_handle = Handle::current();
-
     let mut handles = vec![];
 
     for gp in GPS {
         let pg_pool = pg_pool.clone();
-        let tok_handle = tok_handle.clone();
 
-        // tokio::task::spawn_local(future)
+        let handle = tokio::spawn(async move {
+            let mut scraper = AustriaScraper::default();
+            log::info!("PLENAR info once GP: {gp}");
+            scraper.scrape_info.gp = vec![gp.into()];
 
-        handles.push(std::thread::spawn(move || {
-            tok_handle.block_on(async move {
-                let mut scraper = AustriaScraper::default();
-                log::info!("PLENAR info once GP: {gp}");
-                scraper.scrape_info.gp = vec![gp.into()];
+            let new_plenar_infos = scrape_untill_success::<Vec<PlenarInfo>, _>(|| async {
+                scrape_new_plenar_infos(&scraper).await
+            })
+            .await;
 
-                let new_plenar_infos = scrape_untill_success::<Vec<PlenarInfo>, _>(|| async {
-                    scrape_new_plenar_infos(&scraper).await
-                })
-                .await;
+            let mut inner_handles: Vec<tokio::task::JoinHandle<()>> = vec![];
 
-                let mut handles: Vec<JoinHandle<()>> = vec![];
-
-                for plenar_info in new_plenar_infos.into_iter() {
-                    if handles.len() > MAX_TASKS {
-                        log::info!("awaiting {MAX_TASKS} plenar handles");
-                        for handle in handles.drain(..) {
-                            if let Err(e) = handle.join() {
-                                log::error!("could not await plenar info handle: {e:?}");
-                            }
+            for plenar_info in new_plenar_infos.into_iter() {
+                if inner_handles.len() > MAX_TASKS {
+                    log::info!("awaiting {MAX_TASKS} plenar handles");
+                    for handle in inner_handles.drain(..) {
+                        if let Err(e) = handle.await {
+                            log::error!("could not await plenar info handle: {e:?}");
                         }
                     }
-                    let pg_pool = pg_pool.clone();
+                }
 
-                    let tok_handle = Handle::current();
-                    handles.push(std::thread::spawn(move || {
-                        tok_handle.block_on(async move {
-                            update_plenar_infos_in_db(&plenar_info, &pg_pool).await;
-                        })
-                    }));
+                let pg_pool = pg_pool.clone();
+
+                inner_handles.push(tokio::spawn(async move {
+                    update_plenar_infos_in_db(&plenar_info, &pg_pool).await;
+                }));
+            }
+
+            for handle in inner_handles.drain(..) {
+                if let Err(e) = handle.await {
+                    log::error!("could not await plenar info handle: {e:?}");
                 }
-                for handle in handles.drain(..) {
-                    if let Err(e) = handle.join() {
-                        log::error!("could not await plenar info handle: {e:?}");
-                    }
-                }
-            })
-        }));
+            }
+        });
+
+        handles.push(handle);
+
         if only_latest {
             break;
         }
     }
-    for handle in handles.drain(..) {
-        if let Err(e) = handle.join() {
+
+    for handle in handles {
+        if let Err(e) = handle.await {
             log::error!("could not await plenar info handle: {e:?}");
         }
     }
@@ -117,12 +113,8 @@ pub async fn run_shut_latest(mut shutdown: Shutdown, pg_pool: PgPool) {
             }
             _ = async {
                 let pg_pool = pg_pool.clone();
-                if let Err(e) = tokio::task::spawn_blocking(move || Handle::current().block_on(async move {
-                    log::info!("Starting latest plenar info scraper");
-                    plenar_info_once(&pg_pool, true).await;
-                })).await {
-                    log::error!("Error in plenar info scraper: {:?}", e);
-                }
+                log::info!("Starting latest plenar info scraper");
+                plenar_info_once(&pg_pool, true).await;
                 // legis_init_once().await;
                 log::info!("Latest Plenar info scraper service sleeps for {plenar_sleep} seconds...");
                 tokio::time::sleep(tokio::time::Duration::from_secs(plenar_sleep)).await;
@@ -157,12 +149,8 @@ pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool, only_latest: bool
             }
             _ = async {
                 let pg_pool = pg_pool.clone();
-                if let Err(e) = tokio::task::spawn_blocking(move || Handle::current().block_on(async move {
-                    log::info!("Starting plenar info scraper");
-                    plenar_info_once(&pg_pool, false).await;
-                })).await {
-                    log::error!("Error in plenar info scraper: {:?}", e);
-                }
+                log::info!("Starting plenar info scraper");
+                plenar_info_once(&pg_pool, false).await;
                 // legis_init_once().await;
                 log::info!("Plenar info scraper service sleeps for {plenar_sleep} seconds...");
                 tokio::time::sleep(tokio::time::Duration::from_secs(plenar_sleep)).await;

@@ -21,7 +21,9 @@ use crate::models::*;
 
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Debug, Deserialize, Serialize, Default, Clone, Hash, Type, CompositeType, MeilisearchFilter)]
+#[derive(
+    Debug, Deserialize, Serialize, Default, Clone, Hash, Type, CompositeType, MeilisearchFilter,
+)]
 pub struct GovProposal {
     #[filter(make_vec)]
     pub id: Option<i32>,

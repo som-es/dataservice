@@ -31,22 +31,28 @@ pub async fn update_parties_in_db2(pool: &PgPool, parties: &[Party], gp: &str) {
     }
 }
 
+pub async fn get_parties(scraper: &AustriaScraper) -> crate::Result<Vec<Party>> {
+    Ok(scraper.get_parties().await?)
+}
+
+
+
 pub async fn parties_once(pg_pool: &PgPool) {
     let mut handles = vec![];
     for gp in GPS {
         let pg_pool = pg_pool.clone();
-        let handle = tokio::task::spawn_blocking(move || {
-            Handle::current().block_on(async {
-                let mut scraper = AustriaScraper::default();
-                scraper.scrape_info.gp = vec![gp.into()];
+        let gp = gp.to_string();
+        let handle = tokio::task::spawn(async move {
+            let pg_pool = pg_pool;
+            let mut scraper = AustriaScraper::default();
+            scraper.scrape_info.gp = vec![gp.clone().into()];
 
-                let parties = scrape_untill_success::<Vec<Party>, _>(|| async {
-                    scraper.get_parties().await.map_err(|e| e.into())
-                })
-                .await;
-
-                update_parties_in_db2(&pg_pool, &parties, gp).await;
+            let parties = scrape_untill_success::<Vec<_>, _>(|| async  {
+                scraper.get_parties().await.map_err(|e| e.into())
             })
+            .await;
+
+            update_parties_in_db2(&pg_pool, &parties, &gp).await;
         });
         handles.push(handle);
     }

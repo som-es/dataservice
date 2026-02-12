@@ -244,7 +244,7 @@ pub async fn update_ministrial_proposals_in_db2(
             log::info!("{i} insertion dur: {:?}", start.elapsed());
         }
 
-        gov_proposal.id = Some(ministrial_prop_id); 
+        gov_proposal.id = Some(ministrial_prop_id);
 
         #[cfg(feature = "ai")]
         if let Some(ai_task_tx) = &ai_task_tx {
@@ -413,7 +413,7 @@ pub async fn update_ministrial_proposals_in_db2(
         }
 
         tx.commit().await?;
-        
+
         if should_update {
             if let Some(client) = &app_state.redis_client {
                 if let Err(e) =

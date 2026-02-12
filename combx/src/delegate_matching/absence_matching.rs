@@ -36,16 +36,19 @@ pub async fn absence_matching<'a>(
         .into_iter()
         .collect::<HashSet<_>>();
 
-    match_delegate_names_with_delegate_ids(
-        &active_delegates,
-        &absences_names
+    let absences_names_owned = absences_names.to_vec();
+
+    tokio::task::spawn_blocking(move || {
+        let reversed_names = absences_names_owned
             .iter()
             .map(|x| x.as_str())
             .map(reverse_name)
-            .collect::<Vec<_>>(),
-        &gp,
-        plenar_date,
-    )
+            .collect::<Vec<_>>();
+
+        match_delegate_names_with_delegate_ids(&active_delegates, &reversed_names, &gp, plenar_date)
+    })
+    .await
+    .expect("Blocking task panicked")
 }
 
 #[cfg(test)]
