@@ -15,6 +15,9 @@ RUN apt-get update && apt-get install -y \
     # postgresql \
     libpq-dev \
     cmake \
+    libglib2.0-dev \
+    pkg-config \
+    poppler-glib-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

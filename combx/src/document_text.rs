@@ -204,8 +204,24 @@ pub async fn extract_text_from_html_document(url: &str) -> Option<String> {
 pub async fn extract_text_from_pdf_document(url: &str) -> crate::Result<String> {
     let contents = reqwest::get(url).await?.bytes().await?;
 
-    let text = tokio::task::spawn_blocking(move || pdf_extract::extract_text_from_mem(&contents))
-        .await??;
+    let text = tokio::task::spawn_blocking::<_, crate::Result<String>>(move || {
+        let doc = poppler::Document::from_data(&contents, None)?;
+
+        let num_pages = doc.n_pages();
+        let mut full_text = String::new();
+
+        for i in 0..num_pages {
+            if let Some(page) = doc.page(i) {
+                if let Some(page_text) = page.text() {
+                    full_text.push_str(page_text.as_str());
+                    full_text.push('\n'); 
+                }
+            }
+        }
+        Ok(full_text)
+    })
+    .await??;
+    log::info!("pdf read ok, got {} chars", text.len());
 
     Ok(text)
 }
@@ -226,7 +242,7 @@ pub async fn extract_text_from_original_pdf_document_tesseract(
             .collect::<crate::Result<String>>()
     })
     .await?;
-    log::info!("image to text: {:?}", start.elapsed());
+    log::info!("tesseract ok: {url}, image to text: {:?}", start.elapsed());
     res
 }
 
@@ -252,6 +268,8 @@ pub async fn extract_text_from_original_pdf_document(
 }
 #[cfg(test)]
 mod tests {
+    use poppler::{Document as Poppler};
+
     use super::*;
 
     #[tokio::test]
@@ -389,5 +407,24 @@ der Abgeordnete";
         let text_documents =
             extract_text_from_html_document(documents[0].document_url.as_deref().unwrap()).await;
         dbg!(text_documents);
+    }
+
+    #[tokio::test]
+    async fn test_stack_overflow_doc() {
+        let url = "https://www.parlament.gv.at/dokument/XXIV/III/138/imfname_186126.pdf";
+        let documents = vec![Document {
+            title: Some("Hauptdokument".to_string()),
+            document_type: Some("DigitalPDF".to_string()),
+            document_url: Some(url.to_string()),
+        }];
+
+        let contents = reqwest::get(url).await.unwrap().bytes().await.unwrap();
+        
+
+        // let (content, metadata) = extractor.extract_file_to_string(file_path).unwrap();
+
+        // let res = extract_text_from_pdf_document(url).await.unwrap();
+        // let text_documents = extract_text_from_documents_html_first(&documents, None).await;
+        // println!("{}", &text_document[..])
     }
 }

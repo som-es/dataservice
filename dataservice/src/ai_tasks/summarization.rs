@@ -46,12 +46,14 @@ pub async fn summarize_documents(
 ) -> combx::Result<SummarizeOutput> {
     let inner_docs = docs.to_vec();
     match tokio::spawn(async move {
+        log::info!("starting doc text collection");
         let engine = OCR_ENGINE.clone();
         combine_texts(&extract_text_from_documents_html_first(&inner_docs, engine).await)
     })
     .await
     {
         Ok(input) => {
+            log::info!("doc collection successful");
             if input.len() < 50 {
                 log::error!(
             "Cannot summarize legis init {}, input is too short / empty for documents: {:?}",

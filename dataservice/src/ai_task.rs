@@ -33,9 +33,9 @@ pub struct AiTask {
 impl Ord for AiTask {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.priority.cmp(&other.priority)
-            .then(self.task_id.cmp(&other.task_id))
-            .then(self.db_entry_id.cmp(&other.db_entry_id))
-            .then(self.input.cmp(&other.input))
+        // .then(self.task_id.cmp(&other.task_id))
+        // .then(self.db_entry_id.cmp(&other.db_entry_id))
+        // .then(self.input.cmp(&other.input))
     }
 }
 
@@ -49,9 +49,9 @@ impl Eq for AiTask {}
 impl PartialEq for AiTask {
     fn eq(&self, other: &Self) -> bool {
         self.priority == other.priority
-            && self.task_id == other.task_id
-            && self.db_entry_id == other.db_entry_id
-            && self.input == other.input
+        // && self.task_id == other.task_id
+        // && self.db_entry_id == other.db_entry_id
+        // && self.input == other.input
     }
 }
 
