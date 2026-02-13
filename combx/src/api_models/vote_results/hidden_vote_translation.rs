@@ -30,6 +30,11 @@ pub async fn translate_votes(
     };
 
     let convert_party_name_to_vote = |name: &String, infavor| {
+        let name = if ["XX", "XXI", "XXII"].contains(&gp) && name == "FPÖ" {
+            "F"
+        } else {
+            name
+        };
         let Some(party) = party_name_to_party.get(name).cloned() else {
             log::error!(
                 "Could not find party by name '{}' for gp '{}' for vote translation. Available parties: {:?}",

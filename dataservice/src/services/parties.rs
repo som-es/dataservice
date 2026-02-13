@@ -35,8 +35,6 @@ pub async fn get_parties(scraper: &AustriaScraper) -> crate::Result<Vec<Party>> 
     Ok(scraper.get_parties().await?)
 }
 
-
-
 pub async fn parties_once(pg_pool: &PgPool) {
     let mut handles = vec![];
     for gp in GPS {
@@ -47,7 +45,7 @@ pub async fn parties_once(pg_pool: &PgPool) {
             let mut scraper = AustriaScraper::default();
             scraper.scrape_info.gp = vec![gp.clone().into()];
 
-            let parties = scrape_untill_success::<Vec<_>, _>(|| async  {
+            let parties = scrape_untill_success::<Vec<_>, _>(|| async {
                 scraper.get_parties().await.map_err(|e| e.into())
             })
             .await;

@@ -27,7 +27,7 @@ struct Args {
     only_latest: bool,
 }
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 1024)]
+#[tokio::main(flavor = "multi_thread", worker_threads = 32)]
 async fn main() {
     let _ = dotenvy::dotenv().ok();
     let args = Args::parse();

@@ -51,21 +51,16 @@ pub async fn scrape_new_legis_inits(
         let ai_task_tx = ai_task_tx.clone();
 
         handles.push(tokio::task::spawn(async move {
-                // skipping legis inits that can't be processed right now
-                // mainly many I and A
-                // https://www.parlament.gv.at/gegenstand/XXVII/I/1494
-                // https://www.parlament.gv.at/gegenstand/XXVII/A/2686
-                let Ok(legis_init) = scraper.get_legis_init(&legis_init_path).await else {
-                    log::debug!("Cannot process legislative initiative: '{legis_init_path}'");
-                    return;
-                };
+            // skipping legis inits that can't be processed right now
+            // mainly many I and A
+            // https://www.parlament.gv.at/gegenstand/XXVII/I/1494
+            // https://www.parlament.gv.at/gegenstand/XXVII/A/2686
+            let Ok(legis_init) = scraper.get_legis_init(&legis_init_path).await else {
+                log::debug!("Cannot process legislative initiative: '{legis_init_path}'");
+                return;
+            };
 
-                update_or_insert_legis_init_in_db(
-                    &pool,
-                    &legis_init,
-                    new_legis_init,
-                    Some(ai_task_tx),
-                )
+            update_or_insert_legis_init_in_db(&pool, &legis_init, new_legis_init, Some(ai_task_tx))
                 .await;
         }));
     }
