@@ -245,19 +245,7 @@ pub async fn update_or_insert_legis_init_in_db(
         }
     }
 
-    let show_votes = legis_init.votes.clone();
-
-    if legis_init.votes.is_empty() {
-        if let Err(e) = sqlx::query!(
-            "delete from votes where legislative_initiatives_id = $1",
-            legis_init_id
-        )
-        .execute(&mut *tx)
-        .await
-        {
-            log::error!("Cannot delete votes from legis init: {legis_init_id} with error {e:?}");
-        }
-    }
+    let show_votes = legis_init.votes.clone(); 
 
     if let Err(e) = insert_votes_batch(&mut tx, &vote_result.votes, legis_init_id).await {
         log::warn!("Error inserting votes: '{:?}'.", e);

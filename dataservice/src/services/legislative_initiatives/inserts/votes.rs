@@ -11,6 +11,16 @@ pub async fn insert_votes_batch<'a>(
     }
 
     let mut sp = tx.begin().await?;
+    
+    if let Err(e) = sqlx::query!(
+        "delete from votes where legislative_initiatives_id = $1",
+        legis_init_id
+    )
+    .execute(&mut *sp)
+    .await
+    {
+        log::error!("Cannot delete votes from legis init: {legis_init_id} with error {e:?}");
+    }
 
     let parties: Vec<String> = votes.iter().map(|v| v.party.clone()).collect();
     let fractions: Vec<i32> = votes.iter().map(|v| v.fraction.clone()).collect();
