@@ -23,7 +23,7 @@ somes-macro = { path = "../../somes/somes-macro" }
 optional_struct = "0.5"
 lopdf = "0.38.0"
 image = "0.25.9"
-poppler-rs = "0.24"
+poppler-rs = "0.25"
 ocrs = { workspace = true, optional = true }
 tesseract-rs = { workspace = true, optional = true }
 rten = { version = "0.22.0", default-features = false, optional = true }

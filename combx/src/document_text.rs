@@ -214,7 +214,7 @@ pub async fn extract_text_from_pdf_document(url: &str) -> crate::Result<String> 
             if let Some(page) = doc.page(i) {
                 if let Some(page_text) = page.text() {
                     full_text.push_str(page_text.as_str());
-                    full_text.push('\n'); 
+                    full_text.push('\n');
                 }
             }
         }
@@ -268,27 +268,21 @@ pub async fn extract_text_from_original_pdf_document(
 }
 #[cfg(test)]
 mod tests {
-    use poppler::{Document as Poppler};
+    use poppler::Document as Poppler;
 
     use super::*;
 
     #[tokio::test]
     async fn test_extract_text_from_html_document() {
-        let url = "/dokument/XXVIII/A/468/fname_1715462.pdf";
-        let text = extract_text_from_pdf_document(url).await.ok();
-        assert!(text.is_some());
-        let text = text.unwrap();
-        println!("Extracted text: {}", &text[..300.min(text.len())]);
+        let url = "https://parlament.gv.at/dokument/XXVIII/A/468/fname_1715462.pdf";
+        let text = extract_text_from_pdf_document(url).await.unwrap();
+        println!("Extracted text: {}", &text[..]);
         let should = "
-  Dieser Text wurde elektronisch übermittelt. Abweichungen vom Original sind möglich.
-
 468/A(E) XXVIII. GP
-
 Eingebracht am 24.09.2025
 Dieser Text wurde elektronisch übermittelt. Abweichungen vom Original sind möglich.
- Parlamentarische Materialien
-  ENTSCHLIESSUNGSANTRAG
-
+Parlamentarische Materialien
+ENTSCHLIESSUNGSANTRAG
 der Abgeordnete";
         assert!(text.contains(should));
     }
@@ -419,7 +413,6 @@ der Abgeordnete";
         }];
 
         let contents = reqwest::get(url).await.unwrap().bytes().await.unwrap();
-        
 
         // let (content, metadata) = extractor.extract_file_to_string(file_path).unwrap();
 

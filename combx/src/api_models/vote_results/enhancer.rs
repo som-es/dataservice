@@ -24,7 +24,7 @@ pub trait VoteResultEnhancer: Enhancer {
         &self,
         date: &NaiveDate,
         gp: &str,
-    ) -> impl Future<Output = HashMap<String, Party>>;
+    ) -> impl Future<Output = (Vec<Party>, HashMap<String, Party>)>;
     fn create_db_named_votes(
         &self,
         votes: &ProContra,

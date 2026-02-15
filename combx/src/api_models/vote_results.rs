@@ -223,7 +223,7 @@ impl VoteResult {
             })
             .collect::<Vec<_>>();
 
-        let code_to_parties = db_enhancer
+        let (all_parties, code_to_parties) = db_enhancer
             .gen_code_to_parties_with_date(
                 &db_legis_init.nr_plenary_activity_date,
                 &db_legis_init.gp,
@@ -236,8 +236,13 @@ impl VoteResult {
         {
             match &legis_init.hidden_votes_info.pro_contra_parties {
                 Some(pro_contra_parties) => {
-                    votes =
-                        translate_votes(&code_to_parties, pro_contra_parties, &legis_init.gp).await;
+                    votes = translate_votes(
+                        &all_parties,
+                        &code_to_parties,
+                        pro_contra_parties,
+                        &legis_init.gp,
+                    )
+                    .await;
                 }
                 None => log::warn!(
                     "Pro Contra is empty despite hidden vote info for legis init: {}, {}, {}",

@@ -81,7 +81,7 @@ pub async fn all_parties_at_date(
         .collect())
 }
 
-pub async fn all_parties(pg: &PgPool) -> sqlx::Result<Vec<Party>> {
+pub async fn all_parties_by_most_recent_gp(pg: &PgPool) -> sqlx::Result<Vec<Party>> {
     let parties = sqlx::query!(
         "
         WITH RankedParties AS (

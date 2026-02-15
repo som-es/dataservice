@@ -11,6 +11,7 @@ use crate::{
         named_votes::pg_create_db_named_votes,
     },
     enhancer::{Enhancer, PostgresEnhancer},
+    with_data::all_parties_by_most_recent_gp,
 };
 
 impl VoteResultEnhancer for PostgresEnhancer {
@@ -25,8 +26,15 @@ impl VoteResultEnhancer for PostgresEnhancer {
         &self,
         date: &NaiveDate,
         gp: &str,
-    ) -> impl Future<Output = HashMap<String, Party>> {
-        pg_gen_code_to_parties_with_date(self.source(), date, gp)
+    ) -> impl Future<Output = (Vec<Party>, HashMap<String, Party>)> {
+        async {
+            (
+                all_parties_by_most_recent_gp(self.source())
+                    .await
+                    .unwrap_or_default(),
+                pg_gen_code_to_parties_with_date(self.source(), date, gp).await,
+            )
+        }
     }
 
     fn create_db_named_votes(
