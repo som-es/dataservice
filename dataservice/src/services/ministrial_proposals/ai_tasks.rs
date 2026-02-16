@@ -164,4 +164,45 @@ mod tests {
         dbg!(result.unwrap());
         // println!("input: {}", &input[..std::cmp::min(5000, input.len())]);
     }
+
+    // XXVIII/ME/80/
+    #[tokio::test]
+    async fn test_summary_prompt_xxviii_me_80() {
+        let scraper = AustriaScraper::default();
+        let prop = scraper
+            .get_ministrial_proposal(GegenstandInfo {
+                path: "/gegenstand/XXVIII/ME/80".to_string(),
+                ressort: "".to_string(),
+                ressort_shortform: "".to_string(),
+                due_to: today().date_naive(),
+            })
+            .await
+            .unwrap();
+        let somai_client = SomAiClient::new_local("http://localhost:8000")
+            .await
+            .unwrap();
+        let pg_pool = combx::connect_pg().await;
+        let unique_topics = sqlx::query_scalar!(
+            "select topic_name as topic from unique_eurovoc_topics order by topic"
+        )
+        .fetch_all(&pg_pool)
+        .await
+        .unwrap();
+        let documents = prop
+            .documents
+            .iter()
+            .map(|doc| Document {
+                title: Some(doc.title.clone()),
+                document_url: Some(doc.link.clone()),
+                document_type: Some(doc.ftype.to_string()),
+            })
+            .collect::<Vec<_>>();
+
+        let input = combine_texts(&extract_text_from_documents_html_first(&documents, None).await);
+        println!("input length: {}", input.len());
+
+        let result =
+            summary_prompt2(&somai_client, input, &unique_topics, "Ministerialentwurf").await;
+        dbg!(result.unwrap());
+    }   
 }

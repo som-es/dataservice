@@ -53,6 +53,15 @@ impl CombinedData for GovProposal {
     }
 }
 
+impl CombinedData for OptionalGovProposal {
+    const INDEX: crate::Index = GovProposal::INDEX;
+    const PRIMARY_KEY: &str = GovProposal::PRIMARY_KEY;
+    #[inline]
+    fn id(&self) -> u64 {
+        self.id.unwrap() as u64
+    }
+}
+
 impl<T> FromScrapedType<T> for GovProposal {
     type ScrapedType = (MinistrialProposal, Arc<HashMap<u64, Vec<GovOfficial>>>);
 
