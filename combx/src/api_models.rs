@@ -1,6 +1,9 @@
 pub mod vote_results;
 pub use vote_results::*;
 
+pub mod delegates;
+pub use delegates::*;
+
 pub mod decrees;
 pub use decrees::*;
 

@@ -68,10 +68,10 @@ pub async fn delegate_count(conn: &PgPool) -> Option<i64> {
         .ok()
 }
 
-async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &AppState) {
+async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState) {
     let gov_officials = create_gov_officials_map().await;
 
-    let pg_pool = &pg_pool.pg_pool;
+    let pg_pool = &app_state.pg_pool;
 
     log::info!("Updating delegates in database...");
     for delegate in new_delegates {
@@ -271,20 +271,19 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], pg_pool: &AppState) 
                 }
             }
         }
+        
+        if should_update {
+            if let Some(client) = &app_state.redis_client {
+                if let Err(e) =
+                    crate::notify_update_streamed(combx::Index::Delegates, delegate, client)
+                        .await
+                {
+                    log::error!("Could not notify for delegate update!: {e:?}");
+                }
+            }
+        }
     }
     // Ok(())
-}
-
-pub async fn delete_all_delegate_divisions(
-    delegate_id: i32,
-    pg: &PgPool,
-) -> sqlx::Result<PgQueryResult> {
-    sqlx::query!(
-        "delete from delegates_divisions where delegate_id = $1",
-        delegate_id
-    )
-    .execute(pg)
-    .await
 }
 
 pub async fn insert_delegate_division(
