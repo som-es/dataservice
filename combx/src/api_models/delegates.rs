@@ -1,24 +1,16 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
-use somes_meilisearch_filter::{FilterArgument, FilterOp};
 use somes_macro::{CompositeType, MeilisearchFilter};
+use somes_meilisearch_filter::{FilterArgument, FilterOp};
 use sqlx::Type;
 #[cfg(feature = "utoipa")]
-use utoipa::{ToSchema, IntoParams};
+use utoipa::{IntoParams, ToSchema};
 
 use crate::CombinedData;
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema, IntoParams))]
 #[derive(
-    Debug,
-    Deserialize,
-    Serialize,
-    Default,
-    PartialEq,
-    Clone,
-    CompositeType,
-    Type,
-    MeilisearchFilter,
+    Debug, Deserialize, Serialize, Default, PartialEq, Clone, CompositeType, Type, MeilisearchFilter,
 )]
 pub struct FullMandate {
     pub start_date: Option<NaiveDate>,

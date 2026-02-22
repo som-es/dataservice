@@ -301,6 +301,7 @@ mod tests {
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
+            cpu_task_tx: None,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,
@@ -320,6 +321,7 @@ mod tests {
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
+            cpu_task_tx: None,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,
@@ -344,6 +346,7 @@ mod tests {
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
+            cpu_task_tx: None,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,
@@ -363,6 +366,7 @@ mod tests {
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
+            cpu_task_tx: None,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,
@@ -382,6 +386,7 @@ mod tests {
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
+            cpu_task_tx: None,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,
@@ -402,6 +407,7 @@ mod tests {
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
+            cpu_task_tx: None,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,
@@ -422,6 +428,7 @@ mod tests {
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
+            cpu_task_tx: None,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,
@@ -444,6 +451,7 @@ mod tests {
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
+            cpu_task_tx: None,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,
@@ -466,6 +474,7 @@ mod tests {
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
+            cpu_task_tx: None,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,
@@ -488,6 +497,7 @@ mod tests {
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
+            cpu_task_tx: None,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,

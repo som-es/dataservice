@@ -8,6 +8,7 @@ pub mod shutdown;
 
 use std::{cell::LazyCell, sync::Arc};
 
+use redis::aio::MultiplexedConnection;
 #[cfg(feature = "runner")]
 pub use services::*;
 
@@ -52,6 +53,9 @@ pub const OCR_ENGINE: LazyCell<Option<tesseract_rs::TesseractAPI>> =
     LazyCell::new(|| ::combx::init_ocr_engine_tesseract(&tessdata_dir()).ok());
 
 use dotenvy_macro::dotenv;
+use tokio::sync::mpsc::Sender;
+
+use crate::ai_task::AiTask;
 
 #[cfg(feature = "runner")]
 pub async fn setup_app_data() -> tokio::io::Result<()> {
@@ -84,7 +88,8 @@ pub const GPS: [&str; 9] = [
 #[derive(Clone)]
 pub struct AppState {
     pub pg_pool: PgPool,
-    pub redis_client: Option<redis::Client>,
+    pub redis_client: Option<MultiplexedConnection>,
+    pub cpu_task_tx: Option<Sender<AiTask>>,
 }
 
 #[cfg(feature = "runner")]

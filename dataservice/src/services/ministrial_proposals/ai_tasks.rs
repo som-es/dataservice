@@ -204,5 +204,5 @@ mod tests {
         let result =
             summary_prompt2(&somai_client, input, &unique_topics, "Ministerialentwurf").await;
         dbg!(result.unwrap());
-    }   
+    }
 }

@@ -128,7 +128,9 @@ pub async fn insert_ministrial_decree(
 
         if should_update {
             if let Some(client) = &app_state.redis_client {
-                if let Err(e) = crate::notify_update_streamed(Index::Decrees, &decree, client).await
+                if let Err(e) =
+                    crate::notify_update_streamed(Index::Decrees, &decree, &mut client.clone())
+                        .await
                 {
                     log::error!("Could not notify for decree update!: {e:?}");
                 }
@@ -156,6 +158,7 @@ pub async fn insert_ministrial_decree(
                 priority,
                 task_id: crate::hash!(),
                 db_entry_id: decree_id.id,
+                rerunnable: false,
                 task: Box::new(move |task_args| {
                     Box::pin(async move {
                         use crate::ministrial_decrees::ai_tasks::summarize_decrees_documents;

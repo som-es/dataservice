@@ -11,7 +11,7 @@ pub async fn insert_votes_batch<'a>(
     }
 
     let mut sp = tx.begin().await?;
-    
+
     if let Err(e) = sqlx::query!(
         "delete from votes where legislative_initiatives_id = $1",
         legis_init_id

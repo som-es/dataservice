@@ -374,4 +374,17 @@ mod tests {
             .unwrap();
         dbg!(topics);
     }
+
+    #[tokio::test]
+    async fn test_somai_client_delegate_qa_extraction() {
+        let client = SomAiClient::new_local("http://127.0.0.1:8001")
+            .await
+            .unwrap();
+
+        let res = client
+            .extract_delegate_preview_video_qa(5678)
+            .await
+            .unwrap();
+        dbg!(res);
+    }
 }

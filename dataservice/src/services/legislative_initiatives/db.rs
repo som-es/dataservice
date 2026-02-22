@@ -152,6 +152,7 @@ pub async fn update_or_insert_legis_init_in_db(
                 priority,
                 task_id: crate::hash!(),
                 db_entry_id: legis_init_id,
+                rerunnable: false,
                 task: Box::new(move |task_args| {
                     Box::pin(async move {
                         use crate::legislative_initiatives::summarize_legis_init_documents;
@@ -169,7 +170,7 @@ pub async fn update_or_insert_legis_init_in_db(
                         if ai_summary.is_none() {
                             return Ok(());
                         }
-                        if let Some(client) = &redis_client {
+                        if let Some(mut client) = redis_client {
                             use combx::DbLegislativeInitiativeQuery;
 
                             // could use patching approach in the future
@@ -187,7 +188,7 @@ pub async fn update_or_insert_legis_init_in_db(
                                     },
                                     ..Default::default()
                                 },
-                                client,
+                                &mut client,
                             )
                             .await
                             {
@@ -245,7 +246,7 @@ pub async fn update_or_insert_legis_init_in_db(
         }
     }
 
-    let show_votes = legis_init.votes.clone(); 
+    let show_votes = legis_init.votes.clone();
 
     if let Err(e) = insert_votes_batch(&mut tx, &vote_result.votes, legis_init_id).await {
         log::warn!("Error inserting votes: '{:?}'.", e);
@@ -375,8 +376,11 @@ pub async fn update_or_insert_legis_init_in_db(
 
     if should_update {
         if let Some(client) = &app_state.redis_client {
+            log::error!("NO ERROR: SEND LEGIS INIT STREAMED");
             // could use patching approach in the future
-            if let Err(e) = notify_update_streamed(Index::VoteResults, &vote_result, client).await {
+            if let Err(e) =
+                notify_update_streamed(Index::VoteResults, &vote_result, &mut client.clone()).await
+            {
                 log::error!("Could not notify for vote result update!: {e:?}");
             }
         }

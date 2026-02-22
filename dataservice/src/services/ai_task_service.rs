@@ -12,17 +12,16 @@ use crate::{
     Shutdown,
 };
 
-const MAX_CONCURRENT_TASKS: usize = 1; // mind context size for llama cpp
-
 pub async fn ai_task_handler(
     tasks: Arc<RwLock<BinaryHeap<AiTask>>>,
     somai_client: Arc<SomAiClient>,
     pg_pool: PgPool,
     shutdown: Arc<Shutdown>,
+    max_concurrent_tasks: usize,
 ) {
-    let mut task_buffer = Vec::with_capacity(MAX_CONCURRENT_TASKS);
+    let mut task_buffer = Vec::with_capacity(max_concurrent_tasks);
     while !shutdown.is_shutdown() {
-        if task_buffer.len() >= MAX_CONCURRENT_TASKS {
+        if task_buffer.len() >= max_concurrent_tasks {
             for (db_entry_id, task_id, task) in task_buffer.drain(..) {
                 if let Err(e) = task.await {
                     log::error!(
@@ -66,6 +65,7 @@ pub async fn ai_tasks_service(
     shutdown: Shutdown,
     pg_pool: PgPool,
     mut ai_task_rx: Receiver<AiTask>,
+    concurrent_tasks: usize,
 ) {
     #[cfg(feature = "ai")]
     {
@@ -91,6 +91,7 @@ pub async fn ai_tasks_service(
             somai_client.clone(),
             pg_pool.clone(),
             shutdown.clone(),
+            concurrent_tasks,
         ));
 
         let mut unique_tasks = HashSet::new();
@@ -110,7 +111,9 @@ pub async fn ai_tasks_service(
                 if unique_tasks.contains(&(ai_task.db_entry_id, ai_task.task_id)) {
                     continue;
                 }
-                unique_tasks.insert((ai_task.db_entry_id, ai_task.task_id));
+                if !ai_task.rerunnable {
+                    unique_tasks.insert((ai_task.db_entry_id, ai_task.task_id));
+                }
                 let mut task_queue_guard = task_queue.write().await;
                 task_queue_guard.push(ai_task);
             }
@@ -133,6 +136,7 @@ mod tests {
             priority: Priority::High,
             task_id: 1,
             db_entry_id: 1,
+            rerunnable: false,
             task: Box::new(|_args| {
                 Box::pin(async move { Ok(()) })
                     as Pin<Box<dyn Future<Output = combx::Result<()>> + Send>>
@@ -144,6 +148,7 @@ mod tests {
             priority: Priority::Low,
             task_id: 2,
             db_entry_id: 2,
+            rerunnable: false,
             task: Box::new(|_args| {
                 Box::pin(async move { Ok(()) })
                     as Pin<Box<dyn Future<Output = combx::Result<()>> + Send>>

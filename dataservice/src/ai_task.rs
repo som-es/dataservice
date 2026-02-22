@@ -23,6 +23,7 @@ pub struct AiTask {
     pub priority: Priority,
     pub task_id: u64,
     pub db_entry_id: i32,
+    pub rerunnable: bool,
     pub task: Box<
         dyn (FnOnce(TaskArgs) -> Pin<Box<dyn (Future<Output = combx::Result<()>>) + Send>>)
             + Send

@@ -270,6 +270,7 @@ pub async fn update_ministrial_proposals_in_db2(
                 priority,
                 task_id: crate::hash!(),
                 db_entry_id: ministrial_prop_id,
+                rerunnable: false,
                 task: Box::new(move |task_args| {
                     Box::pin(async move {
                         let ai_summary =
@@ -294,14 +295,14 @@ pub async fn update_ministrial_proposals_in_db2(
                         //     .await;
                         // }
 
-                        let Some(redis_client) = redis_client else {
+                        let Some(mut redis_client) = redis_client else {
                             return Ok(());
                         };
 
                         crate::notify_update_streamed(
                             combx::Index::GovProposals,
                             &inner_gov_proposal,
-                            &redis_client,
+                            &mut redis_client,
                         )
                         .await?;
                         Ok(())
@@ -416,9 +417,12 @@ pub async fn update_ministrial_proposals_in_db2(
 
         if should_update {
             if let Some(client) = &app_state.redis_client {
-                if let Err(e) =
-                    crate::notify_update_streamed(combx::Index::GovProposals, &gov_proposal, client)
-                        .await
+                if let Err(e) = crate::notify_update_streamed(
+                    combx::Index::GovProposals,
+                    &gov_proposal,
+                    &mut client.clone(),
+                )
+                .await
                 {
                     log::error!("Could not notify for gov prop update!: {e:?}");
                 }

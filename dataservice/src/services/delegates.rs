@@ -1,3 +1,5 @@
+mod delegate_qa;
+
 use std::collections::{HashMap, HashSet};
 
 use combx::{create_gov_officials_map, DbContact, DbDelegate, DbMandate};
@@ -5,7 +7,8 @@ use somes_scraper::{delegates::DelegateScraper, AustriaScraper, Delegate, GovOff
 use sqlx::{postgres::PgQueryResult, query, PgPool};
 
 use crate::{
-    services::scrape_untill_success, should_update_by_hash, AppState, CompareHash, Shutdown,
+    enforce_ai_run, services::scrape_untill_success, should_update_by_hash, AppState, CompareHash,
+    Shutdown,
 };
 
 async fn scrape_new_delegates_bs() -> crate::Result<Vec<Delegate>> {
@@ -219,6 +222,36 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
             log::error!("Error inserting delegate information: {:?}", e);
         }
 
+        if enforce_ai_run() || should_update {
+            if let Some(ai_task_tx) = &app_state.cpu_task_tx {
+                let task = crate::ai_task::AiTask {
+                    input: None,
+                    priority: crate::ai_task::Priority::Low,
+                    task_id: crate::hash!(),
+                    db_entry_id: delegate.id as i32,
+                    rerunnable: true,
+                    task: Box::new(move |task_args| {
+                        Box::pin(async move {
+                            let qa = delegate_qa::generate_delegate_introduction(
+                                task_args.db_entry_id,
+                                &task_args.som_ai_client,
+                            )
+                            .await?;
+                            let mut tx = task_args.pg_pool.begin().await?;
+                            delegate_qa::insert_delegate_introduction(task_args.db_entry_id, &qa, &mut tx)
+                                .await?;
+
+                            tx.commit().await?;
+                            Ok(())
+                        })
+                    }),
+                };
+                if let Err(e) = ai_task_tx.send(task).await {
+                    log::error!("Could not send generate introduction AI task for delegate {}: {e:?}", delegate.id);
+                }
+            }
+        }
+
         // if let Err(e) = diesel::insert_into(delegates::table)
         //     .values(&db_delegate)
         //     .on_conflict(delegates::id)
@@ -271,12 +304,15 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
                 }
             }
         }
-        
+
         if should_update {
             if let Some(client) = &app_state.redis_client {
-                if let Err(e) =
-                    crate::notify_update_streamed(combx::Index::Delegates, delegate, client)
-                        .await
+                if let Err(e) = crate::notify_update_streamed(
+                    combx::Index::Delegates,
+                    delegate,
+                    &mut client.clone(),
+                )
+                .await
                 {
                     log::error!("Could not notify for delegate update!: {e:?}");
                 }

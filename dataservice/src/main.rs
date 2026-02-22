@@ -74,7 +74,8 @@ pub fn decree_pages() -> usize {
 }
 
 pub async fn run_services(state: &State, config: Config) {
-    let (ai_task_tx, ai_task_rx) = tokio::sync::mpsc::channel::<AiTask>(16536 * 22);
+    let (llm_ai_task_tx, llm_ai_task_rx) = tokio::sync::mpsc::channel::<AiTask>(16536 * 22);
+    let (cpu_ai_task_tx, cpu_ai_task_rx) = tokio::sync::mpsc::channel::<AiTask>(16536 * 22);
 
     let pool = connect_pg().await;
     let redis_client = redis::Client::open(REDIS_URL);
@@ -89,10 +90,16 @@ pub async fn run_services(state: &State, config: Config) {
             log::error!("Could not create redis client: {e}");
         }
     }
-    let redis_client = redis_client.ok();
+    let redis_client = redis_client;
+    let redis_client = match redis_client {
+        Ok(redis_client) => redis_client.get_multiplexed_async_connection().await,
+        Err(e) => Err(e),
+    }
+    .ok();
     let app_state = AppState {
         pg_pool: pool.clone(),
         redis_client,
+        cpu_task_tx: Some(cpu_ai_task_tx.clone()),
     };
 
     {
@@ -108,13 +115,13 @@ pub async fn run_services(state: &State, config: Config) {
                 true,
                 &app_state,
                 None,
-                ai_task_tx.clone(),
+                llm_ai_task_tx.clone(),
             )
             .await;
 
             let app_state1 = app_state.clone();
 
-            let inner_ai_task_tx = ai_task_tx.clone();
+            let inner_ai_task_tx = llm_ai_task_tx.clone();
             let ministerial_proposals = async move {
                 services::ministrial_proposals::ministrial_proposal_once(
                     false,
@@ -125,7 +132,7 @@ pub async fn run_services(state: &State, config: Config) {
                 .await
             };
             let app_state1 = app_state.clone();
-            let inner_ai_task_tx = ai_task_tx.clone();
+            let inner_ai_task_tx = llm_ai_task_tx.clone();
             let decrees = async move {
                 services::ministrial_decrees::save_ministrial_decrees(
                     decree_pages() as u32,
@@ -146,7 +153,7 @@ pub async fn run_services(state: &State, config: Config) {
         }
         if config.force_fill {
             let app_state1 = app_state.clone();
-            let inner_ai_task_tx = ai_task_tx.clone();
+            let inner_ai_task_tx = llm_ai_task_tx.clone();
             let legis_inits = async move {
                 services::legislative_initiatives::legis_init_once(
                     true,
@@ -163,7 +170,7 @@ pub async fn run_services(state: &State, config: Config) {
                 services::plenar::plenar_info_once(&pool1, true).await;
             };
 
-            let inner_ai_task_tx = ai_task_tx.clone();
+            let inner_ai_task_tx = llm_ai_task_tx.clone();
             let app_state1 = app_state.clone();
             let ministerial_proposals = async move {
                 services::ministrial_proposals::ministrial_proposal_once(
@@ -174,7 +181,7 @@ pub async fn run_services(state: &State, config: Config) {
                 )
                 .await;
             };
-            let inner_ai_task_tx = ai_task_tx.clone();
+            let inner_ai_task_tx = llm_ai_task_tx.clone();
             let app_state1 = app_state.clone();
             let decrees = async move {
                 services::ministrial_decrees::save_ministrial_decrees(
@@ -229,14 +236,14 @@ pub async fn run_services(state: &State, config: Config) {
         tokio::spawn(services::legislative_initiatives::run_shut_every_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
             app_state.clone(),
-            ai_task_tx.clone(),
+            llm_ai_task_tx.clone(),
             config.only_latest,
         )),
         tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
             app_state.clone(),
             new_vote_result_tx.clone(),
-            ai_task_tx.clone(),
+            llm_ai_task_tx.clone(),
             latest_legis_init_sleep + 5000,
             ONLY_LATEST,
             false, // also fetches everything that isn't a law
@@ -245,7 +252,7 @@ pub async fn run_services(state: &State, config: Config) {
             Shutdown::new(state.notify_shutdown.subscribe()),
             app_state.clone(),
             new_vote_result_tx.clone(),
-            ai_task_tx.clone(),
+            llm_ai_task_tx.clone(),
             latest_legis_init_sleep - 40,
             ONLY_LATEST,
             FETCH_ONLY_LAWS,
@@ -254,13 +261,13 @@ pub async fn run_services(state: &State, config: Config) {
             Shutdown::new(state.notify_shutdown.subscribe()),
             app_state.clone(),
             config.only_latest,
-            ai_task_tx.clone(),
+            llm_ai_task_tx.clone(),
         )),
         tokio::spawn(services::ministrial_proposals::run_shut_latest_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
             app_state.clone(),
             new_ministrial_proposal_tx,
-            ai_task_tx.clone(),
+            llm_ai_task_tx.clone(),
         )),
         tokio::spawn(services::plenar::run_shut(
             Shutdown::new(state.notify_shutdown.subscribe()),
@@ -283,7 +290,7 @@ pub async fn run_services(state: &State, config: Config) {
             Shutdown::new(state.notify_shutdown.subscribe()),
             app_state.clone(),
             decree_pages() as u32,
-            ai_task_tx.clone(),
+            llm_ai_task_tx.clone(),
         )),
         tokio::spawn(services::mailer::notify_on_new_vote_results_service(
             Shutdown::new(state.notify_shutdown.subscribe()),
@@ -310,7 +317,14 @@ pub async fn run_services(state: &State, config: Config) {
         tokio::spawn(services::ai_task_service::ai_tasks_service(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone(),
-            ai_task_rx,
+            llm_ai_task_rx,
+            1,
+        )),
+        tokio::spawn(services::ai_task_service::ai_tasks_service(
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            pool.clone(),
+            cpu_ai_task_rx,
+            16,
         )),
     )
     .0
