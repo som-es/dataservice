@@ -131,8 +131,13 @@ pub async fn update_or_insert_legis_init_in_db(
             use crate::{ai_task::Priority, LATEST_GP};
 
             let priority =
+
                 if db_legis_init.raw_data_created_at >= today() - chrono::Duration::days(60) {
-                    Priority::Highest
+                    if db_legis_init.accepted.is_some() {
+                        Priority::Highest
+                    } else {
+                        Priority::Higher
+                    }
                 } else if db_legis_init.gp == LATEST_GP {
                     Priority::High
                 } else {
@@ -376,7 +381,6 @@ pub async fn update_or_insert_legis_init_in_db(
 
     if should_update {
         if let Some(client) = &app_state.redis_client {
-            log::error!("NO ERROR: SEND LEGIS INIT STREAMED");
             // could use patching approach in the future
             if let Err(e) =
                 notify_update_streamed(Index::VoteResults, &vote_result, &mut client.clone()).await

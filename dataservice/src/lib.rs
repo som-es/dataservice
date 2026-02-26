@@ -53,6 +53,8 @@ pub const OCR_ENGINE: LazyCell<Option<tesseract_rs::TesseractAPI>> =
     LazyCell::new(|| ::combx::init_ocr_engine_tesseract(&tessdata_dir()).ok());
 
 use dotenvy_macro::dotenv;
+
+#[cfg(feature = "runner")]
 use tokio::sync::mpsc::Sender;
 
 use crate::ai_task::AiTask;
@@ -89,6 +91,7 @@ pub const GPS: [&str; 9] = [
 pub struct AppState {
     pub pg_pool: PgPool,
     pub redis_client: Option<MultiplexedConnection>,
+    #[cfg(feature = "runner")]
     pub cpu_task_tx: Option<Sender<AiTask>>,
 }
 

@@ -80,7 +80,7 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
     for delegate in new_delegates {
         let (should_update, hash) = should_update_by_hash(delegate, pg_pool).await;
 
-        if !should_update {
+        if !should_update && !enforce_ai_run() {
             log::info!("No need to update delegate {}", delegate.id);
             continue;
         }
@@ -232,14 +232,27 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
                     rerunnable: true,
                     task: Box::new(move |task_args| {
                         Box::pin(async move {
+                            if delegate_qa::delegate_introduction_id_sqlx(
+                                &task_args.pg_pool,
+                                task_args.db_entry_id,
+                            )
+                            .await?
+                            .is_some()
+                            {
+                                return Ok(());
+                            }
                             let qa = delegate_qa::generate_delegate_introduction(
                                 task_args.db_entry_id,
                                 &task_args.som_ai_client,
                             )
                             .await?;
                             let mut tx = task_args.pg_pool.begin().await?;
-                            delegate_qa::insert_delegate_introduction(task_args.db_entry_id, &qa, &mut tx)
-                                .await?;
+                            delegate_qa::insert_delegate_introduction(
+                                task_args.db_entry_id,
+                                &qa,
+                                &mut tx,
+                            )
+                            .await?;
 
                             tx.commit().await?;
                             Ok(())
@@ -247,9 +260,16 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
                     }),
                 };
                 if let Err(e) = ai_task_tx.send(task).await {
-                    log::error!("Could not send generate introduction AI task for delegate {}: {e:?}", delegate.id);
+                    log::error!(
+                        "Could not send generate introduction AI task for delegate {}: {e:?}",
+                        delegate.id
+                    );
                 }
             }
+        }
+
+        if !should_update {
+            continue;
         }
 
         // if let Err(e) = diesel::insert_into(delegates::table)

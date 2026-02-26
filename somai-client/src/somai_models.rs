@@ -78,6 +78,7 @@ pub struct GenericStatusResponse {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EmbeddingRequest {
     pub input: String,
+    pub model: Option<String>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EmbeddingResponse {

@@ -1,4 +1,4 @@
-use sqlx::{Postgres, Transaction};
+use sqlx::{Executor, Postgres, Transaction};
 
 pub async fn generate_delegate_introduction(
     delegate_id: i32,
@@ -26,6 +26,19 @@ pub async fn insert_delegate_qa<'a>(
         .await?;
     }
     Ok(())
+}
+
+pub(crate) async fn delegate_introduction_id_sqlx<'a>(
+    exec: impl Executor<'a, Database = Postgres>,
+    delegate_id: i32,
+) -> sqlx::Result<Option<i32>> {
+    let id = sqlx::query_scalar!(
+        "SELECT id FROM introduction_transcriptions WHERE delegate_id = $1",
+        delegate_id
+    )
+    .fetch_optional(exec)
+    .await?;
+    Ok(id)
 }
 
 pub async fn insert_delegate_introduction<'a>(

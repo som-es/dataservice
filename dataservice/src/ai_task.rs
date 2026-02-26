@@ -5,6 +5,7 @@ use sqlx::PgPool;
 #[derive(PartialEq, Debug, Clone, Eq, PartialOrd, Ord, Copy)]
 pub enum Priority {
     Highest = 10,
+    Higher = 9,
     High = 8,
     Medium = 5,
     Low = 2,
