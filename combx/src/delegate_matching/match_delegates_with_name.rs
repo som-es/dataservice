@@ -308,6 +308,7 @@ pub fn match_delegate_names_with_delegate_ids(
 mod tests {
     use std::collections::HashSet;
 
+    use chrono::NaiveDate;
     use somes_scraper::{AustriaScraper, legis_init::LegislativeInitiatives, plenar::Plenar};
 
     use crate::{connect_pg, reverse_name, today, with_data::active_delegates_at_date};
@@ -364,6 +365,29 @@ mod tests {
         );
         println!("res: {:?}", res.lev_or_deep_split_matched);
         assert_eq!(res.lev_or_deep_split_matched.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_namentlich_name_matching_by_date1() {
+        #[rustfmt::skip]
+        let delegate_names = ["Ablinger", "Amon", "Aubauer", "Auer Jakob", "Auer Josef", "Bartenstein", "Bayr", "Becher", "Binder-Maier", "Brosz Dieter", "Brunner Christiane", "Buchmayr", "Cap", "Cortolezis-Schlager", "Csörgits", "Donabauer Karl", "Donnerbauer Heribert", "Durchschlag", "Einwallner", "Eßl", "Fazekas", "Franz", "Fuhrmann", "Fürntrath-Moretti", "Gahr", "Gartlehner", "Gaßner", "Gerstl", "Gessl-Ranftl", "Glaser", "Glawischnig-Piesczek", "Grillitsch", "Grünewald", "Haberzettl", "Hakel Elisabeth", "Hakl Karin", "Hammer", "Haubner Peter", "Hechtl", "Heinzl", "Hell", "Höfinger", "Höllerer", "Hörl", "Hornek", "Huainigg", "Ikrath", "Jarmer", "Jarolim", "Kaipel", "Katzian", "Keck", "Kirchgatterer", "Klikovits", "Köfer", "Kogler", "Königsberger-Ludwig", "Kopf", "Korun", "Kößl", "Krainer", "Kräuter", "Krist", "Kuntzl", "Kuzdas", "Lapp", "Lettenbichler", "Lichtenecker", "Lipitsch", "Lohfeyer", "Lopatka", "Lueger Angela", "Maier Johann", "Marek", "Matznetter", "Mayer Elmar", "Mayer Peter", "Moser", "Muchitsch", "Musiol", "Muttonen", "Neugebauer Fritz", "Oberhauser", "Obernosterer", "Öllinger", "Pendl", "Pilz", "Pirklhuber", "Plessl", "Prähauser", "Prammer", "Praßl", "Preiner", "Prinz", "Rädler Johann", "Rasinger", "Riepl", "Rudas", "Sacher", "Schatz", "Schickhofer", "Schittenhelm", "Schmuckenschlager", "Schönegger Bernd", "Schönpass Rosemarie", "Schopf", "Schultes", "Schwentner", "Silhavy", "Singer", "Spindelberger", "Stauber Peter", "Steindl Konrad", "Steinhauser", "Steßl-Mühlbacher", "Stummvoll", "Tamandl", "Van der Bellen", "Weninger", "Windbüchler-Souschill", "Windisch", "Wittmann Peter", "Wöginger", "Wurm", "Zinggl"].iter().map(|name| name.to_string()).collect::<Vec<_>>();
+        let date = NaiveDate::from_ymd_opt(2012, 1, 10).unwrap();
+        let pg = connect_pg().await;
+        let active_delegates = active_delegates_at_date(&pg, date)
+            .await
+            .unwrap()
+            .into_iter()
+            .collect::<HashSet<_>>();
+
+        let res = match_delegate_names_with_delegate_ids(
+            &active_delegates,
+            &delegate_names,
+            "XXV",
+            date,
+        );
+
+        println!("res: {:?}", res.lev_or_deep_split_matched);
+        // assert_eq!(res.lev_or_deep_split_matched.len(), 1);
     }
 
     // gegenstand/XXV/UEA/133
@@ -477,6 +501,44 @@ mod tests {
             // println!("res: {:?}", res.lev_or_deep_split_matched);
         }
     }
+
+    #[tokio::test]
+    async fn test_namentlich_name_matching_by_date() {
+        // /gegenstand/XXVI/I/514
+        let scraper = AustriaScraper::default();
+        let init = scraper
+            .get_legis_init("/gegenstand/XXVI/I/514")
+            .await
+            .unwrap();
+        println!("date: {:?}", init.nr_plenary_activity_date);
+        assert!(init.hidden_votes_info.voted_by_name);
+        println!("hidden_vot_infos: {:?}", init.hidden_votes_info);
+        let pro_contra = init
+            .hidden_votes_info
+            .voted_by_name_data
+            .unwrap()
+            .delegates_pro_contra
+            .unwrap();
+
+        let pg = connect_pg().await;
+        let active_delegates = active_delegates_at_date(&pg, init.nr_plenary_activity_date)
+            .await
+            .unwrap()
+            .into_iter()
+            .collect::<HashSet<_>>();
+
+        let res = match_delegate_names_with_delegate_ids(
+            &active_delegates,
+            &pro_contra.pro,
+            &init.gp,
+            init.nr_plenary_activity_date,
+        );
+
+        // let res = res.correctly_matched.into_iter().filter(|x| x.lev > 0).collect::<Vec<_>>();
+        println!("res: {:?}", res.lev_or_deep_split_matched);
+    }
+
+
 
     #[tokio::test]
     async fn test_namentlich_name_matching_xxvi_i_514() {

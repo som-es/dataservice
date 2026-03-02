@@ -289,7 +289,7 @@ der Abgeordnete";
 
     #[tokio::test]
     async fn test_extract_text_from_pdf_document() {
-        let url = "/dokument/XXVIII/A/468/fnameorig_1715462.html";
+        let url = "https://www.parlament.gv.at/dokument/XXVIII/A/468/fnameorig_1715462.html";
         let text = extract_text_from_html_document(url).await;
         assert!(text.is_some());
         let text = text.unwrap();
@@ -305,17 +305,17 @@ der Abgeordnete";
             Document {
                 title: Some("Test HTML Document".to_string()),
                 document_type: Some("HTML".to_string()),
-                document_url: Some("/dokument/XXVIII/A/468/fnameorig_1715462.html".to_string()),
+                document_url: Some("https://www.parlament.gv.at/dokument/XXVIII/A/468/fnameorig_1715462.html".to_string()),
             },
             Document {
                 title: Some("Test HTML Document".to_string()),
                 document_type: Some("DigitalPDF".to_string()),
-                document_url: Some("/dokument/XXVIII/A/468/fnameorig_1715462.pdf".to_string()),
+                document_url: Some("https://www.parlament.gv.at/dokument/XXVIII/A/468/fnameorig_1715462.pdf".to_string()),
             },
             Document {
                 title: Some("Test PDF Document".to_string()),
                 document_type: Some("DigitalPDF".to_string()),
-                document_url: Some("/dokument/XXVIII/A/468/fname_1715462.pdf".to_string()),
+                document_url: Some("https://www.parlament.gv.at/dokument/XXVIII/A/468/fname_1715462.pdf".to_string()),
             },
         ];
         let text_documents = extract_text_from_documents_html_first(&documents, None).await;
@@ -342,7 +342,7 @@ der Abgeordnete";
         let documents = vec![Document {
             title: Some("Test HTML Document".to_string()),
             document_type: Some("HTML".to_string()),
-            document_url: Some("/dokument/XXVIII/III/257/fnameorig_1723642.html".to_string()),
+            document_url: Some("https://www.parlament.gv.at/dokument/XXVIII/III/257/fnameorig_1723642.html".to_string()),
         }];
         let text_documents = extract_text_from_documents_html_first(&documents, None).await;
         let input = combine_texts(&text_documents);
@@ -352,7 +352,7 @@ der Abgeordnete";
     #[cfg(feature = "tesseract")]
     #[tokio::test]
     async fn test_extract_text_from_original_pdf() {
-        let url = "/dokument/XXVIII/A/568/imfname_1722828.pdf";
+        let url = "https://www.parlament.gv.at/dokument/XXVIII/A/568/imfname_1722828.pdf";
         let documents = vec![Document {
             title: Some("Test Original PDF Document".to_string()),
             document_type: Some("OriginalPDF".to_string()),

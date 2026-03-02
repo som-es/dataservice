@@ -388,7 +388,7 @@ mod tests {
             .unwrap();
         dbg!(res);
     }
-    
+
     #[tokio::test]
     async fn test_somai_client_embed() {
         let client = SomAiClient::new_local("http://127.0.0.1:8000")
@@ -396,7 +396,10 @@ mod tests {
             .unwrap();
 
         let res = client
-            .embedding_embed("test this embedding model".into(), Some("Qwen/Qwen3-Embedding-0.6B".into()))
+            .embedding_embed(
+                "test this embedding model".into(),
+                Some("Qwen/Qwen3-Embedding-0.6B".into()),
+            )
             .await
             .unwrap();
         dbg!(res);

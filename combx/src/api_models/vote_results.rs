@@ -407,7 +407,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ai_summary_from_vote_result() {
-        let url = "/dokument/XXVIII/A/468/fname_1715462.pdf";
+        let url = "https://www.parlament.gv.at/dokument/XXVIII/A/468/fname_1715462.pdf";
         let documents = vec![Document {
             title: Some("Test Document".to_string()),
             document_url: Some(url.to_string()),
