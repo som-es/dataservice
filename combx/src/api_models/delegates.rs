@@ -16,6 +16,7 @@ pub struct FullMandate {
     pub start_date: Option<NaiveDate>,
     pub end_date: Option<NaiveDate>,
     pub name: Option<String>,
+    #[filter(make_vec)]
     pub party: Option<String>,
     pub is_nr: Option<bool>,
     pub is_gov_official: Option<bool>,
@@ -26,12 +27,17 @@ pub struct FullMandate {
 
 #[derive(ToSchema, PartialEq, Debug, Clone, Serialize, Deserialize, Default, MeilisearchFilter)]
 pub struct Delegate {
+    #[filter(make_vec)]
     pub id: Option<i32>,
     pub name: Option<String>,
+    #[filter(make_vec)]
     pub party: Option<String>,
+    #[filter(make_vec)]
     pub current_party: Option<String>,
     pub image_url: Option<String>,
+    #[filter(make_vec)]
     pub constituency: Option<String>,
+    #[filter(make_vec)]
     pub council: Option<String>,
     pub seat_row: Option<i32>,
     pub seat_col: Option<i32>,
@@ -44,6 +50,9 @@ pub struct Delegate {
     pub mandates: Option<Vec<FullMandate>>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
+    pub active_gps: Option<Vec<String>>,
+    pub active_nr_gps: Option<Vec<String>>,
+    pub active_gov_gps: Option<Vec<String>>,
 }
 
 impl CombinedData for Delegate {
