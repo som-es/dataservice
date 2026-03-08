@@ -3,6 +3,7 @@ use combx::{
     document_text::{combine_texts, extract_text_from_documents_html_first},
     AiSummary, SummarizeOutput,
 };
+use serde_json::json;
 use somai_client::SomAiClient;
 use somes_common_lib::Document;
 
@@ -122,8 +123,25 @@ async fn summary_prompt(
                     Achte bei den produzierten Informationen auf Maschinenlesbarkeit.
                     Halte dich allgemein an das folgende Datumsformat: YYYY-MM-DD -> Maschinenlesbar!
                     Die Informationen müssen von einer durchschnittlichen Person (aus Österreich) verstanden werden können und barrierfrei sein. Antworte ausschließlich in deutscher Sprache.
-                    "), None, false)
+                    "), None, false, Some(|_: &mut serde_json::Value| {}))
         .await?)
+}
+
+pub fn patch_topics(schema: &mut serde_json::Value, allowed_topics: &[String]) {
+    if let Some(topics_schema) =
+        schema.pointer_mut("/properties/summary/properties/topics")
+    {
+        *topics_schema = json!({
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": allowed_topics
+            },
+            "uniqueItems": true,
+            "minItems": 1,
+            "maxItems": 10
+        });
+    }
 }
 
 pub(crate) async fn summary_prompt2(
@@ -177,6 +195,10 @@ pub(crate) async fn summary_prompt2(
             "),
             None,
             false,
+       Some(|schema: &mut serde_json::Value| {
+            // TODO: activate topic patching when #143 (https://github.com/som-es/somes/issues/143) is done
+            // patch_topics(schema, &topics);
+        }) 
         )
         .await?)
 }

@@ -275,45 +275,15 @@ pub async fn update_or_insert_legis_init_in_db(
         }
     }
 
-    if let Some(new_legis_init_tx) = &new_legis_init {
-        if let Ok(info) = sqlx::query!(
-            "select * from legis_email_info where already_sent_id = $1",
-            legis_init_id
-        )
-        .fetch_optional(&mut *tx)
-        .await
-        {
-            // TODO: use proper timezone handling for nr_plenary_activity_date
-            let diff = today().date_naive() - legis_init.nr_plenary_activity_date;
-
-            let mut legis_init = legis_init.clone();
-            legis_init.votes = show_votes;
-            if diff.num_days() <= *crate::legislative_initiatives::LEGIS_INIT_STILL_SEND_DAYS
-                && info.is_none()
-                && !legis_init.votes.is_empty()
-            {
-                log::info!("Sending fitting legis init: {legis_init_id}");
-                if let Err(e) = new_legis_init_tx
-                    .send(Some((legis_init_id, legis_init)))
-                    .await
-                {
-                    log::error!("could not send legis init to mail notify service: {e:?}")
-                }
-
-                if let Err(e) = sqlx::query!(
-                    "insert into legis_email_info (already_sent_id) values ($1)",
-                    legis_init_id
-                )
-                .execute(&mut *tx)
-                .await
-                {
-                    log::error!(
-                        "could not insert into legis email info for id {legis_init_id}: {e:?}"
-                    );
-                }
-            }
-        };
-    }
+    check_and_send_legis_init_mail(
+        legis_init,
+        new_legis_init,
+        &vote_result,
+        &mut tx,
+        legis_init_id,
+        show_votes,
+    )
+    .await;
 
     if let Err(e) = insert_topics_generic_batch(
         &mut tx,
@@ -391,4 +361,62 @@ pub async fn update_or_insert_legis_init_in_db(
     }
 
     log::info!("Insertion duration for legis init: {:?}", start.elapsed());
+}
+
+async fn check_and_send_legis_init_mail(
+    legis_init: &LegislativeInitiative,
+    new_legis_init: Option<Sender<Option<(i32, LegislativeInitiative)>>>,
+    vote_result: &VoteResult,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    legis_init_id: i32,
+    show_votes: Vec<somes_scraper::Vote>,
+) {
+    if vote_result.eurovoc_topics.is_empty()
+        && vote_result
+            .ai_summary
+            .as_ref()
+            .map(|ai_summary| ai_summary.full_summary.topics.is_empty())
+            .unwrap_or(true)
+    {
+        return;
+    }
+    if let Some(new_legis_init_tx) = &new_legis_init {
+        if let Ok(info) = sqlx::query!(
+            "select * from legis_email_info where already_sent_id = $1",
+            legis_init_id
+        )
+        .fetch_optional(&mut **tx)
+        .await
+        {
+            // TODO: use proper timezone handling for nr_plenary_activity_date
+            let diff = today().date_naive() - legis_init.nr_plenary_activity_date;
+
+            let mut legis_init = legis_init.clone();
+            legis_init.votes = show_votes;
+            if diff.num_days() <= *crate::legislative_initiatives::LEGIS_INIT_STILL_SEND_DAYS
+                && info.is_none()
+                && !legis_init.votes.is_empty()
+            {
+                log::info!("Sending fitting legis init: {legis_init_id}");
+                if let Err(e) = new_legis_init_tx
+                    .send(Some((legis_init_id, legis_init)))
+                    .await
+                {
+                    log::error!("could not send legis init to mail notify service: {e:?}")
+                }
+
+                if let Err(e) = sqlx::query!(
+                    "insert into legis_email_info (already_sent_id) values ($1)",
+                    legis_init_id
+                )
+                .execute(&mut **tx)
+                .await
+                {
+                    log::error!(
+                        "could not insert into legis email info for id {legis_init_id}: {e:?}"
+                    );
+                }
+            }
+        };
+    }
 }

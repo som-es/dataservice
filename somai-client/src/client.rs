@@ -138,25 +138,32 @@ impl SomAiClient {
         Ok(resp.json().await?)
     }
 
-    pub async fn make_llm_request_with_schema<T: JsonSchema + serde::de::DeserializeOwned>(
+    pub async fn make_llm_request_with_schema<T>(
         &self,
         input: String,
         system: String,
         model: Option<String>,
         use_openai: bool,
-    ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
+        schema_patch: Option<impl FnOnce(&mut serde_json::Value)>,
+    ) -> Result<T, Box<dyn std::error::Error + Send + Sync>>
+    where
+        T: JsonSchema + serde::de::DeserializeOwned,
+    {
         let mut schema_generator = SchemaSettings::draft07();
         schema_generator.inline_subschemas = true;
-        let json_schema = Some(
-            serde_json::to_value(&T::json_schema(&mut schema_generator.into_generator())).unwrap(),
-        );
+        let mut json_schema = 
+            serde_json::to_value(&T::json_schema(&mut schema_generator.into_generator()))?;
+
+        if let Some(mut patch) = schema_patch {
+            patch(&mut json_schema);
+        }
 
         let req = LLMRequest {
             input,
             system,
             model,
             use_openai,
-            json_schema,
+            json_schema: Some(json_schema),
         };
         let resp = self
             .client
