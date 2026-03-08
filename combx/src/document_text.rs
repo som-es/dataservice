@@ -305,17 +305,26 @@ der Abgeordnete";
             Document {
                 title: Some("Test HTML Document".to_string()),
                 document_type: Some("HTML".to_string()),
-                document_url: Some("https://www.parlament.gv.at/dokument/XXVIII/A/468/fnameorig_1715462.html".to_string()),
+                document_url: Some(
+                    "https://www.parlament.gv.at/dokument/XXVIII/A/468/fnameorig_1715462.html"
+                        .to_string(),
+                ),
             },
             Document {
                 title: Some("Test HTML Document".to_string()),
                 document_type: Some("DigitalPDF".to_string()),
-                document_url: Some("https://www.parlament.gv.at/dokument/XXVIII/A/468/fnameorig_1715462.pdf".to_string()),
+                document_url: Some(
+                    "https://www.parlament.gv.at/dokument/XXVIII/A/468/fnameorig_1715462.pdf"
+                        .to_string(),
+                ),
             },
             Document {
                 title: Some("Test PDF Document".to_string()),
                 document_type: Some("DigitalPDF".to_string()),
-                document_url: Some("https://www.parlament.gv.at/dokument/XXVIII/A/468/fname_1715462.pdf".to_string()),
+                document_url: Some(
+                    "https://www.parlament.gv.at/dokument/XXVIII/A/468/fname_1715462.pdf"
+                        .to_string(),
+                ),
             },
         ];
         let text_documents = extract_text_from_documents_html_first(&documents, None).await;
@@ -342,7 +351,10 @@ der Abgeordnete";
         let documents = vec![Document {
             title: Some("Test HTML Document".to_string()),
             document_type: Some("HTML".to_string()),
-            document_url: Some("https://www.parlament.gv.at/dokument/XXVIII/III/257/fnameorig_1723642.html".to_string()),
+            document_url: Some(
+                "https://www.parlament.gv.at/dokument/XXVIII/III/257/fnameorig_1723642.html"
+                    .to_string(),
+            ),
         }];
         let text_documents = extract_text_from_documents_html_first(&documents, None).await;
         let input = combine_texts(&text_documents);

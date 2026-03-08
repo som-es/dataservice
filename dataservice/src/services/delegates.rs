@@ -337,6 +337,13 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
                     log::error!("Could not notify for delegate update!: {e:?}");
                 }
             }
+            if let Err(e) =
+                sqlx::query!("REFRESH MATERIALIZED VIEW CONCURRENTLY delegates_with_mandates;")
+                    .execute(pg_pool)
+                    .await
+            {
+                log::error!("Could not refresh delegates_with_mandates view! {e:?}");
+            }
         }
     }
     // Ok(())

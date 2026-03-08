@@ -65,47 +65,74 @@ mod tests {
             Document {
                 title: Some("Kurzinformation".to_string()),
                 document_type: Some("DigitalPDF".to_string()),
-                document_url: Some("https://www.parlament.gv.at/dokument/XXVIII/ME/71/imfname_1729116.pdf".to_string()),
+                document_url: Some(
+                    "https://www.parlament.gv.at/dokument/XXVIII/ME/71/imfname_1729116.pdf"
+                        .to_string(),
+                ),
             },
             Document {
                 title: Some("Begleitschreiben".to_string()),
                 document_type: Some("DigitalPDF".to_string()),
-                document_url: Some("https://www.parlament.gv.at/dokument/XXVIII/ME/71/imfname_1728995.pdf".to_string()),
+                document_url: Some(
+                    "https://www.parlament.gv.at/dokument/XXVIII/ME/71/imfname_1728995.pdf"
+                        .to_string(),
+                ),
             },
             Document {
                 title: Some("Erläuterungen".to_string()),
                 document_type: Some("HTML".to_string()),
-                document_url: Some("https://www.parlament.gv.at/dokument/XXVIII/ME/71/fnameorig_1728992.html".to_string()),
+                document_url: Some(
+                    "https://www.parlament.gv.at/dokument/XXVIII/ME/71/fnameorig_1728992.html"
+                        .to_string(),
+                ),
             },
             Document {
                 title: Some("Gesetzestext".to_string()),
                 document_type: Some("HTML".to_string()),
-                document_url: Some("https://www.parlament.gv.at/dokument/XXVIII/ME/71/fnameorig_1728991.html".to_string()),
+                document_url: Some(
+                    "https://www.parlament.gv.at/dokument/XXVIII/ME/71/fnameorig_1728991.html"
+                        .to_string(),
+                ),
             },
             Document {
                 title: Some("Textgegenüberstellung".to_string()),
                 document_type: Some("HTML".to_string()),
-                document_url: Some("https://www.parlament.gv.at/dokument/XXVIII/ME/71/fnameorig_1728994.html".to_string()),
+                document_url: Some(
+                    "https://www.parlament.gv.at/dokument/XXVIII/ME/71/fnameorig_1728994.html"
+                        .to_string(),
+                ),
             },
             Document {
                 title: Some("Vorblatt und wirkungsorientierte Folgenabschätzung".to_string()),
                 document_type: Some("DigitalPDF".to_string()),
-                document_url: Some("https://www.parlament.gv.at/dokument/XXVIII/ME/71/imfname_1728993.pdf".to_string()),
+                document_url: Some(
+                    "https://www.parlament.gv.at/dokument/XXVIII/ME/71/imfname_1728993.pdf"
+                        .to_string(),
+                ),
             },
             Document {
                 title: Some("Textgegenüberstellung".to_string()),
                 document_type: Some("DigitalPDF".to_string()),
-                document_url: Some("https://www.parlament.gv.at/dokument/XXVIII/ME/71/fname_1728994.pdf".to_string()),
+                document_url: Some(
+                    "https://www.parlament.gv.at/dokument/XXVIII/ME/71/fname_1728994.pdf"
+                        .to_string(),
+                ),
             },
             Document {
                 title: Some("Erläuterungen".to_string()),
                 document_type: Some("DigitalPDF".to_string()),
-                document_url: Some("https://www.parlament.gv.at/dokument/XXVIII/ME/71/fname_1728992.pdf".to_string()),
+                document_url: Some(
+                    "https://www.parlament.gv.at/dokument/XXVIII/ME/71/fname_1728992.pdf"
+                        .to_string(),
+                ),
             },
             Document {
                 title: Some("Gesetzestext".to_string()),
                 document_type: Some("DigitalPDF".to_string()),
-                document_url: Some("https://www.parlament.gv.at/dokument/XXVIII/ME/71/fname_1728991.pdf".to_string()),
+                document_url: Some(
+                    "https://www.parlament.gv.at/dokument/XXVIII/ME/71/fname_1728991.pdf"
+                        .to_string(),
+                ),
             },
         ];
         let pg_pool = combx::connect_pg().await;

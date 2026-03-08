@@ -233,10 +233,11 @@ pub async fn update_or_insert_legis_init_in_db(
             .unwrap_or_default();
 
             if exists {
-                if let Err(e) =
-                    sqlx::query("REFRESH MATERIALIZED VIEW latest_legislative_initiatives")
-                        .execute(pool)
-                        .await
+                if let Err(e) = sqlx::query(
+                    "REFRESH MATERIALIZED VIEW CONCURRENTLY latest_legislative_initiatives",
+                )
+                .execute(pool)
+                .await
                 {
                     log::error!("Could not refresh latest legislative initiatives view: {e:?}")
                 }
