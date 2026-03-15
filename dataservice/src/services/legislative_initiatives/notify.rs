@@ -144,7 +144,6 @@ fn enrich_parliament_with_colors(
         .collect::<Vec<_>>();
 
     let votes_to_party_map = convert_votes_to_party_color_map(votes, colors);
-    println!("vtpm: {votes_to_party_map:?}");
 
     for delegate in delegates {
         match (delegate.seat_row, delegate.seat_col, &delegate.party) {
@@ -335,7 +334,7 @@ pub fn send_new_legis_info_mail(
 
         log::info!("Sending composed new vote result mail to {mail_to}");
         let content = LEGIS_INIT_EMAIL_TEMPLATE.replace("{*VOTE_RESULTS*}", &vote_results_html);
-        println!("content: {content}");
+        // println!("content: {content}");
         if let Err(e) = send_mail(&MAILER, &mail_to, "Neue Abstimmungen auf somes", content) {
             log::error!("could not send legis info mail: {e:?}");
         }

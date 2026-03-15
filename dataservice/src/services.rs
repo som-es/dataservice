@@ -1,7 +1,6 @@
 pub mod ai_task_service;
 pub mod dates;
 pub mod delegates;
-pub mod delete_was_updated;
 pub mod legislative_initiatives;
 pub mod mailer;
 pub mod ministrial_decrees;

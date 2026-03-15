@@ -151,7 +151,7 @@ impl SomAiClient {
     {
         let mut schema_generator = SchemaSettings::draft07();
         schema_generator.inline_subschemas = true;
-        let mut json_schema = 
+        let mut json_schema =
             serde_json::to_value(&T::json_schema(&mut schema_generator.into_generator()))?;
 
         if let Some(mut patch) = schema_patch {

@@ -222,6 +222,7 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
             log::error!("Error inserting delegate information: {:?}", e);
         }
 
+        #[cfg(feature = "ai")]
         if enforce_ai_run() || should_update {
             if let Some(ai_task_tx) = &app_state.cpu_task_tx {
                 let task = crate::ai_task::AiTask {

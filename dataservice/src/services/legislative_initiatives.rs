@@ -23,20 +23,17 @@ use crate::{
     Shutdown, GPS, LATEST_GP,
 };
 
-use dotenvy_macro::dotenv;
-
 pub(self) const LEGIS_INIT_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| {
-    dotenv!("LEGIS_INIT_STILL_SEND_DAYS")
+    std::env::var("LEGIS_INIT_STILL_SEND_DAYS").unwrap_or("10".to_string())
         .parse::<i64>()
         .unwrap_or(10)
 });
 
 pub async fn legis_init_once(
     only_latest: bool,
-    only_laws: bool,
+    only_voteable: bool,
     pg_pool: &AppState,
-    new_legis_init: Option<Sender<Option<(i32, LegislativeInitiative)>>>,
-    ai_task_ts: Sender<AiTask>,
+    ai_task_tx: Sender<AiTask>,
 ) -> Vec<LegislativeInitiative> {
     log::info!("Try scraping legislative initiatives");
 
@@ -46,15 +43,14 @@ pub async fn legis_init_once(
             continue;
         }
         let pg_pool = pg_pool.clone();
-        let new_legis_init = new_legis_init.clone();
-        let ai_task_ts = ai_task_ts.clone();
+        let ai_task_tx = ai_task_tx.clone();
 
         let handle = tokio::spawn(async move {
             let mut scraper = AustriaScraper::default();
             log::info!("LEGIS INIT once GP: {gp}");
             scraper.scrape_info.gp = vec![gp.into()];
             if only_latest {
-                let days = if only_laws {
+                let days = if only_voteable {
                     // this number is a magic number -> maybe reason it with average completion time + n or something
                     // could still be possible that very old (+1001 days old) newly completed legis inits are never sent as email!
                     333
@@ -70,7 +66,7 @@ pub async fn legis_init_once(
 
             let scraper = Arc::new(scraper);
 
-            let searched_doktyps = if only_laws {
+            let searched_doktyps = if only_voteable {
                 Some(LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES.as_slice())
             } else {
                 None
@@ -80,9 +76,10 @@ pub async fn legis_init_once(
                 &pg_pool,
                 scraper.clone(),
                 gp,
-                new_legis_init,
-                ai_task_ts,
+                ai_task_tx,
                 searched_doktyps,
+                only_latest,
+                only_voteable
             )
             .await
             {
@@ -135,7 +132,6 @@ impl CompareHash for VoteResult {
 pub async fn run_shut_latest_gp(
     mut shutdown: Shutdown,
     app_state: AppState,
-    new_legis_init: Sender<Option<(i32, LegislativeInitiative)>>,
     ai_task_tx: Sender<AiTask>,
     legis_init_sleep: u64,
     only_latest: bool,
@@ -143,7 +139,6 @@ pub async fn run_shut_latest_gp(
 ) {
     #[cfg(feature = "legis_init_latest")]
     while !shutdown.is_shutdown() {
-        let new_legis_init = new_legis_init.clone();
         let ai_task_ts = ai_task_tx.clone();
         tokio::select! {
             _ = shutdown.recv() => {
@@ -156,13 +151,7 @@ pub async fn run_shut_latest_gp(
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative (latest) scraper");
 
-                    legis_init_once(only_latest, only_laws, &app_state, Some(new_legis_init.clone()), ai_task_ts.clone()).await;
-
-                    // triggers the email service
-                    let res = new_legis_init.send(None).await;
-                    if let Err(e) = res {
-                        log::error!("Could not send trigger value to email service: {e:?}");
-                    }
+                    legis_init_once(only_latest, only_laws, &app_state, ai_task_ts.clone()).await;
                 }).await {
                     log::error!("Error in legislative initiative (latest) scraper: {:?}", e);
                 }
@@ -209,7 +198,7 @@ pub async fn run_shut_every_gp(
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative scraper");
 
-                    legis_init_once(false, false, &app_state, None, ai_task_tx.clone()).await;
+                    legis_init_once(false, false, &app_state, ai_task_tx.clone()).await;
                 }).await {
                     log::error!("Error in legislative initiative scraper: {:?}", e);
                 }

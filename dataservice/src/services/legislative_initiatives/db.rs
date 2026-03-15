@@ -1,5 +1,6 @@
 use combx::{Index, PostgresEnhancer, VoteResult};
 use somes_scraper::LegislativeInitiative;
+use sqlx::PgPool;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
@@ -17,7 +18,7 @@ use crate::{
 pub async fn update_or_insert_legis_init_in_db(
     app_state: &AppState,
     legis_init: &LegislativeInitiative,
-    new_legis_init: Option<Sender<Option<(i32, LegislativeInitiative)>>>,
+    new_legis_init_tx: Option<Sender<(i32, VoteResult)>>,
     ai_task_tx: Option<Sender<AiTask>>,
 ) {
     let pool = &app_state.pg_pool;
@@ -151,6 +152,8 @@ pub async fn update_or_insert_legis_init_in_db(
                 vote_result.legislative_initiative.ityp.clone(),
                 vote_result.legislative_initiative.inr,
             );
+            let mut vote_result = vote_result.clone();
+            let new_legis_init_tx = new_legis_init_tx.clone();
             let summarization_task = AiTask {
                 input: None,
                 priority,
@@ -168,10 +171,23 @@ pub async fn update_or_insert_legis_init_in_db(
                             Some(other) => other,
                             None => "Unbekannt",
                         };
+                        let pg_pool = task_args.pg_pool.clone();
                         let ai_summary =
                             summarize_legis_init_documents(task_args, &documents, summarization_of)
                                 .await?;
-                        if ai_summary.is_none() {
+
+                        let has_ai_summary = ai_summary.is_some();
+                        vote_result.ai_summary = ai_summary.clone();
+
+                        check_and_send_legis_init_mail(
+                            new_legis_init_tx,
+                            &vote_result,
+                            &pg_pool,
+                            legis_init_id,
+                        )
+                        .await;
+
+                        if !has_ai_summary {
                             return Ok(());
                         }
                         if let Some(mut client) = redis_client {
@@ -251,8 +267,6 @@ pub async fn update_or_insert_legis_init_in_db(
         }
     }
 
-    let show_votes = legis_init.votes.clone();
-
     if let Err(e) = insert_votes_batch(&mut tx, &vote_result.votes, legis_init_id).await {
         log::warn!("Error inserting votes: '{:?}'.", e);
     }
@@ -275,15 +289,8 @@ pub async fn update_or_insert_legis_init_in_db(
         }
     }
 
-    check_and_send_legis_init_mail(
-        legis_init,
-        new_legis_init,
-        &vote_result,
-        &mut tx,
-        legis_init_id,
-        show_votes,
-    )
-    .await;
+    #[cfg(not(feature = "ai"))]
+    check_and_send_legis_init_mail(new_legis_init_tx, &vote_result, pool, legis_init_id).await;
 
     if let Err(e) = insert_topics_generic_batch(
         &mut tx,
@@ -330,28 +337,13 @@ pub async fn update_or_insert_legis_init_in_db(
         log::error!("Error inserting documents for legis init {legis_init_id}: {e:?}");
     }
 
-    if let Err(e) = sqlx::query!(
-        "insert into
-            legis_init_was_updated
-            (legis_init_id)
-            values ($1) on conflict(legis_init_id) do update set
-            updated_at = $2",
-        legis_init_id,
-        crate::today_and_time()
-    )
-    .execute(&mut *tx)
-    .await
-    {
-        log::error!("Error inserting was updated info: '{:?}'. The error occurred for the following legis init: {:?}", e, legis_init_id);
-    }
-
     if let Err(e) = tx.commit().await {
         log::error!("Cannot commit legis init transaction: {e:?}");
     }
 
     if should_update {
         if let Some(client) = &app_state.redis_client {
-            // could use patching approach in the future
+            // TODO: could use patching approach in the future, currently, the receiver side is reconstructing everything from scratch
             if let Err(e) =
                 notify_update_streamed(Index::VoteResults, &vote_result, &mut client.clone()).await
             {
@@ -364,12 +356,10 @@ pub async fn update_or_insert_legis_init_in_db(
 }
 
 async fn check_and_send_legis_init_mail(
-    legis_init: &LegislativeInitiative,
-    new_legis_init: Option<Sender<Option<(i32, LegislativeInitiative)>>>,
+    new_legis_init_tx: Option<Sender<(i32, VoteResult)>>,
     vote_result: &VoteResult,
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    pool: &PgPool,
     legis_init_id: i32,
-    show_votes: Vec<somes_scraper::Vote>,
 ) {
     if vote_result.eurovoc_topics.is_empty()
         && vote_result
@@ -380,26 +370,25 @@ async fn check_and_send_legis_init_mail(
     {
         return;
     }
-    if let Some(new_legis_init_tx) = &new_legis_init {
+    if let Some(new_legis_init_tx) = &new_legis_init_tx {
         if let Ok(info) = sqlx::query!(
             "select * from legis_email_info where already_sent_id = $1",
             legis_init_id
         )
-        .fetch_optional(&mut **tx)
+        .fetch_optional(pool)
         .await
         {
             // TODO: use proper timezone handling for nr_plenary_activity_date
-            let diff = today().date_naive() - legis_init.nr_plenary_activity_date;
+            let diff =
+                today().date_naive() - vote_result.legislative_initiative.nr_plenary_activity_date;
 
-            let mut legis_init = legis_init.clone();
-            legis_init.votes = show_votes;
             if diff.num_days() <= *crate::legislative_initiatives::LEGIS_INIT_STILL_SEND_DAYS
                 && info.is_none()
-                && !legis_init.votes.is_empty()
+                && !vote_result.votes.is_empty()
             {
                 log::info!("Sending fitting legis init: {legis_init_id}");
                 if let Err(e) = new_legis_init_tx
-                    .send(Some((legis_init_id, legis_init)))
+                    .send((legis_init_id, vote_result.clone()))
                     .await
                 {
                     log::error!("could not send legis init to mail notify service: {e:?}")
@@ -409,7 +398,7 @@ async fn check_and_send_legis_init_mail(
                     "insert into legis_email_info (already_sent_id) values ($1)",
                     legis_init_id
                 )
-                .execute(&mut **tx)
+                .execute(pool)
                 .await
                 {
                     log::error!(

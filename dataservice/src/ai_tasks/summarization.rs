@@ -128,9 +128,7 @@ async fn summary_prompt(
 }
 
 pub fn patch_topics(schema: &mut serde_json::Value, allowed_topics: &[String]) {
-    if let Some(topics_schema) =
-        schema.pointer_mut("/properties/summary/properties/topics")
-    {
+    if let Some(topics_schema) = schema.pointer_mut("/properties/summary/properties/topics") {
         *topics_schema = json!({
             "type": "array",
             "items": {
@@ -198,7 +196,7 @@ pub(crate) async fn summary_prompt2(
        Some(|schema: &mut serde_json::Value| {
             // TODO: activate topic patching when #143 (https://github.com/som-es/somes/issues/143) is done
             // patch_topics(schema, &topics);
-        }) 
+        })
         )
         .await?)
 }
