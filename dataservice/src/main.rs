@@ -140,6 +140,7 @@ pub async fn run_services(state: &State, config: Config) {
                     decree_pages() as u32,
                     app_state1,
                     inner_ai_task_tx,
+                    true,
                 )
                 .await;
             };
@@ -188,6 +189,7 @@ pub async fn run_services(state: &State, config: Config) {
                     decree_pages() as u32,
                     app_state1,
                     inner_ai_task_tx,
+                    false,
                 )
                 .await;
             };

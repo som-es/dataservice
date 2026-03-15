@@ -16,7 +16,7 @@ pub(crate) struct SimpleGovOfficial {
     pub active_mandates: Option<Vec<String>>,
 }
 
-pub(super) async fn get_active_gov_officals(
+pub(crate) async fn get_active_gov_officals(
     pg_pool: &PgPool,
 ) -> sqlx::Result<Vec<SimpleGovOfficial>> {
     sqlx::query_as!(
@@ -54,64 +54,11 @@ pub(super) async fn get_active_gov_officals(
     .await
 }
 
-#[cfg(test)]
-mod tests {
-    use std::{collections::HashMap, sync::Arc};
-
-    use combx::{create_gov_officials_map, GovProposal};
-    use somes_scraper::{
-        ministrial_proposals::{GegenstandInfo, MinistrialProposalScraper},
-        AustriaScraper,
-    };
-
-    use crate::{
-        connect_pg,
-        ministrial_proposals::{
-            notify::get_active_gov_officals, send_new_ministrial_prop_info_mail,
-        },
-        today,
-    };
-
-    #[tokio::test]
-    async fn test_send_new_ministerial_prop_mail() {
-        let pg_pool = connect_pg().await;
-        let simple_gov_officials = get_active_gov_officals(&pg_pool).await;
-
-        let simple_gov_officials = simple_gov_officials
-            .unwrap_or_default()
-            .into_iter()
-            .map(|gov| (gov.id, gov))
-            .collect::<HashMap<_, _>>();
-
-        let scraper = AustriaScraper::default();
-        let ministerial_proposal = scraper.get_ministrial_proposal(GegenstandInfo {
-            path: "/gegenstand/XXVIII/ME/60".into(),
-            ressort:
-                "Bundesministerium für Arbeit, Soziales, Gesundheit, Pflege und Konsumentenschutz"
-                    .into(),
-            ressort_shortform: "kp".into(),
-            due_to: today().date_naive(),
-        }).await.unwrap();
-        let gov_officials = Arc::new(create_gov_officials_map().await);
-        let gov_proposal =
-            GovProposal::from_ministerial_proposal(ministerial_proposal, gov_officials);
-        println!("gov proposal: {gov_proposal:?}");
-        let gov_proposals = [&(0, gov_proposal)];
-        send_new_ministrial_prop_info_mail(
-            "flurl.nagy@gmail.com",
-            &gov_proposals,
-            &simple_gov_officials,
-        )
-        .unwrap();
-        loop {}
-    }
-}
-
 pub async fn find_notifiers_ministrial_props<'a>(
     pool: &PgPool,
     gov_props: &'a [(i32, GovProposal)],
 ) -> HashMap<String, Vec<&'a (i32, GovProposal)>> {
-    let ids = query!("select id, email from somes_user where is_email_hashed is false and (send_new_ministrial_prop_mails or send_new_ministrial_prop_by_favo_mails)")
+    let ids = query!("select id, email, send_new_ministrial_prop_mails, send_new_ministrial_prop_by_favo_mails from somes_user where is_email_hashed is false and (send_new_ministrial_prop_mails or send_new_ministrial_prop_by_favo_mails)")
         .fetch_all(pool)
         .await
         .unwrap_or_default();
@@ -129,18 +76,38 @@ pub async fn find_notifiers_ministrial_props<'a>(
         let relevant_gov_props = gov_props
             .iter()
             .filter(|(_id, gov_prop)| {
-                for topic in &gov_prop.eurovoc_topics {
-                    if user_topics.contains(&topic.topic) {
-                        return true;
+                if id.send_new_ministrial_prop_mails {
+                    let topics = if gov_prop.eurovoc_topics.is_empty() {
+                        gov_prop
+                            .ai_summary
+                            .as_ref()
+                            .map(|summary| summary.full_summary.topics.clone())
+                            .unwrap_or_default()
+                    } else {
+                        gov_prop
+                            .eurovoc_topics
+                            .iter()
+                            .map(|x| x.topic.clone())
+                            .collect::<Vec<_>>()
+                    };
+                    for topic in &topics {
+                        if user_topics.contains(topic) {
+                            return true;
+                        }
                     }
                 }
-                favo_dels
-                    .iter()
-                    .find(|favo_del| {
-                        // TODO: prevent that the same user gets multiple mails for the same ministrial prop if he has multiple favorite delegates
-                        gov_prop.ministerial_issuers.contains(&favo_del.delegate_id)
-                    })
-                    .is_some()
+
+                if id.send_new_ministrial_prop_by_favo_mails {
+                    favo_dels
+                        .iter()
+                        .find(|favo_del| {
+                            // TODO: prevent that the same user gets multiple mails for the same ministrial prop if he has multiple favorite delegates
+                            gov_prop.ministerial_issuers.contains(&favo_del.delegate_id)
+                        })
+                        .is_some()
+                } else {
+                    false
+                }
             })
             .collect::<Vec<_>>();
 
@@ -251,5 +218,58 @@ pub(crate) fn notify_users(
         {
             log::error!("could not send ministrial prop info mail: {e:?}");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashMap, sync::Arc};
+
+    use combx::{create_gov_officials_map, GovProposal};
+    use somes_scraper::{
+        ministrial_proposals::{GegenstandInfo, MinistrialProposalScraper},
+        AustriaScraper,
+    };
+
+    use crate::{
+        connect_pg,
+        ministrial_proposals::{
+            notify::get_active_gov_officals, send_new_ministrial_prop_info_mail,
+        },
+        today,
+    };
+
+    #[tokio::test]
+    async fn test_send_new_ministerial_prop_mail() {
+        let pg_pool = connect_pg().await;
+        let simple_gov_officials = get_active_gov_officals(&pg_pool).await;
+
+        let simple_gov_officials = simple_gov_officials
+            .unwrap_or_default()
+            .into_iter()
+            .map(|gov| (gov.id, gov))
+            .collect::<HashMap<_, _>>();
+
+        let scraper = AustriaScraper::default();
+        let ministerial_proposal = scraper.get_ministrial_proposal(GegenstandInfo {
+            path: "/gegenstand/XXVIII/ME/60".into(),
+            ressort:
+                "Bundesministerium für Arbeit, Soziales, Gesundheit, Pflege und Konsumentenschutz"
+                    .into(),
+            ressort_shortform: "kp".into(),
+            due_to: today().date_naive(),
+        }).await.unwrap();
+        let gov_officials = Arc::new(create_gov_officials_map().await);
+        let gov_proposal =
+            GovProposal::from_ministerial_proposal(ministerial_proposal, gov_officials);
+        println!("gov proposal: {gov_proposal:?}");
+        let gov_proposals = [&(0, gov_proposal)];
+        send_new_ministrial_prop_info_mail(
+            "",
+            &gov_proposals,
+            &simple_gov_officials,
+        )
+        .unwrap();
+        loop {}
     }
 }

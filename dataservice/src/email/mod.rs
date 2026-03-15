@@ -20,6 +20,8 @@ pub const MINISTRIAL_PROP_EMAIL_TEMPLATE: &str =
     include_str!("ministrial_prop_email_template.html");
 pub const MINISTRIAL_PROP_ENTRY_TEMPLATE: &str =
     include_str!("ministrial_prop_entry_template.html");
+pub const DECREE_EMAIL_TEMPLATE: &str = include_str!("decree_email_template.html");
+pub const DECREE_ENTRY_TEMPLATE: &str = include_str!("decree_entry_template.html");
 
 pub static MAILER: Lazy<SmtpTransport> = Lazy::new(|| {
     let creds = Credentials::new(SMTP_USERNAME.to_string(), SMTP_PASSWORD.to_string());
