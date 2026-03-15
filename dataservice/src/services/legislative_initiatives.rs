@@ -24,7 +24,8 @@ use crate::{
 };
 
 pub(self) const LEGIS_INIT_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| {
-    std::env::var("LEGIS_INIT_STILL_SEND_DAYS").unwrap_or("10".to_string())
+    std::env::var("LEGIS_INIT_STILL_SEND_DAYS")
+        .unwrap_or("10".to_string())
         .parse::<i64>()
         .unwrap_or(10)
 });
@@ -79,7 +80,7 @@ pub async fn legis_init_once(
                 ai_task_tx,
                 searched_doktyps,
                 only_latest,
-                only_voteable
+                only_voteable,
             )
             .await
             {

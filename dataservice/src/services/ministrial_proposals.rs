@@ -66,7 +66,6 @@ pub async fn scrape_new_ministrial_props(
 pub async fn ministrial_proposal_once(
     only_latest: bool,
     pg_pool: &AppState,
-    new_ministrial_proposal_tx: Option<Sender<Option<(i32, GovProposal)>>>,
     ai_task_tx: Sender<AiTask>,
 ) -> Vec<MinistrialProposal> {
     log::info!("Try scraping ministiral proposals");
@@ -97,9 +96,9 @@ pub async fn ministrial_proposal_once(
         update_ministrial_proposals_in_db2(
             pg_pool,
             new_ministrial_props,
-            new_ministrial_proposal_tx.clone(),
             gov_officials.clone(),
             Some(ai_task_tx.clone()),
+            only_latest,
         )
         .await
         .unwrap();
@@ -157,9 +156,9 @@ impl CompareHash for GovProposal {
 pub async fn update_ministrial_proposals_in_db2(
     app_state: &AppState,
     ministrial_props: Vec<MinistrialProposal>,
-    new_ministrial_proposal_tx: Option<Sender<Option<(i32, GovProposal)>>>,
     gov_officials: Arc<HashMap<u64, Vec<GovOfficial>>>,
     ai_task_tx: Option<Sender<AiTask>>,
+    only_latest: bool,
 ) -> Result<(), sqlx::Error> {
     log::info!(
         "Updating {} ministrial proposal in database...",
@@ -168,7 +167,13 @@ pub async fn update_ministrial_proposals_in_db2(
 
     let pool = &app_state.pg_pool;
 
-    let mut started_acc = false;
+    let (new_ministrial_prop_tx, new_ministrial_prop_rx) = if only_latest {
+        let (tx, rx) = tokio::sync::mpsc::channel::<(i32, GovProposal)>(100);
+        (Some(tx), Some(rx))
+    } else {
+        (None, None)
+    };
+
     for (i, ministrial_prop) in ministrial_props.into_iter().enumerate() {
         // let should_update = crate::should_update_by_time(&ministrial_prop, pool).await;
         let mut gov_proposal =
@@ -261,7 +266,7 @@ pub async fn update_ministrial_proposals_in_db2(
             };
 
             let inner_gov_proposal = gov_proposal.clone();
-            let inner_gov_prop_mail_tx = new_ministrial_proposal_tx.clone();
+            let inner_gov_prop_mail_tx = new_ministrial_prop_tx.clone();
             let pool = pool.clone();
             let redis_client = app_state.redis_client.clone();
             let documents = gov_proposal.documents.clone();
@@ -282,18 +287,16 @@ pub async fn update_ministrial_proposals_in_db2(
 
                         let mut inner_gov_proposal = inner_gov_proposal;
                         inner_gov_proposal.ai_summary = ai_summary;
-                        // if let Some(gov_prop_mail_tx) = inner_gov_prop_mail_tx {
-                        //     check_and_send_ministrial_email(
-                        //         &pool,
-                        //         &mut started_acc,
-                        //         i,
-                        //         &inner_gov_proposal,
-                        //         ministrial_prop_id,
-                        //         &gov_prop_mail_tx,
-                        //         false,
-                        //     )
-                        //     .await;
-                        // }
+
+                        if let Some(gov_prop_mail_tx) = inner_gov_prop_mail_tx {
+                            check_and_send_ministrial_email(
+                                &pool,
+                                &inner_gov_proposal,
+                                ministrial_prop_id,
+                                &gov_prop_mail_tx,
+                            )
+                            .await;
+                        }
 
                         let Some(mut redis_client) = redis_client else {
                             return Ok(());
@@ -306,7 +309,6 @@ pub async fn update_ministrial_proposals_in_db2(
                         )
                         .await?;
                         Ok(())
-                        // TODO: update meilisearch index on finish
                     })
                 }),
             };
@@ -348,15 +350,13 @@ pub async fn update_ministrial_proposals_in_db2(
             .await?;
         }
 
-        if let Some(new_legis_init_tx) = &new_ministrial_proposal_tx {
+        #[cfg(not(feature = "ai"))]
+        if let Some(new_ministrial_prop_tx) = &new_ministrial_prop_tx {
             check_and_send_ministrial_email(
                 pool,
-                &mut started_acc,
-                i,
                 &gov_proposal,
                 ministrial_prop_id,
-                new_legis_init_tx,
-                true,
+                new_ministrial_prop_tx,
             )
             .await;
         }
@@ -430,26 +430,38 @@ pub async fn update_ministrial_proposals_in_db2(
         }
     }
 
-    // without this, the mail sending service wouldn't be triggered if e.g. gov proposals list length  is lower than TOTAL_MINISTERIAL_PROP_SENT threshold
-    if started_acc {
-        if let Some(new_legis_init_tx) = &new_ministrial_proposal_tx {
-            if let Err(e) = new_legis_init_tx.send(None).await {
-                log::error!("could not trigger mail sending service: {e:?}")
+    drop(new_ministrial_prop_tx);
+
+    let pool = pool.clone();
+    tokio::task::spawn(async move {
+        if let Some(mut new_ministrial_prop_rx) = new_ministrial_prop_rx {
+            let mut all_gov_proposals = vec![];
+            while let Some(gov_proposal) = new_ministrial_prop_rx.recv().await {
+                all_gov_proposals.push(gov_proposal);
             }
+
+            let simple_gov_officials = get_active_gov_officals(&pool).await;
+            let simple_gov_officials = simple_gov_officials
+                .unwrap_or_default()
+                .into_iter()
+                .map(|gov| (gov.id, gov))
+                .collect::<HashMap<_, _>>();
+
+            let notify_user_gov_props =
+                find_notifiers_ministrial_props(&pool, &all_gov_proposals).await;
+
+            notify_users(&notify_user_gov_props, &simple_gov_officials);
         }
-    }
+    });
 
     Ok(())
 }
 
 async fn check_and_send_ministrial_email(
     pool: &sqlx::Pool<sqlx::Postgres>,
-    started_acc: &mut bool,
-    i: usize,
     gov_proposal: &GovProposal,
     ministrial_prop_id: i32,
-    new_gov_prop_tx: &Sender<Option<(i32, GovProposal)>>,
-    mind_acc: bool,
+    new_gov_prop_tx: &Sender<(i32, GovProposal)>,
 ) {
     if gov_proposal.eurovoc_topics.is_empty()
         && gov_proposal
@@ -469,20 +481,13 @@ async fn check_and_send_ministrial_email(
     {
         let diff = today().to_utc() - gov_proposal.ministrial_proposal.raw_data_created_at;
 
-        // this works, because the specific ministerial prop paths are sorted desc by inr
-        const TOTAL_MINISTERIAL_PROP_SENT: usize = 30;
-        if (!mind_acc || i < TOTAL_MINISTERIAL_PROP_SENT)
-            && diff.num_days() <= *MINISTRIAL_PROP_STILL_SEND_DAYS
-            && info.is_none()
-        {
+        if diff.num_days() <= *MINISTRIAL_PROP_STILL_SEND_DAYS && info.is_none() {
             log::info!("Sending fitting ministrial prop: {ministrial_prop_id}");
             if let Err(e) = new_gov_prop_tx
-                .send(Some((ministrial_prop_id, gov_proposal.clone())))
+                .send((ministrial_prop_id, gov_proposal.clone()))
                 .await
             {
                 log::error!("could not send ministrial prop to mail notify service: {e:?}")
-            } else {
-                *started_acc = true;
             }
 
             if let Err(e) = sqlx::query!(
@@ -496,18 +501,6 @@ async fn check_and_send_ministrial_email(
                     "could not insert into ministrial email info for id {ministrial_prop_id}: {e:?}"
                 );
             }
-        } else if *started_acc {
-            *started_acc = false;
-
-            // early triggering / stop accumulating
-            if let Err(e) = new_gov_prop_tx.send(None).await {
-                log::error!("could not trigger mail sending service: {e:?}")
-            }
-        }
-        if !mind_acc {
-            if let Err(e) = new_gov_prop_tx.send(None).await {
-                log::error!("could not trigger mail sending service: {e:?}")
-            }
         }
     }
 }
@@ -515,7 +508,6 @@ async fn check_and_send_ministrial_email(
 pub async fn run_shut_latest_gp(
     mut shutdown: Shutdown,
     app_state: AppState,
-    new_ministrial_proposal_tx: Sender<Option<(i32, GovProposal)>>,
     ai_task_tx: Sender<AiTask>,
 ) {
     let legis_init_sleep = std::env::var("MINISTRIAL_PROPOSAL_LATEST_SLEEP")
@@ -529,7 +521,6 @@ pub async fn run_shut_latest_gp(
         });
     #[cfg(feature = "ministerial_latest")]
     while !shutdown.is_shutdown() {
-        let new_ministrial_proposal_tx = new_ministrial_proposal_tx.clone();
         let ai_task_tx = ai_task_tx.clone();
         tokio::select! {
             _ = shutdown.recv() => {
@@ -541,7 +532,7 @@ pub async fn run_shut_latest_gp(
                 let app_state = app_state.clone();
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting ministrial proposal (latest) scraper");
-                    ministrial_proposal_once(true, &app_state, Some(new_ministrial_proposal_tx), ai_task_tx).await;
+                    ministrial_proposal_once(true, &app_state, ai_task_tx).await;
                 }).await {
                     log::error!("Error in ministrial proposal (latest) scraper: {:?}", e);
                 }
@@ -586,7 +577,7 @@ pub async fn run_shut_every_gp(
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting ministrial proposal scraper");
 
-                    ministrial_proposal_once(false, &app_state, None, ai_task_tx).await;
+                    ministrial_proposal_once(false, &app_state, ai_task_tx).await;
                 }).await {
                     log::error!("Error in ministrial proposal scraper: {:?}", e);
                 }

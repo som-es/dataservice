@@ -273,7 +273,10 @@ pub fn send_new_legis_info_mail(
     // let content = EMAIL_TEMPLATE.replace("{*OTP*}", &white_splitted);
     // let content = content.replace("{*MINUTOS*}", &(*EMAIL_EXPIRATION_SECONDS / 60).to_string());
 
-    let vote_results = vote_results.iter().map(|x| (*x).clone()).collect::<Vec<_>>();
+    let vote_results = vote_results
+        .iter()
+        .map(|x| (*x).clone())
+        .collect::<Vec<_>>();
     let delegates = delegates.to_vec();
     let seats = seats.to_vec();
 
@@ -316,7 +319,13 @@ pub fn send_new_legis_info_mail(
                 _ => "Unbekannt",
             };
 
-            let vote_type = match vote_result.legislative_initiative.voting.clone().unwrap_or("_".into()).as_str() {
+            let vote_type = match vote_result
+                .legislative_initiative
+                .voting
+                .clone()
+                .unwrap_or("_".into())
+                .as_str()
+            {
                 "Law" => "Gesetz",
                 "Report" => "Bericht",
                 "Amendment" => "Abänderung",
@@ -324,13 +333,14 @@ pub fn send_new_legis_info_mail(
                 _ => &vote_result.legislative_initiative.ityp,
             };
 
-            let description = 
-                vote_result.ai_summary
+            let description = vote_result
+                .ai_summary
                 .as_ref()
                 .map(|summary| &summary.short_title)
                 .unwrap_or(&vote_result.legislative_initiative.description);
 
-            let party_votes_html = vote_result.votes
+            let party_votes_html = vote_result
+                .votes
                 .iter()
                 .map(|vote| {
                     let symbol = if vote.infavor {

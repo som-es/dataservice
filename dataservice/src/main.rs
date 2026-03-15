@@ -26,7 +26,7 @@ struct Args {
     #[arg(long, default_value_t = false)]
     only_latest: bool,
 
-    /// Runs only voteables for vote results 
+    /// Runs only voteables for vote results
     #[arg(long, default_value_t = false)]
     only_voteable: bool,
 }
@@ -129,7 +129,6 @@ pub async fn run_services(state: &State, config: Config) {
                 services::ministrial_proposals::ministrial_proposal_once(
                     false,
                     &app_state1,
-                    None,
                     inner_ai_task_tx.clone(),
                 )
                 .await
@@ -178,7 +177,6 @@ pub async fn run_services(state: &State, config: Config) {
                 services::ministrial_proposals::ministrial_proposal_once(
                     false,
                     &app_state1,
-                    None,
                     inner_ai_task_tx.clone(),
                 )
                 .await;
@@ -216,9 +214,6 @@ pub async fn run_services(state: &State, config: Config) {
             }
         }
     }
-
-    let (new_ministrial_proposal_tx, new_ministrial_proposal_rx) =
-        tokio::sync::mpsc::channel::<Option<(i32, GovProposal)>>(128);
 
     let latest_legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP_LATEST")
         .unwrap_or_else(|_| "300".to_string())
@@ -263,7 +258,6 @@ pub async fn run_services(state: &State, config: Config) {
         tokio::spawn(services::ministrial_proposals::run_shut_latest_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
             app_state.clone(),
-            new_ministrial_proposal_tx,
             llm_ai_task_tx.clone(),
         )),
         tokio::spawn(services::plenar::run_shut(
@@ -288,15 +282,6 @@ pub async fn run_services(state: &State, config: Config) {
             app_state.clone(),
             decree_pages() as u32,
             llm_ai_task_tx.clone(),
-        )),
-        /*tokio::spawn(services::mailer::notify_on_new_vote_results_service(
-            Shutdown::new(state.notify_shutdown.subscribe()),
-            pool.clone()
-        )),*/
-        tokio::spawn(services::mailer::notify_on_new_ministrial_props_service(
-            Shutdown::new(state.notify_shutdown.subscribe()),
-            new_ministrial_proposal_rx,
-            pool.clone()
         )),
         tokio::spawn(services::dates::run_shut_dates(
             Shutdown::new(state.notify_shutdown.subscribe()),
