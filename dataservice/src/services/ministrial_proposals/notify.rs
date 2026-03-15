@@ -117,7 +117,7 @@ pub(crate) fn send_new_ministrial_prop_info_mail(
                 .replace(
                     "{*PROPOSAL_SOMES_URL*}",
                     &format!(
-                        "https://somes.at/alpha/gov_proposal/{gp}/ME/{inr}",
+                        "https://somes.at/gov_proposal/{gp}/ME/{inr}",
                         gp = ministrial_prop.ministrial_proposal.gp,
                         inr = ministrial_prop.ministrial_proposal.inr
                     ),

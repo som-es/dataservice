@@ -10,7 +10,7 @@ use somes_scraper::Party;
 use sqlx::{query, PgPool};
 
 use crate::{
-    email::{send_mail, LEGIS_INIT_EMAIL_TEMPLATE, MAILER},
+    email::{send_mail, LEGIS_INIT_EMAIL_TEMPLATE, MAILER, VOTE_RESULT_ENTRY_TEMPLATE},
     LATEST_GP,
 };
 // could generify
@@ -265,7 +265,7 @@ pub async fn get_current_seats() -> Option<Vec<u64>> {
 
 pub fn send_new_legis_info_mail(
     mail_to: &str,
-    legis_inits: &[&(i32, VoteResult)],
+    vote_results: &[&(i32, VoteResult)],
     seats: &[u64],
     delegates: &[Delegate],
     colors: HashMap<String, String>,
@@ -273,61 +273,77 @@ pub fn send_new_legis_info_mail(
     // let content = EMAIL_TEMPLATE.replace("{*OTP*}", &white_splitted);
     // let content = content.replace("{*MINUTOS*}", &(*EMAIL_EXPIRATION_SECONDS / 60).to_string());
 
-    let legis_inits = legis_inits.iter().map(|x| (*x).clone()).collect::<Vec<_>>();
+    let vote_results = vote_results.iter().map(|x| (*x).clone()).collect::<Vec<_>>();
     let delegates = delegates.to_vec();
     let seats = seats.to_vec();
 
     let mail_to = mail_to.to_string();
     std::thread::spawn(move || {
         let mut vote_results_html = String::new();
-        for (idx, (_id, legis_init)) in legis_inits.iter().enumerate() {
+        for (idx, (_id, vote_result)) in vote_results.iter().enumerate() {
             if idx >= 5 {
-                if legis_inits.len() >= 6 {
+                if vote_results.len() >= 8 {
                     vote_results_html.push_str(&"Und weitere ...");
                 }
                 break;
             }
-            let parliament_img = generate_parliament_image_with_delegates(
-                &legis_init.votes,
-                &delegates,
-                &seats,
-                &colors,
-            );
+            // let parliament_img = generate_parliament_image_with_delegates(
+            //     &vote_result.votes,
+            //     &delegates,
+            //     &seats,
+            //     &colors,
+            // );
 
-            let mut png_parliament_img_buf = Vec::new();
-            let res = PngEncoder::new(&mut png_parliament_img_buf).write_image(
-                &parliament_img,
-                parliament_img.width(),
-                parliament_img.height(),
-                Rgba::<u8>::COLOR_TYPE,
-            );
+            // let mut png_parliament_img_buf = Vec::new();
+            // let res = PngEncoder::new(&mut png_parliament_img_buf).write_image(
+            //     &parliament_img,
+            //     parliament_img.width(),
+            //     parliament_img.height(),
+            //     Rgba::<u8>::COLOR_TYPE,
+            // );
 
-            if let Err(e) = res {
-                log::error!("could not png encode image: {e:?}");
-                continue;
-            }
+            // if let Err(e) = res {
+            //     log::error!("could not png encode image: {e:?}");
+            //     continue;
+            // }
 
-            #[allow(deprecated)]
-            let base64_parliament_img = base64::encode(png_parliament_img_buf);
+            // #[allow(deprecated)]
+            // let base64_parliament_img = base64::encode(png_parliament_img_buf);
 
-            let vote_result_html_entry = format!(
-                r#"
-                <a href="https://somes.at/alpha/vote_result/{gp}/{ityp}/{inr}">
-                    <div style="display: flex; flex-direction: row; justify-content: space-between; width: 100%;">
-                        <div style="border: 1px solid black; width: 50%; display: flex; justify-content: center; align-items: center;">
-                            {desc}
-                        </div>
-                        <div style="border: 1px solid black; width: 60%;">
-                            <img style="width: 70%;" src="data:image/png;base64,{base64_parliament_img}"/>
-                        </div>
-                    </div>
-                </a>
-            "#,
-                desc = legis_init.legislative_initiative.description,
-                gp = legis_init.legislative_initiative.gp,
-                ityp = legis_init.legislative_initiative.ityp,
-                inr = legis_init.legislative_initiative.inr,
-            );
+            let vote_outcome = match &vote_result.legislative_initiative.accepted {
+                Some(status) if status == "a" => "Angenommen",
+                Some(status) if status == "d" || status == "d" => "Abgelehnt",
+                _ => "Unbekannt",
+            };
+
+            let vote_type = match vote_result.legislative_initiative.voting.clone().unwrap_or("_".into()).as_str() {
+                "Law" => "Gesetz",
+                "Report" => "Bericht",
+                "Amendment" => "Abänderung",
+                "Resolution" => "Entschließung",
+                _ => &vote_result.legislative_initiative.ityp,
+            };
+
+            let description = 
+                vote_result.ai_summary
+                .as_ref()
+                .map(|summary| &summary.short_title)
+                .unwrap_or(&vote_result.legislative_initiative.description);
+
+            let vote_result_html_entry = VOTE_RESULT_ENTRY_TEMPLATE
+                .replace("{*VOTE_RESULT_DESCRIPTION*}", &description)
+                .replace("{*VOTE_RESULT_GP*}", &vote_result.legislative_initiative.gp)
+                .replace("{*VOTE_RESULT_TYPE*}", vote_type)
+                .replace("{*VOTE_RESULT_OUTCOME*}", vote_outcome)
+                .replace(
+                    "{*VOTE_RESULT_SOMES_URL*}",
+                    &format!(
+                        "https://somes.at/vote_result/{gp}/{ityp}/{inr}",
+                        gp = vote_result.legislative_initiative.gp,
+                        ityp = vote_result.legislative_initiative.ityp,
+                        inr = vote_result.legislative_initiative.inr
+                    ),
+                );
 
             vote_results_html.push_str(&vote_result_html_entry);
         }
@@ -415,7 +431,7 @@ mod tests {
         let legis_init = VoteResult::from_legis_init(PostgresEnhancer(pg), legis_init, None).await;
 
         send_new_legis_info_mail(
-            "",
+            "flurl.nagy@gmail.com",
             &[&(19106479, legis_init) /* &(10527230, legis_init1)*/],
             &seats,
             &delegates,
