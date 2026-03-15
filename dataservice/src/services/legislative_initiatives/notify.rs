@@ -312,7 +312,7 @@ pub fn send_new_legis_info_mail(
 
             let vote_outcome = match &vote_result.legislative_initiative.accepted {
                 Some(status) if status == "a" => "Angenommen",
-                Some(status) if status == "d" || status == "d" => "Abgelehnt",
+                Some(status) if status == "d" || status == "p" => "Abgelehnt",
                 _ => "Unbekannt",
             };
 
@@ -330,11 +330,25 @@ pub fn send_new_legis_info_mail(
                 .map(|summary| &summary.short_title)
                 .unwrap_or(&vote_result.legislative_initiative.description);
 
+            let party_votes_html = vote_result.votes
+                .iter()
+                .map(|vote| {
+                    let symbol = if vote.infavor {
+                        "<span style=\"color: #22c55e;\">✓</span>"
+                    } else {
+                        "<span style=\"color: #ef4444;\">✗</span>"
+                    };
+                    format!("{} {}", vote.party, symbol)
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+
             let vote_result_html_entry = VOTE_RESULT_ENTRY_TEMPLATE
                 .replace("{*VOTE_RESULT_DESCRIPTION*}", &description)
                 .replace("{*VOTE_RESULT_GP*}", &vote_result.legislative_initiative.gp)
                 .replace("{*VOTE_RESULT_TYPE*}", vote_type)
                 .replace("{*VOTE_RESULT_OUTCOME*}", vote_outcome)
+                .replace("{*VOTE_RESULT_PARTY_VOTES*}", &party_votes_html)
                 .replace(
                     "{*VOTE_RESULT_SOMES_URL*}",
                     &format!(
