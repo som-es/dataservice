@@ -379,12 +379,8 @@ mod tests {
             .into_iter()
             .collect::<HashSet<_>>();
 
-        let res = match_delegate_names_with_delegate_ids(
-            &active_delegates,
-            &delegate_names,
-            "XXV",
-            date,
-        );
+        let res =
+            match_delegate_names_with_delegate_ids(&active_delegates, &delegate_names, "XXV", date);
 
         println!("res: {:?}", res.lev_or_deep_split_matched);
         // assert_eq!(res.lev_or_deep_split_matched.len(), 1);
@@ -537,8 +533,6 @@ mod tests {
         // let res = res.correctly_matched.into_iter().filter(|x| x.lev > 0).collect::<Vec<_>>();
         println!("res: {:?}", res.lev_or_deep_split_matched);
     }
-
-
 
     #[tokio::test]
     async fn test_namentlich_name_matching_xxvi_i_514() {

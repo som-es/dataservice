@@ -37,13 +37,14 @@ schemars = { workspace = true }
 tesseract-rs = { workspace = true, optional = true }
 chrono-tz = {workspace = true}
 redis = { version = "1.0", features = ["tokio-comp"] }
+regex = "1.12.3"
 [dev-dependencies]
 rand = "0.9"
 
 [features]
-default = ["runner", "ministerial", "ministerial_latest", "legis_init", "legis_init_latest", "ai", "tesseract", "decrees", "dates", "plenar_latest"]
+#default = ["runner", "ministerial", "ministerial_latest", "legis_init", "legis_init_latest", "ai", "tesseract", "decrees", "dates", "plenar_latest"]
 # default = ["runner", "ministerial", "ministerial_latest", "legis_init", "legis_init_latest", "decrees", "dates", "plenar_latest"]
-
+default = ["runner","plenar"]
 models = ["dotenvy", "chrono", "ocrs"] # remove ocrs again
 runner = ["models", "chrono", "reqwest", "simple_logger", "tokio", "dotenvy"]
 utoipa = ["dep:utoipa", "combx/utoipa"]

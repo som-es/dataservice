@@ -6,7 +6,10 @@ use somes_scraper::{
     plenar::{Debate, DebateInfo, PlenarInfo},
     text_utils, PlenarSpeech, Reference, TextExtractor,
 };
+
 use sqlx::{postgres::PgQueryResult, Executor, Postgres};
+
+use crate::plenar::extract_interjection::extract_interjection;
 
 pub async fn insert_plenar_speech_legis_init<'a>(
     pool: impl Executor<'a, Database = Postgres>,
@@ -300,8 +303,7 @@ pub async fn insert_plenar_speech<'a>(
             let (removed_parans, _) =
                 text_utils::remove_paran_contents(updated_spoken_text, '(', ')');
             for removed_paran in removed_parans {
-                // "asdfhasdjklf ahsdfhjklasd (Abg. Hallo: Das ist eine Frechheit!)"
-                // TODO: Issue #25
+                extract_interjection(removed_paran.as_str());
             }
         }
 
