@@ -511,13 +511,13 @@ pub async fn run_shut_latest_gp(
     ai_task_tx: Sender<AiTask>,
 ) {
     let legis_init_sleep = std::env::var("MINISTRIAL_PROPOSAL_LATEST_SLEEP")
-        .unwrap_or_else(|_| "400".to_string())
+        .unwrap_or_else(|_| "2000".to_string())
         .parse()
         .unwrap_or_else(|e| {
             log::warn!(
-                "Could not parse MINISTRIAL_PROPOSAL_LATEST_SLEEP env var: {e}. Using default value of 400 seconds"
+                "Could not parse MINISTRIAL_PROPOSAL_LATEST_SLEEP env var: {e}. Using default value of 2000 seconds"
             );
-            400
+            2000
         });
     #[cfg(feature = "ministerial_latest")]
     while !shutdown.is_shutdown() {

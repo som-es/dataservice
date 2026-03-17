@@ -223,7 +223,7 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
         }
 
         #[cfg(feature = "ai")]
-        if enforce_ai_run() || should_update {
+        if (enforce_ai_run() || should_update) && false {
             if let Some(ai_task_tx) = &app_state.cpu_task_tx {
                 let task = crate::ai_task::AiTask {
                     input: None,

@@ -131,7 +131,7 @@ pub(crate) fn send_new_decree_info_mail(
         if let Err(e) = send_mail(
             &MAILER,
             &mail_to,
-            "Neue Ministerialverordnungen auf somes",
+            "Neue Verordnungen auf somes",
             content,
         ) {
             log::error!("could not send decree info mail: {e:?}");

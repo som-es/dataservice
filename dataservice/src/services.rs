@@ -2,7 +2,6 @@ pub mod ai_task_service;
 pub mod dates;
 pub mod delegates;
 pub mod legislative_initiatives;
-pub mod mailer;
 pub mod ministrial_decrees;
 pub mod ministrial_proposals;
 pub mod parties;
