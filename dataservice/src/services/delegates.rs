@@ -152,7 +152,12 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
                 .map(|prev_name| prev_name.till)
                 .flatten(),
             party: delegate.party.clone(),
-            image_url: delegate.image_url.clone(),
+            image_url: delegate.image.as_ref().map(|image| image.url.clone()),
+            image_copyright: delegate
+                .image
+                .as_ref()
+                .map(|image| image.copyright.clone())
+                .flatten(),
             constituency: delegate.constituency.clone(),
             council: delegate.council.clone(),
             seat_row: delegate.seat.as_ref().map(|seat| seat.row as i32),
@@ -181,9 +186,10 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
                     birthdate,
                     prev_name,
                     prev_name_till,
-                    hash
+                    hash,
+                    image_copyright
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
                 ) ON CONFLICT (id)
                 DO UPDATE SET
                     name = EXCLUDED.name,
@@ -199,7 +205,8 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
                     is_active = EXCLUDED.is_active,
                     birthdate = EXCLUDED.birthdate,
                     updated_at = NOW(),
-                    hash = EXCLUDED.hash
+                    hash = EXCLUDED.hash,
+                    image_copyright = EXCLUDED.image_copyright
             ",
             db_delegate.id,
             db_delegate.name,
@@ -214,7 +221,8 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
             db_delegate.birthdate,
             db_delegate.prev_name,
             db_delegate.prev_name_till,
-            hash as i64
+            hash as i64,
+            db_delegate.image_copyright
         )
         .execute(pg_pool)
         .await

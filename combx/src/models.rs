@@ -44,6 +44,7 @@ pub struct DbDelegate {
     pub prev_name_till: Option<NaiveDate>,
     pub party: Option<String>,
     pub image_url: Option<String>,
+    pub image_copyright: Option<String>,
     pub constituency: Option<String>,
     pub council: Option<String>,
     pub seat_row: Option<i32>,
