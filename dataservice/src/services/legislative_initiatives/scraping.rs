@@ -95,8 +95,13 @@ pub async fn scrape_new_legis_inits(
     let collect_mail_vote_results = tokio::task::spawn(async move {
         if let Some(mut new_vote_result_rx) = new_vote_result_rx {
             let mut all_vote_results = vec![];
+            let mut proposals = vec![];
             while let Some(vote_result) = new_vote_result_rx.recv().await {
-                all_vote_results.push(vote_result);
+                if vote_result.1.votes.is_empty() {
+                    proposals.push(vote_result);
+                } else {
+                    all_vote_results.push(vote_result);
+                }
             }
 
             let seats = get_current_seats().await.unwrap_or_default();
@@ -104,13 +109,34 @@ pub async fn scrape_new_legis_inits(
             let colors = create_color_map(get_current_parties().await.unwrap_or_default());
 
             let notify_user_legis_inits =
-                find_notifiers_legis_init(&pg_pool, &all_vote_results).await;
+                find_notifiers_legis_init(&pg_pool, &all_vote_results, true).await;
             log::info!(
                 "Constructed notifier hashmap with {} entries",
                 notify_user_legis_inits.len()
             );
 
-            notify_users(&seats, &delegates, &notify_user_legis_inits, colors.clone());
+            notify_users(
+                &seats,
+                &delegates,
+                &notify_user_legis_inits,
+                colors.clone(),
+                true,
+            );
+
+            let notify_user_legis_inits =
+                find_notifiers_legis_init(&pg_pool, &proposals, false).await;
+            log::info!(
+                "(proposals) Constructed notifier hashmap with {} entries",
+                notify_user_legis_inits.len()
+            );
+
+            notify_users(
+                &seats,
+                &delegates,
+                &notify_user_legis_inits,
+                colors.clone(),
+                false,
+            );
         }
     });
 

@@ -384,7 +384,7 @@ async fn check_and_send_legis_init_mail(
 
             if diff.num_days() <= *crate::legislative_initiatives::LEGIS_INIT_STILL_SEND_DAYS
                 && info.is_none()
-                && !vote_result.votes.is_empty()
+                && vote_result.legislative_initiative.is_voteable_on
             {
                 log::info!("Sending fitting legis init: {legis_init_id}");
                 if let Err(e) = new_legis_init_tx

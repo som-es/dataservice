@@ -1,37 +1,77 @@
 use std::collections::HashMap;
 
 use combx::{DbVote, Delegate, VoteResult};
-use image::{codecs::png::PngEncoder, ImageEncoder, PixelWithColorType, Rgba};
+use image::Rgba;
 use imageproc::{
     drawing::{draw_filled_circle_mut, draw_filled_rect_mut},
     rect::Rect,
 };
 use somes_scraper::Party;
-use sqlx::{query, PgPool};
+use sqlx::{query, query_as, query_scalar, PgPool};
 
 use crate::{
     email::{send_mail, LEGIS_INIT_EMAIL_TEMPLATE, MAILER, VOTE_RESULT_ENTRY_TEMPLATE},
     LATEST_GP,
 };
-// could generify
+
+struct ToNotify {
+    id: i32,
+    email: String,
+    by_topics: bool,
+    by_person_favo: bool,
+}
+
 pub async fn find_notifiers_legis_init<'a>(
     pool: &PgPool,
     legis_inits: &'a [(i32, VoteResult)],
+    is_finished: bool,
 ) -> HashMap<String, Vec<&'a (i32, VoteResult)>> {
-    let ids = query!("select id, email from somes_user where is_email_hashed is false and send_new_vote_results_mails")
-        .fetch_all(pool)
-        .await
-        .unwrap_or_default();
+    let ids = if is_finished {
+        query_as!(ToNotify, "select id, email, send_new_vote_results_mails as by_topics, send_new_vote_result_by_favo_mails as by_person_favo from somes_user where is_email_hashed is false and (send_new_vote_results_mails or send_new_vote_result_by_favo_mails)")
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default()
+    } else {
+        query_as!(ToNotify, "
+            select
+                id, email,
+                send_new_vote_results_mails as by_topics,
+                send_new_vote_result_by_favo_mails as by_person_favo
+            from somes_user where is_email_hashed is false and (send_new_vote_results_mails or send_new_vote_result_by_favo_mails)")
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default()
+    };
     let mut to_notify_emails = HashMap::new();
     for id in ids {
         let user_topics = query!("select topic_name from user_topics inner join unique_eurovoc_topics ut on ut.id = topic_id where user_id = $1", id.id).fetch_all(pool).await.unwrap_or_default().into_iter().map(|x| x.topic_name).collect::<Vec<_>>();
 
+        let favo_dels = query_scalar!(
+            "select delegate_id from favo_dels where user_id = $1",
+            id.id
+        )
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
         let relevant_legis_inits = legis_inits
             .iter()
             .filter(|legis_init| {
-                for topic in &legis_init.1.eurovoc_topics {
-                    if user_topics.contains(&topic.topic) {
+                if id.by_person_favo {
+                    if legis_init
+                        .1
+                        .issued_by_dels
+                        .iter()
+                        .any(|issued_by_del| favo_dels.contains(&issued_by_del.delegate_id))
+                    {
                         return true;
+                    }
+                }
+                if id.by_topics {
+                    for topic in &legis_init.1.eurovoc_topics {
+                        if user_topics.contains(&topic.topic) {
+                            return true;
+                        }
                     }
                 }
                 false
@@ -269,6 +309,7 @@ pub fn send_new_legis_info_mail(
     seats: &[u64],
     delegates: &[Delegate],
     colors: HashMap<String, String>,
+    is_finished: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // let content = EMAIL_TEMPLATE.replace("{*OTP*}", &white_splitted);
     // let content = content.replace("{*MINUTOS*}", &(*EMAIL_EXPIRATION_SECONDS / 60).to_string());
@@ -316,7 +357,7 @@ pub fn send_new_legis_info_mail(
             let vote_outcome = match &vote_result.legislative_initiative.accepted {
                 Some(status) if status == "a" => "Angenommen",
                 Some(status) if status == "d" || status == "p" => "Abgelehnt",
-                _ => "Unbekannt",
+                _ => "In Bearbeitung",
             };
 
             let vote_type = match vote_result
@@ -333,7 +374,7 @@ pub fn send_new_legis_info_mail(
                 _ => &vote_result.legislative_initiative.ityp,
             };
 
-            let description = vote_result
+            let vote_description = vote_result
                 .ai_summary
                 .as_ref()
                 .map(|summary| &summary.short_title)
@@ -353,8 +394,22 @@ pub fn send_new_legis_info_mail(
                 .collect::<Vec<_>>()
                 .join(", ");
 
+            let title = if is_finished {
+                "Neue Abstimmungsergebnisse"
+            } else {
+                "Neue Anträge"
+            };
+
+            let description = if is_finished {
+                "Der Nationalrat hat kürzlich verschiedene Abstimmungen gehalten, die zu Ihrer Interessenswahl passen."
+            } else {
+                "Kürzlich wurden neue Anträge eingebracht, die zu Ihrere Interessenswahl passen."
+            };
+
             let vote_result_html_entry = VOTE_RESULT_ENTRY_TEMPLATE
-                .replace("{*VOTE_RESULT_DESCRIPTION*}", &description)
+                .replace("{*TITLE*}", title)
+                .replace("{*DESCRIPTION*}", description)
+                .replace("{*VOTE_RESULT_DESCRIPTION*}", &vote_description)
                 .replace("{*VOTE_RESULT_GP*}", &vote_result.legislative_initiative.gp)
                 .replace("{*VOTE_RESULT_TYPE*}", vote_type)
                 .replace("{*VOTE_RESULT_OUTCOME*}", vote_outcome)
@@ -388,11 +443,17 @@ pub fn notify_users(
     delegates: &[Delegate],
     user_legis_inits: &HashMap<String, Vec<&(i32, VoteResult)>>,
     colors: HashMap<String, String>,
+    is_finished: bool,
 ) {
     for (mail_to, legis_inits) in user_legis_inits {
-        if let Err(e) =
-            send_new_legis_info_mail(mail_to, legis_inits, seats, delegates, colors.clone())
-        {
+        if let Err(e) = send_new_legis_info_mail(
+            mail_to,
+            legis_inits,
+            seats,
+            delegates,
+            colors.clone(),
+            is_finished,
+        ) {
             log::error!("could not send legis info mail: {e:?}");
         }
     }
@@ -460,6 +521,7 @@ mod tests {
             &seats,
             &delegates,
             colors,
+            false,
         )
         .unwrap();
 

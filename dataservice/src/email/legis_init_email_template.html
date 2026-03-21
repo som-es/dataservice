@@ -1,67 +1,77 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neue Abstimmungsergebnisse</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-        }
-        .email-container {
-            max-width: 600px;
-            margin: 30px auto;
-            background-color: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-        }
-        .header {
-            background-color: #D8806F;
-            color: white;
-            text-align: center;
-            padding: 20px 10px;
-        }
-        .content {
-            padding: 20px;
-            text-align: center;
-        }
-        
-        .footer {
-            text-align: center;
-            font-size: 0.9rem;
-            color: #888888;
-            padding: 10px;
-            background-color: #F8DFCA;
-        }
-    </style>
-</head>
-<body>
-    <div class="email-container">
-        <div class="header">
-            <h1>Neue Abstimmungen</h1>
-        </div>
-        <div class="content">
-            <p>Der Nationalrat hat kürzlich verschiedene Abstimmungen gehalten, die zu Ihrer Interessenswahl passen.</p>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>{*TITLE*}</title>
+        <style>
+            body {
+                margin: 0;
+                padding: 0;
+                font-family: Arial, sans-serif;
+                background-color: #f4f4f4;
+            }
+            .email-container {
+                max-width: 600px;
+                margin: 30px auto;
+                background-color: #ffffff;
+                border-radius: 8px;
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+                overflow: hidden;
+            }
+            .header {
+                background-color: #d8806f;
+                color: white;
+                text-align: center;
+                padding: 20px 10px;
+            }
+            .content {
+                padding: 20px;
+                text-align: center;
+            }
 
-            <div style="display: flex; flex-direction: column; width: 100%;">
-                {*VOTE_RESULTS*}
+            .footer {
+                text-align: center;
+                font-size: 0.9rem;
+                color: #888888;
+                padding: 10px;
+                background-color: #f8dfca;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="email-container">
+            <div class="header">
+                <h1>{*TITLE*}</h1>
             </div>
+            <div class="content">
+                <p>{*DESCRIPTION*}</p>
 
-            <hr>
-            <div style="display: flex; justify-content: center;">
-                <img src="https://somes.at/images/somes_logo.png" style="width: 10%;" />
-                <div style="align-self: center; font-weight: 200; font-size: xx-large; margin-left: 10px;;">
-                    somes
+                <div style="display: flex; flex-direction: column; width: 100%">
+                    {*VOTE_RESULTS*}
+                </div>
+
+                <hr />
+                <div style="display: flex; justify-content: center">
+                    <img
+                        src="https://somes.at/images/somes_logo.png"
+                        style="width: 10%"
+                    />
+                    <div
+                        style="
+                            align-self: center;
+                            font-weight: 200;
+                            font-size: xx-large;
+                            margin-left: 10px;
+                        "
+                    >
+                        somes
+                    </div>
                 </div>
             </div>
+            <div class="footer">
+                <p>&copy; 2026 somes</p>
+            </div>
         </div>
-        <div class="footer">
-            <p>&copy; 2026 somes</p>
-        </div>
-    </div>
-</body>
+    </body>
 </html>
