@@ -35,9 +35,9 @@ pub async fn find_notifiers_legis_init<'a>(
         query_as!(ToNotify, "
             select
                 id, email,
-                send_new_vote_results_mails as by_topics,
-                send_new_vote_result_by_favo_mails as by_person_favo
-            from somes_user where is_email_hashed is false and (send_new_vote_results_mails or send_new_vote_result_by_favo_mails)")
+                send_new_proposal_mails as by_topics,
+                send_new_proposal_by_favo_mails as by_person_favo
+            from somes_user where is_email_hashed is false and (send_new_proposal_mails or send_new_proposal_by_favo_mails)")
             .fetch_all(pool)
             .await
             .unwrap_or_default()
@@ -394,21 +394,7 @@ pub fn send_new_legis_info_mail(
                 .collect::<Vec<_>>()
                 .join(", ");
 
-            let title = if is_finished {
-                "Neue Abstimmungsergebnisse"
-            } else {
-                "Neue Anträge"
-            };
-
-            let description = if is_finished {
-                "Der Nationalrat hat kürzlich verschiedene Abstimmungen gehalten, die zu Ihrer Interessenswahl passen."
-            } else {
-                "Kürzlich wurden neue Anträge eingebracht, die zu Ihrere Interessenswahl passen."
-            };
-
             let vote_result_html_entry = VOTE_RESULT_ENTRY_TEMPLATE
-                .replace("{*TITLE*}", title)
-                .replace("{*DESCRIPTION*}", description)
                 .replace("{*VOTE_RESULT_DESCRIPTION*}", &vote_description)
                 .replace("{*VOTE_RESULT_GP*}", &vote_result.legislative_initiative.gp)
                 .replace("{*VOTE_RESULT_TYPE*}", vote_type)
@@ -427,10 +413,31 @@ pub fn send_new_legis_info_mail(
             vote_results_html.push_str(&vote_result_html_entry);
         }
 
+        let title = if is_finished {
+            "Neue Abstimmungsergebnisse"
+        } else {
+            "Neue Anträge"
+        };
+
+        let description = if is_finished {
+            "Der Nationalrat hat kürzlich verschiedene Abstimmungen gehalten, die zu Ihrer Interessenswahl passen."
+        } else {
+            "Kürzlich wurden neue Anträge eingebracht, die zu Ihrere Interessenswahl passen."
+        };
+
         log::info!("Sending composed new vote result mail to {mail_to}");
-        let content = LEGIS_INIT_EMAIL_TEMPLATE.replace("{*VOTE_RESULTS*}", &vote_results_html);
-        // println!("content: {content}");
-        if let Err(e) = send_mail(&MAILER, &mail_to, "Neue Abstimmungen auf somes", content) {
+        let content = LEGIS_INIT_EMAIL_TEMPLATE
+            .replace("{*TITLE*}", title)
+            .replace("{*DESCRIPTION*}", description)
+            .replace("{*VOTE_RESULTS*}", &vote_results_html);
+
+        let subject = if is_finished {
+            "Neue Abstimmungen auf somes"
+        } else {
+            "Neue Anträge auf somes"
+        };
+
+        if let Err(e) = send_mail(&MAILER, &mail_to, subject, content) {
             log::error!("could not send legis info mail: {e:?}");
         }
     });
@@ -521,7 +528,7 @@ mod tests {
             &seats,
             &delegates,
             colors,
-            false,
+            true,
         )
         .unwrap();
 

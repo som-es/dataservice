@@ -97,7 +97,7 @@ pub async fn scrape_new_legis_inits(
             let mut all_vote_results = vec![];
             let mut proposals = vec![];
             while let Some(vote_result) = new_vote_result_rx.recv().await {
-                if vote_result.1.votes.is_empty() {
+                if vote_result.1.legislative_initiative.accepted.is_none() {
                     proposals.push(vote_result);
                 } else {
                     all_vote_results.push(vote_result);

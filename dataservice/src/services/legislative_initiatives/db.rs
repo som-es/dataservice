@@ -371,13 +371,23 @@ async fn check_and_send_legis_init_mail(
         return;
     }
     if let Some(new_legis_init_tx) = &new_legis_init_tx {
-        if let Ok(info) = sqlx::query!(
-            "select * from legis_email_info where already_sent_id = $1",
-            legis_init_id
-        )
-        .fetch_optional(pool)
-        .await
-        {
+        let info = if vote_result.legislative_initiative.voting.is_some() {
+            sqlx::query_scalar!(
+                "select already_sent_id from legis_email_info where already_sent_id = $1",
+                legis_init_id
+            )
+            .fetch_optional(pool)
+            .await
+        } else {
+            sqlx::query_scalar!(
+                "select already_sent_id from proposal_email_info where already_sent_id = $1",
+                legis_init_id
+            )
+            .fetch_optional(pool)
+            .await
+        };
+
+        if let Ok(info) = info {
             // TODO: use proper timezone handling for nr_plenary_activity_date
             let diff =
                 today().date_naive() - vote_result.legislative_initiative.nr_plenary_activity_date;
@@ -394,16 +404,30 @@ async fn check_and_send_legis_init_mail(
                     log::error!("could not send legis init to mail notify service: {e:?}")
                 }
 
-                if let Err(e) = sqlx::query!(
-                    "insert into legis_email_info (already_sent_id) values ($1)",
-                    legis_init_id
-                )
-                .execute(pool)
-                .await
-                {
-                    log::error!(
-                        "could not insert into legis email info for id {legis_init_id}: {e:?}"
-                    );
+                if vote_result.legislative_initiative.voting.is_some() {
+                    if let Err(e) = sqlx::query!(
+                        "insert into legis_email_info (already_sent_id) values ($1)",
+                        legis_init_id
+                    )
+                    .execute(pool)
+                    .await
+                    {
+                        log::error!(
+                            "could not insert into legis email info for id {legis_init_id}: {e:?}"
+                        );
+                    }
+                } else {
+                    if let Err(e) = sqlx::query!(
+                        "insert into proposal_email_info (already_sent_id) values ($1)",
+                        legis_init_id
+                    )
+                    .execute(pool)
+                    .await
+                    {
+                        log::error!(
+                            "could not insert into proposal email info for id {legis_init_id}: {e:?}"
+                        );
+                    }
                 }
             }
         };
