@@ -279,11 +279,21 @@ pub async fn run_services(state: &State, config: Config) {
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone()
         )),
+        // latest
         tokio::spawn(services::ministrial_decrees::run_shut_pages(
             Shutdown::new(state.notify_shutdown.subscribe()),
             app_state.clone(),
             decree_pages() as u32,
             llm_ai_task_tx.clone(),
+            true
+        )),
+        // latest
+        tokio::spawn(services::ministrial_decrees::run_shut_pages(
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            app_state.clone(),
+            decree_pages() as u32,
+            llm_ai_task_tx.clone(),
+            false
         )),
         tokio::spawn(services::dates::run_shut_dates(
             Shutdown::new(state.notify_shutdown.subscribe()),

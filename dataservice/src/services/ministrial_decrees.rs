@@ -68,12 +68,16 @@ pub async fn save_ministrial_decrees(
                 &app_state,
                 all_gps.clone(),
                 &ai_task_tx,
-                new_decree_tx.as_ref(),
+                new_decree_tx.clone(),
             )
             .await
             {
                 log::error!("Cannot insert decree: {e:?}");
             }
+        }
+
+        if only_latest && page >= 2 {
+            break;
         }
     }
 
@@ -125,7 +129,7 @@ pub async fn insert_ministrial_decree(
     app_state: &AppState,
     all_gps: Arc<[LegislativePeriod]>,
     ai_task_tx: &Sender<AiTask>,
-    new_decree_tx: Option<&Sender<(i32, Decree)>>,
+    new_decree_tx: Option<Sender<(i32, Decree)>>,
 ) -> crate::Result<()> {
     let pg_pool = &app_state.pg_pool;
     let mut decree =
@@ -184,10 +188,12 @@ pub async fn insert_ministrial_decree(
         .await?;
 
         decree.id = Some(decree_id.id);
+        let decree_id = decree_id.id;
 
         // Check and send email notification for new decree
+        #[cfg(not(feature = "ai"))]
         if let Some(new_decree_tx) = new_decree_tx {
-            check_and_send_decree_email(pg_pool, &decree, decree_id.id, new_decree_tx).await;
+            check_and_send_decree_email(pg_pool, &decree, decree_id.id, &new_decree_tx).await;
         }
 
         if should_update {
@@ -205,13 +211,13 @@ pub async fn insert_ministrial_decree(
         {
             use crate::{ai_task::Priority, LATEST_GP};
 
-            let priority =
+            let (priority, new_decree_tx) =
                 if decree.publication_date >= (today() - chrono::Duration::days(90)).date_naive() {
-                    Priority::Highest
+                    (Priority::Highest, new_decree_tx.clone())
                 } else if decree.gp.as_deref() == Some(LATEST_GP) {
-                    Priority::High
+                    (Priority::High, None)
                 } else {
-                    Priority::Lowest
+                    (Priority::Lowest, None)
                 };
 
             let inner_decree = decree.clone();
@@ -221,14 +227,26 @@ pub async fn insert_ministrial_decree(
                 input: None,
                 priority,
                 task_id: crate::hash!(),
-                db_entry_id: decree_id.id,
+                db_entry_id: decree_id,
                 rerunnable: false,
                 task: Box::new(move |task_args| {
                     Box::pin(async move {
                         use crate::ministrial_decrees::ai_tasks::summarize_decrees_documents;
 
-                        let _ai_summary =
-                            summarize_decrees_documents(task_args, &documents).await?;
+                        let ai_summary = summarize_decrees_documents(task_args, &documents).await?;
+
+                        // not returning on None to still send decree
+                        let mut inner_decree = inner_decree;
+                        inner_decree.ai_summary = ai_summary;
+                        if let Some(decree_mail_tx) = new_decree_tx {
+                            check_and_send_decree_email(
+                                &pool,
+                                &inner_decree,
+                                decree_id,
+                                &decree_mail_tx,
+                            )
+                            .await;
+                        }
 
                         Ok(())
                         // TODO: update meilisearch index on finish
@@ -238,7 +256,7 @@ pub async fn insert_ministrial_decree(
 
             log::info!(
                 "Sending AI task for ministerial decree summarization: {} ({:?}) with priority {priority:?}",
-                decree_id.id,
+                decree_id,
                 decree.gp,
             );
 
@@ -267,7 +285,7 @@ pub async fn insert_ministrial_decree(
                     document_type = EXCLUDED.document_type,
                     document_url = EXCLUDED.document_url;
                 ",
-                decree_id.id,
+                decree_id,
                 document.title,
                 document.document_type,
                 document.document_url
@@ -321,8 +339,9 @@ pub async fn run_shut_pages(
     app_state: AppState,
     pages: u32,
     ai_task_tx: Sender<AiTask>,
+    only_latest: bool,
 ) {
-    let decree_sleep = std::env::var("DECREE_SLEEP")
+    let mut decree_sleep = std::env::var("DECREE_SLEEP")
         .unwrap_or_else(|_| "1000".to_string())
         .parse()
         .unwrap_or_else(|e| {
@@ -331,6 +350,12 @@ pub async fn run_shut_pages(
             );
             1000
         });
+
+    if !only_latest {
+        decree_sleep *= 60;
+    }
+
+    let latest_info = if only_latest { "latest" } else { "" };
 
     #[cfg(feature = "decrees")]
     while !shutdown.is_shutdown() {
@@ -344,12 +369,12 @@ pub async fn run_shut_pages(
             _ = async {
                 let app_state = app_state.clone();
                 if let Err(e) = tokio::task::spawn(async move {
-                    log::info!("Starting Decree Scraper");
-                    save_ministrial_decrees(pages, app_state, ai_task_tx, true).await;
+                    log::info!("Starting {latest_info} Decree Scraper");
+                    save_ministrial_decrees(pages, app_state, ai_task_tx, only_latest).await;
                 }).await {
-                    log::error!("Error in Decree Scraper: {:?}", e);
+                    log::error!("Error in {latest_info} Decree Scraper: {:?}", e);
                 }
-                log::info!("Decree Scraper service sleeps for {decree_sleep} seconds...");
+                log::info!("{latest_info} Decree Scraper service sleeps for {decree_sleep} seconds...");
                 tokio::time::sleep(tokio::time::Duration::from_secs(decree_sleep)).await;
             } => {}
         }

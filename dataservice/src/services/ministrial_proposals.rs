@@ -168,7 +168,7 @@ pub async fn update_ministrial_proposals_in_db2(
     let pool = &app_state.pg_pool;
 
     let (new_ministrial_prop_tx, new_ministrial_prop_rx) = if only_latest {
-        let (tx, rx) = tokio::sync::mpsc::channel::<(i32, GovProposal)>(100);
+        let (tx, rx) = tokio::sync::mpsc::channel::<(i32, GovProposal)>(1024);
         (Some(tx), Some(rx))
     } else {
         (None, None)
@@ -255,18 +255,18 @@ pub async fn update_ministrial_proposals_in_db2(
         if let Some(ai_task_tx) = &ai_task_tx {
             use crate::{ai_task::Priority, LATEST_GP};
 
-            let priority = if gov_proposal.ministrial_proposal.raw_data_created_at
-                >= today() - chrono::Duration::days(90)
-            {
-                Priority::Highest
-            } else if gov_proposal.ministrial_proposal.gp == LATEST_GP {
-                Priority::High
-            } else {
-                Priority::Lowest
-            };
+            let (priority, inner_gov_prop_mail_tx) =
+                if gov_proposal.ministrial_proposal.raw_data_created_at
+                    >= today() - chrono::Duration::days(90)
+                {
+                    (Priority::Highest, new_ministrial_prop_tx.clone())
+                } else if gov_proposal.ministrial_proposal.gp == LATEST_GP {
+                    (Priority::High, None)
+                } else {
+                    (Priority::Lowest, None)
+                };
 
             let inner_gov_proposal = gov_proposal.clone();
-            let inner_gov_prop_mail_tx = new_ministrial_prop_tx.clone();
             let pool = pool.clone();
             let redis_client = app_state.redis_client.clone();
             let documents = gov_proposal.documents.clone();
@@ -281,10 +281,8 @@ pub async fn update_ministrial_proposals_in_db2(
                         let ai_summary =
                             summarize_ministerial_proposal_documents(task_args, &documents).await?;
 
-                        if ai_summary.is_none() {
-                            return Ok(());
-                        }
-
+                        let is_ai_summary_none = ai_summary.is_none();
+                        // not returning on None to still send gov prop
                         let mut inner_gov_proposal = inner_gov_proposal;
                         inner_gov_proposal.ai_summary = ai_summary;
 
@@ -296,6 +294,10 @@ pub async fn update_ministrial_proposals_in_db2(
                                 &gov_prop_mail_tx,
                             )
                             .await;
+                        }
+
+                        if is_ai_summary_none {
+                            return Ok(());
                         }
 
                         let Some(mut redis_client) = redis_client else {
