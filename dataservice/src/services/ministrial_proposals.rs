@@ -337,8 +337,20 @@ pub async fn update_ministrial_proposals_in_db2(
             gov_proposal.ministrial_proposal.inr
         );
 
+        let mut tx = pool.begin().await?;
+
+        if let Err(e) = sqlx::query!(
+            "delete from ministrial_issuer where ministrial_proposal_id = $1",
+            ministrial_prop_id
+        )
+        .execute(&mut *tx)
+        .await
+        {
+            log::error!("Cannot delete all ministrial proposal issuers from {ministrial_prop_id} because of: {e:}");
+        }
+
         for issuer_id in &gov_proposal.ministerial_issuers {
-            sqlx::query!(
+            if let Err(e) = sqlx::query!(
                 r#"
                 INSERT INTO ministrial_issuer (delegate_id, ministrial_proposal_id)
                 VALUES ($1, $2)
@@ -348,8 +360,19 @@ pub async fn update_ministrial_proposals_in_db2(
                 *issuer_id,
                 ministrial_prop_id
             )
-            .execute(pool)
-            .await?;
+            .execute(&mut *tx)
+            .await
+            {
+                log::error!(
+                    "Cannot insert ministrial issuer for {ministrial_prop_id} because of: {e:}"
+                );
+            }
+        }
+
+        if let Err(e) = tx.commit().await {
+            log::error!(
+                "Cannot commit transaction for ministrial issuer replacement: {ministrial_prop_id}, {e:?}"
+            );
         }
 
         #[cfg(not(feature = "ai"))]
