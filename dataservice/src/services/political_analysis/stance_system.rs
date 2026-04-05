@@ -68,8 +68,8 @@ pub enum StanceDetection {
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type)]
 pub struct Citation {
-    point_uuid: String,
-    speech_id: i32,
+    pub point_uuid: String,
+    pub speech_id: i32,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

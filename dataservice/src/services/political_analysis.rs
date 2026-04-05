@@ -6,7 +6,10 @@ mod upload_questions;
 use std::sync::Arc;
 
 use chrono::TimeDelta;
-use qdrant_client::Qdrant;
+use qdrant_client::{
+    qdrant::{group_id::Kind, GetPoints, PointId},
+    Qdrant,
+};
 use somai_client::SomAiClient;
 use sqlx::PgPool;
 use tokio::sync::mpsc::Sender;
@@ -143,6 +146,54 @@ async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Res
                         let answer_id = sqlx::query_scalar!("insert into political_answers(question_id, delegate_id, answer, stance_llm, model_used)
                             values ($1, $2, $3, $4, $5) returning id
                         ", question_id, delegate_id, stance.political_stance, stance_llm, used_llm).fetch_one(&task_args.pg_pool).await?;
+
+                        for citation in stance.citations {
+                            let point_id = PointId::from(citation.point_uuid.clone());
+
+                            let get_points_req = GetPoints {
+                                collection_name: "delegates".to_string(),
+                                ids: vec![point_id],
+                                with_payload: Some(true.into()),
+                                ..Default::default()
+                            };
+
+                            let qdrant_res = qdrant_client.get_points(get_points_req).await?;
+
+                            let mut text_snippet: Option<String> = None;
+
+                            if let Some(point) = qdrant_res.result.first() {
+                                if let Some(text_value) = point.payload.get("text") {
+                                    if let Some(qdrant_client::qdrant::value::Kind::StringValue(
+                                        text,
+                                    )) = &text_value.kind
+                                    {
+                                        text_snippet = Some(text.clone());
+                                    }
+                                }
+                            }
+
+                            let Ok(parsed_uuid) = uuid::Uuid::parse_str(&citation.point_uuid)
+                            else {
+                                log::warn!("Skipping citation insertion because of malformed uuid: {citation:?}");
+                                continue;
+                            };
+
+                            sqlx::query!(
+                                r#"
+                                INSERT INTO stance_citations
+                                    (answer_id, speech_id, point_uuid, text_snippet)
+                                VALUES
+                                    ($1, $2, $3, $4)
+                                ON CONFLICT (answer_id, point_uuid) DO NOTHING
+                                "#,
+                                answer_id,
+                                citation.speech_id,
+                                parsed_uuid,
+                                text_snippet
+                            )
+                            .execute(&task_args.pg_pool)
+                            .await?;
+                        }
 
                         let ref_answers = sqlx::query!("select stance_llm, answer, question_id from political_answers pa where question_id = $1 and is_strong_reference order by stance_llm;", question_id).fetch_all(&task_args.pg_pool).await?;
 

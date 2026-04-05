@@ -78,3 +78,15 @@ create table political_opinions(
     FOREIGN KEY (answer_id) REFERENCES political_answers(id),
     unique(delegate_id, question_id, answer_id)
 );
+
+create table stance_citations(
+    id serial primary key,
+    answer_id int not null,
+    speech_id int not null,
+    point_uuid uuid not null,
+    text_snippet text,
+    created_at timestamptz DEFAULT now(),
+    UNIQUE(answer_id, point_uuid),
+    FOREIGN KEY (speech_id) REFERENCES plenar_speeches(id),
+    FOREIGN KEY (answer_id) REFERENCES political_answers(id)
+);
