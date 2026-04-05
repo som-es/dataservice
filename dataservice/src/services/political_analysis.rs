@@ -5,7 +5,7 @@ mod upload_questions;
 
 use std::sync::Arc;
 
-use chrono::{Months, TimeDelta};
+use chrono::TimeDelta;
 use qdrant_client::Qdrant;
 use somai_client::SomAiClient;
 use sqlx::PgPool;
@@ -14,7 +14,7 @@ use tokio::sync::mpsc::Sender;
 use crate::{
     ai_task::AiTask,
     political_analysis::{
-        embed_speeches::{get_delegate_ids, process_delegate},
+        embed_speeches::get_delegate_ids,
         stance_system::{rag_pipeline, Stance},
     },
     today, Result, Shutdown,
@@ -115,8 +115,6 @@ async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Res
             let qdrant_client = qdrant_client.clone();
             let question_text = question.question.clone();
             let question_id = question.id;
-            let is_left = question.is_left;
-            let is_liberal = question.is_liberal;
             let delegate_id = delegate.id;
             let used_llm = used_llm.clone();
 

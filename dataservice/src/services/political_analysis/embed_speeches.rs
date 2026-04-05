@@ -10,7 +10,6 @@ use qdrant_client::qdrant::{
 use qdrant_client::qdrant::{DeletePoints, PointStruct, PointsSelector, UpsertPoints};
 use qdrant_client::Qdrant;
 use serde_json::json;
-use somai_client::SomAiClient;
 use sqlx::PgPool;
 use std::collections::HashMap;
 
