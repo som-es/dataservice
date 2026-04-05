@@ -16,6 +16,7 @@ use tokio::sync::mpsc::Sender;
 
 use crate::{
     ai_task::{AiTask, TaskArgs},
+    ai_tasks::somai_connect,
     political_analysis::{
         embed_speeches::get_delegate_ids,
         stance_system::{rag_pipeline, Citation, Stance},
@@ -216,15 +217,7 @@ async fn evaluate_and_save_opinion(
 }
 
 async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Result<()> {
-    let ai_client = Arc::new(
-        SomAiClient::new(
-            &std::env::var("SOMAI_URL").unwrap_or_else(|_| "http://127.0.0.1:8000".to_string()),
-            "API_USER",
-            &std::env::var("SOMAI_API_SECRET").unwrap(),
-        )
-        .await?,
-    );
-
+    let ai_client = somai_connect().await?;
     let used_llm = ai_client.get_model().await?.result;
 
     let qdrant_client = Qdrant::from_url(
@@ -247,6 +240,9 @@ async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Res
 
     let today = today().to_utc();
     for delegate in delegates {
+        if delegate.id != 8242 {
+            continue;
+        }
         let last_updated_at = sqlx::query_scalar!(
             "select updated_at from last_vector_speech_update where delegate_id = $1",
             delegate.id

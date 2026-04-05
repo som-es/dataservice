@@ -73,14 +73,16 @@ pub async fn ai_tasks_service(
 
         let mut somai_client = None;
         while somai_client.is_none() {
-            let temp_somai_client = SomAiClient::new_local("http://127.0.0.1:8000").await;
+            use crate::ai_tasks::somai_connect;
+
+            let temp_somai_client = somai_connect().await;
             if let Err(ref e) = temp_somai_client {
                 log::error!("Could not connect to somai API: {e}");
                 sleep(std::time::Duration::from_millis(10000)).await;
             }
             somai_client = temp_somai_client.ok()
         }
-        let somai_client = Arc::new(somai_client.unwrap());
+        let somai_client = somai_client.unwrap();
 
         let task_queue = Arc::new(RwLock::new(std::collections::binary_heap::BinaryHeap::new()));
 

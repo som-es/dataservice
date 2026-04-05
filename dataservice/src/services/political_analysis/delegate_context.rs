@@ -237,8 +237,8 @@ mod tests {
         let spoken_texts = collect_spoken_texts(
             &qdrant_client,
             &ai_client,
-            83148,
-            // 8242,
+            // 83148,
+            8242,
             "Welche Maßnahmen gegen den Klimawandel schlägt er vor?",
         )
         .await
