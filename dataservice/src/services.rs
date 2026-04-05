@@ -6,6 +6,8 @@ pub mod ministrial_decrees;
 pub mod ministrial_proposals;
 pub mod parties;
 pub mod plenar;
+#[cfg(feature = "vectordb")]
+pub mod political_analysis;
 
 pub async fn scrape_untill_success<T, O>(f: impl Fn() -> O) -> T
 where

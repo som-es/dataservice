@@ -398,14 +398,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_somai_client_embed() {
-        let client = SomAiClient::new_local("http://127.0.0.1:8000")
+        let client = SomAiClient::new("http://10.30.0.164:8000", "API_USER", "supersicher123!")
             .await
             .unwrap();
 
         let res = client
             .embedding_embed(
-                "test this embedding model".into(),
-                Some("Qwen/Qwen3-Embedding-0.6B".into()),
+                (0..1000).fold("".into(), |acc: String, x: i32| format!("{acc} again")),
+                // "again test this embedding model again".into(),
+                Some("Qwen/Qwen3-Embedding-4B".into()),
             )
             .await
             .unwrap();

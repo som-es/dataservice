@@ -193,7 +193,7 @@ pub async fn insert_ministrial_decree(
         // Check and send email notification for new decree
         #[cfg(not(feature = "ai"))]
         if let Some(new_decree_tx) = new_decree_tx {
-            check_and_send_decree_email(pg_pool, &decree, decree_id.id, &new_decree_tx).await;
+            check_and_send_decree_email(pg_pool, &decree, decree_id, &new_decree_tx).await;
         }
 
         if should_update {
