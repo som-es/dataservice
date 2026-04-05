@@ -1,12 +1,13 @@
 use crate::political_analysis::EmbeddingProvider;
 use crate::Result;
 use chrono::{Datelike, Utc};
+use qdrant_client::qdrant::points_selector::PointsSelectorOneOf;
 use qdrant_client::qdrant::r#match::MatchValue;
 use qdrant_client::qdrant::{
     condition::ConditionOneOf, vectors_config::Config, Condition, CreateCollection, Distance,
     FieldCondition, Filter, Match, VectorParams, VectorsConfig,
 };
-use qdrant_client::qdrant::{PointStruct, UpsertPoints};
+use qdrant_client::qdrant::{DeletePoints, PointStruct, PointsSelector, UpsertPoints};
 use qdrant_client::Qdrant;
 use serde_json::json;
 use somai_client::SomAiClient;
@@ -127,6 +128,7 @@ pub async fn process_delegate(
     embedder: &impl EmbeddingProvider,
     collection_name: &str,
     delegate: &Delegate,
+    update_entries: bool,
 ) -> crate::Result<()> {
     // 1. Check if delegate already exists in Qdrant (Scroll with filter)
     let filter = Filter {
@@ -145,13 +147,13 @@ pub async fn process_delegate(
     let scroll_res = qdrant
         .scroll(qdrant_client::qdrant::ScrollPoints {
             collection_name: collection_name.to_string(),
-            filter: Some(filter),
+            filter: Some(filter.clone()),
             limit: Some(1),
             ..Default::default()
         })
         .await?;
 
-    if !scroll_res.result.is_empty() {
+    if !scroll_res.result.is_empty() && !update_entries {
         log::info!("Skipping delegate {} (already in Qdrant)", delegate.id);
         return Ok(());
     }
@@ -219,6 +221,23 @@ pub async fn process_delegate(
         speeches.len()
     );
 
+    if update_entries {
+        let delete_res = qdrant
+            .delete_points(DeletePoints {
+                collection_name: collection_name.to_string(),
+                wait: Some(true),
+                points: Some(PointsSelector {
+                    points_selector_one_of: Some(PointsSelectorOneOf::Filter(filter)),
+                }),
+                ..Default::default()
+            })
+            .await?;
+        log::info!(
+            "Successfully deleted points of delegate: {}, {delete_res:?}",
+            delegate.id
+        );
+    }
+
     let batch_size = 500;
     for batch in points.chunks(batch_size) {
         let upsert_points = UpsertPoints {
@@ -228,6 +247,8 @@ pub async fn process_delegate(
         };
         qdrant.upsert_points(upsert_points).await?;
     }
+
+    sqlx::query!("insert into last_vector_speech_update(delegate_id) values ($1) on conflict (delegate_id) do update set updated_at = now()", delegate.id).execute(pool).await?;
 
     Ok(())
 }
@@ -245,7 +266,9 @@ pub async fn process_all_delegates(
 
     for delegate in delegates {
         log::info!("Processing delegate ID: {}", delegate.id);
-        if let Err(e) = process_delegate(pool, qdrant, embedder, collection_name, &delegate).await {
+        if let Err(e) =
+            process_delegate(pool, qdrant, embedder, collection_name, &delegate, false).await
+        {
             log::error!("Failed processing delegate {}: {:?}", delegate.id, e);
         }
     }

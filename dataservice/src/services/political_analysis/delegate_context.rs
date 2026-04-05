@@ -180,7 +180,7 @@ pub async fn collect_delegate_profile(
     http_client: &HttpClient,
     delegate_id: i32,
 ) -> Result<String> {
-    let delegate_url = format!("https://somes.at/api/v1/delegates/id/{}", delegate_id);
+    let delegate_url = format!("https://somes.at/api/at/v1/delegates/id/{}", delegate_id);
     let mut delegate_info: JsonValue = http_client.get(&delegate_url).send().await?.json().await?;
 
     // let qa_url = format!(

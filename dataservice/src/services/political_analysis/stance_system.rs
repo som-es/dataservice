@@ -7,7 +7,7 @@ use crate::{
 };
 use qdrant_client::Qdrant;
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use somai_client::SomAiClient;
 use somes_scraper::today;
 use sqlx::prelude::{FromRow, Type};
@@ -16,26 +16,31 @@ pub fn create_stance_system_prompt(context: &str, profile: &str) -> String {
     let today = today();
     format!(
         r#"
-        Du bist ein Experte für politische Analyse und Stance Detection.
-        Deine Aufgabe ist es, basierend auf einer bereitgestellten Frage oder Themen und einem gegebenen Kontext, die Position des angegebenen Politikers zu analysieren.
-        Achte darauf, die Haltung klar erkenntlich für ein Stance Detection System in der Erklärung der Position einzubauen. Dabei muss jede Antwort auf Deutsch erfolgen
+    Du bist ein KI-Experte für politische Analyse und Stance Detection.
+    Deine Aufgabe ist es, die inhaltliche Position (Stance) eines Politikers zu einer spezifischen Frage oder einem Thema präzise zu ermitteln – basierend ausschließlich auf dem bereitgestellten Kontext.
 
-        WICHTIG - FOLGE DIESER ANTWORT STRUKTUR:
-        1. Fang direkt mit der Position des Politikers an, ohne unnötige Einleitung
-        2. Erwähne direkt die Position ohne drum-herum!
-        3. Liste mögliche Punkte NICHT auf, sondern schreib einen einzigen Absatz über die Position
-        4. Falls keine Äußerungen zum Untermauern der Position vorhanden sind, dann breche ab. Beispiel: "Die SPÖ-Abgeordnete Michaela Stefans hat in ihren Äußerungen nie eine explizite Position zur Aufgabe der Neutralität Österreichs geäußert"
-        5. Erfinde nichts. Beziehe dich rein auf den folgenden Kontext! Wenn der Kontext demnach leer ist, oder nicht genügend Informationen enthält, dann kannst du auch nicht korrekt antworten!
-        6. Beachte, dass manche Informationen, wie z.B. welche Regierungsparteien gerade im Amt ist, sich im Laufe der Zeit verändert haben.
-        7. Schreibe die schriftliche Position, die aus den Reden generiert wurde, in "political_stance". Ob diese Position bzw. Haltung positiv, neutral oder negativ ist, ist in "stance_detection" einzutragen.
-        8. Halte dich dringend an diese Zitationsregel: Speichere die Identifikationdaten für die generierte Haltung verwendeten Reden in "citations" ab. Point-ID => "point_uuid", Rede-ID => "speech_id"
+    WICHTIGE ANWEISUNG ZUM AUSGABEFORMAT:
+    Du musst deine Antwort zwingend als valides JSON-Objekt formatieren.
 
-        Kontext (in Form von Redesnippets des Politkers): '{context}'
-        JSON Steckbrief (beinhaltet Informationen zum angegebenen Politker): '{profile}'
-        Allgemeine Informationen: Heute ist der {today}, aktuelle Legislaturperiode: {LATEST_GP}, Regierung aus ÖVP-SPÖ-NEOS
+    REGELN FÜR DIE INHALTLICHE GENERIERUNG:
+    1. Direkter Einstieg: Beginne im Feld `political_stance` sofort mit der Position des Politikers. Lass unnötige Einleitungen (wie "Die Position ist...") weg.
+    2. Textformat: Liste Argumente NICHT in Stichpunkten auf. Schreibe stattdessen einen einzigen, zusammenhängenden ausführlichen Absatz mit mehreren Sätzen zur Begründung.
+    3. Zero Hallucination: Erfinde absolut nichts. Deine Analyse muss zu 100 % aus dem bereitgestellten Kontext ableitbar sein.
+    4. Fehlende Informationen: Wenn der Kontext leer ist oder keine Äußerungen zur Frage enthält, schreibe in `political_stance` exakt dies (Beispiel: "Die Abgeordnete XY hat in ihren Äußerungen nie eine explizite Position zur Frage Z geäußert."). In diesem Fall muss `stance_detection` auf "Neutral" gesetzt werden.
+    5. "stance_detection" ist immer im Bezug zur Frage: Falls die Haltung positiv gegenüber der Frage ist, trage "Positive" bei "stance_detection" ein, ansonsten "Negative".
+    6. Zitationen: Halte dich strikt an die Quellen. Für jede Rede, die du zur Generierung der Haltung verwendet hast, musst du ein Objekt in das `citations`-Array einfügen (mit der jeweiligen `point_uuid` und `speech_id`).
+    7. Historischer Kontext: Beachte bei der Analyse, dass sich Funktionen, Regierungsbeteiligungen und Parteizugehörigkeiten im Laufe der Zeit verändert haben können.
+    8. Sprache: Alle generierten Textwerte im JSON müssen zwingend auf Deutsch verfasst sein.
 
-        Antworte vollständig in deutscher Sprache!
-        Wie erwähnt: Erfinde nichts! Beziehe dich rein auf den folgenden Kontext! Wenn der Kontext demnach leer ist, oder nicht genügend Informationen für die Beantwortung der Frage enthält, dann kannst du auch nicht auf die Position eingehen!
+    DATENGRUNDLAGE:
+    Kontext (Redesnippets des Politikers):
+    {context}
+
+    JSON Steckbrief (Informationen zum Politiker):
+    {profile}
+
+    Allgemeine System-Informationen:
+    Heute ist der {today}. Aktuelle Legislaturperiode: {LATEST_GP}. Aktuelle Regierung: ÖVP-SPÖ-NEOS.
     "#
     )
 }
@@ -55,9 +60,9 @@ pub async fn populate_system_prompt(
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone, Type)]
 pub enum StanceDetection {
-    Pro,
+    Postive,
     Neutral,
-    Contra,
+    Negative,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
@@ -70,30 +75,28 @@ pub struct Citation {
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type)]
 pub struct Stance {
-    political_stance: String,
-    stance_dection: StanceDetection,
-    citations: Vec<Citation>,
+    pub political_stance: String,
+    pub stance_dection: StanceDetection,
+    pub citations: Vec<Citation>,
 }
 
-pub async fn rag_pipeline(
+pub async fn rag_pipeline<T: JsonSchema + DeserializeOwned>(
     ai_client: &SomAiClient,
     qdrant_client: &Qdrant,
     delegate_id: i32,
     question: &str,
-) -> crate::Result<()> {
+) -> crate::Result<T> {
     let prompt = populate_system_prompt(qdrant_client, ai_client, delegate_id, question).await?;
     log::info!("stance prompt length: {}", prompt.len());
-    let res = ai_client
-        .make_llm_request_with_schema::<Stance>(
+    Ok(ai_client
+        .make_llm_request_with_schema::<T>(
             question.into(),
             prompt,
             None,
             false,
             Some(|_schema: &mut serde_json::Value| {}),
         )
-        .await?;
-    dbg!(&res);
-    Ok(())
+        .await?)
 }
 
 #[cfg(test)]
@@ -101,7 +104,7 @@ mod tests {
     use qdrant_client::Qdrant;
     use somai_client::SomAiClient;
 
-    use crate::political_analysis::stance_system::rag_pipeline;
+    use crate::political_analysis::stance_system::{rag_pipeline, Stance};
 
     #[tokio::test]
     async fn test_rag_pipeline() {
@@ -114,8 +117,10 @@ mod tests {
         let delegate_id = 8242;
         let question = "Der Staat sollte weniger ins Wirtschaftsleben eingreifen.";
 
-        rag_pipeline(&ai_client, &qdrant_client, delegate_id, question)
-            .await
-            .unwrap();
+        let stance: Stance =
+            rag_pipeline::<Stance>(&ai_client, &qdrant_client, delegate_id, question)
+                .await
+                .unwrap();
+        log::info!("stance: {stance:?}");
     }
 }

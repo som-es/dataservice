@@ -55,7 +55,7 @@ tesseract = ["dep:tesseract-rs", "combx/tesseract"]
 
 ocrs = ["dep:ocrs", "combx/ocrs", "combx/rten", "combx/rten-imageproc", "combx/rten-tensor"]
 
-vectordb = ["qdrant-client", "uuid"]
+vectordb = ["qdrant-client", "uuid", "ai"]
 ai = []
 legis_init_latest = []
 legis_init = []
