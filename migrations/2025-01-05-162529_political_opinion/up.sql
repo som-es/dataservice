@@ -69,7 +69,7 @@ create table political_opinions(
     question_id int not null,
     answer_id int not null,
     stance varchar(255) not null,
-    stance_acc float not null,
+    stance_acc float,
     pro_strong_ref_score float not null,
     contra_strong_ref_score float not null,
     ref_score float not null,

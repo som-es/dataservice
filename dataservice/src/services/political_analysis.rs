@@ -40,6 +40,13 @@ impl EmbeddingProvider for SomAiClient {
     }
 }
 
+struct Question {
+    id: i32,
+    question: String,
+    is_left: Option<bool>,
+    is_liberal: Option<bool>,
+}
+
 async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Result<()> {
     let ai_client = Arc::new(
         SomAiClient::new(
@@ -63,10 +70,12 @@ async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Res
         .unwrap_or_default();
 
     let delegates = get_delegate_ids(&pg_pool).await?;
-    let questions =
-        sqlx::query!("SELECT id, question, is_left, is_liberal name FROM political_questions")
-            .fetch_all(pg_pool)
-            .await?;
+    let questions = sqlx::query_as!(
+        Question,
+        "SELECT id, question, is_liberal, is_left FROM political_questions"
+    )
+    .fetch_all(pg_pool)
+    .await?;
 
     let today = today().to_utc();
     for delegate in delegates {
@@ -106,8 +115,11 @@ async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Res
             let qdrant_client = qdrant_client.clone();
             let question_text = question.question.clone();
             let question_id = question.id;
+            let is_left = question.is_left;
+            let is_liberal = question.is_liberal;
             let delegate_id = delegate.id;
             let used_llm = used_llm.clone();
+
             let ai_task = AiTask {
                 input: None,
                 priority: crate::ai_task::Priority::Medium,
@@ -124,18 +136,40 @@ async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Res
                         )
                         .await?;
 
-                        let stance_llm = match stance.stance_dection {
+                        let stance_llm = match stance.stance_detection {
                             stance_system::StanceDetection::Postive => "Positive",
                             stance_system::StanceDetection::Neutral => "Neutral",
                             stance_system::StanceDetection::Negative => "Negative",
                         };
 
-                        sqlx::query!("insert into political_answers(question_id, delegate_id, answer, stance_llm, model_used)
-                            values ($1, $2, $3, $4, $5)
-                        ", question_id, delegate_id, stance.political_stance, stance_llm, used_llm).execute(&task_args.pg_pool).await?;
+                        let answer_id = sqlx::query_scalar!("insert into political_answers(question_id, delegate_id, answer, stance_llm, model_used)
+                            values ($1, $2, $3, $4, $5) returning id
+                        ", question_id, delegate_id, stance.political_stance, stance_llm, used_llm).fetch_one(&task_args.pg_pool).await?;
 
-                        let ref_answers = sqlx::query!("select stance_llm, answer, question_id from political_answers pa where question_id = $1 and is_strong_reference;", question_id).fetch_all(&task_args.pg_pool).await?;
+                        let ref_answers = sqlx::query!("select stance_llm, answer, question_id from political_answers pa where question_id = $1 and is_strong_reference order by stance_llm;", question_id).fetch_all(&task_args.pg_pool).await?;
 
+                        let negative_ref = &ref_answers[0].answer;
+                        let positive_ref = &ref_answers[1].answer;
+
+                        let pro_sim = ai_client
+                            .embedding_embed_and_cosine(
+                                positive_ref.to_string(),
+                                stance.political_stance.to_string(),
+                            )
+                            .await?
+                            .cosine_similarity;
+
+                        let contra_sim = ai_client
+                            .embedding_embed_and_cosine(
+                                negative_ref.to_string(),
+                                stance.political_stance.to_string(),
+                            )
+                            .await?
+                            .cosine_similarity;
+                        let score = 10.0 * (pro_sim - contra_sim).powi(2);
+
+                        sqlx::query!("insert into political_opinions (delegate_id, question_id, answer_id, stance, pro_strong_ref_score, contra_strong_ref_score, ref_score) values ($1, $2, $3, $4, $5, $6, $7)",
+                                    delegate_id, question_id, answer_id, stance_llm, pro_sim, contra_sim, score).execute(&task_args.pg_pool).await?;
                         Ok(())
                     })
                 }),

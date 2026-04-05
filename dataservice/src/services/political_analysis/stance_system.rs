@@ -76,7 +76,7 @@ pub struct Citation {
 #[derive(JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, Type)]
 pub struct Stance {
     pub political_stance: String,
-    pub stance_dection: StanceDetection,
+    pub stance_detection: StanceDetection,
     pub citations: Vec<Citation>,
 }
 
