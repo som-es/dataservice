@@ -238,6 +238,7 @@ async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Res
     .fetch_all(pg_pool)
     .await?;
 
+    let mut entry_id = 0;
     let today = today().to_utc();
     for delegate in delegates {
         if delegate.id != 8242 {
@@ -258,6 +259,7 @@ async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Res
         };
 
         if !vector_update_skip && today - last_updated_at < TimeDelta::days(30 * 3) {
+            log::info!("Skip delegate {}, time delta too low", delegate.id);
             continue;
         }
 
@@ -286,8 +288,8 @@ async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Res
                 input: None,
                 priority: crate::ai_task::Priority::Medium,
                 task_id: crate::hash!(),
-                db_entry_id: 0,
-                rerunnable: true,
+                db_entry_id: entry_id,
+                rerunnable: !vector_update_skip,
                 task: Box::new(move |task_args| {
                     Box::pin(async move {
                         process_delegate_stance(
@@ -307,6 +309,7 @@ async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Res
             if let Err(e) = ai_task_tx.send(ai_task).await {
                 log::error!("Cannot send ai task: {e:?}")
             }
+            entry_id += 1;
         }
     }
 

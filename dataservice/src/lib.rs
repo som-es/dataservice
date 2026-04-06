@@ -112,8 +112,8 @@ pub fn today_and_time() -> chrono::DateTime<Local> {
 
 pub async fn connect_pg() -> PgPool {
     PgPoolOptions::new()
-        .max_connections(128)
-        .min_connections(4)
+        .max_connections(60)
+        .min_connections(5)
         .connect(DATABASE_URL)
         .await
         .unwrap()
@@ -140,9 +140,9 @@ mod tests {
 
         let res = query!(
             "SELECT spoken_text, COUNT(*) as c
-FROM plenar_speeches 
-WHERE spoken_text IS NOT NULL 
-GROUP BY spoken_text 
+FROM plenar_speeches
+WHERE spoken_text IS NOT NULL
+GROUP BY spoken_text
 HAVING COUNT(*) > 1 order by c desc;"
         )
         .fetch_all(&pg)

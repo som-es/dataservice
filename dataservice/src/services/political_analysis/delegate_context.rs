@@ -239,7 +239,7 @@ mod tests {
             &ai_client,
             // 83148,
             8242,
-            "Welche Maßnahmen gegen den Klimawandel schlägt er vor?",
+            "In Österreich sollte eine 32-Stunden-Woche eingeführt werden, bei gleichbleibendem Lohn.",
         )
         .await
         .unwrap();
