@@ -21,11 +21,15 @@ pub async fn extract_interjections<'a>(
     let mut interjections: Vec<Interjection> = Vec::new();
 
     for param in params {
-        interjections.push(
-            extract_interjection(param.as_str(), &plenar_speech, &db_delegates, &plenar_date)
-                .unwrap(),
-        )
-    }
+    let extracted = extract_interjection(
+        param.as_str(),
+        &plenar_speech,
+        &db_delegates,
+        &plenar_date,
+    );
+
+    interjections.extend(extracted);
+}
 
     save_interjection(interjections, pool, plenar_speech_id).await
 }
@@ -80,132 +84,184 @@ pub async fn save_interjection<'a>(
     Ok(())
 }
 
-pub fn extract_interjection(
+fn extract_interjection(
     param: &str,
     plenar_speech: &PlenarSpeech,
     db_delegate: &Vec<DbDelegate>,
     plenar_date: &DateTime<Utc>,
-) -> Option<Interjection> {
-    let (name, text) = extract_interjection_parts(param)?;
-    let delegate_results = match_delegate_name_with_delegate_id(
-        db_delegate.iter(),
-        plenar_date.date_naive(),
-        &name,
-        true,
-    );
+) -> Vec<Interjection> {
 
-    let best = delegate_results.get(0)?;
+    let parts = extract_interjections_parts(param);
 
-    let delegate_matching = DelegateMatching {
-        similiarity_score: best.similiarity_score as i64,
-        searched_with: best.searched_with.clone(),
-        matched_with: best.matched_with.clone(),
-        delegate_id: best.delegate_id as i32,
-        manually_matched: best.manually_matched,
-    };
+    let mut result = Vec::new();
 
-    Some(Interjection {
-        interjection_text: text,
-        interjector_delegate_id: best.delegate_id as i32,
-        plenar_speech: plenar_speech.clone(),
-        delegate_matching,
-    })
+    for (name, text) in parts {
+        let delegate_results = match_delegate_name_with_delegate_id(
+            db_delegate.iter(),
+            plenar_date.date_naive(),
+            &name,
+            true,
+        );
+
+        if let Some(best) = delegate_results.get(0) {
+            let delegate_matching = DelegateMatching {
+                similiarity_score: best.similiarity_score as i64,
+                searched_with: best.searched_with.clone(),
+                matched_with: best.matched_with.clone(),
+                delegate_id: best.delegate_id as i32,
+                manually_matched: best.manually_matched,
+            };
+
+            result.push(Interjection {
+                interjection_text: text,
+                interjector_delegate_id: best.delegate_id as i32,
+                plenar_speech: plenar_speech.clone(),
+                delegate_matching,
+            });
+        }
+    }
+
+    result
 }
 
-fn extract_interjection_parts(param: &str) -> Option<(String, String)> {
-    let re = Regex::new(r"Abg\.\s*([A-Za-zÄÖÜäöüß\-\s]+?):\s*(.+)").ok()?;
+fn extract_interjections_parts(param: &str) -> Vec<(String, String)> {
+    let re = Regex::new(
+        r"Abg\.\s*([A-Za-zÄÖÜäöüß\-\s]+?)\s*(?:–[^:]+)?\s*:\s*(.+?)(?=–\s*Abg\.|$)"
+    ).unwrap();
 
-    let caps = re.captures(param)?;
-
-    let name = caps.get(1)?.as_str().trim().to_string();
-    let text = caps.get(2)?.as_str().trim().to_string();
-
-    Some((name, text))
+    re.captures_iter(param)
+        .filter_map(|caps| {
+            let name = caps.get(1)?.as_str().trim().to_string();
+            let text = caps.get(2)?.as_str().trim().to_string();
+            Some((name, text))
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+   #[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_extraction(input: &str, expected: Vec<(&str, &str)>) {
+        let result = extract_interjections_parts(input);
+
+        let expected: Vec<(String, String)> = expected
+            .into_iter()
+            .map(|(n, t)| (n.to_string(), t.to_string()))
+            .collect();
+
+        assert_eq!(result, expected);
+    }
+
     #[test]
     fn test_interjection_extraction_1() {
         assert_extraction(
             "Abg. Hallo: Das ist eine Frechheit!",
-            Some(("Hallo", "Das ist eine Frechheit!")),
+            vec![("Hallo", "Das ist eine Frechheit!")],
         );
     }
+
     #[test]
     fn test_interjection_extraction_2() {
         assert_extraction(
             "Abg. Schwarz: Stimmt ja nicht! Erst heute hat er wieder ...!",
-            Some(("Schwarz", "Stimmt ja nicht! Erst heute hat er wieder ...!")),
+            vec![("Schwarz", "Stimmt ja nicht! Erst heute hat er wieder ...!")],
         );
     }
 
     #[test]
     fn test_interjection_extraction_3() {
-        assert_extraction("Abg. Stefan: Geh!", Some(("Stefan", "Geh!")));
+        assert_extraction(
+            "Abg. Stefan: Geh!",
+            vec![("Stefan", "Geh!")],
+        );
     }
 
     #[test]
     fn test_interjection_extraction_4() {
         assert_extraction(
             "Abg. Keck: Sie sind auch kein Bürgermeister!",
-            Some(("Keck", "Sie sind auch kein Bürgermeister!")),
+            vec![("Keck", "Sie sind auch kein Bürgermeister!")],
         );
     }
 
     #[test]
     fn test_interjection_extraction_5() {
         assert_extraction(
-        "Abg. Meinl-Reisinger: Die Wirtshausprämie könnte man auch ...! Die braucht man auch nicht!",
-        Some(("Meinl-Reisinger", "Die Wirtshausprämie könnte man auch ...! Die braucht man auch nicht!")),
-    );
+            "Abg. Meinl-Reisinger: Die Wirtshausprämie könnte man auch ...! Die braucht man auch nicht!",
+            vec![(
+                "Meinl-Reisinger",
+                "Die Wirtshausprämie könnte man auch ...! Die braucht man auch nicht!",
+            )],
+        );
     }
 
     #[test]
-    fn test_interjection_extraction_6() {
+    fn test_interjection_extraction_6_multiple() {
         assert_extraction(
             "Beifall bei der ÖVP. – Abg. Plessl: Was sagen
 Sie zum Vertrag 2002? Eine Nebelgranate! Das Problem Vertragsgestaltung 2002
 sprechen Sie gar nicht an! – Abg. Steinacker – auf dem Weg zu ihrem Sitzplatz –: Aus
 gut mach schlecht!",
-            Some((
-                "Meinl-Reisinger",
-                "Die Wirtshausprämie könnte man auch ...! Die braucht man auch nicht!",
-            )),
+            vec![
+                (
+                    "Plessl",
+                    "Was sagen
+Sie zum Vertrag 2002? Eine Nebelgranate! Das Problem Vertragsgestaltung 2002
+sprechen Sie gar nicht an!",
+                ),
+                (
+                    "Steinacker",
+                    "Aus
+gut mach schlecht!",
+                ),
+            ],
+        );
+    } 
+
+    #[test]
+    fn test_interjection_extraction_with_inserted_text() {
+        assert_extraction(
+            "Abg. Steinacker – auf dem Weg zu ihrem Sitzplatz –: Aus gut mach schlecht!",
+            vec![("Steinacker", "Aus gut mach schlecht!")],
         );
     }
 
     #[test]
     fn test_interjection_extraction_negative_1() {
-        assert_extraction("Beifall bei Abgeordneten der SPÖ.", None);
+        assert_extraction(
+            "Beifall bei Abgeordneten der SPÖ.",
+            vec![],
+        );
     }
 
     #[test]
     fn test_interjection_extraction_negative_2() {
-        assert_extraction("SPÖ", None);
+        assert_extraction(
+            "SPÖ",
+            vec![],
+        );
     }
 
     #[test]
     fn test_interjection_extraction_negative_3() {
         assert_extraction(
             "Beifall und Bravoruf bei der SPÖ sowie Beifall bei den NEOS.",
-            None,
+            vec![],
         );
     }
+}
+    fn assert_extraction(input: &str, expected: Vec<(&str, &str)>) {
+    let result = extract_interjections_parts(input);
 
-    fn assert_extraction(input: &str, expected: Option<(&str, &str)>) {
-        let result = extract_interjection_parts(input);
+    let expected: Vec<(String, String)> = expected
+        .into_iter()
+        .map(|(n, t)| (n.to_string(), t.to_string()))
+        .collect();
 
-        match (result, expected) {
-            (Some((name, text)), Some((exp_name, exp_text))) => {
-                assert_eq!(name, exp_name);
-                assert_eq!(text, exp_text);
-            }
-            (None, None) => {}
-            (other, expected) => {
-                panic!("Mismatch:\nGot: {:?}\nExpected: {:?}", other, expected);
-            }
-        }
-    }
+    assert_eq!(result, expected);
+}
 }
