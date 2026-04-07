@@ -102,6 +102,15 @@ impl SomAiClient {
     }
 
     // ===================== ENDPOINTS =====================
+    pub async fn get_model(&self) -> Result<LLMResponse, reqwest::Error> {
+        let resp = self
+            .client
+            .get(format!("{}/api/model", self.base_url))
+            .header("Authorization", self.auth_header().await)
+            .send()
+            .await?;
+        Ok(resp.json().await?)
+    }
 
     pub async fn make_llm_request<T: JsonSchema>(
         &self,
@@ -138,25 +147,32 @@ impl SomAiClient {
         Ok(resp.json().await?)
     }
 
-    pub async fn make_llm_request_with_schema<T: JsonSchema + serde::de::DeserializeOwned>(
+    pub async fn make_llm_request_with_schema<T>(
         &self,
         input: String,
         system: String,
         model: Option<String>,
         use_openai: bool,
-    ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
+        schema_patch: Option<impl FnOnce(&mut serde_json::Value)>,
+    ) -> Result<T, Box<dyn std::error::Error + Send + Sync>>
+    where
+        T: JsonSchema + serde::de::DeserializeOwned,
+    {
         let mut schema_generator = SchemaSettings::draft07();
         schema_generator.inline_subschemas = true;
-        let json_schema = Some(
-            serde_json::to_value(&T::json_schema(&mut schema_generator.into_generator())).unwrap(),
-        );
+        let mut json_schema =
+            serde_json::to_value(&T::json_schema(&mut schema_generator.into_generator()))?;
+
+        if let Some(mut patch) = schema_patch {
+            patch(&mut json_schema);
+        }
 
         let req = LLMRequest {
             input,
             system,
             model,
             use_openai,
-            json_schema,
+            json_schema: Some(json_schema),
         };
         let resp = self
             .client
@@ -391,14 +407,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_somai_client_embed() {
-        let client = SomAiClient::new_local("http://127.0.0.1:8000")
+        let client = SomAiClient::new("http://10.30.0.164:8000", "API_USER", "supersicher123!")
             .await
             .unwrap();
 
         let res = client
             .embedding_embed(
-                "test this embedding model".into(),
-                Some("Qwen/Qwen3-Embedding-0.6B".into()),
+                (0..1000).fold("".into(), |acc: String, x: i32| format!("{acc} again")),
+                // "again test this embedding model again".into(),
+                Some("Qwen/Qwen3-Embedding-4B".into()),
             )
             .await
             .unwrap();

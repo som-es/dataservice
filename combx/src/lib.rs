@@ -21,6 +21,10 @@ mod enhancer;
 pub use enhancer::*;
 pub mod with_data;
 
+pub mod schemars {
+    pub use schemars::*;
+}
+
 pub const DATABASE_URL: &str = dotenv!("DATABASE_URL");
 pub const LATEST_GP: &str = dotenv!("LATEST_GP");
 pub const SOMAI_API_SECRET: &str = dotenv!("SOMAI_API_SECRET");

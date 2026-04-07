@@ -16,7 +16,7 @@ pub async fn summarize_decrees_documents(
     .await?;
     if info.is_some() {
         log::info!(
-            "Skipping legis init emphasis summarization for id {}, already set.",
+            "Skipping decree summarization for id {}, already set.",
             task_args.db_entry_id
         );
         return Ok(None);

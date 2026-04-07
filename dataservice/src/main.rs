@@ -25,6 +25,10 @@ struct Args {
     /// Runs only latest services
     #[arg(long, default_value_t = false)]
     only_latest: bool,
+
+    /// Runs only voteables for vote results
+    #[arg(long, default_value_t = false)]
+    only_voteable: bool,
 }
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 32)]
@@ -32,7 +36,7 @@ async fn main() {
     let _ = dotenvy::dotenv().ok();
     let args = Args::parse();
 
-    simple_logger::init_with_level(log::Level::Error).unwrap();
+    simple_logger::init_with_level(log::Level::Info).unwrap();
 
     if let Err(e) = setup_app_data().await {
         log::error!("Cannot create app data directory: {e:?}");
@@ -114,7 +118,6 @@ pub async fn run_services(state: &State, config: Config) {
                 false,
                 true,
                 &app_state,
-                None,
                 llm_ai_task_tx.clone(),
             )
             .await;
@@ -126,7 +129,6 @@ pub async fn run_services(state: &State, config: Config) {
                 services::ministrial_proposals::ministrial_proposal_once(
                     false,
                     &app_state1,
-                    None,
                     inner_ai_task_tx.clone(),
                 )
                 .await
@@ -138,6 +140,7 @@ pub async fn run_services(state: &State, config: Config) {
                     decree_pages() as u32,
                     app_state1,
                     inner_ai_task_tx,
+                    true,
                 )
                 .await;
             };
@@ -159,7 +162,6 @@ pub async fn run_services(state: &State, config: Config) {
                     true,
                     false,
                     &app_state1,
-                    None,
                     inner_ai_task_tx.clone(),
                 )
                 .await;
@@ -176,7 +178,6 @@ pub async fn run_services(state: &State, config: Config) {
                 services::ministrial_proposals::ministrial_proposal_once(
                     false,
                     &app_state1,
-                    None,
                     inner_ai_task_tx.clone(),
                 )
                 .await;
@@ -188,6 +189,7 @@ pub async fn run_services(state: &State, config: Config) {
                     decree_pages() as u32,
                     app_state1,
                     inner_ai_task_tx,
+                    false,
                 )
                 .await;
             };
@@ -215,12 +217,6 @@ pub async fn run_services(state: &State, config: Config) {
         }
     }
 
-    let (new_vote_result_tx, new_vote_result_rx) =
-        tokio::sync::mpsc::channel::<Option<(i32, somes_scraper::LegislativeInitiative)>>(128);
-
-    let (new_ministrial_proposal_tx, new_ministrial_proposal_rx) =
-        tokio::sync::mpsc::channel::<Option<(i32, GovProposal)>>(128);
-
     let latest_legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP_LATEST")
         .unwrap_or_else(|_| "300".to_string())
         .parse()
@@ -242,7 +238,6 @@ pub async fn run_services(state: &State, config: Config) {
         tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
             app_state.clone(),
-            new_vote_result_tx.clone(),
             llm_ai_task_tx.clone(),
             latest_legis_init_sleep + 5000,
             ONLY_LATEST,
@@ -251,9 +246,8 @@ pub async fn run_services(state: &State, config: Config) {
         tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
             app_state.clone(),
-            new_vote_result_tx.clone(),
             llm_ai_task_tx.clone(),
-            latest_legis_init_sleep - 40,
+            latest_legis_init_sleep + 60,
             ONLY_LATEST,
             FETCH_ONLY_LAWS,
         )),
@@ -266,7 +260,6 @@ pub async fn run_services(state: &State, config: Config) {
         tokio::spawn(services::ministrial_proposals::run_shut_latest_gp(
             Shutdown::new(state.notify_shutdown.subscribe()),
             app_state.clone(),
-            new_ministrial_proposal_tx,
             llm_ai_task_tx.clone(),
         )),
         tokio::spawn(services::plenar::run_shut(
@@ -286,25 +279,21 @@ pub async fn run_services(state: &State, config: Config) {
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone()
         )),
+        // latest
         tokio::spawn(services::ministrial_decrees::run_shut_pages(
             Shutdown::new(state.notify_shutdown.subscribe()),
             app_state.clone(),
             decree_pages() as u32,
             llm_ai_task_tx.clone(),
+            true
         )),
-        tokio::spawn(services::mailer::notify_on_new_vote_results_service(
+        // latest
+        tokio::spawn(services::ministrial_decrees::run_shut_pages(
             Shutdown::new(state.notify_shutdown.subscribe()),
-            new_vote_result_rx,
-            pool.clone()
-        )),
-        tokio::spawn(services::mailer::notify_on_new_ministrial_props_service(
-            Shutdown::new(state.notify_shutdown.subscribe()),
-            new_ministrial_proposal_rx,
-            pool.clone()
-        )),
-        tokio::spawn(services::delete_was_updated::delete_was_updated_entries(
-            Shutdown::new(state.notify_shutdown.subscribe()),
-            pool.clone()
+            app_state.clone(),
+            decree_pages() as u32,
+            llm_ai_task_tx.clone(),
+            false
         )),
         tokio::spawn(services::dates::run_shut_dates(
             Shutdown::new(state.notify_shutdown.subscribe()),
@@ -326,6 +315,11 @@ pub async fn run_services(state: &State, config: Config) {
             cpu_ai_task_rx,
             16,
         )),
+        tokio::spawn(services::political_analysis::run_shut(
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            pool.clone(),
+            llm_ai_task_tx.clone(),
+        ))
     )
     .0
     .unwrap();

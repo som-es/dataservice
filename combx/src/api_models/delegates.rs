@@ -35,6 +35,7 @@ pub struct Delegate {
     #[filter(make_vec)]
     pub current_party: Option<String>,
     pub image_url: Option<String>,
+    pub image_copyright: Option<String>,
     #[filter(make_vec)]
     pub constituency: Option<String>,
     #[filter(make_vec)]

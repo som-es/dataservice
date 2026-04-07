@@ -1,13 +1,13 @@
 pub mod ai_task_service;
 pub mod dates;
 pub mod delegates;
-pub mod delete_was_updated;
 pub mod legislative_initiatives;
-pub mod mailer;
 pub mod ministrial_decrees;
 pub mod ministrial_proposals;
 pub mod parties;
 pub mod plenar;
+#[cfg(feature = "vectordb")]
+pub mod political_analysis;
 
 pub async fn scrape_untill_success<T, O>(f: impl Fn() -> O) -> T
 where

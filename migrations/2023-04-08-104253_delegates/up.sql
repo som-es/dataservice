@@ -19,6 +19,7 @@ create table delegates (
     prev_name_till date,
     party varchar(100),
     image_url varchar(300),
+    image_copyright varchar(255),
     constituency varchar(200),
     council varchar(200),
     seat_row int default null,

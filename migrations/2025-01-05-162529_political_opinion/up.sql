@@ -41,6 +41,14 @@ create table political_questions_detailed_topics_influence(
     FOREIGN key (question_id) REFERENCES political_questions(id)
 );
 
+create table last_vector_speech_update(
+    id serial primary key,
+    delegate_id int not null,
+    updated_at timestamptz not null default now(),
+    FOREIGN KEY (delegate_id) REFERENCES delegates(id),
+    unique(delegate_id)
+);
+
 create table political_answers(
     id serial primary key,
     question_id int not null,
@@ -49,6 +57,7 @@ create table political_answers(
     stance_llm varchar(255) not null,
     is_strong_reference boolean,
     model_used varchar(255),
+    created_at timestamptz not null default now(),
     FOREIGN KEY (delegate_id) REFERENCES delegates(id),
     FOREIGN KEY (question_id) REFERENCES political_questions(id),
     UNIQUE(stance_llm, is_strong_reference, question_id)
@@ -60,7 +69,7 @@ create table political_opinions(
     question_id int not null,
     answer_id int not null,
     stance varchar(255) not null,
-    stance_acc float not null,
+    stance_acc float,
     pro_strong_ref_score float not null,
     contra_strong_ref_score float not null,
     ref_score float not null,
@@ -68,4 +77,16 @@ create table political_opinions(
     FOREIGN KEY (question_id) REFERENCES political_questions(id),
     FOREIGN KEY (answer_id) REFERENCES political_answers(id),
     unique(delegate_id, question_id, answer_id)
+);
+
+create table stance_citations(
+    id serial primary key,
+    answer_id int not null,
+    speech_id int not null,
+    point_uuid uuid not null,
+    text_snippet text,
+    created_at timestamptz DEFAULT now(),
+    UNIQUE(answer_id, point_uuid),
+    FOREIGN KEY (speech_id) REFERENCES plenar_speeches(id),
+    FOREIGN KEY (answer_id) REFERENCES political_answers(id)
 );

@@ -1,37 +1,77 @@
 use std::collections::HashMap;
 
 use combx::{DbVote, Delegate, VoteResult};
-use image::{codecs::png::PngEncoder, ImageEncoder, PixelWithColorType, Rgba};
+use image::Rgba;
 use imageproc::{
     drawing::{draw_filled_circle_mut, draw_filled_rect_mut},
     rect::Rect,
 };
 use somes_scraper::Party;
-use sqlx::{query, PgPool};
+use sqlx::{query, query_as, query_scalar, PgPool};
 
 use crate::{
-    email::{send_mail, LEGIS_INIT_EMAIL_TEMPLATE, MAILER},
+    email::{send_mail, LEGIS_INIT_EMAIL_TEMPLATE, MAILER, VOTE_RESULT_ENTRY_TEMPLATE},
     LATEST_GP,
 };
-// could generify
+
+struct ToNotify {
+    id: i32,
+    email: String,
+    by_topics: bool,
+    by_person_favo: bool,
+}
+
 pub async fn find_notifiers_legis_init<'a>(
     pool: &PgPool,
     legis_inits: &'a [(i32, VoteResult)],
+    is_finished: bool,
 ) -> HashMap<String, Vec<&'a (i32, VoteResult)>> {
-    let ids = query!("select id, email from somes_user where is_email_hashed is false and send_new_vote_results_mails")
-        .fetch_all(pool)
-        .await
-        .unwrap_or_default();
+    let ids = if is_finished {
+        query_as!(ToNotify, "select id, email, send_new_vote_results_mails as by_topics, send_new_vote_result_by_favo_mails as by_person_favo from somes_user where is_email_hashed is false and (send_new_vote_results_mails or send_new_vote_result_by_favo_mails)")
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default()
+    } else {
+        query_as!(ToNotify, "
+            select
+                id, email,
+                send_new_proposal_mails as by_topics,
+                send_new_proposal_by_favo_mails as by_person_favo
+            from somes_user where is_email_hashed is false and (send_new_proposal_mails or send_new_proposal_by_favo_mails)")
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default()
+    };
     let mut to_notify_emails = HashMap::new();
     for id in ids {
         let user_topics = query!("select topic_name from user_topics inner join unique_eurovoc_topics ut on ut.id = topic_id where user_id = $1", id.id).fetch_all(pool).await.unwrap_or_default().into_iter().map(|x| x.topic_name).collect::<Vec<_>>();
 
+        let favo_dels = query_scalar!(
+            "select delegate_id from favo_dels where user_id = $1",
+            id.id
+        )
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
         let relevant_legis_inits = legis_inits
             .iter()
             .filter(|legis_init| {
-                for topic in &legis_init.1.eurovoc_topics {
-                    if user_topics.contains(&topic.topic) {
+                if id.by_person_favo {
+                    if legis_init
+                        .1
+                        .issued_by_dels
+                        .iter()
+                        .any(|issued_by_del| favo_dels.contains(&issued_by_del.delegate_id))
+                    {
                         return true;
+                    }
+                }
+                if id.by_topics {
+                    for topic in &legis_init.1.eurovoc_topics {
+                        if user_topics.contains(&topic.topic) {
+                            return true;
+                        }
                     }
                 }
                 false
@@ -144,7 +184,6 @@ fn enrich_parliament_with_colors(
         .collect::<Vec<_>>();
 
     let votes_to_party_map = convert_votes_to_party_color_map(votes, colors);
-    println!("vtpm: {votes_to_party_map:?}");
 
     for delegate in delegates {
         match (delegate.seat_row, delegate.seat_col, &delegate.party) {
@@ -266,77 +305,139 @@ pub async fn get_current_seats() -> Option<Vec<u64>> {
 
 pub fn send_new_legis_info_mail(
     mail_to: &str,
-    legis_inits: &[&(i32, VoteResult)],
+    vote_results: &[&(i32, VoteResult)],
     seats: &[u64],
     delegates: &[Delegate],
     colors: HashMap<String, String>,
+    is_finished: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // let content = EMAIL_TEMPLATE.replace("{*OTP*}", &white_splitted);
     // let content = content.replace("{*MINUTOS*}", &(*EMAIL_EXPIRATION_SECONDS / 60).to_string());
 
-    let legis_inits = legis_inits.iter().map(|x| (*x).clone()).collect::<Vec<_>>();
+    let vote_results = vote_results
+        .iter()
+        .map(|x| (*x).clone())
+        .collect::<Vec<_>>();
     let delegates = delegates.to_vec();
     let seats = seats.to_vec();
 
     let mail_to = mail_to.to_string();
     std::thread::spawn(move || {
         let mut vote_results_html = String::new();
-        for (idx, (_id, legis_init)) in legis_inits.iter().enumerate() {
+        for (idx, (_id, vote_result)) in vote_results.iter().enumerate() {
             if idx >= 5 {
-                if legis_inits.len() >= 6 {
+                if vote_results.len() >= 8 {
                     vote_results_html.push_str(&"Und weitere ...");
                 }
                 break;
             }
-            let parliament_img = generate_parliament_image_with_delegates(
-                &legis_init.votes,
-                &delegates,
-                &seats,
-                &colors,
-            );
+            // let parliament_img = generate_parliament_image_with_delegates(
+            //     &vote_result.votes,
+            //     &delegates,
+            //     &seats,
+            //     &colors,
+            // );
 
-            let mut png_parliament_img_buf = Vec::new();
-            let res = PngEncoder::new(&mut png_parliament_img_buf).write_image(
-                &parliament_img,
-                parliament_img.width(),
-                parliament_img.height(),
-                Rgba::<u8>::COLOR_TYPE,
-            );
+            // let mut png_parliament_img_buf = Vec::new();
+            // let res = PngEncoder::new(&mut png_parliament_img_buf).write_image(
+            //     &parliament_img,
+            //     parliament_img.width(),
+            //     parliament_img.height(),
+            //     Rgba::<u8>::COLOR_TYPE,
+            // );
 
-            if let Err(e) = res {
-                log::error!("could not png encode image: {e:?}");
-                continue;
-            }
+            // if let Err(e) = res {
+            //     log::error!("could not png encode image: {e:?}");
+            //     continue;
+            // }
 
-            #[allow(deprecated)]
-            let base64_parliament_img = base64::encode(png_parliament_img_buf);
+            // #[allow(deprecated)]
+            // let base64_parliament_img = base64::encode(png_parliament_img_buf);
 
-            let vote_result_html_entry = format!(
-                r#"
-                <a href="https://somes.at/alpha/vote_result/{gp}/{ityp}/{inr}">
-                    <div style="display: flex; flex-direction: row; justify-content: space-between; width: 100%;">
-                        <div style="border: 1px solid black; width: 50%; display: flex; justify-content: center; align-items: center;">
-                            {desc}
-                        </div>
-                        <div style="border: 1px solid black; width: 60%;">
-                            <img style="width: 70%;" src="data:image/png;base64,{base64_parliament_img}"/>
-                        </div>
-                    </div>
-                </a>
-            "#,
-                desc = legis_init.legislative_initiative.description,
-                gp = legis_init.legislative_initiative.gp,
-                ityp = legis_init.legislative_initiative.ityp,
-                inr = legis_init.legislative_initiative.inr,
-            );
+            let vote_outcome = match &vote_result.legislative_initiative.accepted {
+                Some(status) if status == "a" => "Angenommen",
+                Some(status) if status == "d" || status == "p" => "Abgelehnt",
+                _ => "In Bearbeitung",
+            };
+
+            let vote_type = match vote_result
+                .legislative_initiative
+                .voting
+                .clone()
+                .unwrap_or("_".into())
+                .as_str()
+            {
+                "Law" => "Gesetz",
+                "Report" => "Bericht",
+                "Amendment" => "Abänderung",
+                "Resolution" => "Entschließung",
+                _ => &vote_result.legislative_initiative.ityp,
+            };
+
+            let vote_description = vote_result
+                .ai_summary
+                .as_ref()
+                .map(|summary| &summary.short_title)
+                .unwrap_or(&vote_result.legislative_initiative.description);
+
+            let party_votes_html = vote_result
+                .votes
+                .iter()
+                .map(|vote| {
+                    let symbol = if vote.infavor {
+                        "<span style=\"color: #22c55e;\">✓</span>"
+                    } else {
+                        "<span style=\"color: #ef4444;\">✗</span>"
+                    };
+                    format!("{} {}", vote.party, symbol)
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            let vote_result_html_entry = VOTE_RESULT_ENTRY_TEMPLATE
+                .replace("{*VOTE_RESULT_DESCRIPTION*}", &vote_description)
+                .replace("{*VOTE_RESULT_GP*}", &vote_result.legislative_initiative.gp)
+                .replace("{*VOTE_RESULT_TYPE*}", vote_type)
+                .replace("{*VOTE_RESULT_OUTCOME*}", vote_outcome)
+                .replace("{*VOTE_RESULT_PARTY_VOTES*}", &party_votes_html)
+                .replace(
+                    "{*VOTE_RESULT_SOMES_URL*}",
+                    &format!(
+                        "https://somes.at/vote_result/{gp}/{ityp}/{inr}",
+                        gp = vote_result.legislative_initiative.gp,
+                        ityp = vote_result.legislative_initiative.ityp,
+                        inr = vote_result.legislative_initiative.inr
+                    ),
+                );
 
             vote_results_html.push_str(&vote_result_html_entry);
         }
 
+        let title = if is_finished {
+            "Neue Abstimmungsergebnisse"
+        } else {
+            "Neue Anträge"
+        };
+
+        let description = if is_finished {
+            "Der Nationalrat hat kürzlich verschiedene Abstimmungen gehalten, die zu Ihrer Interessenswahl passen."
+        } else {
+            "Kürzlich wurden neue Anträge eingebracht, die zu Ihrere Interessenswahl passen."
+        };
+
         log::info!("Sending composed new vote result mail to {mail_to}");
-        let content = LEGIS_INIT_EMAIL_TEMPLATE.replace("{*VOTE_RESULTS*}", &vote_results_html);
-        println!("content: {content}");
-        if let Err(e) = send_mail(&MAILER, &mail_to, "Neue Abstimmungen auf somes", content) {
+        let content = LEGIS_INIT_EMAIL_TEMPLATE
+            .replace("{*TITLE*}", title)
+            .replace("{*DESCRIPTION*}", description)
+            .replace("{*VOTE_RESULTS*}", &vote_results_html);
+
+        let subject = if is_finished {
+            "Neue Abstimmungen auf somes"
+        } else {
+            "Neue Anträge auf somes"
+        };
+
+        if let Err(e) = send_mail(&MAILER, &mail_to, subject, content) {
             log::error!("could not send legis info mail: {e:?}");
         }
     });
@@ -349,11 +450,17 @@ pub fn notify_users(
     delegates: &[Delegate],
     user_legis_inits: &HashMap<String, Vec<&(i32, VoteResult)>>,
     colors: HashMap<String, String>,
+    is_finished: bool,
 ) {
     for (mail_to, legis_inits) in user_legis_inits {
-        if let Err(e) =
-            send_new_legis_info_mail(mail_to, legis_inits, seats, delegates, colors.clone())
-        {
+        if let Err(e) = send_new_legis_info_mail(
+            mail_to,
+            legis_inits,
+            seats,
+            delegates,
+            colors.clone(),
+            is_finished,
+        ) {
             log::error!("could not send legis info mail: {e:?}");
         }
     }
@@ -416,11 +523,12 @@ mod tests {
         let legis_init = VoteResult::from_legis_init(PostgresEnhancer(pg), legis_init, None).await;
 
         send_new_legis_info_mail(
-            "",
+            "flurl.nagy@gmail.com",
             &[&(19106479, legis_init) /* &(10527230, legis_init1)*/],
             &seats,
             &delegates,
             colors,
+            true,
         )
         .unwrap();
 

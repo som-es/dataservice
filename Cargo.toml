@@ -6,7 +6,7 @@ members = [
 ]
 
 [workspace.dependencies]
-sqlx = { version="0.8", features = ["postgres", "runtime-tokio", "chrono", "tls-rustls"] }
+sqlx = { version="0.8", features = ["postgres", "runtime-tokio", "chrono", "tls-rustls", "uuid"] }
 somes-scraper = { path = "../scraper" }
 # somes-scraper = { git = "ssh://git@github.com/som-es/scraper" }
 somes-common-lib = {path = "../somes/somes-common-lib"}

@@ -4,6 +4,7 @@ create table favo_dels(
     user_id int not null,
     delegate_id int not null,
     favo_on timestamptz default now(),
+    user_info_days int not null default 30,
     foreign key (user_id) references somes_user(id) on delete cascade,
     foreign key (delegate_id) references delegates(id) on delete cascade
 );

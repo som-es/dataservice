@@ -18,8 +18,8 @@ pub async fn insert_references_batch<'a>(
     let inrs: Vec<i32> = references.iter().map(|r| r.inr as i32).collect();
 
     let res = sqlx::query!(
-        "INSERT INTO legis_inits_refs (origin_legis_init_id, ref_gp, ref_ityp, ref_inr) 
-         SELECT * FROM UNNEST($1::int4[], $2::text[], $3::text[], $4::int4[]) 
+        "INSERT INTO legis_inits_refs (origin_legis_init_id, ref_gp, ref_ityp, ref_inr)
+         SELECT * FROM UNNEST($1::int4[], $2::text[], $3::text[], $4::int4[])
          ON CONFLICT DO NOTHING",
         &init_ids,
         &gps,

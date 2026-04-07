@@ -383,7 +383,7 @@ mod tests {
             match_delegate_names_with_delegate_ids(&active_delegates, &delegate_names, "XXV", date);
 
         println!("res: {:?}", res.lev_or_deep_split_matched);
-        // assert_eq!(res.lev_or_deep_split_matched.len(), 1);
+        assert_eq!(res.lev_or_deep_split_matched.len(), 1);
     }
 
     // gegenstand/XXV/UEA/133
@@ -531,7 +531,8 @@ mod tests {
         );
 
         // let res = res.correctly_matched.into_iter().filter(|x| x.lev > 0).collect::<Vec<_>>();
-        println!("res: {:?}", res.lev_or_deep_split_matched);
+        // println!("res: {:?}", res.correctly_matched.l);
+        assert_eq!(res.correctly_matched.len(), pro_contra.pro.len());
     }
 
     #[tokio::test]
@@ -568,7 +569,49 @@ mod tests {
 
         // let res = res.correctly_matched.into_iter().filter(|x| x.lev > 0).collect::<Vec<_>>();
         println!("res: {:?}", res.lev_or_deep_split_matched);
+
+        assert_eq!(res.correctly_matched.len(), pro_contra.pro.len());
     }
+
+    // XXIII/UEA/321
+    #[tokio::test]
+    async fn test_namentlich_name_matching_xxii_uea_321() {
+        let scraper = AustriaScraper::default();
+        let init = scraper
+            .get_legis_init("/gegenstand/XXIII/UEA/321")
+            .await
+            .unwrap();
+        println!("date: {:?}", init.nr_plenary_activity_date);
+        assert!(init.hidden_votes_info.voted_by_name);
+        println!("hidden_vot_infos: {:?}", init.hidden_votes_info);
+        let pro_contra = init
+            .hidden_votes_info
+            .voted_by_name_data
+            .unwrap()
+            .delegates_pro_contra
+            .unwrap();
+
+        let pg = connect_pg().await;
+        let active_delegates = active_delegates_at_date(&pg, init.nr_plenary_activity_date)
+            .await
+            .unwrap()
+            .into_iter()
+            .collect::<HashSet<_>>();
+
+        let res = match_delegate_names_with_delegate_ids(
+            &active_delegates,
+            &pro_contra.pro,
+            &init.gp,
+            init.nr_plenary_activity_date,
+        );
+
+        // let res = res.correctly_matched.into_iter().filter(|x| x.lev > 0).collect::<Vec<_>>();
+        println!("res: {:?}", res.lev_or_deep_split_matched);
+
+        assert_eq!(res.correctly_matched.len(), pro_contra.pro.len());
+    }
+
+
 
     #[tokio::test]
     async fn test_all_plenar_absences_matching() {
@@ -662,6 +705,7 @@ mod tests {
 
         println!("res: {:?}", res.correctly_matched);
         println!("res: {:?}", res.lev_or_deep_split_matched);
+        assert!(res.lev_or_deep_split_matched.is_empty());
     }
 
     #[test]
