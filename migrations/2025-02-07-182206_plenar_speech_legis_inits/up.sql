@@ -25,12 +25,16 @@ create index index_ref_gp ON legis_inits_refs (ref_gp, ref_ityp, ref_inr);
 
 
 
+
+
 create table interjections(
     id serial primary key,
     interjection_text text,
     interjector_delegate_id int not null,
     plenar_speech_id int not null,
+    delegate_matching_id int not null,
     foreign key(interjector_delegate_id) references delegates(id),
     foreign key(plenar_speech_id) references plenar_speeches(id),
+    foreign key(delegate_matching_id) references delegate_matching(id),
     unique(interjection_text, interjector_delegate_id, plenar_speech_id)
 );

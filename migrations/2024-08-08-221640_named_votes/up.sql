@@ -11,6 +11,15 @@ create table named_vote_info(
     foreign key (legis_init_id) references legislative_initiatives(id)
 );
 
+create table delegate_matching(
+    id serial primary key,
+    similiarity_score bigint not null,
+    searched_with varchar(255),
+    matched_with varchar(255) not null,
+    delegate_id int not null,
+    manually_matched boolean default false
+);
+
 create table named_votes(
     id serial primary key,
     infavor boolean,

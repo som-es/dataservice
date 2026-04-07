@@ -9,6 +9,7 @@ use utoipa::ToSchema;
 
 pub use crate::api_models::*;
 
+
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 // #[diesel(table_name = proposals)]
@@ -278,4 +279,23 @@ pub struct DbParty {
 )]
 pub struct Topic {
     pub topic: String,
+}
+
+use somes_scraper::PlenarSpeech;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Interjection {
+    pub interjection_text: String,
+    pub interjector_delegate_id: i32,
+    pub plenar_speech: PlenarSpeech,
+    pub delegate_matching: DelegateMatching,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct DelegateMatching {
+    pub similiarity_score: i64,
+    pub searched_with: String,
+    pub matched_with: String,
+    pub delegate_id: i32,
+    pub manually_matched: bool,
 }
