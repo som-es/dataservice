@@ -15,8 +15,7 @@ pub async fn extract_interjections<'a>(
     plenar_speech_id: i32,
 ) -> Result<(), sqlx::Error> {
     let db_delegates = active_delegates_at_date(&mut **pool, plenar_date.date_naive())
-        .await
-        .unwrap();
+        .await?;
 
     let mut interjections: Vec<Interjection> = Vec::new();
 
@@ -138,9 +137,6 @@ fn extract_interjections_parts(param: &str) -> Vec<(String, String)> {
         .collect()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
    #[cfg(test)]
 mod tests {
     use super::*;
