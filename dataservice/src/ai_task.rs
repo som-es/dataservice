@@ -1,5 +1,6 @@
 use std::{fmt::Debug, future::Future, pin::Pin, sync::Arc};
 
+use chrono::NaiveDateTime;
 use sqlx::PgPool;
 
 #[derive(PartialEq, Debug, Clone, Eq, PartialOrd, Ord, Copy)]
@@ -25,6 +26,7 @@ pub struct AiTask {
     pub task_id: u64,
     pub db_entry_id: i32,
     pub rerunnable: bool,
+    pub created_at: NaiveDateTime,
     pub task: Box<
         dyn (FnOnce(TaskArgs) -> Pin<Box<dyn (Future<Output = combx::Result<()>>) + Send>>)
             + Send
@@ -36,6 +38,7 @@ impl Ord for AiTask {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.priority
             .cmp(&other.priority)
+            .then(other.created_at.cmp(&self.created_at))
             .then(self.task_id.cmp(&other.task_id))
             .then(self.db_entry_id.cmp(&other.db_entry_id))
             .then(self.input.cmp(&other.input))

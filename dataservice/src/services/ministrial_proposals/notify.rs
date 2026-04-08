@@ -264,12 +264,7 @@ mod tests {
             GovProposal::from_ministerial_proposal(ministerial_proposal, gov_officials);
         println!("gov proposal: {gov_proposal:?}");
         let gov_proposals = [&(0, gov_proposal)];
-        send_new_ministrial_prop_info_mail(
-            "",
-            &gov_proposals,
-            &simple_gov_officials,
-        )
-        .unwrap();
+        send_new_ministrial_prop_info_mail("", &gov_proposals, &simple_gov_officials).unwrap();
         loop {}
     }
 }

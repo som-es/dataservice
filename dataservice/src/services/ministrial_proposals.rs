@@ -18,7 +18,7 @@ use crate::{
     enforce_ai_run,
     services::scrape_untill_success,
     should_update::StoredUpdatedAt,
-    today, today_and_time,
+    today,
     topics::{insert_topics_generic_batch, TableType, TopicType},
     AppState, CompareHash, Shutdown, GPS,
 };
@@ -253,6 +253,8 @@ pub async fn update_ministrial_proposals_in_db2(
 
         #[cfg(feature = "ai")]
         if let Some(ai_task_tx) = &ai_task_tx {
+            use combx::today_and_time;
+
             use crate::{ai_task::Priority, LATEST_GP};
 
             let (priority, inner_gov_prop_mail_tx) =
@@ -276,6 +278,7 @@ pub async fn update_ministrial_proposals_in_db2(
                 task_id: crate::hash!(),
                 db_entry_id: ministrial_prop_id,
                 rerunnable: false,
+                created_at: today_and_time(),
                 task: Box::new(move |task_args| {
                     Box::pin(async move {
                         let ai_summary =

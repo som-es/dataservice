@@ -6,6 +6,7 @@ mod upload_questions;
 use std::sync::Arc;
 
 use chrono::TimeDelta;
+use combx::today_and_time;
 use qdrant_client::{
     qdrant::{group_id::Kind, GetPoints, PointId},
     Qdrant,
@@ -289,7 +290,9 @@ async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Res
                 priority: crate::ai_task::Priority::Medium,
                 task_id: crate::hash!(),
                 db_entry_id: entry_id,
-                rerunnable: !vector_update_skip,
+                // rerunnable: !vector_update_skip,
+                rerunnable: true,
+                created_at: today_and_time(),
                 task: Box::new(move |task_args| {
                     Box::pin(async move {
                         process_delegate_stance(

@@ -58,7 +58,7 @@ pub async fn score_search_results_qdrant(
                 .into_iter()
                 .map(|val| val as f32)
                 .collect::<Vec<_>>(),
-            limit: 30,
+            limit: 25,
             filter: Some(filter),
             with_payload: Some(payload_selector),
             with_vectors: None,
@@ -124,8 +124,17 @@ pub fn construct_information_from_entity(
     id: Option<&PointId>,
 ) -> Option<String> {
     let id = id.map(|id| id.point_id_options.as_ref()).flatten();
-    let upper_padding = extract_qdrant_string_array(payload.get("upper_padding")).join(" ");
-    let lower_padding = extract_qdrant_string_array(payload.get("lower_padding")).join(" ");
+    let upper_padding = extract_qdrant_string_array(payload.get("upper_padding"));
+    let upper_padding = if upper_padding.len() as i32 - 30 > 1 {
+        &upper_padding[30..]
+    } else {
+        &upper_padding
+    }
+    .join(" ");
+
+    let lower_padding = extract_qdrant_string_array(payload.get("lower_padding"));
+    let lower_padding = lower_padding[..std::cmp::min(30, lower_padding.len())].join(" ");
+
     let text = extract_qdrant_string(payload.get("text"));
     let about = extract_qdrant_string(payload.get("about"));
     let date = extract_qdrant_string(payload.get("date"));
@@ -239,10 +248,13 @@ mod tests {
             &ai_client,
             // 83148,
             8242,
-            "In Österreich sollte eine 32-Stunden-Woche eingeführt werden, bei gleichbleibendem Lohn.",
+            "Erbschaften sollten besteuert werden.",
         )
         .await
         .unwrap();
-        log::info!("spoken_texts: {spoken_texts}")
+        log::info!(
+            "spoken_texts: {spoken_texts}, length: {}",
+            spoken_texts.len()
+        );
     }
 }
