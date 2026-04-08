@@ -9,7 +9,6 @@ use utoipa::ToSchema;
 
 pub use crate::api_models::*;
 
-
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 // #[diesel(table_name = proposals)]

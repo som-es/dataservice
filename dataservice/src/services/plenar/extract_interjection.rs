@@ -1,11 +1,13 @@
 use chrono::{DateTime, Utc};
-use chrono_tz::America::Paramaribo;
 use combx::{
-    DbDelegate, DelegateMatching, Interjection, match_delegate_name_with_delegate_id, with_data::active_delegates_at_date
+    match_delegate_name_with_delegate_id, with_data::active_delegates_at_date, DbDelegate,
+    DelegateMatching, Interjection,
 };
-use regex::Regex;
 use somes_scraper::PlenarSpeech;
 use sqlx::Postgres;
+
+const DASH: char = '–';
+const DASH_STR: &str = "–";
 
 pub async fn extract_interjections<'a>(
     params: Vec<String>,
@@ -14,21 +16,16 @@ pub async fn extract_interjections<'a>(
     pool: &mut sqlx::Transaction<'a, Postgres>,
     plenar_speech_id: i32,
 ) -> Result<(), sqlx::Error> {
-    let db_delegates = active_delegates_at_date(&mut **pool, plenar_date.date_naive())
-        .await?;
+    let db_delegates = active_delegates_at_date(&mut **pool, plenar_date.date_naive()).await?;
 
     let mut interjections: Vec<Interjection> = Vec::new();
 
     for param in params {
-    let extracted = extract_interjection(
-        param.as_str(),
-        &plenar_speech,
-        &db_delegates,
-        &plenar_date,
-    );
+        let extracted =
+            extract_interjection(param.as_str(), &plenar_speech, &db_delegates, &plenar_date);
 
-    interjections.extend(extracted);
-}
+        interjections.extend(extracted);
+    }
 
     save_interjection(interjections, pool, plenar_speech_id).await
 }
@@ -89,7 +86,6 @@ fn extract_interjection(
     db_delegate: &Vec<DbDelegate>,
     plenar_date: &DateTime<Utc>,
 ) -> Vec<Interjection> {
-
     let parts = extract_interjections_parts(param);
 
     let mut result = Vec::new();
@@ -124,20 +120,35 @@ fn extract_interjection(
 }
 
 fn extract_interjections_parts(param: &str) -> Vec<(String, String)> {
-    let re = Regex::new(
-        r"Abg\.\s*([A-Za-zÄÖÜäöüß\-\s]+?)\s*(?:–[^:]+)?\s*:\s*(.+?)(?=–\s*Abg\.|$)"
-    ).unwrap();
+    let text = format!("{DASH_STR} {}", param);
 
-    re.captures_iter(param)
-        .filter_map(|caps| {
-            let name = caps.get(1)?.as_str().trim().to_string();
-            let text = caps.get(2)?.as_str().trim().to_string();
-            Some((name, text))
+    text.split(&format!("{DASH_STR} Abg."))
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                return None;
+            }
+
+            let (name, text) = s.split_once(':')?;
+
+            let mut name = name.trim().to_string();
+
+            // 👉 Spezialfall: "Name – irgendwas –"
+            if name.matches(DASH).count() >= 2 {
+                name = name
+                    .split(DASH)
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+            }
+
+            Some((name, text.trim().to_string()))
         })
         .collect()
 }
 
-   #[cfg(test)]
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -170,10 +181,7 @@ mod tests {
 
     #[test]
     fn test_interjection_extraction_3() {
-        assert_extraction(
-            "Abg. Stefan: Geh!",
-            vec![("Stefan", "Geh!")],
-        );
+        assert_extraction("Abg. Stefan: Geh!", vec![("Stefan", "Geh!")]);
     }
 
     #[test]
@@ -198,25 +206,16 @@ mod tests {
     #[test]
     fn test_interjection_extraction_6_multiple() {
         assert_extraction(
-            "Beifall bei der ÖVP. – Abg. Plessl: Was sagen
-Sie zum Vertrag 2002? Eine Nebelgranate! Das Problem Vertragsgestaltung 2002
-sprechen Sie gar nicht an! – Abg. Steinacker – auf dem Weg zu ihrem Sitzplatz –: Aus
-gut mach schlecht!",
+            "Beifall bei der ÖVP. – Abg. Plessl: Was sagen Sie zum Vertrag 2002? Eine Nebelgranate! Das Problem Vertragsgestaltung 2002 sprechen Sie gar nicht an! – Abg. Steinacker – auf dem Weg zu ihrem Sitzplatz –: Aus gut mach schlecht!",
             vec![
                 (
                     "Plessl",
-                    "Was sagen
-Sie zum Vertrag 2002? Eine Nebelgranate! Das Problem Vertragsgestaltung 2002
-sprechen Sie gar nicht an!",
+                    "Was sagen Sie zum Vertrag 2002? Eine Nebelgranate! Das Problem Vertragsgestaltung 2002 sprechen Sie gar nicht an!",
                 ),
-                (
-                    "Steinacker",
-                    "Aus
-gut mach schlecht!",
-                ),
+                ("Steinacker", "Aus gut mach schlecht!"),
             ],
         );
-    } 
+    }
 
     #[test]
     fn test_interjection_extraction_with_inserted_text() {
@@ -228,18 +227,12 @@ gut mach schlecht!",
 
     #[test]
     fn test_interjection_extraction_negative_1() {
-        assert_extraction(
-            "Beifall bei Abgeordneten der SPÖ.",
-            vec![],
-        );
+        assert_extraction("Beifall bei Abgeordneten der SPÖ.", vec![]);
     }
 
     #[test]
     fn test_interjection_extraction_negative_2() {
-        assert_extraction(
-            "SPÖ",
-            vec![],
-        );
+        assert_extraction("SPÖ", vec![]);
     }
 
     #[test]
@@ -249,15 +242,4 @@ gut mach schlecht!",
             vec![],
         );
     }
-}
-    fn assert_extraction(input: &str, expected: Vec<(&str, &str)>) {
-    let result = extract_interjections_parts(input);
-
-    let expected: Vec<(String, String)> = expected
-        .into_iter()
-        .map(|(n, t)| (n.to_string(), t.to_string()))
-        .collect();
-
-    assert_eq!(result, expected);
-}
 }

@@ -128,12 +128,7 @@ pub(crate) fn send_new_decree_info_mail(
 
         log::info!("Sending composed new decree mail to {mail_to}");
         let content = crate::email::DECREE_EMAIL_TEMPLATE.replace("{*DECREES*}", &decrees_html);
-        if let Err(e) = send_mail(
-            &MAILER,
-            &mail_to,
-            "Neue Verordnungen auf somes",
-            content,
-        ) {
+        if let Err(e) = send_mail(&MAILER, &mail_to, "Neue Verordnungen auf somes", content) {
             log::error!("could not send decree info mail: {e:?}");
         }
     });

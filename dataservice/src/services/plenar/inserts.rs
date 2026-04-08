@@ -10,7 +10,7 @@ use somes_scraper::{
 
 use sqlx::{postgres::PgQueryResult, Executor, Postgres};
 
-use crate::plenar::{extract_interjection::extract_interjection, extract_interjections};
+use crate::plenar::extract_interjection::extract_interjections;
 
 pub async fn insert_plenar_speech_legis_init<'a>(
     pool: impl Executor<'a, Database = Postgres>,
@@ -311,7 +311,7 @@ pub async fn insert_plenar_speech<'a>(
                 pool,
                 plenar_speech_id,
             )
-            .await;
+            .await?;
         }
 
         sqlx::query!(

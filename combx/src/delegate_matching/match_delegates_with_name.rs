@@ -611,8 +611,6 @@ mod tests {
         assert_eq!(res.correctly_matched.len(), pro_contra.pro.len());
     }
 
-
-
     #[tokio::test]
     async fn test_all_plenar_absences_matching() {
         let mut scraper = AustriaScraper::default();
