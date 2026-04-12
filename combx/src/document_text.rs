@@ -36,7 +36,7 @@ pub fn combine_texts(documents: &[TextDocument]) -> String {
         .join(" ")
 }
 
-const TOTAL_PROMPT_LENGTH: usize = 125000;
+const TOTAL_PROMPT_LENGTH: usize = 256000;
 
 pub async fn extract_text_from_documents_html_first(
     documents: &[Document],

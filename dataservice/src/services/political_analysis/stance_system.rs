@@ -35,7 +35,7 @@ pub fn create_stance_system_prompt(question: &str, context: &str, profile: &str)
     - Trage "Neutral" ein, wenn er sich nicht eindeutig positioniert, abwägt oder keine Daten vorliegen.
 
     REGELN FÜR ZITATIONEN (`citations`):
-    - Halte dich strikt an die Quellen. Für jede Rede, die du zur Generierung herangezogen hast, musst du ein Objekt in das Array einfügen.
+    - Halte dich strikt an die Quellen. Für jede Rede, die du zur Generierung der Haltung herangezogen hast, musst du ein Objekt in das Array einfügen.
 
     ALLGEMEINE REGELN:
     - Historischer Kontext: Beachte, dass sich Funktionen, Regierungsbeteiligungen und Parteizugehörigkeiten verändert haben können.
@@ -126,9 +126,24 @@ mod tests {
             .await
             .unwrap();
 
+        let model = ai_client.get_model().await.unwrap();
+        log::info!("model: {model:?}");
+        return;
+
         let qdrant_client = Qdrant::from_url("http://10.30.0.164:6334").build().unwrap();
         let delegate_id = 8242;
+        // let question = "Straftäter:innen sollten härter bestraft werden.";
         let question = "Der Staat sollte weniger ins Wirtschaftsleben eingreifen.";
+        let question = "Erbschaften sollten besteuert werden.";
+        let question =
+            "Wichtige Entscheidungen sollten stärker auf nationaler Ebene getroffen werden und nicht auf EU-Ebene. ";
+        let question = "Österreich sollte seine Neutralität aufgeben.";
+
+        let question = "Österreich sollte sich für die Erweiterung der EU einsetzen.";
+        let question = "Um Gewalt gegen Frauen zu bekämpfen, müssen traditionelle Männlichkeitsbilder überwunden werden.";
+        let question = "Die Polizei sollte die Möglichkeit bekommen, die Messenger-Dienste (WhatsApp, Signal, ...) von Strafverdächtigen zu überwachen. ";
+        let question = "Die Rechte von Beschuldigten im Strafverfahren müssen gestärkt werden.";
+        let question = "Volksbegehren, die eine bestimmte Anzahl an Unterstützungen erreichen, sollten automatisch zu Volksabstimmungen führen";
 
         let stance: Stance =
             rag_pipeline::<Stance>(&ai_client, &qdrant_client, delegate_id, question)

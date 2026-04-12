@@ -242,9 +242,9 @@ async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Res
     let mut entry_id = 0;
     let today = today().to_utc();
     for delegate in delegates {
-        if delegate.id != 8242 {
-            continue;
-        }
+        // if delegate.id != 8242 {
+        //     continue;
+        // }
         let last_updated_at = sqlx::query_scalar!(
             "select updated_at from last_vector_speech_update where delegate_id = $1",
             delegate.id

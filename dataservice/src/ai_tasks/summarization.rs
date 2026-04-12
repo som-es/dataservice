@@ -12,6 +12,7 @@ use crate::{ai_task::TaskArgs, OCR_ENGINE};
 pub async fn insert_ai_summary_sqlx(
     pool: &sqlx::PgPool,
     summary: &AiSummary,
+    model_used: &str,
 ) -> combx::Result<i32> {
     let id = sqlx::query!(
         "INSERT INTO summaries (
@@ -24,14 +25,14 @@ pub async fn insert_ai_summary_sqlx(
             version,
             generated_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING id; 
+        RETURNING id;
          ",
         serde_json::to_value(summary)?,
         summary.short_title,
         summary.short_summary,
         summary.detailed_summary,
         format!("{:?}", summary.complexity_scope_of_proposal),
-        "GPT-OSS-120B",
+        model_used,
         "1",
         Local::now()
     )
@@ -94,15 +95,15 @@ async fn summary_prompt(
 ) -> combx::Result<SummarizeOutput> {
     Ok(somai_client
         .make_llm_request_with_schema::<SummarizeOutput>(input, format!("
-                    Du bist ein Experte für politische Zusammenfassungen und Analyse in Österreich für Laien. 
-                    Bitte fasse die beigefügten Dokumente, die zu einem Antrag, der im österreichischen Nationalrat behandelt wird, gehören, zusammen. 
-                    Diese Dokumente sollen dir helfen, den Antrag besser zu verstehen. 
+                    Du bist ein Experte für politische Zusammenfassungen und Analyse in Österreich für Laien.
+                    Bitte fasse die beigefügten Dokumente, die zu einem Antrag, der im österreichischen Nationalrat behandelt wird, gehören, zusammen.
+                    Diese Dokumente sollen dir helfen, den Antrag besser zu verstehen.
                     Generiere einen kurzen und bündigen Titel für den Antrag. => short_title
                     Fasse einerseits den Antrag in 2, bei komplexeren Anträgen in maximal 3, Sätzen zusammen. => short_summary
                     Fasse andererseits den Antrag in 3 bis maximal 8 Stichpunkten zusammen. => key_points
                     Bei einfacheren Anträgen können es auch weniger Stichpunkte sein (auch weniger als 3).
-                    Dabei sollen die ersten Stichpunkte oberflächlicher sein. Weitere Stichpunkte sollen graduell Details ergänzen. 
-                    
+                    Dabei sollen die ersten Stichpunkte oberflächlicher sein. Weitere Stichpunkte sollen graduell Details ergänzen.
+
                     Falls unterschiedliche Bestimmungen zu unterschiedlichen Zeitpunkten in Kraft treten (start_date) oder anschließend außer Kraft treten bzw. auslaufen (end_date), gib dies bei den jeweiligen Stichpunkten an. => key_points.enforcement_start_end.start_date, key_points.enforcement_start_end.end_date
                     Extrahiere das Datum des Inkrafttretens und des Auslaufens des Gesetzes, falls eindeutige, allgemein gültige Zeitpunkte vorhanden sind (Typischerweise nicht befüllen, sofern eine Spezifizierung nach Stichpunkten vorliegt). => general_enforcement_start_end
                     Zusätzliche Hinweise zu den Daten können in start_notes und end_notes angegeben werden. => general_enforcement_start_end.start_notes, general_enforcement_start_end.end_notes
@@ -113,7 +114,7 @@ async fn summary_prompt(
 
                     Klassifiziere die behandelnden Themen des Antrags anhand der folgenden Liste, wähle bis zu 10 Themen: {topics:?} => topics
 
-                    Falls ein Glossar für schwierige Begriffe notwendig ist, achte darauf, dass die Definition direkt beginnt, ohne den eigentlichen zu definierenden Term anfangs zu wiederholen => glossary.difficult_terms.simple_definition 
+                    Falls ein Glossar für schwierige Begriffe notwendig ist, achte darauf, dass die Definition direkt beginnt, ohne den eigentlichen zu definierenden Term anfangs zu wiederholen => glossary.difficult_terms.simple_definition
 
                     Wähle den finanziellen Umfang des Antrags anhand der folgenden Kategorien, setze dabei nicht zu hoch an!: HighCost, ModerateCost, LowCost, Neutral, RevenueGenerating, Unclear => fiscal_analysis.economic_burden
                     Schätze die Kosten des Antrags in Millionen Euro pro Jahr oder pro Monat, falls möglich => fiscal_analysis.estimated_cost_per_year_in_million, fiscal_analysis.estimated_cost_per_month_in_million
@@ -156,14 +157,14 @@ pub(crate) async fn summary_prompt2(
             In diesem Fall analysierst du Dokumente, die zu folgendem Typ gehören: {summarization_of}.
 
 ### DEINE AUFGABEN:
-1.  **Zusammenfassung:** 
+1.  **Zusammenfassung:**
     - Erstelle einen kurzen, sprechenden Titel, der das Thema des Antrags prägnant zusammenfasst (`short_title`).
-    - Erstelle eine ultrakurze Zusammenfassung (2-3 Sätze) für `short_summary`.
+    - Erstelle eine kürzere Zusammenfassung (maximal 2-3 Sätze) für `short_summary`.
     - Erstelle eine detailliertere Zusammenfassung für `detailed_summary`. (2x bis 3x so lang wie `short_summary`)
     - Erstelle eine noch detailliertere Zusammenfassung für `very_detailed_summary`. (3x bis 4x so lang wie `short_summary`)
     - Wenn Paragraphenangaben vorhanden wären, lass sie weg. Keine Paragraphenangaben in `short_summary` oder `detailed_summary`, da sie Laien verwirren würden.
     - Statt „Der Antrag fügte § 21 Abs. 23 hinzu ...“ formuliere lieber z.B. „Der Antrag fügt eine neue Regelung hinzu, die ...“.
-2.  **Key Points:** Erstelle 3-8 Stichpunkte (`key_points`). Beginne oberflächlich und werde graduell detaillierter. 
+2.  **Key Points:** Erstelle 3-8 Stichpunkte (`key_points`). Beginne oberflächlich und werde graduell detaillierter.
     - Prüfe für jeden Punkt, ob spezifische Inkrafttretensdaten (`enforcement_start_date`) oder Ablaufdaten (`enforcement_end_date`) im Text stehen.
     - Paragrafen- oder Abschnittsangaben dürfen NICHT in `point` angegeben werden, ausschließlich in `paragraph_references`. Wenn Paragraphenangaben vorhanden wären, lass sie aus `point` weg => Keine Paragraphenangaben in den User-Facing-Elementen, da sie Laien verwirren würden.
     - Gib den rohen Verweis an, z.B. '§ 5 Abs. 2 Z 3' und zerlege ihn in `parsed_reference_parts`. (Artikel => Article, Paragraph => Paragraph, Abs. => Subsection, Z. => Point, also § 5 Abs. 2 Z 3: Paragraph(5), Subsection(2), Point(3)) Falls eine Referenz z.B. über mehrere Subsections geht, gib alle Teile an. (Abs. 1-3 => Subsection(1), Subsection(2), Subsection(3), oder Abs. 1,4 => Subsection(1), Subsection(4))
