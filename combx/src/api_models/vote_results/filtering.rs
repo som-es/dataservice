@@ -47,6 +47,19 @@ pub fn meilisearch_filters_vote_result(
         &build_prefix("other_keyword_topics", prefix.as_deref()),
     ));
 
+    if let Some(meilisearch_helper) = vote_result_filter.meilisearch_helper {
+        filter_conditions.extend(to_meilisearch_filters(
+            &meilisearch_helper.filter_arguments(),
+            &FilterOptions {
+                prefix: Some(build_prefix(
+                    "meilisearch_helper",
+                    prefix.as_deref(),
+                )),
+                ..Default::default()
+            },
+        ));
+    }
+
     if let Some(named_votes) = vote_result_filter.named_votes {
         filter_conditions.extend(to_meilisearch_filters(
             &named_votes

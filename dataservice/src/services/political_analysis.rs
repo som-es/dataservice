@@ -6,6 +6,7 @@ mod upload_questions;
 use std::sync::Arc;
 
 use chrono::TimeDelta;
+use combx::today_and_time;
 use qdrant_client::{
     qdrant::{group_id::Kind, GetPoints, PointId},
     Qdrant,
@@ -241,9 +242,9 @@ async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Res
     let mut entry_id = 0;
     let today = today().to_utc();
     for delegate in delegates {
-        if delegate.id != 8242 {
-            continue;
-        }
+        // if delegate.id != 8242 {
+        //     continue;
+        // }
         let last_updated_at = sqlx::query_scalar!(
             "select updated_at from last_vector_speech_update where delegate_id = $1",
             delegate.id
@@ -289,7 +290,9 @@ async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Res
                 priority: crate::ai_task::Priority::Medium,
                 task_id: crate::hash!(),
                 db_entry_id: entry_id,
-                rerunnable: !vector_update_skip,
+                // rerunnable: !vector_update_skip,
+                rerunnable: true,
+                created_at: today_and_time(),
                 task: Box::new(move |task_args| {
                     Box::pin(async move {
                         process_delegate_stance(

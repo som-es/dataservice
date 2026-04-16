@@ -34,7 +34,12 @@ pub(crate) async fn summarize_and_save(
 ) -> combx::Result<Option<DbAiSummary>> {
     let summary = summarize_documents(&task_args, docs, summarization_of).await?;
     if let Some(summary) = summary.summary {
-        let summary_id = insert_ai_summary_sqlx(&task_args.pg_pool, &summary).await?;
+        let summary_id = insert_ai_summary_sqlx(
+            &task_args.pg_pool,
+            &summary,
+            &task_args.som_ai_client.get_model().await?.result,
+        )
+        .await?;
 
         let db_ai_summary = sqlx::query_as!(
             DbAiSummary,

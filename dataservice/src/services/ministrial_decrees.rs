@@ -209,7 +209,7 @@ pub async fn insert_ministrial_decree(
 
         #[cfg(feature = "ai")]
         {
-            use crate::{ai_task::Priority, LATEST_GP};
+            use crate::{ai_task::Priority, today_and_time, LATEST_GP};
 
             let (priority, new_decree_tx) =
                 if decree.publication_date >= (today() - chrono::Duration::days(90)).date_naive() {
@@ -229,6 +229,7 @@ pub async fn insert_ministrial_decree(
                 task_id: crate::hash!(),
                 db_entry_id: decree_id,
                 rerunnable: false,
+                created_at: today_and_time().naive_local(),
                 task: Box::new(move |task_args| {
                     Box::pin(async move {
                         use crate::ministrial_decrees::ai_tasks::summarize_decrees_documents;

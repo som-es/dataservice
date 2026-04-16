@@ -125,7 +125,7 @@ pub async fn ai_tasks_service(
 
 #[cfg(test)]
 mod tests {
-    use crate::ai_task::Priority;
+    use crate::{ai_task::Priority, today_and_time};
 
     #[tokio::test]
     async fn test_ai_task_ordering() {
@@ -139,6 +139,7 @@ mod tests {
             task_id: 1,
             db_entry_id: 1,
             rerunnable: false,
+            created_at: today_and_time().naive_local(),
             task: Box::new(|_args| {
                 Box::pin(async move { Ok(()) })
                     as Pin<Box<dyn Future<Output = combx::Result<()>> + Send>>
@@ -151,6 +152,7 @@ mod tests {
             task_id: 2,
             db_entry_id: 2,
             rerunnable: false,
+            created_at: today_and_time().naive_local(),
             task: Box::new(|_args| {
                 Box::pin(async move { Ok(()) })
                     as Pin<Box<dyn Future<Output = combx::Result<()>> + Send>>

@@ -42,9 +42,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_summary_prompt_xxviii_i_298() {
-        let somai_client = SomAiClient::new_local("http://localhost:8000")
-            .await
-            .unwrap();
+        // let somai_client = SomAiClient::new_local("http://localhost:8000")
+        //     .await
+        //     .unwrap();
+
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let somai_client =
+            SomAiClient::new("http://10.30.0.164:8000", "API_USER", "supersicher123!")
+                .await
+                .unwrap();
+
         /*
                -----------+----------------------------+------------------------+---------------+-----------------------------------------------
         291810000 |                   94523539 | Gesetzestext           | DigitalPDF    | /dokument/XXVIII/I/298/fname_1722547.pdf
@@ -115,9 +122,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_summary_prompt_xxviii_i_308() {
-        let somai_client = SomAiClient::new_local("http://localhost:8000")
-            .await
-            .unwrap();
+        // let somai_client = SomAiClient::new_local("http://localhost:8000")
+        //     .await
+        //     .unwrap();
+
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let somai_client =
+            SomAiClient::new("http://10.30.0.164:8000", "API_USER", "supersicher123!")
+                .await
+                .unwrap();
 
         //                 id     | legislative_initiatives_id |         title          | document_type |                 document_url
         // -----------+----------------------------+------------------------+---------------+-----------------------------------------------
@@ -204,9 +217,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_summary_prompt_xxviii_i_269() {
-        let somai_client = SomAiClient::new_local("http://localhost:8000")
-            .await
-            .unwrap();
+        // let somai_client = SomAiClient::new_local("http://localhost:8000")
+        //     .await
+        //     .unwrap();
+
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let somai_client =
+            SomAiClient::new("http://10.30.0.164:8000", "API_USER", "supersicher123!")
+                .await
+                .unwrap();
 
         let docs = [
             Document {
