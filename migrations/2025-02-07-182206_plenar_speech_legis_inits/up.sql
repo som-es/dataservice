@@ -23,10 +23,6 @@ create table legis_inits_refs(
 
 create index index_ref_gp ON legis_inits_refs (ref_gp, ref_ityp, ref_inr);
 
-
-
-
-
 create table interjections(
     id serial primary key,
     interjection_text text,

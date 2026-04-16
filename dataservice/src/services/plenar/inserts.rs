@@ -10,7 +10,7 @@ use somes_scraper::{
 
 use sqlx::{postgres::PgQueryResult, Executor, Postgres};
 
-use crate::plenar::extract_interjection::extract_interjections;
+use crate::plenar::extract_interjection::extract_and_save_interjections;
 
 pub async fn insert_plenar_speech_legis_init<'a>(
     pool: impl Executor<'a, Database = Postgres>,
@@ -304,7 +304,7 @@ pub async fn insert_plenar_speech<'a>(
         if let Some(updated_spoken_text) = &updated_spoken_text {
             let (removed_parans, _) =
                 text_utils::remove_paran_contents(updated_spoken_text, '(', ')');
-            extract_interjections(
+            extract_and_save_interjections(
                 removed_parans,
                 plenar_speech.clone(),
                 plenar_date,

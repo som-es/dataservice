@@ -4,28 +4,42 @@ use combx::{
     DelegateMatching, Interjection,
 };
 use somes_scraper::PlenarSpeech;
-use sqlx::Postgres;
+use sqlx::{Executor, Postgres};
 
 const DASH: char = '–';
 const DASH_STR: &str = "–";
 
 pub async fn extract_interjections<'a>(
-    params: Vec<String>,
+    paran_contents: Vec<String>,
+    plenar_speech: PlenarSpeech,
+    plenar_date: DateTime<Utc>,
+    con: impl Executor<'a, Database = Postgres>,
+) -> Result<Vec<Interjection>, sqlx::Error> {
+    let db_delegates = active_delegates_at_date(con, plenar_date.date_naive()).await?;
+
+    Ok(paran_contents
+        .into_iter()
+        .map(|paran_content| {
+            extract_interjection(
+                paran_content.as_str(),
+                &plenar_speech,
+                &db_delegates,
+                &plenar_date,
+            )
+        })
+        .flatten()
+        .collect())
+}
+
+pub async fn extract_and_save_interjections<'a>(
+    paran_contents: Vec<String>,
     plenar_speech: PlenarSpeech,
     plenar_date: DateTime<Utc>,
     pool: &mut sqlx::Transaction<'a, Postgres>,
     plenar_speech_id: i32,
 ) -> Result<(), sqlx::Error> {
-    let db_delegates = active_delegates_at_date(&mut **pool, plenar_date.date_naive()).await?;
-
-    let mut interjections: Vec<Interjection> = Vec::new();
-
-    for param in params {
-        let extracted =
-            extract_interjection(param.as_str(), &plenar_speech, &db_delegates, &plenar_date);
-
-        interjections.extend(extracted);
-    }
+    let interjections =
+        extract_interjections(paran_contents, plenar_speech, plenar_date, &mut **pool).await?;
 
     save_interjection(interjections, pool, plenar_speech_id).await
 }
@@ -42,7 +56,7 @@ pub async fn save_interjection<'a>(
                 similiarity_score,
                 searched_with,
                 matched_with,
-                delegate_id, 
+                delegate_id,
                 manually_matched
             )
             VALUES ($1, $2, $3, $4, $5)
@@ -88,7 +102,7 @@ fn extract_interjection(
 ) -> Vec<Interjection> {
     let parts = extract_interjections_parts(param);
 
-    let mut result = Vec::new();
+    let mut interjections = Vec::new();
 
     for (name, text) in parts {
         let delegate_results = match_delegate_name_with_delegate_id(
@@ -107,7 +121,7 @@ fn extract_interjection(
                 manually_matched: best.manually_matched,
             };
 
-            result.push(Interjection {
+            interjections.push(Interjection {
                 interjection_text: text,
                 interjector_delegate_id: best.delegate_id as i32,
                 plenar_speech: plenar_speech.clone(),
@@ -116,7 +130,7 @@ fn extract_interjection(
         }
     }
 
-    result
+    interjections
 }
 
 fn extract_interjections_parts(param: &str) -> Vec<(String, String)> {
@@ -133,14 +147,9 @@ fn extract_interjections_parts(param: &str) -> Vec<(String, String)> {
 
             let mut name = name.trim().to_string();
 
-            // 👉 Spezialfall: "Name – irgendwas –"
+            // Spezialfall: "Name – irgendwas –"
             if name.matches(DASH).count() >= 2 {
-                name = name
-                    .split(DASH)
-                    .next()
-                    .unwrap_or("")
-                    .trim()
-                    .to_string();
+                name = name.split(DASH).next().unwrap_or("").trim().to_string();
             }
 
             Some((name, text.trim().to_string()))
@@ -150,6 +159,12 @@ fn extract_interjections_parts(param: &str) -> Vec<(String, String)> {
 
 #[cfg(test)]
 mod tests {
+    use chrono::{Date, NaiveDate};
+    use chrono_tz::TzOffset;
+    use somes_scraper::Speech;
+
+    use crate::{connect_pg, connect_pg2};
+
     use super::*;
 
     fn assert_extraction(input: &str, expected: Vec<(&str, &str)>) {
@@ -215,6 +230,49 @@ mod tests {
                 ("Steinacker", "Aus gut mach schlecht!"),
             ],
         );
+    }
+
+    #[tokio::test]
+    pub async fn test_interjection_delegate_id_matching_multiple() {
+        let paran_content =
+            "Beifall bei der ÖVP. – Abg. Plessl: Was sagen Sie zum Vertrag 2002? Eine Nebelgranate! Das Problem Vertragsgestaltung 2002 sprechen Sie gar nicht an! – Abg. Steinacker – auf dem Weg zu ihrem Sitzplatz –: Aus gut mach schlecht!";
+        let pg = connect_pg2().await;
+        let plenar_date = DateTime::<Utc>::from_naive_utc_and_offset(
+            NaiveDate::from_ymd_opt(2019, 9, 25)
+                .unwrap()
+                .and_hms_nano_opt(0, 0, 0, 0)
+                .unwrap(),
+            Utc,
+        );
+
+        let plenar_speech = PlenarSpeech {
+            ty: "".into(),
+            duration_in_seconds: 0,
+            speech: Speech::default(),
+        };
+
+        let interjections =
+            extract_interjections(vec![paran_content.into()], plenar_speech, plenar_date, &pg)
+                .await
+                .unwrap();
+
+        let match1 = DelegateMatching {
+            similiarity_score: 0,
+            searched_with: "Plessl".into(),
+            matched_with: "Plessl Rudolf".into(),
+            delegate_id: 51549,
+            manually_matched: false,
+        };
+
+        let match2 = DelegateMatching {
+            similiarity_score: 0,
+            searched_with: "Steinacker".into(),
+            matched_with: "Steinacker Michaela, Mag.".into(),
+            delegate_id: 83059,
+            manually_matched: false,
+        };
+        assert_eq!(interjections[0].delegate_matching.clone(), match1);
+        assert_eq!(interjections[1].delegate_matching.clone(), match2);
     }
 
     #[test]
