@@ -1,12 +1,16 @@
 use std::collections::HashSet;
 
+use chrono::{DateTime, Utc};
 use log::warn;
 use somes_scraper::{
     call_to_order::CallToOrderInfo,
     plenar::{Debate, DebateInfo, PlenarInfo},
     text_utils, PlenarSpeech, Reference, TextExtractor,
 };
+
 use sqlx::{postgres::PgQueryResult, Executor, Postgres};
+
+use crate::plenar::extract_interjection::extract_and_save_interjections;
 
 pub async fn insert_plenar_speech_legis_init<'a>(
     pool: impl Executor<'a, Database = Postgres>,
@@ -108,6 +112,7 @@ pub async fn insert_plenar_speech<'a>(
     corresponding_debate: &DebateInfo,
     val_debate_id: i32,
     text_extractor: &mut TextExtractor,
+    plenar_date: DateTime<Utc>,
 ) -> Result<(), sqlx::Error> {
     let disable_speech_text =
         std::env::var("DISABLE_SPEECH_TEXT").unwrap_or_else(|_| "true".into()) == "true";
@@ -299,10 +304,14 @@ pub async fn insert_plenar_speech<'a>(
         if let Some(updated_spoken_text) = &updated_spoken_text {
             let (removed_parans, _) =
                 text_utils::remove_paran_contents(updated_spoken_text, '(', ')');
-            for removed_paran in removed_parans {
-                // "asdfhasdjklf ahsdfhjklasd (Abg. Hallo: Das ist eine Frechheit!)"
-                // TODO: Issue #25
-            }
+            extract_and_save_interjections(
+                removed_parans,
+                plenar_speech.clone(),
+                plenar_date,
+                pool,
+                plenar_speech_id,
+            )
+            .await?;
         }
 
         sqlx::query!(

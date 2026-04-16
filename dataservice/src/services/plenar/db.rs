@@ -68,6 +68,7 @@ pub async fn update_plenar_infos_in_db(plenar_info: &PlenarInfo, pg_pool: &PgPoo
                 &debate.info,
                 debate_id,
                 &mut text_extractor,
+                plenar_info.created_at,
             )
             .await
             {

@@ -14,6 +14,9 @@ pub use db::*;
 mod inserts;
 pub use inserts::*;
 
+mod extract_interjection;
+pub use extract_interjection::*;
+
 const MAX_TASKS: usize = 1;
 
 pub async fn plenar_info_once(pg_pool: &PgPool, only_latest: bool) {
