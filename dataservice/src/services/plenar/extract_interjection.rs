@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use chrono::{DateTime, Utc};
 use combx::{
     match_delegate_name_with_delegate_id, with_data::active_delegates_at_date, DbDelegate,
@@ -15,11 +17,13 @@ pub async fn extract_interjections<'a>(
     plenar_date: DateTime<Utc>,
     con: impl Executor<'a, Database = Postgres>,
 ) -> Result<Vec<Interjection>, sqlx::Error> {
-    let db_delegates = active_delegates_at_date(con, plenar_date.date_naive()).await?;
-
-    Ok(paran_contents
-        .into_iter()
-        .map(|paran_content| {
+    let db_delegates: Arc<[DbDelegate]> =
+        Arc::from(active_delegates_at_date(con, plenar_date.date_naive()).await?);
+    let mut interjections = Vec::with_capacity(paran_contents.len());
+    for paran_content in paran_contents {
+        let plenar_speech = plenar_speech.clone();
+        let db_delegates = db_delegates.clone();
+        let Ok(interjection) = tokio::task::spawn_blocking(move || {
             extract_interjection(
                 paran_content.as_str(),
                 &plenar_speech,
@@ -27,8 +31,13 @@ pub async fn extract_interjections<'a>(
                 &plenar_date,
             )
         })
-        .flatten()
-        .collect())
+        .await
+        else {
+            continue;
+        };
+        interjections.extend(interjection);
+    }
+    Ok(interjections)
 }
 
 pub async fn extract_and_save_interjections<'a>(
@@ -97,7 +106,7 @@ pub async fn save_interjection<'a>(
 fn extract_interjection(
     param: &str,
     plenar_speech: &PlenarSpeech,
-    db_delegate: &Vec<DbDelegate>,
+    db_delegate: &[DbDelegate],
     plenar_date: &DateTime<Utc>,
 ) -> Vec<Interjection> {
     let parts = extract_interjections_parts(param);
@@ -217,6 +226,15 @@ mod tests {
             )],
         );
     }
+    /* */
+    #[test]
+    fn test_interjection_extraction_7() {
+        assert_extraction(
+            "Abg. Dr. Schüssel:
+                    Benita – und nicht Benito!",
+            vec![("Dr. Schüssel", "Benita – und nicht Benito!")],
+        );
+    }
 
     #[test]
     fn test_interjection_extraction_6_multiple() {
@@ -235,7 +253,7 @@ mod tests {
     #[tokio::test]
     pub async fn test_interjection_delegate_id_matching_multiple() {
         let paran_content =
-            "Beifall bei der ÖVP. – Abg. Plessl: Was sagen Sie zum Vertrag 2002? Eine Nebelgranate! Das Problem Vertragsgestaltung 2002 sprechen Sie gar nicht an! – Abg. Steinacker – auf dem Weg zu ihrem Sitzplatz –: Aus gut mach schlecht!";
+            "Beifall bei der ÖVP. – Abg. Dr. Plessl: Was sagen Sie zum Vertrag 2002? Eine Nebelgranate! Das Problem Vertragsgestaltung 2002 sprechen Sie gar nicht an! – Abg. Steinacker – auf dem Weg zu ihrem Sitzplatz –: Aus gut mach schlecht!";
         let pg = connect_pg2().await;
         let plenar_date = DateTime::<Utc>::from_naive_utc_and_offset(
             NaiveDate::from_ymd_opt(2019, 9, 25)
@@ -257,8 +275,8 @@ mod tests {
                 .unwrap();
 
         let match1 = DelegateMatching {
-            similiarity_score: 0,
-            searched_with: "Plessl".into(),
+            similiarity_score: 4,
+            searched_with: "Dr. Plessl".into(),
             matched_with: "Plessl Rudolf".into(),
             delegate_id: 51549,
             manually_matched: false,

@@ -304,14 +304,20 @@ pub async fn insert_plenar_speech<'a>(
         if let Some(updated_spoken_text) = &updated_spoken_text {
             let (removed_parans, _) =
                 text_utils::remove_paran_contents(updated_spoken_text, '(', ')');
-            extract_and_save_interjections(
+            println!("removed parans: {removed_parans:?}");
+            if let Err(e) = extract_and_save_interjections(
                 removed_parans,
                 plenar_speech.clone(),
                 plenar_date,
                 pool,
                 plenar_speech_id,
             )
-            .await?;
+            .await
+            {
+                log::error!(
+                    "Could not extract and save interjections for {plenar_speech_id}: {e:?}"
+                )
+            }
         }
 
         sqlx::query!(

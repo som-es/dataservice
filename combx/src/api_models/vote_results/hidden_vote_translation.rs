@@ -37,7 +37,7 @@ pub async fn translate_votes(
 
     let convert_party_name_to_vote = |name: &String, infavor| {
         let Some(party) = party_name_to_party.get(name).cloned() else {
-            log::error!(
+            log::warn!(
                 "Could not find party by name '{}' for gp '{}' for vote translation. Available parties: {:?}. Trying all parties next.",
                 name,
                 gp,

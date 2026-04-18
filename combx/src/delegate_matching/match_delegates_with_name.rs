@@ -114,10 +114,10 @@ pub fn match_delegate_name_with_delegate_id<'a, I: Iterator<Item = &'a DbDelegat
             for delegate_name_split in &delegate_split {
                 if deep_search {
                     for name in &name_split {
-                        if !name.contains(delegate_name_split) {
-                            deep_search_mismatch += 1;
-                        } else {
+                        if name.contains(delegate_name_split) {
                             deep_split_matched = true;
+                        } else {
+                            deep_search_mismatch += 1;
                         }
                     }
                 }
