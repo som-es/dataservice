@@ -288,6 +288,8 @@ pub struct Interjection {
     pub interjection_text: String,
     pub interjector_delegate_id: i32,
     pub plenar_speech: PlenarSpeech,
+    pub rel_start_idx: usize,
+    pub rel_end_idx: usize,
     pub delegate_matching: DelegateMatching,
 }
 

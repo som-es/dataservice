@@ -5,14 +5,17 @@ use combx::{
     match_delegate_name_with_delegate_id, with_data::active_delegates_at_date, DbDelegate,
     DelegateMatching, Interjection,
 };
-use somes_scraper::PlenarSpeech;
-use sqlx::{Executor, Postgres};
+use somes_scraper::{
+    text_utils::{remove_paran_contents, ParanContent},
+    PlenarSpeech,
+};
+use sqlx::{Connection, Executor, Postgres};
 
 const DASH: char = '–';
 const DASH_STR: &str = "–";
 
 pub async fn extract_interjections<'a>(
-    paran_contents: Vec<String>,
+    paran_contents: Vec<ParanContent>,
     plenar_speech: PlenarSpeech,
     plenar_date: DateTime<Utc>,
     con: impl Executor<'a, Database = Postgres>,
@@ -24,12 +27,7 @@ pub async fn extract_interjections<'a>(
         let plenar_speech = plenar_speech.clone();
         let db_delegates = db_delegates.clone();
         let Ok(interjection) = tokio::task::spawn_blocking(move || {
-            extract_interjection(
-                paran_content.as_str(),
-                &plenar_speech,
-                &db_delegates,
-                &plenar_date,
-            )
+            extract_interjection(&paran_content, &plenar_speech, &db_delegates, &plenar_date)
         })
         .await
         else {
@@ -41,7 +39,7 @@ pub async fn extract_interjections<'a>(
 }
 
 pub async fn extract_and_save_interjections<'a>(
-    paran_contents: Vec<String>,
+    paran_contents: Vec<ParanContent>,
     plenar_speech: PlenarSpeech,
     plenar_date: DateTime<Utc>,
     pool: &mut sqlx::Transaction<'a, Postgres>,
@@ -55,9 +53,27 @@ pub async fn extract_and_save_interjections<'a>(
 
 pub async fn save_interjection<'a>(
     interjections: Vec<Interjection>,
-    pool: &mut sqlx::Transaction<'a, Postgres>,
+    tx: &mut sqlx::Transaction<'a, Postgres>,
     plenar_speech_id: i32,
 ) -> Result<(), sqlx::Error> {
+    let mut tx = tx.begin().await?;
+
+    let delegate_matching_ids = sqlx::query_scalar!(
+        "DELETE FROM interjections WHERE plenar_speech_id = $1 RETURNING delegate_matching_id",
+        plenar_speech_id
+    )
+    .fetch_all(&mut *tx)
+    .await?;
+
+    for to_delete_delegate_matching_id in delegate_matching_ids {
+        sqlx::query!(
+            "delete from delegate_matching where id = $1",
+            to_delete_delegate_matching_id
+        )
+        .execute(&mut *tx)
+        .await?;
+    }
+
     for interjection in interjections {
         let delegate_matching_id: i32 = sqlx::query!(
             r#"
@@ -77,7 +93,7 @@ pub async fn save_interjection<'a>(
             interjection.delegate_matching.delegate_id,
             interjection.delegate_matching.manually_matched,
         )
-        .fetch_one(&mut **pool)
+        .fetch_one(&mut *tx)
         .await?
         .id;
 
@@ -87,29 +103,34 @@ pub async fn save_interjection<'a>(
                 interjection_text,
                 interjector_delegate_id,
                 plenar_speech_id,
-                delegate_matching_id
+                delegate_matching_id,
+                rel_start_idx,
+                rel_end_idx
             )
-            VALUES ($1, $2, $3, $4)
+            VALUES ($1, $2, $3, $4, $5, $6)
             "#,
             interjection.interjection_text,
             interjection.interjector_delegate_id,
             plenar_speech_id,
             delegate_matching_id,
+            interjection.rel_start_idx as i32,
+            interjection.rel_end_idx as i32,
         )
-        .execute(&mut **pool)
+        .execute(&mut *tx)
         .await?;
     }
+    tx.commit().await?;
 
     Ok(())
 }
 
 fn extract_interjection(
-    param: &str,
+    paran: &ParanContent,
     plenar_speech: &PlenarSpeech,
     db_delegate: &[DbDelegate],
     plenar_date: &DateTime<Utc>,
 ) -> Vec<Interjection> {
-    let parts = extract_interjections_parts(param);
+    let parts = extract_interjections_parts(&paran.content);
 
     let mut interjections = Vec::new();
 
@@ -135,6 +156,8 @@ fn extract_interjection(
                 interjector_delegate_id: best.delegate_id as i32,
                 plenar_speech: plenar_speech.clone(),
                 delegate_matching,
+                rel_start_idx: paran.start_idx,
+                rel_end_idx: paran.end_idx,
             });
         }
     }
@@ -160,19 +183,19 @@ fn extract_interjections_parts(param: &str) -> Vec<(String, String)> {
             if name.matches(DASH).count() >= 2 {
                 name = name.split(DASH).next().unwrap_or("").trim().to_string();
             }
+            (_, name) = remove_paran_contents(&name, '[', ']');
 
-            Some((name, text.trim().to_string()))
+            Some((name.trim().to_string(), text.trim().to_string()))
         })
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::{Date, NaiveDate};
-    use chrono_tz::TzOffset;
+    use chrono::NaiveDate;
     use somes_scraper::Speech;
 
-    use crate::{connect_pg, connect_pg2};
+    use crate::connect_pg2;
 
     use super::*;
 
@@ -226,13 +249,19 @@ mod tests {
             )],
         );
     }
-    /* */
     #[test]
     fn test_interjection_extraction_7() {
         assert_extraction(
             "Abg. Dr. Schüssel:
                     Benita – und nicht Benito!",
             vec![("Dr. Schüssel", "Benita – und nicht Benito!")],
+        );
+    }
+    #[test]
+    fn test_interjection_extraction_8() {
+        assert_extraction(
+            "Abg. Gewessler [Grüne]: Mit Ihrer Politik sicher nicht!",
+            vec![("Gewessler", "Mit Ihrer Politik sicher nicht!")],
         );
     }
 
@@ -269,10 +298,18 @@ mod tests {
             speech: Speech::default(),
         };
 
-        let interjections =
-            extract_interjections(vec![paran_content.into()], plenar_speech, plenar_date, &pg)
-                .await
-                .unwrap();
+        let interjections = extract_interjections(
+            vec![ParanContent {
+                start_idx: 0,
+                end_idx: 0,
+                content: paran_content.into(),
+            }],
+            plenar_speech,
+            plenar_date,
+            &pg,
+        )
+        .await
+        .unwrap();
 
         let match1 = DelegateMatching {
             similiarity_score: 4,
