@@ -85,25 +85,36 @@ pub async fn pg_get_plenar_speeches(
 ) -> sqlx::Result<Vec<DbSpeechWithLink>> {
     sqlx::query_as!(
         DbSpeechWithLink,
-        "
-                    SELECT
-                        legis_init_id,
-                        delegate_id,
-                        CASE
-                            WHEN opinion = 'Pro' THEN ($2 NOT LIKE '%p%')
-                            WHEN opinion = 'Contra' THEN ($2 LIKE '%p%')
-                            ELSE NULL
-                        END AS infavor,
-                        duration_in_seconds,
-                        opinion,
-                        document_url,
-                        about
-                    FROM plenar_speeches
-                    INNER JOIN plenar_speech_links psl ON plenar_speeches.id = psl.plenar_speech_id
-                    INNER JOIN plenar_speech_legis_inits pl ON pl.speech_id = plenar_speeches.id
-                    INNER JOIN debates ON debates.id = plenar_speeches.debate_id
-                    WHERE legis_init_id = $1
-                    ",
+        r#"
+        SELECT
+            COALESCE(array_agg(pl.legis_init_id), ARRAY[]::integer[]) AS "vote_result_ids!",
+            delegate_id,
+            CASE
+                WHEN opinion = 'Pro' THEN ($2 NOT LIKE '%p%')
+                WHEN opinion = 'Contra' THEN ($2 LIKE '%p%')
+                ELSE NULL
+            END AS infavor,
+            duration_in_seconds,
+            opinion,
+            document_url,
+            about
+        FROM plenar_speeches
+        INNER JOIN plenar_speech_links psl ON plenar_speeches.id = psl.plenar_speech_id
+        INNER JOIN plenar_speech_legis_inits pl ON pl.speech_id = plenar_speeches.id
+        INNER JOIN debates ON debates.id = plenar_speeches.debate_id
+        WHERE plenar_speeches.id IN (
+            SELECT speech_id
+            FROM plenar_speech_legis_inits
+            WHERE legis_init_id = $1
+        )
+        GROUP BY
+            plenar_speeches.id,
+            delegate_id,
+            duration_in_seconds,
+            opinion,
+            document_url,
+            about
+        "#,
         maybe_legis_init_id,
         db_legis_init.pre_declined_type
     )
@@ -159,7 +170,7 @@ pub async fn pg_get_absences_from_legis_init(
             SELECT plenary_session_id
             FROM legislative_initiatives
             WHERE id = $1
-        ) 
+        )
             ",
         maybe_legis_init_id
     )
@@ -172,7 +183,58 @@ pub async fn pg_get_referenced_by_other_ids(
     pool: &PgPool,
     db_legis_init: &DbLegislativeInitiativeQuery,
 ) -> Result<Vec<i32>, sqlx::Error> {
-    sqlx::query!("select origin_legis_init_id from legis_inits_refs where ref_gp = $1 and ref_ityp = $2 and ref_inr = $3", 
+    sqlx::query!("select origin_legis_init_id from legis_inits_refs where ref_gp = $1 and ref_ityp = $2 and ref_inr = $3",
         db_legis_init.gp, db_legis_init.ityp, db_legis_init.inr).fetch_all(pool).await
         .map(|x| x.into_iter().map(|x| x.origin_legis_init_id).collect::<Vec<_>>())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        DbLegislativeInitiativeQuery, DbSpeechWithLink, connect_pg, pg_get_plenar_speeches,
+    };
+
+    #[tokio::test]
+    async fn test_get_plenar_speeches() {
+        let pg = connect_pg().await;
+        let db_legis_init = DbLegislativeInitiativeQuery::default();
+        let maybe_legis_init_id = 28198521;
+        let mut speeches = pg_get_plenar_speeches(&pg, &db_legis_init, maybe_legis_init_id)
+            .await
+            .unwrap();
+        for speech in &mut speeches {
+            speech.vote_result_ids.sort();
+        }
+        let cmp_ids = speeches[0].vote_result_ids.clone();
+        for speech in &speeches {
+            assert_eq!(cmp_ids, speech.vote_result_ids);
+            // for id in &speech.vote_result_ids {
+            //     assert!(cmp_ids.contains(id));
+            // }
+        }
+        dbg!(&speeches);
+        let speech = DbSpeechWithLink {
+                delegate_id: 35469,
+                vote_result_ids: vec![
+                    28198521,
+                    95144039,
+                    111699852,
+                    111699891,
+                ],
+                infavor: None,
+                duration_in_seconds: Some(
+                    562,
+                ),
+                opinion: Some(
+                    "Contra".into(),
+                ),
+                document_url: Some(
+                    "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/63/A_-_18_16_03_00898949.html#142".into(),
+                ),
+                about: Some(
+                    "Asylstopp-Novelle 2025".into(),
+                ),
+            };
+        assert!(speeches.contains(&speech));
+    }
 }

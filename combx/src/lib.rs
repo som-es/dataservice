@@ -40,7 +40,7 @@ pub trait CombinedData {
 
 pub async fn connect_pg() -> PgPool {
     PgPoolOptions::new()
-        .max_connections(150)
+        .max_connections(10)
         .connect(DATABASE_URL)
         .await
         .unwrap()

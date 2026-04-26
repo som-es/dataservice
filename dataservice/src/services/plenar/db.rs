@@ -34,6 +34,7 @@ pub async fn update_plenar_infos_in_db(plenar_info: &PlenarInfo, pg_pool: &PgPoo
         }
     }
 
+    log::info!("inserting debates");
     for debate in &plenar_info.debates {
         // get id from here, log here
 
@@ -109,7 +110,7 @@ pub async fn update_plenar_infos_in_db(plenar_info: &PlenarInfo, pg_pool: &PgPoo
                         manually_matched = EXCLUDED.manually_matched
                     ", match_res.lev as i64, match_res.similiarity_score as i64, match_res.searched_with, match_res.matched_with, match_res.delegate_id as i32, match_res.manually_matched, plenar_id
                 ).execute(pg_pool).await {
-                    log::warn!("Error inserting absene {e:?} for absence {match_res:?}");
+                    log::error!("Error inserting absene {e:?} for absence {match_res:?}");
                 }
         }
     }

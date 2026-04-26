@@ -331,7 +331,7 @@ impl VoteResult {
                         .first()
                         .map(|html_url| html_url.document_url.clone()),
                     about: None,
-                    legis_init_id: None,
+                    vote_result_ids: None,
                 }
             })
             .collect::<Vec<_>>();

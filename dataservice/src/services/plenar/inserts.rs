@@ -114,6 +114,7 @@ pub async fn insert_plenar_speech<'a>(
     text_extractor: &mut TextExtractor,
     plenar_date: DateTime<Utc>,
 ) -> Result<(), sqlx::Error> {
+    log::info!("insert plenar speech");
     let disable_speech_text =
         std::env::var("DISABLE_SPEECH_TEXT").unwrap_or_else(|_| "true".into()) == "true";
 
@@ -300,11 +301,10 @@ pub async fn insert_plenar_speech<'a>(
                         val_debate_id, plenar_speech
                     );
         }
-
         if let Some(updated_spoken_text) = &updated_spoken_text {
             let (removed_parans, _) =
                 text_utils::remove_paran_contents(updated_spoken_text, '(', ')');
-            println!("removed parans: {removed_parans:?}");
+            log::info!("removed parans: {removed_parans:?}");
             if let Err(e) = extract_and_save_interjections(
                 removed_parans,
                 plenar_speech.clone(),

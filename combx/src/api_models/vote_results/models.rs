@@ -165,7 +165,7 @@ pub struct DbVoteIns {
 pub struct DbSpeechWithLink {
     #[filter(make_optional)]
     pub delegate_id: i32,
-    pub legis_init_id: Option<i32>,
+    pub vote_result_ids: Option<Vec<i32>>,
     pub infavor: Option<bool>,
     pub duration_in_seconds: Option<i32>,
     pub opinion: Option<String>,
