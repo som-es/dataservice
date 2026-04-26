@@ -1,5 +1,5 @@
 pub mod active_delegates;
-pub mod activity;
+pub mod delegates;
 pub mod get_all_titles;
 pub mod gps;
 pub mod named_votes;

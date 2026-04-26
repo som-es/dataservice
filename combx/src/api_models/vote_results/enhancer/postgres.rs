@@ -203,7 +203,7 @@ mod tests {
             .await
             .unwrap();
         for speech in &mut speeches {
-            speech.vote_result_ids.sort();
+            speech.vote_result_ids.as_mut().unwrap().sort();
         }
         let cmp_ids = speeches[0].vote_result_ids.clone();
         for speech in &speeches {
@@ -215,12 +215,12 @@ mod tests {
         dbg!(&speeches);
         let speech = DbSpeechWithLink {
                 delegate_id: 35469,
-                vote_result_ids: vec![
+                vote_result_ids: Some(vec![
                     28198521,
                     95144039,
                     111699852,
                     111699891,
-                ],
+                ]),
                 infavor: None,
                 duration_in_seconds: Some(
                     562,

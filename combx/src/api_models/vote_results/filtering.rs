@@ -51,10 +51,7 @@ pub fn meilisearch_filters_vote_result(
         filter_conditions.extend(to_meilisearch_filters(
             &meilisearch_helper.filter_arguments(),
             &FilterOptions {
-                prefix: Some(build_prefix(
-                    "meilisearch_helper",
-                    prefix.as_deref(),
-                )),
+                prefix: Some(build_prefix("meilisearch_helper", prefix.as_deref())),
                 ..Default::default()
             },
         ));
