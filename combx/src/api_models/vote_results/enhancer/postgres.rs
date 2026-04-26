@@ -87,7 +87,7 @@ pub async fn pg_get_plenar_speeches(
         DbSpeechWithLink,
         r#"
         SELECT
-            COALESCE(array_agg(pl.legis_init_id), ARRAY[]::integer[]) AS "vote_result_ids!",
+            COALESCE(array_remove(array_agg(pl.legis_init_id), NULL), ARRAY[]::integer[]) AS "vote_result_ids!",
             delegate_id,
             CASE
                 WHEN opinion = 'Pro' THEN ($2 NOT LIKE '%p%')
