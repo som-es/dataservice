@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use chrono::Days;
 use combx::with_data::delegates::{
     extract_call_to_orders_by_delegate, extract_last_delegate_speeches,
@@ -17,6 +19,7 @@ pub struct NamedVoteWithVoteResult {
 
 #[derive(Debug)]
 pub struct RecentActivity {
+    delegate_id: i32,
     gov_poposals: Vec<OptionalGovProposal>,
     issued_proposals: Vec<OptionalVoteResult>,
     decrees: Vec<OptionalDecree>,
@@ -102,6 +105,7 @@ pub async fn collect_recent_activity_by_delegate(
     let speeches = extract_last_delegate_speeches(delegate_id, pg_pool, last_n_days).await?;
 
     Ok(RecentActivity {
+        delegate_id,
         gov_poposals: recent_gov_proposals,
         issued_proposals: recent_issued_proposals,
         decrees: recent_decrees,
@@ -109,6 +113,36 @@ pub async fn collect_recent_activity_by_delegate(
         speeches,
         call_to_orders,
     })
+}
+pub async fn populate_delegate_profile_html(acitivity: &RecentActivity) -> String {
+    todo!()
+}
+
+pub async fn send_delegate_activity_mail(
+    mail_to: &str,
+    html_delegate_activities: &HashMap<i32, String>,
+) {
+}
+
+pub struct DelegateNotification {
+    delegate_id: i32,
+    user_info_days: i32,
+}
+
+async fn find_notifiers(pg: &PgPool) -> sqlx::Result<HashMap<String, Vec<DelegateNotification>>> {
+    let mut notifiers = HashMap::new();
+    let users = sqlx::query!("select email, id from somes_user where not is_email_hashed and send_new_delegate_activity_mails").fetch_all(pg).await?;
+    for user in users {
+        let delegate_ids = sqlx::query_as!(
+            DelegateNotification,
+            "select delegate_id, user_info_days from favo_dels where user_id = $1",
+            user.id
+        )
+        .fetch_all(pg)
+        .await?;
+        notifiers.insert(user.email, delegate_ids);
+    }
+    Ok(notifiers)
 }
 
 #[cfg(test)]
