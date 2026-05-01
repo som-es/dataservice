@@ -297,12 +297,12 @@ pub struct Topic {
     Hash,
 )]
 pub struct Interjection {
-    pub interjection_text: String,
+    pub interjection_text: Option<String>,
     pub interjector_delegate_id: i32,
-    pub plenar_speech_id: i64,
-    pub rel_start_idx: i64,
-    pub rel_end_idx: i64,
-    pub delegate_matching: DelegateMatching,
+    pub plenar_speech_id: i32,
+    pub rel_start_idx: i32,
+    pub rel_end_idx: i32,
+    pub delegate_match: DelegateMatch,
 }
 
 
@@ -321,7 +321,7 @@ pub struct Interjection {
     MeilisearchFilter,
     Hash,
 )]
-pub struct DelegateMatching {
+pub struct DelegateMatch {
     pub similiarity_score: i64,
     pub searched_with: String,
     pub matched_with: String,

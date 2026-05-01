@@ -3,11 +3,10 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use combx::{
     match_delegate_name_with_delegate_id, with_data::active_delegates_at_date, DbDelegate,
-    DelegateMatching, Interjection,
+    DelegateMatch, Interjection,
 };
 use somes_scraper::{
     text_utils::{remove_paran_contents, ParanContent},
-    PlenarSpeech,
 };
 use sqlx::{Connection, Executor, Postgres};
 
@@ -85,11 +84,11 @@ pub async fn save_interjection<'a>(
             VALUES ($1, $2, $3, $4, $5)
             RETURNING id
             "#,
-            interjection.delegate_matching.similiarity_score,
-            interjection.delegate_matching.searched_with,
-            interjection.delegate_matching.matched_with,
-            interjection.delegate_matching.delegate_id,
-            interjection.delegate_matching.manually_matched,
+            interjection.delegate_match.similiarity_score,
+            interjection.delegate_match.searched_with,
+            interjection.delegate_match.matched_with,
+            interjection.delegate_match.delegate_id,
+            interjection.delegate_match.manually_matched,
         )
         .fetch_one(&mut *tx)
         .await?
@@ -141,7 +140,7 @@ fn extract_interjection(
         );
 
         if let Some(best) = delegate_results.get(0) {
-            let delegate_matching = DelegateMatching {
+            let delegate_match = DelegateMatch {
                 similiarity_score: best.similiarity_score as i64,
                 searched_with: best.searched_with.clone(),
                 matched_with: best.matched_with.clone(),
@@ -150,12 +149,12 @@ fn extract_interjection(
             };
 
             interjections.push(Interjection {
-                interjection_text: text,
+                interjection_text: Some(text),
                 interjector_delegate_id: best.delegate_id as i32,
-                plenar_speech_id,
-                delegate_matching,
-                rel_start_idx: paran.start_idx as i64,
-                rel_end_idx: paran.end_idx as i64,
+                plenar_speech_id: plenar_speech_id as i32,
+                delegate_match,
+                rel_start_idx: paran.start_idx as i32,
+                rel_end_idx: paran.end_idx as i32,
             });
         }
     }
@@ -191,7 +190,6 @@ fn extract_interjections_parts(param: &str) -> Vec<(String, String)> {
 #[cfg(test)]
 mod tests {
     use chrono::NaiveDate;
-    use somes_scraper::Speech;
 
     use crate::connect_pg2;
 
@@ -303,7 +301,7 @@ mod tests {
         .await
         .unwrap();
 
-        let match1 = DelegateMatching {
+        let match1 = DelegateMatch {
             similiarity_score: 4,
             searched_with: "Dr. Plessl".into(),
             matched_with: "Plessl Rudolf".into(),
@@ -311,15 +309,15 @@ mod tests {
             manually_matched: false,
         };
 
-        let match2 = DelegateMatching {
+        let match2 = DelegateMatch {
             similiarity_score: 0,
             searched_with: "Steinacker".into(),
             matched_with: "Steinacker Michaela, Mag.".into(),
             delegate_id: 83059,
             manually_matched: false,
         };
-        assert_eq!(interjections[0].delegate_matching.clone(), match1);
-        assert_eq!(interjections[1].delegate_matching.clone(), match2);
+        assert_eq!(interjections[0].delegate_match.clone(), match1);
+        assert_eq!(interjections[1].delegate_match.clone(), match2);
     }
 
     #[test]

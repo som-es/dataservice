@@ -5,8 +5,6 @@ mod call_to_orders;
 pub use call_to_orders::*;
 mod named_votes;
 pub use named_votes::*;
-mod interjections;
-pub use interjections::*;
 
 use sqlx::{PgPool, query, query_as};
 
@@ -107,7 +105,7 @@ pub async fn extract_delegate_speeches(
                 opinion,
                 document_url,
                 raw_data_created_at
-            ORDER BY raw_data_created_at DESC
+            ORDER BY raw_data_created_at DESC, plenar_speeches.id
             OFFSET $2 LIMIT $3
             "#,
             delegate_id,
