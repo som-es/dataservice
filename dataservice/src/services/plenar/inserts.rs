@@ -307,10 +307,9 @@ pub async fn insert_plenar_speech<'a>(
             log::info!("removed parans: {removed_parans:?}");
             if let Err(e) = extract_and_save_interjections(
                 removed_parans,
-                plenar_speech.clone(),
+                plenar_speech_id as i64,
                 plenar_date,
                 pool,
-                plenar_speech_id,
             )
             .await
             {

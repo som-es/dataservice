@@ -281,19 +281,46 @@ pub struct Topic {
     pub topic: String,
 }
 
-use somes_scraper::PlenarSpeech;
-
-#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(
+    Debug,
+    Deserialize,
+    Serialize,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    CompositeType,
+    Type,
+    MeilisearchFilter,
+    Hash,
+)]
 pub struct Interjection {
     pub interjection_text: String,
     pub interjector_delegate_id: i32,
-    pub plenar_speech: PlenarSpeech,
-    pub rel_start_idx: usize,
-    pub rel_end_idx: usize,
+    pub plenar_speech_id: i64,
+    pub rel_start_idx: i64,
+    pub rel_end_idx: i64,
     pub delegate_matching: DelegateMatching,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(
+    Debug,
+    Deserialize,
+    Serialize,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    CompositeType,
+    Type,
+    MeilisearchFilter,
+    Hash,
+)]
 pub struct DelegateMatching {
     pub similiarity_score: i64,
     pub searched_with: String,

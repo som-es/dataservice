@@ -5,6 +5,8 @@ mod call_to_orders;
 pub use call_to_orders::*;
 mod named_votes;
 pub use named_votes::*;
+mod interjections;
+pub use interjections::*;
 
 use sqlx::{PgPool, query, query_as};
 

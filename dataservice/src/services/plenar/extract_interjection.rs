@@ -16,7 +16,7 @@ const DASH_STR: &str = "–";
 
 pub async fn extract_interjections<'a>(
     paran_contents: Vec<ParanContent>,
-    plenar_speech: PlenarSpeech,
+    plenar_speech_id: i64,
     plenar_date: DateTime<Utc>,
     con: impl Executor<'a, Database = Postgres>,
 ) -> Result<Vec<Interjection>, sqlx::Error> {
@@ -24,10 +24,9 @@ pub async fn extract_interjections<'a>(
         Arc::from(active_delegates_at_date(con, plenar_date.date_naive()).await?);
     let mut interjections = Vec::with_capacity(paran_contents.len());
     for paran_content in paran_contents {
-        let plenar_speech = plenar_speech.clone();
         let db_delegates = db_delegates.clone();
         let Ok(interjection) = tokio::task::spawn_blocking(move || {
-            extract_interjection(&paran_content, &plenar_speech, &db_delegates, &plenar_date)
+            extract_interjection(&paran_content, plenar_speech_id, &db_delegates, &plenar_date)
         })
         .await
         else {
@@ -40,13 +39,12 @@ pub async fn extract_interjections<'a>(
 
 pub async fn extract_and_save_interjections<'a>(
     paran_contents: Vec<ParanContent>,
-    plenar_speech: PlenarSpeech,
+    plenar_speech_id: i64,
     plenar_date: DateTime<Utc>,
     pool: &mut sqlx::Transaction<'a, Postgres>,
-    plenar_speech_id: i32,
 ) -> Result<(), sqlx::Error> {
     let interjections =
-        extract_interjections(paran_contents, plenar_speech, plenar_date, &mut **pool).await?;
+        extract_interjections(paran_contents, plenar_speech_id, plenar_date, &mut **pool).await?;
 
     save_interjection(interjections, pool, plenar_speech_id).await
 }
@@ -54,13 +52,13 @@ pub async fn extract_and_save_interjections<'a>(
 pub async fn save_interjection<'a>(
     interjections: Vec<Interjection>,
     tx: &mut sqlx::Transaction<'a, Postgres>,
-    plenar_speech_id: i32,
+    plenar_speech_id: i64,
 ) -> Result<(), sqlx::Error> {
     let mut tx = tx.begin().await?;
 
     let delegate_matching_ids = sqlx::query_scalar!(
         "DELETE FROM interjections WHERE plenar_speech_id = $1 RETURNING delegate_matching_id",
-        plenar_speech_id
+        plenar_speech_id as i32
     )
     .fetch_all(&mut *tx)
     .await?;
@@ -111,7 +109,7 @@ pub async fn save_interjection<'a>(
             "#,
             interjection.interjection_text,
             interjection.interjector_delegate_id,
-            plenar_speech_id,
+            plenar_speech_id as i32,
             delegate_matching_id,
             interjection.rel_start_idx as i32,
             interjection.rel_end_idx as i32,
@@ -126,7 +124,7 @@ pub async fn save_interjection<'a>(
 
 fn extract_interjection(
     paran: &ParanContent,
-    plenar_speech: &PlenarSpeech,
+    plenar_speech_id: i64,
     db_delegate: &[DbDelegate],
     plenar_date: &DateTime<Utc>,
 ) -> Vec<Interjection> {
@@ -154,10 +152,10 @@ fn extract_interjection(
             interjections.push(Interjection {
                 interjection_text: text,
                 interjector_delegate_id: best.delegate_id as i32,
-                plenar_speech: plenar_speech.clone(),
+                plenar_speech_id,
                 delegate_matching,
-                rel_start_idx: paran.start_idx,
-                rel_end_idx: paran.end_idx,
+                rel_start_idx: paran.start_idx as i64,
+                rel_end_idx: paran.end_idx as i64,
             });
         }
     }
@@ -292,19 +290,13 @@ mod tests {
             Utc,
         );
 
-        let plenar_speech = PlenarSpeech {
-            ty: "".into(),
-            duration_in_seconds: 0,
-            speech: Speech::default(),
-        };
-
         let interjections = extract_interjections(
             vec![ParanContent {
                 start_idx: 0,
                 end_idx: 0,
                 content: paran_content.into(),
             }],
-            plenar_speech,
+            0,
             plenar_date,
             &pg,
         )
