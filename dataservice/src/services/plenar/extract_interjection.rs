@@ -14,6 +14,7 @@ const DASH_STR: &str = "–";
 pub async fn extract_interjections<'a>(
     paran_contents: Vec<ParanContent>,
     plenar_speech_id: i64,
+    speaker_delegate_id: i64,
     plenar_date: DateTime<Utc>,
     con: impl Executor<'a, Database = Postgres>,
 ) -> Result<Vec<Interjection>, sqlx::Error> {
@@ -26,6 +27,7 @@ pub async fn extract_interjections<'a>(
             extract_interjection(
                 &paran_content,
                 plenar_speech_id,
+                speaker_delegate_id,
                 &db_delegates,
                 &plenar_date,
             )
@@ -42,11 +44,18 @@ pub async fn extract_interjections<'a>(
 pub async fn extract_and_save_interjections<'a>(
     paran_contents: Vec<ParanContent>,
     plenar_speech_id: i64,
+    speaker_delegate_id: i64,
     plenar_date: DateTime<Utc>,
     pool: &mut sqlx::Transaction<'a, Postgres>,
 ) -> Result<(), sqlx::Error> {
-    let interjections =
-        extract_interjections(paran_contents, plenar_speech_id, plenar_date, &mut **pool).await?;
+    let interjections = extract_interjections(
+        paran_contents,
+        plenar_speech_id,
+        speaker_delegate_id,
+        plenar_date,
+        &mut **pool,
+    )
+    .await?;
 
     save_interjection(interjections, pool, plenar_speech_id).await
 }
@@ -127,6 +136,7 @@ pub async fn save_interjection<'a>(
 fn extract_interjection(
     paran: &ParanContent,
     plenar_speech_id: i64,
+    speaker_delegate_id: i64,
     db_delegate: &[DbDelegate],
     plenar_date: &DateTime<Utc>,
 ) -> Vec<Interjection> {
@@ -162,6 +172,7 @@ fn extract_interjection(
                 date: *plenar_date,
                 rel_start_idx: paran.start_idx as i32,
                 rel_end_idx: paran.end_idx as i32,
+                speaker_delegate_id: speaker_delegate_id as i32,
             });
         }
     }
@@ -314,6 +325,7 @@ mod tests {
                 end_idx: 0,
                 content: paran_content.into(),
             }],
+            0,
             0,
             plenar_date,
             &pg,

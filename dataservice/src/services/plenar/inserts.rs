@@ -308,6 +308,7 @@ pub async fn insert_plenar_speech<'a>(
             if let Err(e) = extract_and_save_interjections(
                 removed_parans,
                 plenar_speech_id as i64,
+                plenar_speech.speech.delegate_id as i64,
                 plenar_date,
                 pool,
             )
