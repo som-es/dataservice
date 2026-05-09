@@ -181,28 +181,60 @@ fn extract_interjection(
 }
 
 fn extract_interjections_parts(param: &str) -> Vec<(String, String)> {
-    let text = format!("{DASH_STR} {}", param);
+    let mut text = param.to_string();
+    let mut interjections = vec![];
+    while let Some(name_text_split) = text.find(':') {
+        let name = &text[..name_text_split];
 
-    text.split(&format!("{DASH_STR} Abg."))
-        .filter_map(|s| {
-            let s = s.trim();
-            if s.is_empty() {
-                return None;
+        let text_part = &text[name_text_split + 1..];
+
+        let name = name.trim();
+        let mut name = if name.contains("Abg.") {
+            name.split_once("Abg.").unwrap_or(("", "")).1.to_string()
+        } else {
+            "".to_string()
+        };
+
+        // Spezialfall: "Name – irgendwas –"
+        if name.matches(DASH).count() >= 2 {
+            name = name.split(DASH).next().unwrap_or("").trim().to_string();
+        }
+        let mut end_idx = text_part.len();
+        let mut pre_skipped = false;
+        let mut prev_non_whitespace_char = None;
+        for (idx, char) in text_part.char_indices() {
+            if char == DASH {
+                if let Some(check_char) = text_part[idx..].chars().nth(2) {
+                    if check_char.is_uppercase()
+                        || (prev_non_whitespace_char.map(|c: char| c.is_ascii_punctuation()))
+                            .unwrap_or_default()
+                    {
+                        end_idx = idx;
+                        pre_skipped = true;
+                        break;
+                    }
+                }
             }
-
-            let (name, text) = s.split_once(':')?;
-
-            let mut name = name.trim().to_string();
-
-            // Spezialfall: "Name – irgendwas –"
-            if name.matches(DASH).count() >= 2 {
-                name = name.split(DASH).next().unwrap_or("").trim().to_string();
+            if !char.is_whitespace() {
+                prev_non_whitespace_char = Some(char);
             }
-            (_, name) = remove_paran_contents(&name, '[', ']');
+        }
 
-            Some((name.trim().to_string(), text.trim().to_string()))
-        })
-        .collect()
+        let res_text = text_part[..end_idx].trim().to_string();
+        let skip = if pre_skipped { 3 } else { 0 };
+        let start = text[name_text_split + end_idx..]
+            .char_indices()
+            .nth(skip)
+            .map(|(i, _)| name_text_split + end_idx + i)
+            .unwrap_or(text.len());
+
+        text = text[start..].to_string();
+
+        (_, name) = remove_paran_contents(&name, '[', ']');
+
+        interjections.push((name.trim().to_string(), res_text));
+    }
+    interjections
 }
 
 #[cfg(test)]
@@ -227,12 +259,14 @@ mod tests {
     // (Abg. Martin Graf: Das war ein Schallmeiner-Schurkenstück! – Abg. Schallmeiner: ... kennt sich der Herr Graf aus, mit den Schurkenstücken! – Unruhe im Saal. – Der Präsident gibt das Glockenzeichen.)
 
     #[test]
-    fn test_interjection_extraction() {
+    fn test_interjection_extraction_x() {
         assert_extraction(
-            "Abg. Martin Graf: Das war ein Schallmeiner-Schurkenstück! – Abg. Schallmeiner: ... kennt sich der Herr Graf aus, mit den Schurkenstücken! – Unruhe im Saal. – Der Präsident gibt das Glockenzeichen.",
+            "Abg. Martin Graf: Das war ein Schallmeiner-Schurkenstück! – Abg. Schallmeiner: ... kennt sich der Herr Graf aus, mit den Schurkenstücken! – Unruhe im Saal. – Der Präsident gibt das Glockenzeichen. – Abg. Hirsch: Super.. – Rufe ber der ÖVP: AJA!",
             vec![
                 ("Martin Graf", "Das war ein Schallmeiner-Schurkenstück!"),
                 ("Schallmeiner", "... kennt sich der Herr Graf aus, mit den Schurkenstücken!"),
+                    ("Hirsch", "Super.."),
+                    ("", "AJA!")
             ],
         );
     }
@@ -289,6 +323,25 @@ mod tests {
         assert_extraction(
             "Abg. Gewessler [Grüne]: Mit Ihrer Politik sicher nicht!",
             vec![("Gewessler", "Mit Ihrer Politik sicher nicht!")],
+        );
+    }
+
+    #[test]
+    fn test_interjection_extraction_9() {
+        // Rufe bei der ÖVP: Oh!
+        assert_extraction(
+            "Rufe bei der ÖVP: Oh! – Abg. Ha: Uh!",
+            vec![("", "Oh!"), ("Ha", "Uh!")],
+        );
+    }
+
+    // Sie nicht! – weitere Zwischenrufe bei der ÖVP
+    #[test]
+    fn test_interjection_extraction_10() {
+        // Rufe bei der ÖVP: Oh!
+        assert_extraction(
+            "Abg. Sieber: Sie nicht! – weitere Zwischenrufe bei der ÖVP",
+            vec![("Sieber", "Sie nicht!")],
         );
     }
 
