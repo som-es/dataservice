@@ -299,12 +299,13 @@ pub struct Topic {
 pub struct Interjection {
     pub interjection_text: Option<String>,
     pub interjector_delegate_id: i32,
+    pub date: DateTime<Utc>,
+    pub speaker_delegate_id: i32,
     pub plenar_speech_id: i32,
     pub rel_start_idx: i32,
     pub rel_end_idx: i32,
     pub delegate_match: DelegateMatch,
 }
-
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(

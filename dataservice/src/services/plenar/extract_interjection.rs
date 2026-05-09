@@ -5,9 +5,7 @@ use combx::{
     match_delegate_name_with_delegate_id, with_data::active_delegates_at_date, DbDelegate,
     DelegateMatch, Interjection,
 };
-use somes_scraper::{
-    text_utils::{remove_paran_contents, ParanContent},
-};
+use somes_scraper::text_utils::{remove_paran_contents, ParanContent};
 use sqlx::{Connection, Executor, Postgres};
 
 const DASH: char = '–';
@@ -25,7 +23,12 @@ pub async fn extract_interjections<'a>(
     for paran_content in paran_contents {
         let db_delegates = db_delegates.clone();
         let Ok(interjection) = tokio::task::spawn_blocking(move || {
-            extract_interjection(&paran_content, plenar_speech_id, &db_delegates, &plenar_date)
+            extract_interjection(
+                &paran_content,
+                plenar_speech_id,
+                &db_delegates,
+                &plenar_date,
+            )
         })
         .await
         else {
@@ -132,6 +135,9 @@ fn extract_interjection(
     let mut interjections = Vec::new();
 
     for (name, text) in parts {
+        if name.is_empty() || text.is_empty() {
+            continue;
+        }
         let delegate_results = match_delegate_name_with_delegate_id(
             db_delegate.iter(),
             plenar_date.date_naive(),
@@ -153,6 +159,7 @@ fn extract_interjection(
                 interjector_delegate_id: best.delegate_id as i32,
                 plenar_speech_id: plenar_speech_id as i32,
                 delegate_match,
+                date: *plenar_date,
                 rel_start_idx: paran.start_idx as i32,
                 rel_end_idx: paran.end_idx as i32,
             });
@@ -204,6 +211,19 @@ mod tests {
             .collect();
 
         assert_eq!(result, expected);
+    }
+
+    // (Abg. Martin Graf: Das war ein Schallmeiner-Schurkenstück! – Abg. Schallmeiner: ... kennt sich der Herr Graf aus, mit den Schurkenstücken! – Unruhe im Saal. – Der Präsident gibt das Glockenzeichen.)
+
+    #[test]
+    fn test_interjection_extraction() {
+        assert_extraction(
+            "Abg. Martin Graf: Das war ein Schallmeiner-Schurkenstück! – Abg. Schallmeiner: ... kennt sich der Herr Graf aus, mit den Schurkenstücken! – Unruhe im Saal. – Der Präsident gibt das Glockenzeichen.",
+            vec![
+                ("Martin Graf", "Das war ein Schallmeiner-Schurkenstück!"),
+                ("Schallmeiner", "... kennt sich der Herr Graf aus, mit den Schurkenstücken!"),
+            ],
+        );
     }
 
     #[test]
