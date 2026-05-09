@@ -186,7 +186,13 @@ fn extract_interjections_parts(param: &str) -> Vec<(String, String)> {
     while let Some(name_text_split) = text.find(':') {
         let name = &text[..name_text_split];
 
-        let text_part = &text[name_text_split + 1..];
+        let text_part_start = text[name_text_split..]
+            .char_indices()
+            .nth(1)
+            .map(|(i, _)| name_text_split + i)
+            .unwrap_or(text.len());
+
+        let text_part = &text[text_part_start..];
 
         let name = name.trim();
         let mut name = if name.contains("Abg.") {
@@ -222,10 +228,10 @@ fn extract_interjections_parts(param: &str) -> Vec<(String, String)> {
 
         let res_text = text_part[..end_idx].trim().to_string();
         let skip = if pre_skipped { 3 } else { 0 };
-        let start = text[name_text_split + end_idx..]
+        let start = text[text_part_start + end_idx..]
             .char_indices()
             .nth(skip)
-            .map(|(i, _)| name_text_split + end_idx + i)
+            .map(|(i, _)| text_part_start + end_idx + i)
             .unwrap_or(text.len());
 
         text = text[start..].to_string();
@@ -297,6 +303,15 @@ mod tests {
         assert_extraction(
             "Abg. Keck: Sie sind auch kein Bürgermeister!",
             vec![("Keck", "Sie sind auch kein Bürgermeister!")],
+        );
+    }
+
+    #[test]
+    fn test_interjection_extraction_qouted_1() {
+        //
+        assert_extraction(
+            "Abg. Bures: „Wie es sich gehört!“",
+            vec![("Bures", "„Wie es sich gehört!“")],
         );
     }
 
