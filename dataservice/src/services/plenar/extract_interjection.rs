@@ -106,6 +106,13 @@ pub async fn save_interjection<'a>(
         .await?
         .id;
 
+        let cleaned_interjection_text: Option<String> =
+            interjection.interjection_text.map(|text| {
+                text.chars()
+                    .filter(|c| !matches!(c, '„' | '“' | '‚' | '‘'))
+                    .collect()
+            });
+
         sqlx::query!(
             r#"
             INSERT INTO interjections (
@@ -118,7 +125,7 @@ pub async fn save_interjection<'a>(
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             "#,
-            interjection.interjection_text,
+            cleaned_interjection_text,
             interjection.interjector_delegate_id,
             plenar_speech_id as i32,
             delegate_matching_id,
