@@ -1,11 +1,18 @@
-<a href="{*PROPOSAL_SOMES_URL*}">
+<a href="{*PROPOSAL_SOMES_URL*}" style="text-decoration: none; color: inherit; display: block">
     <table
         role="presentation"
         width="100%"
         cellspacing="0"
         cellpadding="0"
         border="0"
-        style="margin-top: 20px; font-family: Arial, sans-serif; color: black"
+        style="
+            margin-top: 20px;
+            font-family: Arial, sans-serif;
+            color: black;
+            table-layout: fixed;
+            width: 100%;
+            border-collapse: separate;
+        "
     >
         <tr>
             <td
@@ -22,119 +29,105 @@
                     cellspacing="0"
                     cellpadding="0"
                     border="0"
+                    style="table-layout: fixed; width: 100%"
                 >
-                    <tr valign="top">
+                    <tr>
                         <!-- LEFT CONTENT -->
-                        <td style="vertical-align: top; width: 100%">
+                        <td style="vertical-align: top; padding-right: 10px">
                             <!-- PROPOSAL DESCRIPTION -->
-                            <div style="font-size: 14px; margin-bottom: 8px">
+                            <div
+                                style="
+                                    font-size: 14px;
+                                    line-height: 1.4;
+                                    margin-bottom: 8px;
+                                    word-wrap: break-word;
+                                    overflow-wrap: break-word;
+                                    word-break: break-word;
+                                "
+                            >
                                 {*PROPOSAL_DESCRIPTION*}
                             </div>
 
-                            <!-- TAG BADGES -->
-                            <table
-                                role="presentation"
-                                cellspacing="0"
-                                cellpadding="0"
-                                border="0"
-                                style="border-collapse: collapse"
-                            >
-                                <tr>
-                                    <td
-                                        style="
-                                            background-color: rgb(
-                                                250,
-                                                233,
-                                                218
-                                            );
-                                            color: black;
-                                            font-size: 12px;
-                                            line-height: 16px;
-                                            font-weight: 600;
-                                            border-radius: 6px;
-                                            padding: 4px 8px;
-                                            white-space: nowrap;
-                                        "
-                                    >
-                                        {*PROPOSAL_MINISTRY*}
-                                    </td>
-                                    <td width="6"></td>
-                                    <td
-                                        style="
-                                            background-color: rgb(
-                                                250,
-                                                233,
-                                                218
-                                            );
-                                            color: black;
-                                            font-size: 12px;
-                                            line-height: 16px;
-                                            font-weight: 600;
-                                            border-radius: 6px;
-                                            padding: 4px 8px;
-                                            white-space: nowrap;
-                                        "
-                                    >
-                                        {*PROPOSAL_DATE*}
-                                    </td>
-                                    <td width="6"></td>
-                                    <td
-                                        style="
-                                            background-color: rgb(
-                                                250,
-                                                233,
-                                                218
-                                            );
-                                            color: black;
-                                            font-size: 12px;
-                                            line-height: 16px;
-                                            font-weight: 600;
-                                            border-radius: 6px;
-                                            padding: 4px 8px;
-                                            white-space: nowrap;
-                                        "
-                                    >
-                                        {*PROPOSAL_GP*}
-                                    </td>
-                                    <td width="6"></td>
-                                    <td
-                                        style="
-                                            background-color: rgb(
-                                                250,
-                                                233,
-                                                218
-                                            );
-                                            color: black;
-                                            font-size: 12px;
-                                            line-height: 16px;
-                                            font-weight: 600;
-                                            border-radius: 6px;
-                                            padding: 4px 8px;
-                                            white-space: nowrap;
-                                        "
-                                    >
-                                        {*PROPOSAL_GOV_OFFICIAL_NAME*}
-                                    </td>
-                                </tr>
-                            </table>
+                            <!-- TAG BADGES (inline-block so they wrap) -->
+                            <div style="font-size: 0; line-height: 0">
+                                <span
+                                    style="
+                                        display: inline-block;
+                                        background-color: rgb(250, 233, 218);
+                                        color: black;
+                                        font-size: 12px;
+                                        line-height: 16px;
+                                        font-weight: 600;
+                                        border-radius: 6px;
+                                        padding: 4px 8px;
+                                        margin: 0 6px 6px 0;
+                                        white-space: nowrap;
+                                    "
+                                    >{*PROPOSAL_MINISTRY*}</span
+                                ><span
+                                    style="
+                                        display: inline-block;
+                                        background-color: rgb(250, 233, 218);
+                                        color: black;
+                                        font-size: 12px;
+                                        line-height: 16px;
+                                        font-weight: 600;
+                                        border-radius: 6px;
+                                        padding: 4px 8px;
+                                        margin: 0 6px 6px 0;
+                                        white-space: nowrap;
+                                    "
+                                    >{*PROPOSAL_DATE*}</span
+                                ><span
+                                    style="
+                                        display: inline-block;
+                                        background-color: rgb(250, 233, 218);
+                                        color: black;
+                                        font-size: 12px;
+                                        line-height: 16px;
+                                        font-weight: 600;
+                                        border-radius: 6px;
+                                        padding: 4px 8px;
+                                        margin: 0 6px 6px 0;
+                                        white-space: nowrap;
+                                    "
+                                    >{*PROPOSAL_GP*}</span
+                                ><span
+                                    style="
+                                        display: inline-block;
+                                        background-color: rgb(250, 233, 218);
+                                        color: black;
+                                        font-size: 12px;
+                                        line-height: 16px;
+                                        font-weight: 600;
+                                        border-radius: 6px;
+                                        padding: 4px 8px;
+                                        margin: 0 6px 6px 0;
+                                        white-space: nowrap;
+                                    "
+                                    >{*PROPOSAL_GOV_OFFICIAL_NAME*}</span
+                                >
+                            </div>
                         </td>
 
                         <!-- RIGHT CONTENT: DELEGATE IMAGE -->
                         <td
+                            width="80"
                             style="
                                 vertical-align: middle;
-                                padding-left: 10px;
+                                width: 80px;
                                 text-align: right;
                             "
                         >
                             <img
                                 src="{*PROPOSAL_DELEGATE_IMG_URL*}"
                                 alt="Image of delegate {*PROPOSAL_GOV_OFFICIAL_NAME*}"
+                                width="80"
+                                height="80"
                                 style="
-                                    min-width: 80px;
-                                    max-height: 80px;
+                                    width: 80px;
+                                    height: 80px;
                                     border-radius: 50%;
-                                    margin-left: 8px;
                                     object-fit: cover;
                                     display: block;
                                 "
