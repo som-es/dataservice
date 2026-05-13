@@ -158,7 +158,9 @@ pub async fn notify_delegate_activity_users(pg: &PgPool) -> sqlx::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use crate::connect_pg;
+    use std::collections::HashMap;
+
+use crate::{connect_pg, delegates::notify::{populate_delegate_profile_html, send_delegate_activity_mail}};
 
     use super::collect_recent_activity_by_delegate;
 
@@ -171,5 +173,18 @@ mod tests {
             .await
             .unwrap();
         dbg!(activity);
+    }
+
+    #[tokio::test]
+    async fn test_send_delegate_activity_mail() {
+        let mail_to = "";
+        let pg_pool = connect_pg().await;
+        let last_n_days = 30;
+        let delegate_id = 32506;
+        let activity = collect_recent_activity_by_delegate(delegate_id, &pg_pool, last_n_days).await.unwrap();
+        let html = populate_delegate_profile_html(&activity).await;
+        let mut delegate_activities = HashMap::new();
+        delegate_activities.insert(delegate_id, html);
+        send_delegate_activity_mail(mail_to, &delegate_activities).unwrap();
     }
 }
