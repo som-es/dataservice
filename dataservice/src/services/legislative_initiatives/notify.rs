@@ -306,9 +306,9 @@ pub async fn get_current_seats() -> Option<Vec<u64>> {
 pub fn send_new_legis_info_mail(
     mail_to: &str,
     vote_results: &[&(i32, VoteResult)],
-    seats: &[u64],
-    delegates: &[Delegate],
-    colors: HashMap<String, String>,
+    _seats: &[u64],
+    _delegates: &[Delegate],
+    _colors: HashMap<String, String>,
     is_finished: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // let content = EMAIL_TEMPLATE.replace("{*OTP*}", &white_splitted);
@@ -318,8 +318,8 @@ pub fn send_new_legis_info_mail(
         .iter()
         .map(|x| (*x).clone())
         .collect::<Vec<_>>();
-    let delegates = delegates.to_vec();
-    let seats = seats.to_vec();
+    // let delegates = delegates.to_vec();
+    // let seats = seats.to_vec();
 
     let mail_to = mail_to.to_string();
     std::thread::spawn(move || {
