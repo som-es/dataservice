@@ -1,0 +1,1 @@
+drop table delegate_activity_email_info;

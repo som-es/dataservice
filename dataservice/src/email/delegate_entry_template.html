@@ -1,21 +1,56 @@
-<div style="display: flex; flex-direction: column">
-    <img
-        src="{*DELEGATE_IMG_URL*}"
-        alt="Image of delegate {*DELEGATE_NAME*}"
-        style="
-            min-width: 80px;
-            max-height: 80px;
-            border-radius: 50%;
-            margin-left: 8px;
-            object-fit: cover;
-            display: block;
-        "
-    />
+<div style="margin: 24px 0; text-align: left">
+    <table
+        role="presentation"
+        width="100%"
+        cellspacing="0"
+        cellpadding="0"
+        border="0"
+        style="margin-bottom: 12px"
+    >
+        <tr>
+            <td style="vertical-align: middle; width: 80px; padding-right: 12px">
+                <img
+                    src="{*DELEGATE_IMG_URL*}"
+                    alt="Image of delegate {*DELEGATE_NAME*}"
+                    width="80"
+                    height="80"
+                    style="
+                        width: 80px;
+                        height: 80px;
+                        border-radius: 50%;
+                        object-fit: cover;
+                        display: block;
+                    "
+                />
+            </td>
+            <td style="vertical-align: middle">
+                <h2
+                    style="
+                        margin: 0;
+                        font-size: 1.25rem;
+                        line-height: 1.3;
+                        word-wrap: break-word;
+                    "
+                >
+                    {*DELEGATE_NAME*}
+                </h2>
+                <p
+                    style="
+                        margin: 4px 0 0 0;
+                        color: #777;
+                        word-wrap: break-word;
+                    "
+                >
+                    {*DELEGATE_PARTY*}
+                </p>
+            </td>
+        </tr>
+    </table>
 
-    <div style="display: flex; flex-direction: column">{*DECREES*}</div>
-    <div style="display: flex; flex-direction: column">{*GOV_PROPOSALS*}</div>
-    <div style="display: flex; flex-direction: column">
-        {*ISSUED_PROPOSALS*}
-    </div>
-    <div style="display: flex; flex-direction: column">{*NAMED_VOTES*}</div>
+    <div>{*DECREES*}</div>
+    <div>{*GOV_PROPOSALS*}</div>
+    <div>{*ISSUED_PROPOSALS*}</div>
+    <div>{*NAMED_VOTES*}</div>
+    <div>{*SPEECHES*}</div>
+    <div>{*CALL_TO_ORDERS*}</div>
 </div>
