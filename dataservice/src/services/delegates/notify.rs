@@ -24,7 +24,8 @@ async fn find_notifiers(pg: &PgPool) -> sqlx::Result<HashMap<String, Vec<Delegat
     let users = sqlx::query!("select email, id from somes_user where not is_email_hashed and send_new_delegate_activity_mails").fetch_all(pg).await?;
 
     for user in users {
-        let delegate_ids = sqlx::query_as::<_, DelegateNotification>(
+        let delegate_ids = sqlx::query_as!(
+            DelegateNotification,
             r#"
             select
                 fd.user_id,
@@ -37,8 +38,8 @@ async fn find_notifiers(pg: &PgPool) -> sqlx::Result<HashMap<String, Vec<Delegat
                 and delegate_activity_email_info.delegate_id = fd.delegate_id
             where fd.user_id = $1
             "#,
+            user.id
         )
-        .bind(user.id)
         .fetch_all(pg)
         .await?;
 
@@ -69,7 +70,7 @@ async fn mark_delegate_activity_mail_sent(
     sent_at: DateTime<Utc>,
 ) -> sqlx::Result<()> {
     for delegate_id in delegate_ids {
-        sqlx::query(
+        sqlx::query!(
             r#"
             insert into delegate_activity_email_info (user_id, delegate_id, last_sent_at)
             values ($1, $2, $3)
@@ -79,10 +80,10 @@ async fn mark_delegate_activity_mail_sent(
                 excluded.last_sent_at
             )
             "#,
+            user_id,
+            delegate_id,
+            sent_at
         )
-        .bind(user_id)
-        .bind(delegate_id)
-        .bind(sent_at)
         .execute(pg)
         .await?;
     }
@@ -160,7 +161,10 @@ pub async fn notify_delegate_activity_users(pg: &PgPool) -> sqlx::Result<()> {
 mod tests {
     use std::collections::HashMap;
 
-use crate::{connect_pg, delegates::notify::{populate_delegate_profile_html, send_delegate_activity_mail}};
+    use crate::{
+        connect_pg,
+        delegates::notify::{populate_delegate_profile_html, send_delegate_activity_mail},
+    };
 
     use super::collect_recent_activity_by_delegate;
 
@@ -181,7 +185,9 @@ use crate::{connect_pg, delegates::notify::{populate_delegate_profile_html, send
         let pg_pool = connect_pg().await;
         let last_n_days = 30;
         let delegate_id = 32506;
-        let activity = collect_recent_activity_by_delegate(delegate_id, &pg_pool, last_n_days).await.unwrap();
+        let activity = collect_recent_activity_by_delegate(delegate_id, &pg_pool, last_n_days)
+            .await
+            .unwrap();
         let html = populate_delegate_profile_html(&activity).await;
         println!("html: {html}");
         let mut delegate_activities = HashMap::new();
