@@ -1,6 +1,6 @@
 use chrono::Local;
 use combx::{
-    document_text::{combine_texts, extract_text_from_documents_html_first},
+    document_text::{combine_texts, extract_text_from_documents_html_first_stripped},
     AiSummary, SummarizeOutput,
 };
 use serde_json::json;
@@ -50,7 +50,7 @@ pub async fn summarize_documents(
     match tokio::spawn(async move {
         log::info!("starting doc text collection");
         let engine = OCR_ENGINE.clone();
-        combine_texts(&extract_text_from_documents_html_first(&inner_docs, engine).await)
+        combine_texts(&extract_text_from_documents_html_first_stripped(&inner_docs, engine).await)
     })
     .await
     {

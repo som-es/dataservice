@@ -38,6 +38,35 @@ pub fn combine_texts(documents: &[TextDocument]) -> String {
 
 const TOTAL_PROMPT_LENGTH: usize = 256000;
 
+pub async fn extract_text_from_documents_html_first_stripped(
+    documents: &[Document],
+    #[cfg(feature = "tesseract")] ocr_engine: Option<tesseract_rs::TesseractAPI>,
+    #[cfg(not(feature = "tesseract"))] ocr_engine: Option<Arc<OcrEngine>>,
+) -> Vec<TextDocument> {
+    let mut results = extract_text_from_documents_html_first(documents, ocr_engine).await;
+    // move document called "Gesetzestext" to the front if exists
+    if let Some(pos) = results.iter().position(|doc| {
+        doc.document
+            .title
+            .as_deref()
+            .map(|x| x.contains("Gesetzestext"))
+            .unwrap_or_default()
+    }) {
+        let doc = results.remove(pos);
+        results.insert(0, doc);
+    }
+
+    let mut acc_text_length = 0;
+    results
+        .into_iter()
+        .filter(|doc| {
+            let is_prompt_full = acc_text_length <= TOTAL_PROMPT_LENGTH;
+            acc_text_length += doc.text.len();
+            is_prompt_full
+        })
+        .collect()
+}
+
 pub async fn extract_text_from_documents_html_first(
     documents: &[Document],
     #[cfg(feature = "tesseract")] ocr_engine: Option<tesseract_rs::TesseractAPI>,
@@ -110,28 +139,7 @@ pub async fn extract_text_from_documents_html_first(
     }
 
     results.sort_by(|a, b| b.text.len().cmp(&a.text.len()));
-
-    // move document called "Gesetzestext" to the front if exists
-    if let Some(pos) = results.iter().position(|doc| {
-        doc.document
-            .title
-            .as_deref()
-            .map(|x| x.contains("Gesetzestext"))
-            .unwrap_or_default()
-    }) {
-        let doc = results.remove(pos);
-        results.insert(0, doc);
-    }
-
-    let mut acc_text_length = 0;
     results
-        .into_iter()
-        .filter(|doc| {
-            let is_prompt_full = acc_text_length <= TOTAL_PROMPT_LENGTH;
-            acc_text_length += doc.text.len();
-            is_prompt_full
-        })
-        .collect()
 }
 
 pub async fn extract_text_from_documents(
@@ -327,7 +335,8 @@ der Abgeordnete";
                 ),
             },
         ];
-        let text_documents = extract_text_from_documents_html_first(&documents, None).await;
+        let text_documents =
+            extract_text_from_documents_html_first_stripped(&documents, None).await;
         assert_eq!(text_documents.len(), 2);
         assert_eq!(
             text_documents[0].document.title.as_deref(),
@@ -356,7 +365,8 @@ der Abgeordnete";
                     .to_string(),
             ),
         }];
-        let text_documents = extract_text_from_documents_html_first(&documents, None).await;
+        let text_documents =
+            extract_text_from_documents_html_first_stripped(&documents, None).await;
         let input = combine_texts(&text_documents);
         dbg!(input);
     }

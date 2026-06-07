@@ -113,10 +113,18 @@ impl GovProposal {
             due_to: ministerial_proposal.gegenstand_info.due_to,
             ressort: ministerial_proposal.gegenstand_info.ressort,
             ressort_shortform: ministerial_proposal.gegenstand_info.ressort_shortform,
-            legis_init_gp: ministerial_proposal.legis_gp,
-            legis_init_inr: ministerial_proposal.legis_init_inr.map(|x| x as i32),
-            legis_init_ityp: ministerial_proposal.legis_init_ityp,
-            has_vote_result: ministerial_proposal.legis_init_inr.is_some(),
+            legis_init_gp: ministerial_proposal
+                .legis_reference
+                .as_ref()
+                .map(|reference| reference.gp.clone()),
+            legis_init_inr: ministerial_proposal
+                .legis_reference
+                .as_ref()
+                .map(|x| x.inr as i32),
+            has_vote_result: ministerial_proposal.legis_reference.is_some(),
+            legis_init_ityp: ministerial_proposal
+                .legis_reference
+                .map(|reference| reference.ityp),
             created_at: None,
             updated_at: None,
         };

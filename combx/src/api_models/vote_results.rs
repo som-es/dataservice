@@ -403,7 +403,7 @@ mod tests {
     use somes_common_lib::Document;
     use somes_scraper::{AustriaScraper, legis_init::LegislativeInitiatives};
 
-    use crate::document_text::{combine_texts, extract_text_from_documents_html_first};
+    use crate::document_text::{combine_texts, extract_text_from_documents_html_first_stripped};
 
     #[tokio::test]
     async fn test_ai_summary_from_vote_result() {
@@ -421,7 +421,7 @@ mod tests {
         );
 
         let document_texts =
-            combine_texts(&extract_text_from_documents_html_first(&documents, None).await);
+            combine_texts(&extract_text_from_documents_html_first_stripped(&documents, None).await);
 
         println!(
             "document_texts: {}",
