@@ -31,7 +31,7 @@ pub async fn summarize_ministerial_proposal_documents(
 
 #[cfg(test)]
 mod tests {
-    use combx::document_text::{combine_texts, extract_text_from_documents_html_first};
+    use combx::document_text::{combine_texts, extract_text_from_documents_html_first_stripped};
     use somai_client::SomAiClient;
     use somes_scraper::{
         ministrial_proposals::{GegenstandInfo, MinistrialProposalScraper},
@@ -143,7 +143,8 @@ mod tests {
         .await
         .unwrap();
 
-        let input = combine_texts(&extract_text_from_documents_html_first(&docs, None).await);
+        let input =
+            combine_texts(&extract_text_from_documents_html_first_stripped(&docs, None).await);
 
         let result = summary_prompt2(&somai_client, input, &unique_topics, "Antrag/Gesetz").await;
         assert!(result.is_ok());
@@ -183,7 +184,8 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let input = combine_texts(&extract_text_from_documents_html_first(&documents, None).await);
+        let input =
+            combine_texts(&extract_text_from_documents_html_first_stripped(&documents, None).await);
         println!("input length: {}", input.len());
 
         let result =
@@ -225,7 +227,8 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let input = combine_texts(&extract_text_from_documents_html_first(&documents, None).await);
+        let input =
+            combine_texts(&extract_text_from_documents_html_first_stripped(&documents, None).await);
         println!("input length: {}", input.len());
 
         let result =

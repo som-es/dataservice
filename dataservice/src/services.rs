@@ -4,6 +4,7 @@ pub mod delegates;
 pub mod legislative_initiatives;
 pub mod ministrial_decrees;
 pub mod ministrial_proposals;
+pub mod parliamentary_qa;
 pub mod parties;
 pub mod plenar;
 #[cfg(feature = "vectordb")]

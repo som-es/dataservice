@@ -33,7 +33,7 @@ pub async fn summarize_legis_init_documents(
 
 #[cfg(test)]
 mod tests {
-    use combx::document_text::{combine_texts, extract_text_from_documents_html_first};
+    use combx::document_text::{combine_texts, extract_text_from_documents_html_first_stripped};
     use somai_client::SomAiClient;
 
     use crate::{ai_tasks::summary_prompt2, OCR_ENGINE};
@@ -113,7 +113,8 @@ mod tests {
         .await
         .unwrap();
 
-        let input = combine_texts(&extract_text_from_documents_html_first(&docs, None).await);
+        let input =
+            combine_texts(&extract_text_from_documents_html_first_stripped(&docs, None).await);
 
         let result = summary_prompt2(&somai_client, input, &unique_topics, "Antrag/Gesetz").await;
         assert!(result.is_ok());
@@ -207,8 +208,9 @@ mod tests {
         .fetch_all(&pg_pool)
         .await
         .unwrap();
-        let input =
-            combine_texts(&extract_text_from_documents_html_first(&docs, OCR_ENGINE.clone()).await);
+        let input = combine_texts(
+            &extract_text_from_documents_html_first_stripped(&docs, OCR_ENGINE.clone()).await,
+        );
 
         let result = summary_prompt2(&somai_client, input, &unique_topics, "Antrag/Gesetz").await;
         assert!(result.is_ok());
@@ -287,7 +289,8 @@ mod tests {
         .await
         .unwrap();
 
-        let input = combine_texts(&extract_text_from_documents_html_first(&docs, None).await);
+        let input =
+            combine_texts(&extract_text_from_documents_html_first_stripped(&docs, None).await);
         let result = summary_prompt2(&somai_client, input, &unique_topics, "Antrag/Gesetz").await;
         assert!(result.is_ok());
         dbg!(result.unwrap());
@@ -317,8 +320,9 @@ mod tests {
         .await
         .unwrap();
 
-        let input =
-            combine_texts(&extract_text_from_documents_html_first(&docs, OCR_ENGINE.clone()).await);
+        let input = combine_texts(
+            &extract_text_from_documents_html_first_stripped(&docs, OCR_ENGINE.clone()).await,
+        );
         let result =
             summary_prompt2(&somai_client, input, &unique_topics, "Entschließungsantrag").await;
         assert!(result.is_ok());
@@ -347,8 +351,9 @@ mod tests {
         .await
         .unwrap();
 
-        let input =
-            combine_texts(&extract_text_from_documents_html_first(&docs, OCR_ENGINE.clone()).await);
+        let input = combine_texts(
+            &extract_text_from_documents_html_first_stripped(&docs, OCR_ENGINE.clone()).await,
+        );
         // let result = summary_prompt2(&somai_client, input, &unique_topics).await;
         // assert!(result.is_ok());
         // dbg!(result.unwrap());
@@ -380,8 +385,9 @@ mod tests {
         .fetch_all(&pg_pool)
         .await
         .unwrap();
-        let input =
-            combine_texts(&extract_text_from_documents_html_first(&docs, OCR_ENGINE.clone()).await);
+        let input = combine_texts(
+            &extract_text_from_documents_html_first_stripped(&docs, OCR_ENGINE.clone()).await,
+        );
         let result =
             summary_prompt2(&somai_client, input, &unique_topics, "Abänderungsantrag").await;
         assert!(result.is_ok());
