@@ -1,9 +1,10 @@
 use combx::connect_pg;
 use eframe::egui;
 use egui_graphs::{
-    DefaultEdgeShape, DefaultNodeShape, DisplayEdge, DisplayNode, DrawContext, EdgeProps, Graph,
-    GraphView, Layout, LayoutRandom, LayoutState, LayoutStateRandom, Node, SettingsInteraction,
-    SettingsNavigation, SettingsStyle,
+    to_graph, DefaultEdgeShape, DefaultNodeShape, DisplayEdge, DisplayNode, DrawContext,
+    EdgeProps, ForceAlgorithm, FruchtermanReingold, FruchtermanReingoldState, Graph, GraphView,
+    Layout, LayoutForceDirected, LayoutRandom, LayoutState, LayoutStateRandom, Node,
+    SettingsInteraction, SettingsNavigation, SettingsStyle,
 };
 use fasttext::FastText;
 use petgraph::stable_graph::{IndexType, StableGraph};
@@ -14,6 +15,11 @@ use crate::unique_topics::{all_unique_eurovoc_topics, hallucinated_ai_topics_by_
 
 mod unique_topics;
 
+const EDGE_THRESHOLD: f32 = 0.3;
+const MIN_EDGE_WIDTH: f32 = 0.8;
+const MAX_EDGE_WIDTH: f32 = 4.5;
+const MIN_EDGE_LENGTH: f32 = 150.0;
+const MAX_EDGE_LENGTH: f32 = 940.0;
 const GERMAN_STOP_WORDS: &[&str] = &[
     "aber", "als", "am", "an", "auch", "auf", "aus", "bei", "beim", "bis", "das", "dem", "den",
     "der", "des", "die", "durch", "ein", "eine", "einem", "einen", "einer", "eines", "für", "im",
@@ -21,7 +27,7 @@ const GERMAN_STOP_WORDS: &[&str] = &[
     "zur",
 ];
 
-// type TopicGraph = Graph<String, f32, Undirected, u32, DefaultNodeShape, WeightedEdgeShape>;
+type TopicGraph = Graph<String, f32, Undirected, u32, DefaultNodeShape, WeightedEdgeShape>;
 
 // type TopicGraphView<'a> = GraphView<
 //     'a,
@@ -35,19 +41,13 @@ const GERMAN_STOP_WORDS: &[&str] = &[
 //     NoopLayout,
 // >;
 
-type TopicGraph = Graph<String, f32, Undirected>;
+// type TopicGraph = Graph<String, f32, Undirected, f32>;
 
-type TopicGraphView<'a> = GraphView<
-    'a,
-    String,
-    f32,
-    Undirected,
-    u32,
-    DefaultNodeShape,
-    DefaultEdgeShape,
-    LayoutStateRandom,
-    LayoutRandom,
->;
+type L = LayoutForceDirected<FruchtermanReingold>;
+type S = FruchtermanReingoldState;
+
+type TopicGraphView<'a> =
+    GraphView<'a, String, f32, Undirected, u32, DefaultNodeShape, WeightedEdgeShape, S, L>;
 
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
@@ -173,17 +173,31 @@ fn is_german_stop_word(token: &str) -> bool {
 
 struct App {
     graph: TopicGraph,
+    initialized: bool,
 }
 
 impl App {
     fn new(graph: TopicGraph) -> Self {
-        Self { graph }
+        Self {
+            graph,
+            initialized: false,
+        }
     }
 }
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut eframe::Frame) {
         egui::CentralPanel::default().show_inside(ui, |ui| {
+            // Configure force-directed layout for better spacing on first run
+            if !self.initialized {
+                let mut state = egui_graphs::get_layout_state::<FruchtermanReingoldState>(ui, None);
+                state.k_scale = 3.0;      // Increase to spread nodes further apart (default ~1.0)
+                state.c_repulse = 2.5;    // Increase repulsion force between nodes (default ~1.0)
+                state.c_attract = 0.5;    // Decrease attraction to allow more spreading (default ~1.0)
+                egui_graphs::set_layout_state(ui, state, None);
+                self.initialized = true;
+            }
+            
             let navigation = SettingsNavigation::new()
                 .with_fit_to_screen_enabled(false)
                 .with_zoom_and_pan_enabled(true)
