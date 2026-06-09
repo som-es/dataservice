@@ -22,12 +22,19 @@ mod unique_topics;
 const MODEL_PATH: &str = "unique-topics/models/cc.de.300.bin";
 const FALLBACK_MODEL_PATH: &str = "models/cc.de.300.bin";
 const FASTEMBED_CACHE_DIR: &str = ".fastembed_cache";
-const EUROVOC_CLUSTER_SPACING: f32 = 1_000.0;
-const CLUSTER_MIN_RADIUS: f32 = 55.0;
-const CLUSTER_MAX_RADIUS: f32 = 340.0;
-const CLUSTER_RING_SPACING: f32 = 24.0;
-const TOP_EUROVOC_EDGES: usize = 1;
-const MIN_EDGE_SIMILARITY: f32 = 0.38;
+const GRAPH_VIEW_ID: &str = "unique-topics-static-similarity-layout-v4";
+const EUROVOC_CLUSTER_SPACING: f32 = 420.0;
+const EUROVOC_JITTER: f32 = 10.0;
+const CLUSTER_MIN_RADIUS: f32 = 20.0;
+const CLUSTER_MAX_RADIUS: f32 = 115.0;
+const CLUSTER_RING_SPACING: f32 = 6.0;
+const TOP_EUROVOC_EDGES: usize = 2;
+const MIN_EDGE_SIMILARITY: f32 = 0.36;
+const INTER_CLUSTER_PULL: f32 = 0.05;
+const SIMILARITY_RADIUS_EXPONENT: f32 = 2.8;
+const SUBCLUSTER_RADIUS_FACTOR: f32 = 0.5;
+const SUBCLUSTER_BASE_OFFSET: f32 = 10.0;
+const ZOOM_SPEED: f32 = 0.025;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -43,6 +50,7 @@ struct Args {
 }
 
 type TopicGraph = Graph<TopicNode, f32, Undirected>;
+type AnchorGroupKey = (usize, Option<usize>);
 
 type TopicGraphView<'a> = GraphView<
     'a,
@@ -147,7 +155,7 @@ impl eframe::App for App {
                 .with_fit_to_screen_enabled(false)
                 .with_fit_to_screen_padding(0.08)
                 .with_zoom_and_pan_enabled(true)
-                .with_zoom_speed(0.1);
+                .with_zoom_speed(ZOOM_SPEED);
             let interactions = SettingsInteraction::new()
                 .with_dragging_enabled(false)
                 .with_hover_enabled(true)
@@ -158,7 +166,7 @@ impl eframe::App for App {
                 .with_interactions(&interactions)
                 .with_navigations(&navigation)
                 .with_styles(&style)
-                .with_id(Some("unique-topics-static-similarity-layout".to_owned()));
+                .with_id(Some(GRAPH_VIEW_ID.to_owned()));
             ui.add(&mut view);
         });
     }
@@ -382,7 +390,7 @@ fn place_eurovoc_nodes(eurovoc_indices: &[usize]) -> HashMap<usize, Pos2> {
         let col = cursor % columns;
         let row = cursor / columns;
         let angle = golden_angle(cursor);
-        let jitter = Vec2::angled(angle) * 30.0;
+        let jitter = Vec2::angled(angle) * EUROVOC_JITTER;
         positions.insert(
             topic_index,
             Pos2::new(
@@ -401,7 +409,9 @@ fn place_ai_nodes(
     eurovoc_positions: &HashMap<usize, Pos2>,
 ) -> Vec<TopicPlacement> {
     let mut placements = Vec::new();
-    let mut cluster_counts = HashMap::<usize, usize>::new();
+    let mut group_counts = HashMap::<AnchorGroupKey, usize>::new();
+    let mut group_orders = HashMap::<AnchorGroupKey, usize>::new();
+    let mut primary_group_counts = HashMap::<usize, usize>::new();
     let ai_indices = topics
         .iter()
         .enumerate()
@@ -414,24 +424,39 @@ fn place_ai_nodes(
             let angle = golden_angle(ai_order);
             placements.push(TopicPlacement {
                 topic_index,
-                position: Pos2::new(angle.cos() * 550.0, angle.sin() * 550.0),
+                position: Pos2::new(angle.cos() * 220.0, angle.sin() * 220.0),
                 anchors,
             });
             continue;
         };
 
-        let cluster_index = cluster_counts.entry(anchor.eurovoc_index).or_default();
-        let local_index = *cluster_index;
-        *cluster_index += 1;
+        let secondary_index = anchors.get(1).map(|anchor| anchor.eurovoc_index);
+        let group_key = (anchor.eurovoc_index, secondary_index);
+        let group_order = *group_orders.entry(group_key).or_insert_with(|| {
+            let next_order = primary_group_counts.entry(anchor.eurovoc_index).or_default();
+            let order = *next_order;
+            *next_order += 1;
+            order
+        });
+        let group_index = group_counts.entry(group_key).or_default();
+        let local_index = *group_index;
+        *group_index += 1;
 
-        let center = eurovoc_positions[&anchor.eurovoc_index];
+        let primary_center = eurovoc_positions[&anchor.eurovoc_index];
+        let semantic_center = weighted_anchor_center(&anchors, eurovoc_positions);
         let normalized_similarity = anchor.similarity.clamp(0.0, 1.0);
         let similarity_radius = CLUSTER_MIN_RADIUS
-            + (1.0 - normalized_similarity).powf(1.7) * (CLUSTER_MAX_RADIUS - CLUSTER_MIN_RADIUS);
-        let ring = (local_index as f32).sqrt().floor();
-        let crowding_radius = ring * CLUSTER_RING_SPACING;
-        let angle = golden_angle(local_index) + anchor.eurovoc_index as f32 * 0.173;
-        let offset = Vec2::angled(angle) * (similarity_radius + crowding_radius);
+            + (1.0 - normalized_similarity).powf(SIMILARITY_RADIUS_EXPONENT)
+                * (CLUSTER_MAX_RADIUS - CLUSTER_MIN_RADIUS);
+        let group_direction =
+            anchor_group_direction(primary_center, secondary_index, group_order, eurovoc_positions);
+        let semantic_offset = (semantic_center - primary_center) * INTER_CLUSTER_PULL;
+        let subgroup_offset = group_direction
+            * (SUBCLUSTER_BASE_OFFSET + similarity_radius * SUBCLUSTER_RADIUS_FACTOR);
+        let center = primary_center + semantic_offset + subgroup_offset;
+        let crowding_radius = (local_index as f32).sqrt().floor() * CLUSTER_RING_SPACING;
+        let angle = golden_angle(local_index) + group_order as f32 * 0.631;
+        let offset = Vec2::angled(angle) * crowding_radius;
 
         placements.push(TopicPlacement {
             topic_index,
@@ -441,6 +466,52 @@ fn place_ai_nodes(
     }
 
     placements
+}
+
+fn anchor_group_direction(
+    primary_center: Pos2,
+    secondary_index: Option<usize>,
+    group_order: usize,
+    eurovoc_positions: &HashMap<usize, Pos2>,
+) -> Vec2 {
+    if let Some(secondary_center) =
+        secondary_index.and_then(|index| eurovoc_positions.get(&index).copied())
+    {
+        let direction = secondary_center - primary_center;
+        let length = (direction.x * direction.x + direction.y * direction.y).sqrt();
+        if length > f32::EPSILON {
+            return direction / length;
+        }
+    }
+
+    Vec2::angled(golden_angle(group_order))
+}
+
+fn weighted_anchor_center(
+    anchors: &[SimilarityAnchor],
+    eurovoc_positions: &HashMap<usize, Pos2>,
+) -> Pos2 {
+    let mut weighted_sum = Vec2::ZERO;
+    let mut total_weight = 0.0;
+
+    for anchor in anchors {
+        let Some(position) = eurovoc_positions.get(&anchor.eurovoc_index) else {
+            continue;
+        };
+        let weight = (anchor.similarity - MIN_EDGE_SIMILARITY).max(0.0).powf(2.0);
+        weighted_sum += position.to_vec2() * weight;
+        total_weight += weight;
+    }
+
+    if total_weight <= f32::EPSILON {
+        anchors
+            .first()
+            .and_then(|anchor| eurovoc_positions.get(&anchor.eurovoc_index))
+            .copied()
+            .unwrap_or(Pos2::ZERO)
+    } else {
+        (weighted_sum / total_weight).to_pos2()
+    }
 }
 
 fn nearest_eurovoc_anchors(
