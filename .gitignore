@@ -8,3 +8,4 @@ caching
 .env
 nohup.out
 unique-topics/models
+unique-topics/.fastembed_cache
