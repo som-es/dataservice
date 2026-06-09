@@ -11,3 +11,4 @@ fasttext = "0.8.0"
 eframe = "0.34.3"
 egui_graphs = "0.30.0"
 petgraph = "0.8.3"
+serde = { workspace = true }
