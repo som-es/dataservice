@@ -1,0 +1,13 @@
+[package]
+name = "unique-topics"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+sqlx = { workspace = true }
+combx = { path = "../combx" }
+tokio = { workspace = true }
+fasttext = "0.8.0"
+eframe = "0.34.3"
+egui_graphs = "0.30.0"
+petgraph = "0.8.3"

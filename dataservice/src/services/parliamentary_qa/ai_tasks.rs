@@ -32,7 +32,6 @@ mod tests {
         .unwrap();
 
         let input = combine_texts(&extract_text_from_documents_html_first(&docs, None).await);
-        dbg!(&input);
 
         let result = somai_client
             .make_llm_request_with_schema::<QuestionEntry>(
@@ -58,7 +57,7 @@ mod tests {
                 false,
                 Some(|schema: &mut serde_json::Value| {
                     // TODO: activate topic patching when #143 (https://github.com/som-es/somes/issues/143) is done
-                    // patch_topics(schema, &topics);
+                    crate::ai_tasks::patch_topics("/properties/topics", schema, &unique_topics);
                 }),
             )
             .await;
