@@ -1,10 +1,10 @@
-use combx::{AiSummary, DbAiSummary};
-use sqlx::{PgPool, types::Json};
+use combx::DbAiSummary;
+use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};
 
+#[allow(dead_code)]
 pub async fn all_unique_ai_topics(pg: &PgPool) -> sqlx::Result<HashSet<String>> {
-    let summaries = sqlx::query_as!(
-        DbAiSummary,
+    let summaries = sqlx::query_as::<_, DbAiSummary>(
         r#"
         select
             id,
@@ -15,9 +15,9 @@ pub async fn all_unique_ai_topics(pg: &PgPool) -> sqlx::Result<HashSet<String>> 
             model_used,
             short_title,
             short_summary,
-            full_summary as "full_summary: Json<AiSummary>"
+            full_summary
         from summaries
-        "#
+        "#,
     )
     .fetch_all(pg)
     .await?;
@@ -29,8 +29,7 @@ pub async fn all_unique_ai_topics(pg: &PgPool) -> sqlx::Result<HashSet<String>> 
 }
 
 pub async fn ai_topics_by_model(pg: &PgPool) -> sqlx::Result<HashMap<String, HashSet<String>>> {
-    let summaries = sqlx::query_as!(
-        DbAiSummary,
+    let summaries = sqlx::query_as::<_, DbAiSummary>(
         r#"
         select
             id,
@@ -41,9 +40,9 @@ pub async fn ai_topics_by_model(pg: &PgPool) -> sqlx::Result<HashMap<String, Has
             model_used,
             short_title,
             short_summary,
-            full_summary as "full_summary: Json<AiSummary>"
+            full_summary
         from summaries
-        "#
+        "#,
     )
     .fetch_all(pg)
     .await?;
@@ -63,11 +62,11 @@ pub async fn ai_topics_by_model(pg: &PgPool) -> sqlx::Result<HashMap<String, Has
 }
 
 pub async fn all_unique_eurovoc_topics(pg: &PgPool) -> sqlx::Result<HashSet<String>> {
-    sqlx::query_scalar!(
+    sqlx::query_scalar::<_, String>(
         r#"
         select topic_name
         from unique_eurovoc_topics
-        "#
+        "#,
     )
     .fetch_all(pg)
     .await
@@ -99,6 +98,7 @@ pub async fn hallucinated_ai_topics_by_model(
     Ok(ranked)
 }
 
+#[allow(dead_code)]
 pub async fn compare_ai_topics_with_unique_topics(pg: &PgPool) -> sqlx::Result<()> {
     let ranked = hallucinated_ai_topics_by_model(pg).await?;
 
