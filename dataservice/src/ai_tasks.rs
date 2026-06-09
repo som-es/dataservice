@@ -1,4 +1,5 @@
 mod summarization;
+mod unique_topics;
 use std::sync::Arc;
 
 use combx::{AiSummary, DbAiSummary};
@@ -6,6 +7,7 @@ use somai_client::SomAiClient;
 use somes_common_lib::Document;
 use sqlx::types::Json;
 pub use summarization::*;
+pub use unique_topics::*;
 
 use crate::ai_task::TaskArgs;
 
