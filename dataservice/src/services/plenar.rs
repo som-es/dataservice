@@ -1,6 +1,8 @@
 use std::thread::JoinHandle;
 
-use crate::{scrape_untill_success, should_update::StoredUpdatedAt, Shutdown, GPS};
+use crate::{
+    scrape_untill_success, should_update::StoredUpdatedAt, ApiLimiter, Shutdown, GPS,
+};
 use somes_scraper::{plenar::PlenarInfo, AustriaScraper};
 use sqlx::PgPool;
 use tokio::runtime::Handle;
@@ -19,13 +21,18 @@ pub use extract_interjection::*;
 
 const MAX_TASKS: usize = 1;
 
-pub async fn plenar_info_once(pg_pool: &PgPool, only_latest: bool) {
+pub async fn plenar_info_once(
+    pg_pool: &PgPool,
+    parliament_api_limiter: ApiLimiter,
+    only_latest: bool,
+) {
     log::info!("Try scraping plenar info");
 
     let mut handles = vec![];
 
     for gp in GPS {
         let pg_pool = pg_pool.clone();
+        let parliament_api_limiter = parliament_api_limiter.clone();
 
         let handle = tokio::spawn(async move {
             let mut scraper = AustriaScraper::default();
@@ -33,7 +40,7 @@ pub async fn plenar_info_once(pg_pool: &PgPool, only_latest: bool) {
             scraper.scrape_info.gp = vec![gp.into()];
 
             let new_plenar_infos = scrape_untill_success::<Vec<PlenarInfo>, _>(|| async {
-                scrape_new_plenar_infos(&scraper).await
+                scrape_new_plenar_infos(&scraper, parliament_api_limiter.clone()).await
             })
             .await;
 
@@ -93,7 +100,11 @@ impl StoredUpdatedAt for PlenarInfo {
     }
 }
 
-pub async fn run_shut_latest(mut shutdown: Shutdown, pg_pool: PgPool) {
+pub async fn run_shut_latest(
+    mut shutdown: Shutdown,
+    pg_pool: PgPool,
+    parliament_api_limiter: ApiLimiter,
+) {
     // insert_all_serially().await;
     // return;
     let plenar_sleep = std::env::var("PLENAR_SLEEP_LATEST")
@@ -116,8 +127,9 @@ pub async fn run_shut_latest(mut shutdown: Shutdown, pg_pool: PgPool) {
             }
             _ = async {
                 let pg_pool = pg_pool.clone();
+                let parliament_api_limiter = parliament_api_limiter.clone();
                 log::info!("Starting latest plenar info scraper");
-                plenar_info_once(&pg_pool, true).await;
+                plenar_info_once(&pg_pool, parliament_api_limiter, true).await;
                 // legis_init_once().await;
                 log::info!("Latest Plenar info scraper service sleeps for {plenar_sleep} seconds...");
                 tokio::time::sleep(tokio::time::Duration::from_secs(plenar_sleep)).await;
@@ -126,7 +138,12 @@ pub async fn run_shut_latest(mut shutdown: Shutdown, pg_pool: PgPool) {
     }
 }
 
-pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool, only_latest: bool) {
+pub async fn run_shut(
+    mut shutdown: Shutdown,
+    pg_pool: PgPool,
+    parliament_api_limiter: ApiLimiter,
+    only_latest: bool,
+) {
     if only_latest {
         return;
     }
@@ -152,8 +169,9 @@ pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool, only_latest: bool
             }
             _ = async {
                 let pg_pool = pg_pool.clone();
+                let parliament_api_limiter = parliament_api_limiter.clone();
                 log::info!("Starting plenar info scraper");
-                plenar_info_once(&pg_pool, false).await;
+                plenar_info_once(&pg_pool, parliament_api_limiter, false).await;
                 // legis_init_once().await;
                 log::info!("Plenar info scraper service sleeps for {plenar_sleep} seconds...");
                 tokio::time::sleep(tokio::time::Duration::from_secs(plenar_sleep)).await;
@@ -251,7 +269,9 @@ mod tests {
             scraper.scrape_info.gp = vec![gp.into()];
             let start = tokio::time::Instant::now();
             println!("Scraping plenar infos for GP: {gp}");
-            let plenars = scrape_new_plenar_infos(&scraper).await.unwrap();
+            let plenars = scrape_new_plenar_infos(&scraper, crate::ApiLimiter::new(32))
+                .await
+                .unwrap();
             let duration = start.elapsed();
             println!(
                 "Scraped {} plenar infos for GP: {gp} in {:?}",

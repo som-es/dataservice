@@ -5,9 +5,13 @@ use somes_scraper::{
 };
 use sqlx::PgPool;
 
-use crate::{today_and_time, Shutdown};
+use crate::{today_and_time, ApiLimiter, Shutdown};
 
-pub async fn save_dates(pg_pool: &PgPool, only_latest: bool) -> crate::Result<()> {
+pub async fn save_dates(
+    pg_pool: &PgPool,
+    parliament_api_limiter: ApiLimiter,
+    only_latest: bool,
+) -> crate::Result<()> {
     let scraper = AustriaScraper::default();
     let mut date_filter = DateFilter::default();
     if only_latest {
@@ -26,7 +30,9 @@ pub async fn save_dates(pg_pool: &PgPool, only_latest: bool) -> crate::Result<()
             ),
         });
     }
-    let dates = scraper.post_dates_payload(&date_filter).await?;
+    let dates = parliament_api_limiter
+        .run(scraper.post_dates_payload(&date_filter))
+        .await?;
     let dates = scraper
         .raw_dates_into_parliament_dates(dates)
         .await
@@ -127,7 +133,11 @@ pub async fn save_date(date: ParliamentDate, pg_pool: &PgPool) -> crate::Result<
     Ok(())
 }
 
-pub async fn run_shut_dates(mut shutdown: Shutdown, pg_pool: PgPool) {
+pub async fn run_shut_dates(
+    mut shutdown: Shutdown,
+    pg_pool: PgPool,
+    parliament_api_limiter: ApiLimiter,
+) {
     let dates_sleep = std::env::var("DATES_SLEEP")
         .unwrap_or_else(|_| "20000".to_string())
         .parse()
@@ -148,9 +158,10 @@ pub async fn run_shut_dates(mut shutdown: Shutdown, pg_pool: PgPool) {
             }
             _ = async {
                 let pg_pool = pg_pool.clone();
+                let parliament_api_limiter = parliament_api_limiter.clone();
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting dates Scraper");
-                    save_dates(&pg_pool, false).await
+                    save_dates(&pg_pool, parliament_api_limiter, false).await
                 }).await {
                     log::error!("Error in dates Scraper: {:?}", e);
                 }
@@ -161,7 +172,11 @@ pub async fn run_shut_dates(mut shutdown: Shutdown, pg_pool: PgPool) {
     }
 }
 
-pub async fn run_shut_dates_latest(mut shutdown: Shutdown, pg_pool: PgPool) {
+pub async fn run_shut_dates_latest(
+    mut shutdown: Shutdown,
+    pg_pool: PgPool,
+    parliament_api_limiter: ApiLimiter,
+) {
     let dates_sleep = std::env::var("DATES_SLEEP_LATEST")
         .unwrap_or_else(|_| "60".to_string())
         .parse()
@@ -182,9 +197,10 @@ pub async fn run_shut_dates_latest(mut shutdown: Shutdown, pg_pool: PgPool) {
             }
             _ = async {
                 let pg_pool = pg_pool.clone();
+                let parliament_api_limiter = parliament_api_limiter.clone();
                 let handle = tokio::task::spawn(async move {
                     log::info!("Starting (latest) dates Scraper");
-                    save_dates(&pg_pool, true).await
+                    save_dates(&pg_pool, parliament_api_limiter, true).await
                 }).await;
 
                 match handle {

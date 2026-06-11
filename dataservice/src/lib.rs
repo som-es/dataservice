@@ -2,6 +2,8 @@
 pub mod db;
 
 #[cfg(feature = "runner")]
+pub mod api_limiter;
+#[cfg(feature = "runner")]
 pub mod services;
 #[cfg(feature = "runner")]
 pub mod shutdown;
@@ -16,6 +18,8 @@ pub use services::*;
 use chrono::{DateTime, Local, NaiveDate};
 #[cfg(feature = "runner")]
 pub use db::*;
+#[cfg(feature = "runner")]
+pub use api_limiter::*;
 #[cfg(feature = "runner")]
 pub use shutdown::*;
 use sqlx::{postgres::PgPoolOptions, PgPool};
@@ -91,6 +95,8 @@ pub const GPS: [&str; 9] = [
 pub struct AppState {
     pub pg_pool: PgPool,
     pub redis_client: Option<ConnectionManager>,
+    #[cfg(feature = "runner")]
+    pub parliament_api_limiter: ApiLimiter,
     #[cfg(feature = "runner")]
     pub cpu_task_tx: Option<Sender<AiTask>>,
 }

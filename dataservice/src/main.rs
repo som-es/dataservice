@@ -3,7 +3,7 @@ use dataservice::{
     ai_task::{self, AiTask},
     connect_pg,
     delegates::delegate_count,
-    model_dir, services, setup_app_data, AppState, Shutdown, REDIS_URL,
+    model_dir, services, setup_app_data, AppState, ApiLimiter, Shutdown, REDIS_URL,
 };
 use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
@@ -36,7 +36,7 @@ async fn main() {
     let _ = dotenvy::dotenv().ok();
     let args = Args::parse();
 
-    simple_logger::init_with_level(log::Level::Error).unwrap();
+    simple_logger::init_with_level(log::Level::Info).unwrap();
 
     if let Err(e) = setup_app_data().await {
         log::error!("Cannot create app data directory: {e:?}");
@@ -103,6 +103,7 @@ pub async fn run_services(state: &State, config: Config) {
     let app_state = AppState {
         pg_pool: pool.clone(),
         redis_client,
+        parliament_api_limiter: ApiLimiter::from_env(),
         cpu_task_tx: Some(cpu_ai_task_tx.clone()),
     };
 
@@ -111,9 +112,14 @@ pub async fn run_services(state: &State, config: Config) {
             log::info!("Delegates are 0, start scraping ...");
             let hs = std::collections::HashSet::new();
             let _res = services::delegates::delegates_once(&hs, app_state.clone()).await;
-            services::parties::parties_once(&pool).await;
+            services::parties::parties_once(&pool, app_state.parliament_api_limiter.clone()).await;
 
-            services::plenar::plenar_info_once(&pool, false).await;
+            services::plenar::plenar_info_once(
+                &pool,
+                app_state.parliament_api_limiter.clone(),
+                false,
+            )
+            .await;
             services::legislative_initiatives::legis_init_once(
                 false,
                 true,
@@ -145,7 +151,10 @@ pub async fn run_services(state: &State, config: Config) {
                 .await;
             };
             let pool1 = pool.clone();
-            let dates = async move { services::dates::save_dates(&pool1, false).await };
+            let parliament_api_limiter = app_state.parliament_api_limiter.clone();
+            let dates = async move {
+                services::dates::save_dates(&pool1, parliament_api_limiter, false).await
+            };
             tokio::join!(
                 tokio::spawn(ministerial_proposals),
                 tokio::spawn(decrees),
@@ -168,8 +177,9 @@ pub async fn run_services(state: &State, config: Config) {
             };
 
             let pool1 = pool.clone();
+            let parliament_api_limiter = app_state.parliament_api_limiter.clone();
             let plenars = async move {
-                services::plenar::plenar_info_once(&pool1, true).await;
+                services::plenar::plenar_info_once(&pool1, parliament_api_limiter, true).await;
             };
 
             let inner_ai_task_tx = llm_ai_task_tx.clone();
@@ -194,8 +204,9 @@ pub async fn run_services(state: &State, config: Config) {
                 .await;
             };
             let pool1 = pool.clone();
+            let parliament_api_limiter = app_state.parliament_api_limiter.clone();
             let dates = async move {
-                let _ = services::dates::save_dates(&pool1, false).await;
+                let _ = services::dates::save_dates(&pool1, parliament_api_limiter, false).await;
             };
 
             let handles = [
@@ -265,11 +276,13 @@ pub async fn run_services(state: &State, config: Config) {
         tokio::spawn(services::plenar::run_shut(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone(),
+            app_state.parliament_api_limiter.clone(),
             config.only_latest
         )),
         tokio::spawn(services::plenar::run_shut_latest(
             Shutdown::new(state.notify_shutdown.subscribe()),
-            pool.clone()
+            pool.clone(),
+            app_state.parliament_api_limiter.clone()
         )),
         tokio::spawn(services::delegates::run_shut(
             Shutdown::new(state.notify_shutdown.subscribe()),
@@ -277,7 +290,8 @@ pub async fn run_services(state: &State, config: Config) {
         )),
         tokio::spawn(services::parties::run_shut(
             Shutdown::new(state.notify_shutdown.subscribe()),
-            pool.clone()
+            pool.clone(),
+            app_state.parliament_api_limiter.clone()
         )),
         // latest
         tokio::spawn(services::ministrial_decrees::run_shut_pages(
@@ -297,11 +311,13 @@ pub async fn run_services(state: &State, config: Config) {
         )),
         tokio::spawn(services::dates::run_shut_dates(
             Shutdown::new(state.notify_shutdown.subscribe()),
-            pool.clone()
+            pool.clone(),
+            app_state.parliament_api_limiter.clone()
         )),
         tokio::spawn(services::dates::run_shut_dates_latest(
             Shutdown::new(state.notify_shutdown.subscribe()),
-            pool.clone()
+            pool.clone(),
+            app_state.parliament_api_limiter.clone()
         )),
         tokio::spawn(services::ai_task_service::ai_tasks_service(
             Shutdown::new(state.notify_shutdown.subscribe()),
