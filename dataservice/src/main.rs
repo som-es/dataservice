@@ -1,9 +1,6 @@
-use combx::GovProposal;
 use dataservice::{
-    ai_task::{self, AiTask},
-    connect_pg,
-    delegates::delegate_count,
-    model_dir, services, setup_app_data, AppState, ApiLimiter, Shutdown, REDIS_URL,
+    ai_task::AiTask, connect_pg, delegates::delegate_count, services, setup_app_data, ApiLimiter,
+    AppState, Shutdown, REDIS_URL,
 };
 use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
@@ -36,7 +33,7 @@ async fn main() {
     let _ = dotenvy::dotenv().ok();
     let args = Args::parse();
 
-    simple_logger::init_with_level(log::Level::Info).unwrap();
+    simple_logger::init_with_level(log::Level::Error).unwrap();
 
     if let Err(e) = setup_app_data().await {
         log::error!("Cannot create app data directory: {e:?}");

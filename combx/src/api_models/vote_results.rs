@@ -223,17 +223,17 @@ impl VoteResult {
             })
             .collect::<Vec<_>>();
 
-        let (all_parties, code_to_parties) = db_enhancer
-            .gen_code_to_parties_with_date(
-                &db_legis_init.nr_plenary_activity_date,
-                &db_legis_init.gp,
-            )
-            .await;
-
         if legis_init.votes.is_empty()
             // && legis_init.accepted == Some(somes_scraper::AcceptedState::PreDeclined)
             && legis_init.hidden_votes_info.pro_contra_parties.is_some()
         {
+            let (all_parties, code_to_parties) = db_enhancer
+                .gen_code_to_parties_with_date(
+                    &db_legis_init.nr_plenary_activity_date,
+                    &db_legis_init.gp,
+                )
+                .await;
+
             match &legis_init.hidden_votes_info.pro_contra_parties {
                 Some(pro_contra_parties) => {
                     votes = translate_votes(

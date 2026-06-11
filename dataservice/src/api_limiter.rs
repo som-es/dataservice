@@ -3,7 +3,7 @@ use std::{future::Future, sync::Arc};
 use tokio::sync::Semaphore;
 
 pub const API_MAX_CONCURRENT_TASKS_ENV: &str = "PARLIAMENT_API_MAX_CONCURRENT_TASKS";
-pub const DEFAULT_PARLIAMENT_API_MAX_CONCURRENT_TASKS: usize = 48;
+pub const DEFAULT_PARLIAMENT_API_MAX_CONCURRENT_TASKS: usize = 24;
 
 #[derive(Clone, Debug)]
 pub struct ApiLimiter {
