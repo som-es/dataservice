@@ -1,11 +1,91 @@
 pub mod ai_tasks;
+use std::sync::Arc;
+
 pub use ai_tasks::*;
 
 mod patch_references;
+use chrono::Days;
 pub use patch_references::*;
-use tokio::sync::mpsc::Sender;
+use somes_scraper::{
+    parliamentary_questions::ParliamentaryQAScraper, proposals::ProposalScraper, AustriaScraper,
+    ParliamentaryQAEntity, QaType,
+};
+use tokio::sync::{mpsc::Sender, Semaphore};
 
-use crate::{ai_task::AiTask, AppState, Shutdown};
+use crate::{ai_task::AiTask, today_and_time, AppState, Shutdown};
+
+async fn pqa_pipeline(
+    app_state: AppState,
+    ai_task_tx: Sender<AiTask>,
+    only_latest: bool,
+) -> crate::Result<()> {
+    let mut scraper = AustriaScraper::default();
+
+    if only_latest {
+        scraper.scrape_info.date_start = today_and_time()
+            .naive_local()
+            .checked_sub_days(Days::new(30));
+    }
+
+    let scraper = Arc::new(scraper);
+
+    let paths = app_state
+        .parliament_api_limiter
+        .run(scraper.post_parliamentary_qa_payload(true))
+        .await?;
+    let wait = Arc::new(Semaphore::new(16));
+    let mut handles = vec![];
+    for path in scraper.proposal_paths(paths)? {
+        let scraper = scraper.clone();
+        let app_state = app_state.clone();
+        let wait = wait.clone();
+        let ai_task_tx = ai_task_tx.clone();
+        handles.push(tokio::task::spawn(async move {
+            let Ok(qa) = app_state
+                .parliament_api_limiter
+                .run(scraper.get_parliamentary_qa(&path))
+                .await
+            else {
+                log::error!("could not fetch parliamentary qa entry");
+                return Ok(());
+            };
+
+            let permit = wait.acquire().await.unwrap();
+
+            if qa.qa_type == QaType::Question {
+                if let Err(e) = handle_question(app_state, ai_task_tx, qa).await {
+                    log::error!("could not await handle (inner error): {e:?}");
+                }
+            }
+
+            drop(permit);
+            crate::Result::Ok(())
+        }));
+    }
+
+    for handle in handles {
+        match handle.await {
+            Ok(info) => {
+                if let Err(e) = info {
+                    log::error!("could not await handle (inner error): {e:?}");
+                }
+            }
+            Err(e) => {
+                log::error!("could not await handle (panic?): {e:?}");
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn handle_question(
+    app_state: AppState,
+    ai_task_tx: Sender<AiTask>,
+    question: ParliamentaryQAEntity,
+) -> crate::Result<()> {
+    // question.references.
+    Ok(())
+}
 
 pub async fn run_shut_latest_gp(
     mut shutdown: Shutdown,
@@ -34,6 +114,12 @@ pub async fn run_shut_latest_gp(
                     800
                 });
 
+    let sleep = if only_latest {
+        pqa_latest_sleep
+    } else {
+        pqa_sleep
+    };
+
     while !shutdown.is_shutdown() {
         let ai_task_tx = ai_task_tx.clone();
         tokio::select! {
@@ -45,17 +131,17 @@ pub async fn run_shut_latest_gp(
             _ = async {
                 let app_state = app_state.clone();
                 if let Err(e) = tokio::task::spawn(async move {
-                    log::info!("Starting legislative initiative (latest) scraper");
+                    log::info!("Starting parliamentary qa service");
 
-                    // legis_init_once(only_latest, only_laws, &app_state, ai_task_tx.clone()).await;
+                    pqa_pipeline(app_state, ai_task_tx, only_latest).await
                 }).await {
-                    log::error!("Error in legislative initiative (latest) scraper: {:?}", e);
+                    log::error!("Error in parliamentary qa service: {:?}", e);
                 }
 
 
                 // legis_init_once().await;
-                // log::info!("Legislative initiative (latest) scraper service sleeps for {legis_init_sleep} seconds...");
-                // tokio::time::sleep(tokio::time::Duration::from_secs(legis_init_sleep)).await;
+                log::info!("parliamentary qa service sleeps for {sleep} seconds...");
+                tokio::time::sleep(tokio::time::Duration::from_secs(sleep)).await;
             } => {}
         }
     }

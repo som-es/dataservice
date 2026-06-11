@@ -1,10 +1,8 @@
 use std::{
     collections::HashMap,
-    hash::{Hash, Hasher},
     sync::{Arc, LazyLock},
 };
 
-use chrono::Utc;
 use combx::{
     with_data::gps::{gps, LegislativePeriod},
     Decree, FromScrapedType, Index, PostgresEnhancer,

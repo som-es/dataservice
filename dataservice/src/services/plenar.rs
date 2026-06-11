@@ -187,12 +187,12 @@ mod tests {
 
     use chrono::NaiveDateTime;
     use combx::GPS;
-    use rand::{rand_core::le, Rng};
-    use somes_scraper::{plenar::Plenar, AustriaScraper, Scraper, TextExtractor};
+    use rand::Rng;
+    use somes_scraper::{plenar::Plenar, AustriaScraper};
 
     use crate::{
         connect_pg,
-        plenar::{insert_plenar_info, scrape_new_plenar_infos, update_plenar_infos_in_db},
+        plenar::{scrape_new_plenar_infos, update_plenar_infos_in_db},
     };
 
     #[test]

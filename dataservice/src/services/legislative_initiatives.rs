@@ -1,6 +1,6 @@
 use chrono::{Days, Utc};
 use combx::VoteResult;
-use tokio::{runtime::Handle, sync::mpsc::Sender};
+use tokio::sync::mpsc::Sender;
 mod db;
 pub mod notify;
 pub use db::*;
