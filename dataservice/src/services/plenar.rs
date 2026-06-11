@@ -1,11 +1,8 @@
-use std::thread::JoinHandle;
-
 use crate::{
     scrape_untill_success, should_update::StoredUpdatedAt, ApiLimiter, Shutdown, GPS,
 };
 use somes_scraper::{plenar::PlenarInfo, AustriaScraper};
 use sqlx::PgPool;
-use tokio::runtime::Handle;
 
 mod scraping;
 pub use scraping::*;
@@ -57,9 +54,10 @@ pub async fn plenar_info_once(
                 }
 
                 let pg_pool = pg_pool.clone();
+                let parliament_api_limiter = parliament_api_limiter.clone();
 
                 inner_handles.push(tokio::spawn(async move {
-                    update_plenar_infos_in_db(&plenar_info, &pg_pool).await;
+                    update_plenar_infos_in_db(&plenar_info, &pg_pool, parliament_api_limiter).await;
                 }));
             }
 
@@ -256,7 +254,8 @@ mod tests {
 
         let pool = connect_pg().await;
 
-        update_plenar_infos_in_db(&res, &pool).await;
+        let parliament_api_limiter = crate::ApiLimiter::new(32);
+        update_plenar_infos_in_db(&res, &pool, parliament_api_limiter).await;
     }
 
     #[tokio::test]
@@ -336,7 +335,8 @@ mod tests {
 
         let pool = connect_pg().await;
 
-        update_plenar_infos_in_db(&res, &pool).await;
+        let parliament_api_limiter = crate::ApiLimiter::new(32);
+        update_plenar_infos_in_db(&res, &pool, parliament_api_limiter).await;
     }
 
     #[tokio::test]
