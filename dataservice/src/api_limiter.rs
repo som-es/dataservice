@@ -3,7 +3,7 @@ use std::{future::Future, sync::Arc};
 use tokio::sync::Semaphore;
 
 pub const API_MAX_CONCURRENT_TASKS_ENV: &str = "PARLIAMENT_API_MAX_CONCURRENT_TASKS";
-pub const DEFAULT_PARLIAMENT_API_MAX_CONCURRENT_TASKS: usize = 32;
+pub const DEFAULT_PARLIAMENT_API_MAX_CONCURRENT_TASKS: usize = 48;
 
 #[derive(Clone, Debug)]
 pub struct ApiLimiter {
@@ -19,7 +19,7 @@ impl ApiLimiter {
 
     pub fn from_env() -> Self {
         let max_concurrent_tasks = api_max_concurrent_tasks_from_env();
-        log::info!("Parliament API max concurrent scraper tasks: {max_concurrent_tasks}");
+        log::info!("concurrent scraper tasks: {max_concurrent_tasks}");
         Self::new(max_concurrent_tasks)
     }
 
