@@ -1,3 +1,59 @@
+use combx::{
+    document_text::{combine_texts, extract_text_from_documents_html_first},
+    QuestionEntry,
+};
+use somai_client::SomAiClient;
+use somes_common_lib::Document;
+
+use crate::OCR_ENGINE;
+
+pub async fn question_extraction(
+    somai_client: &SomAiClient,
+    unique_topics: &[String],
+    docs: &[Document],
+) -> crate::Result<QuestionEntry> {
+    let docs = docs.iter().filter(|doc| {
+        doc.document_type
+            .as_deref()
+            .map(|doc| doc.contains("PDF"))
+            .unwrap_or_default()
+    });
+
+    let engine = OCR_ENGINE.clone();
+    let input = combine_texts(&extract_text_from_documents_html_first(docs, engine).await);
+
+    somai_client
+        .make_llm_request_with_schema::<QuestionEntry>(
+            input,
+            format!(
+                r##"Bringe die folgende Anfrage in das angegebene JSON-Schema. Extrahiere ALLE Fragen.
+                Klassifiziere das Thema anhand dieser Liste (max 10): {unique_topics:?}
+                Schreibe eine Zusammenfassung der Fragen in 'question_summary', und eine ausführlichere in 'detailed_question_summary'.
+                Die 'info' summaries sollen Zusammenfassungen über den Anlass der Fragestellung beinhalten.
+                'short_title' muss einen sprechenden, user-facing Titel entsprechen.
+                Die verwendeten Quellen müssen in `info_sources_urls` verwendet werden.
+                Die rohe Frage muss in 'raw_question' abgespeichert werden. Entferne dabei allerdings die Numerierung am Anfang. Achte darauf, dass alle Fragen verarbeitet werden.
+                Trage bei 'nth_level' immer die konkrete Identifikation einer Frage ein. Das Array darf nicht leer sein! Dabei ist die erste Ebene immer eine numerische Numerierung, weitere Ebenen vom folgenden Beispiel ableiten.
+                    z.B. 3. Wird Rust dominieren?
+                            a) wenn ja, gehe kurz auf die Vorteile ein
+                            b) wenn nein, erwähne kurz die Alternativen
+                            i) systems programming languages
+                            ii) OOP languages
+
+                Jede einzelne Frage oder Punkt wird anschließend in `questions' eingetragen.
+                    z.B. Question {{ raw_question: 'OOP languages', nth_level: [Number(3), String('b'), String('ii')] }} // beachte wie 'nth_level' eingetragen wurde!
+                "##
+            ),
+            None,
+            false,
+            Some(|schema: &mut serde_json::Value| {
+                // TODO: activate topic patching when #143 (https://github.com/som-es/somes/issues/143) is done
+                crate::ai_tasks::patch_topics("/properties/topics", schema, &unique_topics);
+            }),
+        )
+        .await
+}
+
 #[cfg(test)]
 mod tests {
     use combx::{
@@ -8,11 +64,11 @@ mod tests {
 
     use somes_common_lib::Document;
 
-    use crate::parliamentary_qa::patch_reference_possibility;
+    use crate::parliamentary_qa::{patch_reference_possibility, question_extraction};
 
     #[tokio::test]
     async fn test_parliamentary_question_extraction() {
-        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let init_with_level = simple_logger::init_with_level(log::Level::Info).unwrap();
         let somai_client =
             SomAiClient::new("http://10.30.0.164:8000", "API_USER", "supersicher123!")
                 .await
@@ -32,40 +88,7 @@ mod tests {
         .fetch_all(&pg_pool)
         .await
         .unwrap();
-
-        let input = combine_texts(&extract_text_from_documents_html_first(&docs, None).await);
-        println!("input: {input}");
-
-        let result = somai_client
-            .make_llm_request_with_schema::<QuestionEntry>(
-                input,
-                format!(
-                    r##"Bringe die folgende Anfrage in das angegebene JSON-Schema. Extrahiere ALLE Fragen.
-                    Klassifiziere das Thema anhand dieser Liste (max 10): {unique_topics:?}
-                    Schreibe eine Zusammenfassung der Fragen in 'question_summary', und eine ausführlichere in 'detailed_question_summary'.
-                    Die 'info' summaries sollen Zusammenfassungen über den Anlass der Fragestellung beinhalten.
-                    'short_title' muss einen sprechenden, user-facing Titel entsprechen.
-                    Die verwendeten Quellen müssen in `info_sources_urls` verwendet werden.
-                    Die rohe Frage muss in 'raw_question' abgespeichert werden. Entferne dabei allerdings die Numerierung am Anfang. Achte darauf, dass alle Fragen verarbeitet werden.
-                    Trage bei 'nth_level' immer die konkrete Identifikation einer Frage ein. Das Array darf nicht leer sein! Dabei ist die erste Ebene immer eine numerische Numerierung, weitere Ebenen vom folgenden Beispiel ableiten.
-                        z.B. 3. Wird Rust dominieren?
-                             a) wenn ja, gehe kurz auf die Vorteile ein
-                             b) wenn nein, erwähne kurz die Alternativen
-                             i) systems programming languages
-                             ii) OOP languages
-
-                    Jede einzelne Frage oder Punkt wird anschließend in `questions' eingetragen.
-                        z.B. Question {{ raw_question: 'OOP languages', nth_level: [Number(3), String('b'), String('ii')] }} // beachte wie 'nth_level' eingetragen wurde!
-                    "##
-                ),
-                None,
-                false,
-                Some(|schema: &mut serde_json::Value| {
-                    // TODO: activate topic patching when #143 (https://github.com/som-es/somes/issues/143) is done
-                    crate::ai_tasks::patch_topics("/properties/topics", schema, &unique_topics);
-                }),
-            )
-            .await;
+        let result = question_extraction(&somai_client, &unique_topics, &docs).await;
         dbg!(&result);
         assert!(result.is_ok());
     }
@@ -93,7 +116,7 @@ mod tests {
         .await
         .unwrap();
 
-        let input = combine_texts(&extract_text_from_documents_html_first(&docs, None).await);
+        let input = combine_texts(&extract_text_from_documents_html_first(docs.iter(), None).await);
 
         #[rustfmt::skip]
         let questions =

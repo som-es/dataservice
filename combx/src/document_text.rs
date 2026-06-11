@@ -43,7 +43,7 @@ pub async fn extract_text_from_documents_html_first_stripped(
     #[cfg(feature = "tesseract")] ocr_engine: Option<tesseract_rs::TesseractAPI>,
     #[cfg(not(feature = "tesseract"))] ocr_engine: Option<Arc<OcrEngine>>,
 ) -> Vec<TextDocument> {
-    let mut results = extract_text_from_documents_html_first(documents, ocr_engine).await;
+    let mut results = extract_text_from_documents_html_first(documents.iter(), ocr_engine).await;
     // move document called "Gesetzestext" to the front if exists
     if let Some(pos) = results.iter().position(|doc| {
         doc.document
@@ -67,12 +67,15 @@ pub async fn extract_text_from_documents_html_first_stripped(
         .collect()
 }
 
-pub async fn extract_text_from_documents_html_first(
-    documents: &[Document],
+pub async fn extract_text_from_documents_html_first<
+    'a,
+    I: std::iter::Iterator<Item = &'a Document>,
+>(
+    documents: I,
     #[cfg(feature = "tesseract")] ocr_engine: Option<tesseract_rs::TesseractAPI>,
     #[cfg(not(feature = "tesseract"))] ocr_engine: Option<Arc<OcrEngine>>,
 ) -> Vec<TextDocument> {
-    let mut results = Vec::with_capacity(documents.len());
+    let mut results = vec![];
     let mut grouped_documents = HashMap::<String, Vec<Document>>::new();
     for document in documents {
         grouped_documents

@@ -53,7 +53,7 @@ async fn pqa_pipeline(
             let permit = wait.acquire().await.unwrap();
 
             if qa.qa_type == QaType::Question {
-                if let Err(e) = handle_question(app_state, ai_task_tx, qa).await {
+                if let Err(e) = handle_question(app_state, ai_task_tx, qa, &scraper).await {
                     log::error!("could not await handle (inner error): {e:?}");
                 }
             }
@@ -82,8 +82,39 @@ async fn handle_question(
     app_state: AppState,
     ai_task_tx: Sender<AiTask>,
     question: ParliamentaryQAEntity,
+    scraper: &AustriaScraper,
 ) -> crate::Result<()> {
-    // question.references.
+    let mut answers = vec![];
+    for reference in question
+        .references
+        .iter()
+        .filter(|reference| reference.qa_type == QaType::Answer)
+    {
+        answers.push(
+            app_state
+                .parliament_api_limiter
+                .run(scraper.get_parliamentary_qa(&format!(
+                    "/gegenstand/{}/{}/{}",
+                    reference.reference.gp, reference.reference.ityp, reference.reference.inr
+                )))
+                .await?,
+        );
+    }
+
+    ai_task_tx.send(AiTask {
+        input: None,
+        priority: crate::ai_task::Priority::Medium,
+        task_id: crate::hash!(),
+        db_entry_id: 0,
+        rerunnable: true,
+        created_at: combx::today_and_time(),
+        task: Box::new(move |task_args| {
+            Box::pin(async move {
+                //
+                Ok(())
+            })
+        }),
+    });
     Ok(())
 }
 
