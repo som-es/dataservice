@@ -188,7 +188,6 @@ pub fn match_delegate_names_with_delegate_ids(
     gp: &str,
     date: NaiveDate,
 ) -> MatchResult {
-    println!("delegate_names: {delegate_names:?}");
     let mut find_not_sure_if_matched_correctly = active_delegates
         .iter()
         .map(|del| (del.id as usize, del))

@@ -83,7 +83,6 @@ pub async fn match_all_named_votes(
             match_delegate_names_with_delegate_ids(&active_delegates, &votes.pro, &gp, voted_on);
         let mut pro = pro_res.correctly_matched;
         pro.extend_from_slice(&pro_res.lev_or_deep_split_matched);
-        println!("lev_or_deep_pro: {:?}", pro_res.lev_or_deep_split_matched);
 
         let contra_res =
             match_delegate_names_with_delegate_ids(&active_delegates, &votes.contra, &gp, voted_on);
