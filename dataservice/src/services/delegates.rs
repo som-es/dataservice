@@ -10,17 +10,24 @@ use sqlx::{postgres::PgQueryResult, query, PgPool};
 
 use crate::{
     enforce_ai_run, services::scrape_untill_success, should_update_by_hash, AppState, CompareHash,
-    Shutdown,
+    ApiLimiter, Shutdown,
 };
 
-async fn scrape_new_delegates_bs() -> crate::Result<Vec<Delegate>> {
+async fn scrape_new_delegates_bs(
+    parliament_api_limiter: ApiLimiter,
+) -> crate::Result<Vec<Delegate>> {
     let scraper = AustriaScraper::default();
 
     let mut delegates = vec![];
 
-    let persons = scraper.post_persons_payload_bs().await?;
+    let persons = parliament_api_limiter
+        .run(scraper.post_persons_payload_bs())
+        .await?;
     for person_path in scraper.person_paths_bs(persons).unwrap_or_default() {
-        let Ok(delegate) = scraper.get_delegate_bs(person_path).await else {
+        let Ok(delegate) = parliament_api_limiter
+            .run(scraper.get_delegate_bs(person_path))
+            .await
+        else {
             continue;
         };
         delegates.push(delegate);
@@ -28,15 +35,23 @@ async fn scrape_new_delegates_bs() -> crate::Result<Vec<Delegate>> {
     Ok(delegates)
 }
 
-async fn scrape_new_delegates(prev_delegates: &HashSet<Delegate>) -> crate::Result<Vec<Delegate>> {
+async fn scrape_new_delegates(
+    prev_delegates: &HashSet<Delegate>,
+    parliament_api_limiter: ApiLimiter,
+) -> crate::Result<Vec<Delegate>> {
     let scraper = AustriaScraper::default();
 
     let mut delegates = vec![];
 
-    let persons = scraper.post_persons_payload().await?;
+    let persons = parliament_api_limiter
+        .run(scraper.post_persons_payload())
+        .await?;
     for person_path in scraper.person_paths(persons).unwrap_or_default() {
         // println!("person_path: {person_path}");
-        let Ok(delegate) = scraper.get_delegate(person_path).await else {
+        let Ok(delegate) = parliament_api_limiter
+            .run(scraper.get_delegate(person_path))
+            .await
+        else {
             continue;
         };
 
@@ -506,12 +521,14 @@ pub async fn delegates_once(
 ) -> Vec<Delegate> {
     log::info!("Scraping all delegates...");
 
-    let new_delegates_bs =
-        scrape_untill_success::<Vec<Delegate>, _>(|| async { scrape_new_delegates_bs().await })
-            .await;
+    let parliament_api_limiter = pg_pool.parliament_api_limiter.clone();
+    let new_delegates_bs = scrape_untill_success::<Vec<Delegate>, _>(|| async {
+        scrape_new_delegates_bs(parliament_api_limiter.clone()).await
+    })
+    .await;
 
     let mut new_delegates = scrape_untill_success::<Vec<Delegate>, _>(|| async {
-        scrape_new_delegates(&prev_delegates).await
+        scrape_new_delegates(&prev_delegates, pg_pool.parliament_api_limiter.clone()).await
     })
     .await;
 

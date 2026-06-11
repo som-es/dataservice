@@ -1,7 +1,7 @@
 use somes_scraper::{parties::Parties, AustriaScraper, Party};
 use tokio::runtime::Handle;
 
-use crate::{scrape_untill_success, Shutdown, GPS};
+use crate::{scrape_untill_success, ApiLimiter, Shutdown, GPS};
 
 use sqlx::PgPool;
 
@@ -35,10 +35,11 @@ pub async fn get_parties(scraper: &AustriaScraper) -> crate::Result<Vec<Party>> 
     Ok(scraper.get_parties().await?)
 }
 
-pub async fn parties_once(pg_pool: &PgPool) {
+pub async fn parties_once(pg_pool: &PgPool, parliament_api_limiter: ApiLimiter) {
     let mut handles = vec![];
     for gp in GPS {
         let pg_pool = pg_pool.clone();
+        let parliament_api_limiter = parliament_api_limiter.clone();
         let gp = gp.to_string();
         let handle = tokio::task::spawn(async move {
             let pg_pool = pg_pool;
@@ -46,7 +47,10 @@ pub async fn parties_once(pg_pool: &PgPool) {
             scraper.scrape_info.gp = vec![gp.clone().into()];
 
             let parties = scrape_untill_success::<Vec<_>, _>(|| async {
-                scraper.get_parties().await.map_err(|e| e.into())
+                parliament_api_limiter
+                    .run(scraper.get_parties())
+                    .await
+                    .map_err(|e| e.into())
             })
             .await;
 
@@ -63,7 +67,11 @@ pub async fn parties_once(pg_pool: &PgPool) {
     }
 }
 
-pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool) {
+pub async fn run_shut(
+    mut shutdown: Shutdown,
+    pg_pool: PgPool,
+    parliament_api_limiter: ApiLimiter,
+) {
     let party_sleep = std::env::var("PARTY_SLEEP")
         .unwrap_or_else(|_| "10000".to_string())
         .parse()
@@ -84,9 +92,10 @@ pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool) {
             }
             _ = async {
                 let pg_pool = pg_pool.clone();
+                let parliament_api_limiter = parliament_api_limiter.clone();
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting party scraper");
-                    parties_once(&pg_pool).await;
+                    parties_once(&pg_pool, parliament_api_limiter).await;
                 }).await {
                     log::error!("Error in party scraper: {:?}", e);
                 }

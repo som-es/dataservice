@@ -2,8 +2,7 @@ use std::sync::Arc;
 
 use combx::VoteResult;
 use somes_scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative};
-use sqlx::PgPool;
-use tokio::{runtime::Handle, sync::mpsc::Sender};
+use tokio::sync::mpsc::Sender;
 
 use crate::{
     ai_task::AiTask,
@@ -14,7 +13,7 @@ use crate::{
         },
         update_or_insert_legis_init_in_db,
     },
-    AppState, LATEST_GP,
+    AppState,
 };
 
 pub async fn scrape_new_legis_inits(
@@ -26,14 +25,11 @@ pub async fn scrape_new_legis_inits(
     only_latest: bool,
     only_voteable: bool,
 ) -> crate::Result<Vec<LegislativeInitiative>> {
-    let legis_inits = scraper.post_legis_payload(searched_doktyps).await?;
+    let legis_inits = state
+        .parliament_api_limiter
+        .run(scraper.post_legis_payload(searched_doktyps))
+        .await?;
     let legis_init_paths = scraper.legis_paths(legis_inits)?;
-
-    let max_tasks = if gp != LATEST_GP {
-        5 // cache hit rate MUST be high for this to work
-    } else {
-        1
-    };
     let mut handles: Vec<tokio::task::JoinHandle<()>> = vec![];
 
     let (new_vote_result_tx, new_vote_result_rx) = if only_latest && only_voteable {
@@ -45,25 +41,10 @@ pub async fn scrape_new_legis_inits(
     };
 
     log::info!("Fetching and inserting ({gp}) now.");
-    let mut info_print_counter = 0;
     for legis_init_path in legis_init_paths.iter().rev() {
         let legis_init_path = legis_init_path.clone();
         let scraper = scraper.clone();
         let pool = state.clone();
-
-        if handles.len() > max_tasks {
-            if info_print_counter % 16 == 0 {
-                log::info!("Awaiting handles ({gp}) now.");
-            }
-            for handle in handles.drain(..max_tasks) {
-                if let Err(e) = handle.await {
-                    if e.is_panic() {
-                        log::error!("join Error: {e:?}")
-                    }
-                }
-            }
-            info_print_counter += 1;
-        }
 
         // let new_legis_init = new_legis_init.clone();
         let new_vote_result_tx = new_vote_result_tx.clone();
@@ -74,7 +55,11 @@ pub async fn scrape_new_legis_inits(
             // mainly many I and A
             // https://www.parlament.gv.at/gegenstand/XXVII/I/1494
             // https://www.parlament.gv.at/gegenstand/XXVII/A/2686
-            let Ok(legis_init) = scraper.get_legis_init(&legis_init_path).await else {
+            let Ok(legis_init) = pool
+                .parliament_api_limiter
+                .run(scraper.get_legis_init(&legis_init_path))
+                .await
+            else {
                 log::debug!("Cannot process legislative initiative: '{legis_init_path}'");
                 return;
             };

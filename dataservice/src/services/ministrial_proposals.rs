@@ -16,6 +16,7 @@ use tokio::{sync::mpsc::Sender, time::Instant};
 use crate::{
     ai_task::AiTask,
     enforce_ai_run,
+    api_limiter::ApiLimiter,
     services::scrape_untill_success,
     should_update::StoredUpdatedAt,
     today,
@@ -37,11 +38,12 @@ pub use db::*;
 
 pub async fn scrape_new_ministrial_props(
     scraper: &AustriaScraper,
+    parliament_api_limiter: ApiLimiter,
 ) -> crate::Result<Vec<MinistrialProposal>> {
     let mut proposal_payload = ProposalsPayload::default();
     proposal_payload.scrape_info = scraper.scrape_info.clone();
-    let ministrial_proposals = scraper
-        .post_ministrial_proposals_payload(proposal_payload)
+    let ministrial_proposals = parliament_api_limiter
+        .run(scraper.post_ministrial_proposals_payload(proposal_payload))
         .await?;
     let mut ministrial_props_paths = scraper.ministrial_prop_paths(ministrial_proposals)?;
     sort_ministerial_prop_paths_desc(&mut ministrial_props_paths);
@@ -49,8 +51,8 @@ pub async fn scrape_new_ministrial_props(
     let mut new_ministrial_props = Vec::with_capacity(ministrial_props_paths.len());
 
     for ministrial_prop_path in ministrial_props_paths {
-        let Ok(ministrial_prop) = scraper
-            .get_ministrial_proposal(ministrial_prop_path.clone())
+        let Ok(ministrial_prop) = parliament_api_limiter
+            .run(scraper.get_ministrial_proposal(ministrial_prop_path.clone()))
             .await
         else {
             log::debug!("Cannot process ministrial proposal: '{ministrial_prop_path:?}'");
@@ -84,7 +86,7 @@ pub async fn ministrial_proposal_once(
         }
 
         let new_ministrial_props = scrape_untill_success::<Vec<_>, _>(|| async {
-            scrape_new_ministrial_props(&scraper).await
+            scrape_new_ministrial_props(&scraper, pg_pool.parliament_api_limiter.clone()).await
         })
         .await;
 
