@@ -16,6 +16,8 @@ use crate::{
     AppState,
 };
 
+const LEGIS_INIT_MAX_INSERT_TASKS: usize = 8;
+
 pub async fn scrape_new_legis_inits(
     state: &AppState,
     scraper: Arc<AustriaScraper>,
@@ -40,6 +42,8 @@ pub async fn scrape_new_legis_inits(
         (None, None)
     };
 
+    let max_tasks = LEGIS_INIT_MAX_INSERT_TASKS;
+
     log::info!("Fetching and inserting ({gp}) now.");
     for legis_init_path in legis_init_paths.iter().rev() {
         let legis_init_path = legis_init_path.clone();
@@ -49,6 +53,17 @@ pub async fn scrape_new_legis_inits(
         // let new_legis_init = new_legis_init.clone();
         let new_vote_result_tx = new_vote_result_tx.clone();
         let ai_task_tx = ai_task_tx.clone();
+        
+        if handles.len() > max_tasks {
+            
+            for handle in handles.drain(..max_tasks) {
+                if let Err(e) = handle.await {
+                    if e.is_panic() {
+                        log::error!("join Error: {e:?}")
+                    }
+                }
+            }
+        }
 
         handles.push(tokio::task::spawn(async move {
             // skipping legis inits that can't be processed right now
