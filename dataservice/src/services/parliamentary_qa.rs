@@ -101,20 +101,65 @@ async fn handle_question(
         );
     }
 
-    ai_task_tx.send(AiTask {
-        input: None,
-        priority: crate::ai_task::Priority::Medium,
-        task_id: crate::hash!(),
-        db_entry_id: 0,
-        rerunnable: true,
-        created_at: combx::today_and_time(),
-        task: Box::new(move |task_args| {
-            Box::pin(async move {
-                //
-                Ok(())
-            })
-        }),
-    });
+    ai_task_tx
+        .send(AiTask {
+            input: None,
+            priority: crate::ai_task::Priority::Medium,
+            task_id: crate::hash!(),
+            db_entry_id: 0,
+            rerunnable: true,
+            created_at: combx::today_and_time(),
+            task: Box::new(move |task_args| {
+                Box::pin(async move {
+                    // add rerun guards
+
+                    let unique_topics = sqlx::query_scalar!(
+                        "select topic_name as topic from unique_eurovoc_topics order by topic"
+                    )
+                    .fetch_all(&task_args.pg_pool)
+                    .await?;
+
+                    let extracted_question = extract_question(
+                        &task_args.som_ai_client,
+                        &unique_topics,
+                        &question
+                            .documents
+                            .iter()
+                            .map(|doc| somes_common_lib::Document {
+                                title: Some(doc.title.clone()),
+                                document_url: Some(doc.link.clone()),
+                                document_type: Some(doc.ftype.to_string()),
+                            })
+                            .collect::<Vec<_>>(),
+                    )
+                    .await?;
+
+                    let mut extracted_answers = vec![];
+                    for answer in answers {
+                        let extracted_anwer = extract_answer(
+                            &task_args.som_ai_client,
+                            &unique_topics,
+                            &answer
+                                .documents
+                                .iter()
+                                .map(|doc| somes_common_lib::Document {
+                                    title: Some(doc.title.clone()),
+                                    document_url: Some(doc.link.clone()),
+                                    document_type: Some(doc.ftype.to_string()),
+                                })
+                                .collect::<Vec<_>>(),
+                            &extracted_question.questions,
+                        )
+                        .await?;
+                        extracted_answers.push(extracted_anwer);
+                    }
+
+                    //
+                    Ok(())
+                })
+            }),
+        })
+        .await?;
     Ok(())
 }
 
