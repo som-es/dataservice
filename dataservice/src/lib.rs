@@ -8,7 +8,7 @@ pub mod shutdown;
 
 use std::{cell::LazyCell, sync::Arc};
 
-use redis::aio::MultiplexedConnection;
+use redis::aio::ConnectionManager;
 #[cfg(feature = "runner")]
 pub use services::*;
 
@@ -90,7 +90,7 @@ pub const GPS: [&str; 9] = [
 #[derive(Clone)]
 pub struct AppState {
     pub pg_pool: PgPool,
-    pub redis_client: Option<MultiplexedConnection>,
+    pub redis_client: Option<ConnectionManager>,
     #[cfg(feature = "runner")]
     pub cpu_task_tx: Option<Sender<AiTask>>,
 }

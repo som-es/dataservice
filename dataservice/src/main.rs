@@ -96,7 +96,7 @@ pub async fn run_services(state: &State, config: Config) {
     }
     let redis_client = redis_client;
     let redis_client = match redis_client {
-        Ok(redis_client) => redis_client.get_multiplexed_async_connection().await,
+        Ok(redis_client) => redis_client.get_connection_manager().await,
         Err(e) => Err(e),
     }
     .ok();

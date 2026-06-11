@@ -36,7 +36,7 @@ clap = { version = "4.5.53", features = ["derive"] }
 schemars = { workspace = true }
 tesseract-rs = { workspace = true, optional = true }
 chrono-tz = {workspace = true}
-redis = { version = "1.0", features = ["tokio-comp"] }
+redis = { version = "1.0", features = ["tokio-comp", "connection-manager"] }
 regex = "1.12.3"
 qdrant-client = {version = "1.17.0", optional = true}
 uuid = {version = "1.23.0", optional = true, features =  ["v4"] }
