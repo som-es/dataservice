@@ -7,6 +7,8 @@ use sqlx::{prelude::FromRow, types::Json};
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
+use crate::AbortReason;
+
 #[derive(Hash, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, CompositeType)]
 pub struct DbAnswerEntry {
     pub id: i64,
@@ -18,6 +20,14 @@ pub struct DbAnswerEntry {
     pub model_used: String,
     pub version: String,
     pub generated_at: DateTime<Utc>,
+}
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(
+    JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, CompositeType,
+)]
+pub struct AnswerEntryOutput {
+    pub answer_entry: Option<AnswerEntry>,
+    pub abort_reason: AbortReason,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
@@ -88,6 +98,15 @@ pub struct DbQuestionEntry {
     pub model_used: String,
     pub version: String,
     pub generated_at: DateTime<Utc>,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(
+    JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, CompositeType,
+)]
+pub struct QuestionEntryOutput {
+    pub question_entry: Option<QuestionEntry>,
+    pub abort_reason: AbortReason,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

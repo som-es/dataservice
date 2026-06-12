@@ -1,6 +1,6 @@
 use combx::{
     document_text::{combine_texts, extract_text_from_documents_html_first},
-    AnswerEntry, QuestionEntry,
+    AnswerEntryOutput, QuestionEntryOutput,
 };
 use somai_client::SomAiClient;
 use somes_common_lib::Document;
@@ -11,11 +11,11 @@ pub async fn extract_question(
     somai_client: &SomAiClient,
     unique_topics: &[String],
     docs: &[Document],
-) -> crate::Result<QuestionEntry> {
+) -> crate::Result<QuestionEntryOutput> {
     let input = extract_pqa_input(docs).await;
 
     somai_client
-        .make_llm_request_with_schema::<QuestionEntry>(
+        .make_llm_request_with_schema::<QuestionEntryOutput>(
             input,
             format!(
                 r##"Bringe die folgende Anfrage in das angegebene JSON-Schema. Extrahiere ALLE Fragen.
@@ -64,10 +64,10 @@ pub async fn extract_answer(
     unique_topics: &[String],
     docs: &[Document],
     questions: &[combx::Question],
-) -> crate::Result<AnswerEntry> {
+) -> crate::Result<AnswerEntryOutput> {
     let input = extract_pqa_input(docs).await;
     somai_client
-        .make_llm_request_with_schema::<AnswerEntry>(
+        .make_llm_request_with_schema::<AnswerEntryOutput>(
             input,
             format!(
                 r##"Bringe die folgende Anfrage in das angegebene JSON-Schema.

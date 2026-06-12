@@ -5,7 +5,7 @@ pub use inserts::*;
 use std::sync::Arc;
 mod patch_references;
 use chrono::Days;
-use combx::DbQuestionEntry;
+use combx::{AbortReason, DbQuestionEntry};
 pub use patch_references::*;
 use somes_scraper::{
     parliamentary_questions::ParliamentaryQAScraper, proposals::ProposalScraper, AustriaScraper,
@@ -188,6 +188,12 @@ async fn handle_question(
                                     .collect::<Vec<_>>(),
                             )
                             .await?;
+                            if extracted_question.abort_reason != AbortReason::None || extracted_question.question_entry.is_none() {
+                                log::error!("(question) No documents? provided in context for question {}, documents: {:?}, abort reason: {:?}, skipping", question_id, question.documents, extracted_question.abort_reason);
+                                Err(combx::Error::Custom("No documents provided in context for question, skipping".to_string()))?;
+                            }
+                            let extracted_question = extracted_question.question_entry.unwrap();
+
                             insert_question_entry(
                                 &task_args.pg_pool,
                                 question_id,
@@ -212,7 +218,7 @@ async fn handle_question(
                         {
                             continue;
                         }
-                        let extracted_anwer = extract_answer(
+                        let extracted_answer = extract_answer(
                             &task_args.som_ai_client,
                             &unique_topics,
                             &answer
@@ -227,15 +233,21 @@ async fn handle_question(
                             &questions,
                         )
                         .await?;
+
+                        if extracted_answer.abort_reason != AbortReason::None || extracted_answer.answer_entry.is_none() {
+                            log::error!("(answer) No documents? provided in context for answer {}, documents: {:?}, abort reason: {:?}, skipping", answer_id, answer.documents, extracted_answer.abort_reason);
+                            Err(combx::Error::Custom("No documents provided in context for answer, skipping".to_string()))?;
+                        }
+                        let extracted_answer = extracted_answer.answer_entry.unwrap();
                         insert_answer_entry(
                             &task_args.pg_pool,
                             answer_id,
-                            &extracted_anwer,
+                            &extracted_answer,
                             &task_args.som_ai_client.get_model().await?.result,
                             "1",
                         )
                         .await?;
-                        extracted_answers.push(extracted_anwer);
+                        extracted_answers.push(extracted_answer);
                     }
 
                     //
