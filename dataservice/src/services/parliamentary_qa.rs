@@ -1,18 +1,20 @@
 pub mod ai_tasks;
-use std::sync::Arc;
-
 pub use ai_tasks::*;
-
+pub mod inserts;
+pub use inserts::*;
+use std::sync::Arc;
 mod patch_references;
 use chrono::Days;
+use combx::DbQuestionEntry;
 pub use patch_references::*;
 use somes_scraper::{
     parliamentary_questions::ParliamentaryQAScraper, proposals::ProposalScraper, AustriaScraper,
     ParliamentaryQAEntity, QaType,
 };
+use sqlx::{types::Json, PgPool};
 use tokio::sync::{mpsc::Sender, Semaphore};
 
-use crate::{ai_task::AiTask, today_and_time, AppState, Shutdown};
+use crate::{ai_task::AiTask, enforce_ai_run, today_and_time, AppState, Shutdown, StoredUpdatedAt};
 
 async fn pqa_pipeline(
     app_state: AppState,
@@ -78,27 +80,52 @@ async fn pqa_pipeline(
     Ok(())
 }
 
+impl StoredUpdatedAt for ParliamentaryQAEntity {
+    async fn stored_updated_at(&self, pg: &PgPool) -> Option<chrono::DateTime<chrono::Utc>> {
+        sqlx::query!(
+            "select raw_data_updated_at from pqa_meta where inr = $1 and gp = $2 and ityp = $3",
+            self.inr as i32,
+            self.gp,
+            self.ityp
+        )
+        .fetch_optional(pg)
+        .await
+        .ok()
+        .flatten()
+        .map(|x| x.raw_data_updated_at)
+        .flatten()
+    }
+}
+
 async fn handle_question(
     app_state: AppState,
     ai_task_tx: Sender<AiTask>,
     question: ParliamentaryQAEntity,
     scraper: &AustriaScraper,
 ) -> crate::Result<()> {
+    let should_update = crate::should_update_by_time(&question, &app_state.pg_pool).await;
+
+    if !enforce_ai_run() && !should_update {
+        return Ok(());
+    }
+
+    let question_id = insert_pqa(&app_state.pg_pool, &question).await?;
+
     let mut answers = vec![];
     for reference in question
         .references
         .iter()
         .filter(|reference| reference.qa_type == QaType::Answer)
     {
-        answers.push(
-            app_state
-                .parliament_api_limiter
-                .run(scraper.get_parliamentary_qa(&format!(
-                    "/gegenstand/{}/{}/{}",
-                    reference.reference.gp, reference.reference.ityp, reference.reference.inr
-                )))
-                .await?,
-        );
+        let answer = app_state
+            .parliament_api_limiter
+            .run(scraper.get_parliamentary_qa(&format!(
+                "/gegenstand/{}/{}/{}",
+                reference.reference.gp, reference.reference.ityp, reference.reference.inr
+            )))
+            .await?;
+
+        answers.push((insert_pqa(&app_state.pg_pool, &answer).await?, answer));
     }
 
     ai_task_tx
@@ -106,12 +133,37 @@ async fn handle_question(
             input: None,
             priority: crate::ai_task::Priority::Medium,
             task_id: crate::hash!(),
-            db_entry_id: 0,
-            rerunnable: true,
+            db_entry_id: question_id as i32,
+            rerunnable: false,
             created_at: combx::today_and_time(),
             task: Box::new(move |task_args| {
                 Box::pin(async move {
-                    // add rerun guards
+                    use combx::QuestionEntry;
+                    let question_entry = sqlx::query_as!(
+                        DbQuestionEntry,
+                        r#"
+                        select
+                            id,
+                            pqa_meta_id,
+                            short_title,
+                            once_sentence_short_info_summary,
+                            very_short_info_summary,
+                            short_info_summary,
+                            info_summary,
+                            detailed_info_summary,
+                            question_summary,
+                            detailed_question_summary,
+                            full_question_entry as "full_question_entry: Json<QuestionEntry>",
+                            model_used,
+                            version,
+                            generated_at
+                        from pqa_questions
+                        where id = $1
+                        "#,
+                        question_id
+                    )
+                    .fetch_optional(&task_args.pg_pool)
+                    .await?;
 
                     let unique_topics = sqlx::query_scalar!(
                         "select topic_name as topic from unique_eurovoc_topics order by topic"
@@ -119,23 +171,47 @@ async fn handle_question(
                     .fetch_all(&task_args.pg_pool)
                     .await?;
 
-                    let extracted_question = extract_question(
-                        &task_args.som_ai_client,
-                        &unique_topics,
-                        &question
-                            .documents
-                            .iter()
-                            .map(|doc| somes_common_lib::Document {
-                                title: Some(doc.title.clone()),
-                                document_url: Some(doc.link.clone()),
-                                document_type: Some(doc.ftype.to_string()),
-                            })
-                            .collect::<Vec<_>>(),
-                    )
-                    .await?;
+                    let questions = match question_entry {
+                        Some(entry) => entry.full_question_entry.questions.clone(),
+                        None => {
+                            let extracted_question = extract_question(
+                                &task_args.som_ai_client,
+                                &unique_topics,
+                                &question
+                                    .documents
+                                    .iter()
+                                    .map(|doc| somes_common_lib::Document {
+                                        title: Some(doc.title.clone()),
+                                        document_url: Some(doc.link.clone()),
+                                        document_type: Some(doc.ftype.to_string()),
+                                    })
+                                    .collect::<Vec<_>>(),
+                            )
+                            .await?;
+                            insert_question_entry(
+                                &task_args.pg_pool,
+                                question_id,
+                                &extracted_question,
+                                &task_args.som_ai_client.get_model().await?.result,
+                                "1",
+                            )
+                            .await?;
+                            extracted_question.questions
+                        }
+                    };
 
                     let mut extracted_answers = vec![];
-                    for answer in answers {
+                    for (answer_id, answer) in answers {
+                        if sqlx::query_scalar!(
+                            "select id from pqa_answers where pqa_meta_id = $1",
+                            answer_id
+                        )
+                        .fetch_optional(&task_args.pg_pool)
+                        .await?
+                        .is_some()
+                        {
+                            continue;
+                        }
                         let extracted_anwer = extract_answer(
                             &task_args.som_ai_client,
                             &unique_topics,
@@ -148,7 +224,15 @@ async fn handle_question(
                                     document_type: Some(doc.ftype.to_string()),
                                 })
                                 .collect::<Vec<_>>(),
-                            &extracted_question.questions,
+                            &questions,
+                        )
+                        .await?;
+                        insert_answer_entry(
+                            &task_args.pg_pool,
+                            answer_id,
+                            &extracted_anwer,
+                            &task_args.som_ai_client.get_model().await?.result,
+                            "1",
                         )
                         .await?;
                         extracted_answers.push(extracted_anwer);

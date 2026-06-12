@@ -1,10 +1,24 @@
+use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use somes_macro::CompositeType;
-use sqlx::prelude::FromRow;
+use sqlx::{prelude::FromRow, types::Json};
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
+
+#[derive(Hash, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, CompositeType)]
+pub struct DbAnswerEntry {
+    pub id: i64,
+    pub pqa_meta_id: i64,
+    pub short_title: String,
+    pub full_answer_summary: String,
+    pub detailed_full_answer_summary: String,
+    pub full_answer_entry: Json<AnswerEntry>,
+    pub model_used: String,
+    pub version: String,
+    pub generated_at: DateTime<Utc>,
+}
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
@@ -56,6 +70,24 @@ pub enum Confidence {
     Confident,
     Likely,
     NotConfident,
+}
+
+#[derive(Hash, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, CompositeType)]
+pub struct DbQuestionEntry {
+    pub id: i64,
+    pub pqa_meta_id: i64,
+    pub short_title: String,
+    pub once_sentence_short_info_summary: String,
+    pub very_short_info_summary: String,
+    pub short_info_summary: String,
+    pub info_summary: String,
+    pub detailed_info_summary: String,
+    pub question_summary: String,
+    pub detailed_question_summary: String,
+    pub full_question_entry: Json<QuestionEntry>,
+    pub model_used: String,
+    pub version: String,
+    pub generated_at: DateTime<Utc>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
