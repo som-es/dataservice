@@ -1,9 +1,9 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 #[cfg(not(feature = "tesseract"))]
 use ocrs::OcrEngine;
 use somes_common_lib::Document;
-use somes_scraper::{AustriaScraper, Scraper, TextExtractor};
+use somes_scraper::TextExtractor;
 
 use crate::{extract_images_from_pdf, pdf};
 
@@ -90,7 +90,7 @@ pub async fn extract_text_from_documents_html_first<
         let mut try_extract_digital_pdf = false;
         match maybe_html {
             Some(html_doc) => {
-                if let Some(text) = extract_text_from_document(html_doc, ocr_engine.clone()).await {
+                if let Ok(text) = extract_text_from_document(html_doc, ocr_engine.clone()).await {
                     results.push(TextDocument {
                         document: html_doc.clone(),
                         text,
@@ -110,7 +110,7 @@ pub async fn extract_text_from_documents_html_first<
                 .iter()
                 .find(|x| x.document_type.as_deref() == Some("DigitalPDF"));
             if let Some(pdf_doc) = maybe_pdf {
-                if let Some(text) = extract_text_from_document(pdf_doc, ocr_engine.clone()).await {
+                if let Ok(text) = extract_text_from_document(pdf_doc, ocr_engine.clone()).await {
                     results.push(TextDocument {
                         document: pdf_doc.clone(),
                         text,
@@ -128,8 +128,7 @@ pub async fn extract_text_from_documents_html_first<
                 .iter()
                 .find(|x| x.document_type.as_deref() == Some("OriginalPDF"));
             if let Some(orig_pdf_doc) = maybe_orig_pdf {
-                if let Some(text) =
-                    extract_text_from_document(orig_pdf_doc, ocr_engine.clone()).await
+                if let Ok(text) = extract_text_from_document(orig_pdf_doc, ocr_engine.clone()).await
                 {
                     // println!("Extracted text from OriginalPDF document: {}", &text[..800.min(text.len())]);
                     results.push(TextDocument {
@@ -152,7 +151,7 @@ pub async fn extract_text_from_documents(
 ) -> Vec<TextDocument> {
     let mut results = Vec::with_capacity(documents.len());
     for document in documents {
-        let Some(text) = extract_text_from_document(document, ocr_engine.clone()).await else {
+        let Ok(text) = extract_text_from_document(document, ocr_engine.clone()).await else {
             continue;
         };
         results.push(TextDocument {
@@ -167,30 +166,40 @@ pub async fn extract_text_from_document(
     document: &Document,
     #[cfg(feature = "tesseract")] ocr_engine: Option<tesseract_rs::TesseractAPI>,
     #[cfg(not(feature = "tesseract"))] ocr_engine: Option<Arc<OcrEngine>>,
-) -> Option<String> {
-    let document_url = document.document_url.as_ref()?;
-    let document_type = document.document_type.as_ref()?;
+) -> crate::Result<String> {
+    let document_url = document
+        .document_url
+        .as_ref()
+        .ok_or_else(|| Box::new(crate::Error::Custom("no doc url".into())))?;
+    let document_type = document
+        .document_type
+        .as_ref()
+        .ok_or_else(|| Box::new(crate::Error::Custom("no doc type".into())))?;
     match document_type.as_str() {
-        "HTML" => extract_text_from_html_document(document_url.as_str()).await,
+        "HTML" => Ok(extract_text_from_html_document(document_url.as_str())
+            .await
+            .ok_or_else(|| Box::new(crate::Error::Custom("Could not extract HTML text".into())))?),
         "DigitalPDF" => match extract_text_from_pdf_document(document_url.as_str()).await {
-            Ok(text) => Some(text),
+            Ok(text) => Ok(text),
             Err(e) => {
                 log::error!("Cannot process document {document:?} because of {e:?}");
-                None
+                Err(e)
             }
         },
         "OriginalPDF" => {
             #[cfg(feature = "tesseract")]
             match extract_text_from_original_pdf_document_tesseract(
                 document_url.as_str(),
-                ocr_engine?,
+                ocr_engine.ok_or_else(|| {
+                    Box::new(crate::Error::Custom("no ocr engine available".into()))
+                })?,
             )
             .await
             {
-                Ok(text) => Some(text),
+                Ok(text) => Ok(text),
                 Err(e) => {
                     log::error!("Cannot process original document {document:?} because of {e:?}");
-                    None
+                    return Err(e);
                 }
             }
             #[cfg(not(feature = "tesseract"))]
@@ -203,7 +212,9 @@ pub async fn extract_text_from_document(
                 }
             }
         }
-        _ => None,
+        _ => Err(Box::new(crate::Error::Custom(
+            "unsupported doc type".into(),
+        ))),
     }
 }
 

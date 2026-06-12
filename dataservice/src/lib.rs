@@ -8,18 +8,18 @@ pub mod services;
 #[cfg(feature = "runner")]
 pub mod shutdown;
 
-use std::{cell::LazyCell, sync::Arc};
+use std::{cell::LazyCell, env::VarError, sync::Arc};
 
 use redis::aio::ConnectionManager;
 #[cfg(feature = "runner")]
 pub use services::*;
 
 #[cfg(feature = "runner")]
+pub use api_limiter::*;
+#[cfg(feature = "runner")]
 use chrono::{DateTime, Local, NaiveDate};
 #[cfg(feature = "runner")]
 pub use db::*;
-#[cfg(feature = "runner")]
-pub use api_limiter::*;
 #[cfg(feature = "runner")]
 pub use shutdown::*;
 use sqlx::{postgres::PgPoolOptions, PgPool};
@@ -53,8 +53,19 @@ pub const OCR_ENGINE: LazyCell<Option<Arc<ocrs::OcrEngine>>> = LazyCell::new(|| 
 });
 
 #[cfg(feature = "tesseract")]
+fn init_engine() -> crate::Result<tesseract_rs::TesseractAPI> {
+    Ok(::combx::init_ocr_engine_tesseract(&tessdata_dir()?)?)
+}
+
+#[cfg(feature = "tesseract")]
 pub const OCR_ENGINE: LazyCell<Option<tesseract_rs::TesseractAPI>> =
-    LazyCell::new(|| ::combx::init_ocr_engine_tesseract(&tessdata_dir()).ok());
+    LazyCell::new(|| match init_engine() {
+        Ok(engine) => Some(engine),
+        Err(e) => {
+            log::error!("Could not init tesseract engine => OCR actions disabled: {e:?}");
+            None
+        }
+    });
 
 use dotenvy_macro::dotenv;
 
@@ -80,8 +91,8 @@ pub fn model_dir() -> String {
     format!("{}/.dataservice", home)
 }
 
-pub fn tessdata_dir() -> String {
-    std::env::var("TESSDATA_DIR").expect("TESSDATA_DIR env var must be set")
+pub fn tessdata_dir() -> std::result::Result<String, VarError> {
+    std::env::var("TESSDATA_DIR")
 }
 
 pub const DATABASE_URL: &str = dotenv!("DATABASE_URL");
