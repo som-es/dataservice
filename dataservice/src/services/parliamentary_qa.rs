@@ -236,7 +236,7 @@ async fn handle_question(
 
                         if extracted_answer.abort_reason != AbortReason::None || extracted_answer.answer_entry.is_none() {
                             log::error!("(answer) No documents? provided in context for answer {}, documents: {:?}, abort reason: {:?}, skipping", answer_id, answer.documents, extracted_answer.abort_reason);
-                            Err(combx::Error::Custom("No documents provided in context for answer, skipping".to_string()))?;
+                            continue
                         }
                         let extracted_answer = extracted_answer.answer_entry.unwrap();
                         insert_answer_entry(
