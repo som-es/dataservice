@@ -328,14 +328,17 @@ pub async fn run_services(state: &State, config: Config) {
             cpu_ai_task_rx,
             16,
         )),
-        tokio::spawn(async {
-            #[cfg(feature = "vectordb")]
-            services::political_analysis::run_shut(
-                Shutdown::new(state.notify_shutdown.subscribe()),
-                pool.clone(),
-                llm_ai_task_tx.clone(),
-            )
-        })
+        tokio::spawn(services::political_analysis_service(
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            pool.clone(),
+            llm_ai_task_tx.clone(),
+        )),
+        tokio::spawn(services::parliamentary_qa_service(
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            app_state.clone(),
+            llm_ai_task_tx.clone(),
+            true,
+        ))
     )
     .0
     .unwrap();

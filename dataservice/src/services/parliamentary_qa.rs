@@ -297,7 +297,6 @@ pub async fn run_shut_latest_gp(
         tokio::select! {
             _ = shutdown.recv() => {
                 println!("shutting down");
-                // return ok?
                 break;
             }
             _ = async {
@@ -309,9 +308,6 @@ pub async fn run_shut_latest_gp(
                 }).await {
                     log::error!("Error in parliamentary qa service: {:?}", e);
                 }
-
-
-                // legis_init_once().await;
                 log::info!("parliamentary qa service sleeps for {sleep} seconds...");
                 tokio::time::sleep(tokio::time::Duration::from_secs(sleep)).await;
             } => {}
