@@ -15,8 +15,8 @@ use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{
     ai_task::AiTask,
-    enforce_ai_run,
     api_limiter::ApiLimiter,
+    enforce_ai_run,
     services::scrape_untill_success,
     should_update::StoredUpdatedAt,
     today,
@@ -95,7 +95,7 @@ pub async fn ministrial_proposal_once(
             new_ministrial_props.len()
         );
 
-        update_ministrial_proposals_in_db2(
+        if let Err(e) = update_ministrial_proposals_in_db2(
             pg_pool,
             new_ministrial_props,
             gov_officials.clone(),
@@ -103,7 +103,11 @@ pub async fn ministrial_proposal_once(
             only_latest,
         )
         .await
-        .unwrap();
+        {
+            log::error!(
+                "could not insert all ministerial proposals for gp: {gp}, because of: {e:?}"
+            );
+        }
         if only_latest {
             break;
         }
@@ -155,6 +159,290 @@ impl CompareHash for GovProposal {
     }
 }
 
+pub async fn update_or_insert_ministerial_proposal(
+    app_state: &AppState,
+    ai_task_tx: Option<Sender<AiTask>>,
+    gov_officials: Arc<HashMap<u64, Vec<GovOfficial>>>,
+    ministrial_prop: MinistrialProposal,
+    new_ministrial_prop_tx: Option<Sender<(i32, GovProposal)>>,
+) -> sqlx::Result<()> {
+    let pool = &app_state.pg_pool;
+    let mut gov_proposal =
+        GovProposal::from_scraped_type((), (ministrial_prop, gov_officials.clone())).await;
+
+    let (should_update, hash) = crate::should_update_by_hash(&gov_proposal, pool).await;
+    if !enforce_ai_run() && !should_update {
+        log::info!(
+            "No need to update ministrial proposal: {}/ME/{}",
+            gov_proposal.ministrial_proposal.gp,
+            gov_proposal.ministrial_proposal.inr
+        );
+        return Ok(());
+    }
+
+    log::info!(
+        "Processing ministrial proposal: {}/ME/{}",
+        gov_proposal.ministrial_proposal.gp,
+        gov_proposal.ministrial_proposal.inr
+    );
+    // log::info!("inserting single ministrial prop");
+
+    let start = Instant::now();
+    // Insert or update the ministrial proposal
+    let ministrial_prop_id = sqlx::query!(
+                r#"
+                INSERT INTO ministrial_proposals (
+                    title, inr, emphasis, description, ityp, gp, raw_data_created_at, raw_data_updated_at,
+                    due_to, ressort, ressort_shortform, legis_init_gp, legis_init_inr, legis_init_ityp, has_vote_result,
+                    updated_at, hash
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+                ON CONFLICT (inr, ityp, gp)
+                DO UPDATE SET
+                    title = EXCLUDED.title,
+                    emphasis = EXCLUDED.emphasis,
+                    description = EXCLUDED.description,
+                    raw_data_created_at = EXCLUDED.raw_data_created_at,
+                    raw_data_updated_at = EXCLUDED.raw_data_updated_at,
+                    due_to = EXCLUDED.due_to,
+                    ressort = EXCLUDED.ressort,
+                    ressort_shortform = EXCLUDED.ressort_shortform,
+                    legis_init_gp = EXCLUDED.legis_init_gp,
+                    legis_init_inr = EXCLUDED.legis_init_inr,
+                    legis_init_ityp = EXCLUDED.legis_init_ityp,
+                    has_vote_result = EXCLUDED.has_vote_result,
+                    updated_at = EXCLUDED.updated_at,
+                    hash = EXCLUDED.hash
+                RETURNING id
+                "#,
+                gov_proposal.ministrial_proposal.title,
+                gov_proposal.ministrial_proposal.inr,
+                gov_proposal.ministrial_proposal.emphasis,
+                gov_proposal.ministrial_proposal.description,
+                gov_proposal.ministrial_proposal.ityp,
+                gov_proposal.ministrial_proposal.gp,
+                gov_proposal.ministrial_proposal.raw_data_created_at,
+                gov_proposal.ministrial_proposal.raw_data_updated_at,
+                gov_proposal.ministrial_proposal.due_to,
+                gov_proposal.ministrial_proposal.ressort,
+                gov_proposal.ministrial_proposal.ressort_shortform,
+                gov_proposal.ministrial_proposal.legis_init_gp,
+                gov_proposal.ministrial_proposal.legis_init_inr,
+                gov_proposal.ministrial_proposal.legis_init_ityp,
+                gov_proposal.ministrial_proposal.has_vote_result,
+                crate::today_and_time(),
+                hash as i64
+            )
+            .fetch_one(pool)
+            .await?
+            .id;
+
+    gov_proposal.id = Some(ministrial_prop_id);
+
+    #[cfg(feature = "ai")]
+    if let Some(ai_task_tx) = &ai_task_tx {
+        use combx::today_and_time;
+
+        use crate::{ai_task::Priority, LATEST_GP};
+
+        let (priority, inner_gov_prop_mail_tx) =
+            if gov_proposal.ministrial_proposal.raw_data_created_at
+                >= today() - chrono::Duration::days(90)
+            {
+                (Priority::Highest, new_ministrial_prop_tx.clone())
+            } else if gov_proposal.ministrial_proposal.gp == LATEST_GP {
+                (Priority::High, None)
+            } else {
+                (Priority::Lowest, None)
+            };
+
+        let inner_gov_proposal = gov_proposal.clone();
+        let pool = pool.clone();
+        let redis_client = app_state.redis_client.clone();
+        let documents = gov_proposal.documents.clone();
+        let summarization_task = AiTask {
+            input: None,
+            priority,
+            task_id: crate::hash!(),
+            db_entry_id: ministrial_prop_id,
+            rerunnable: false,
+            created_at: today_and_time(),
+            task: Box::new(move |task_args| {
+                Box::pin(async move {
+                    let ai_summary =
+                        summarize_ministerial_proposal_documents(task_args, &documents).await?;
+
+                    let is_ai_summary_none = ai_summary.is_none();
+                    // not returning on None to still send gov prop
+                    let mut inner_gov_proposal = inner_gov_proposal;
+                    inner_gov_proposal.ai_summary = ai_summary;
+
+                    if let Some(gov_prop_mail_tx) = inner_gov_prop_mail_tx {
+                        check_and_send_ministrial_email(
+                            &pool,
+                            &inner_gov_proposal,
+                            ministrial_prop_id,
+                            &gov_prop_mail_tx,
+                        )
+                        .await;
+                    }
+
+                    if is_ai_summary_none {
+                        return Ok(());
+                    }
+
+                    let Some(mut redis_client) = redis_client else {
+                        return Ok(());
+                    };
+
+                    crate::notify_update_streamed(
+                        combx::Index::GovProposals,
+                        &inner_gov_proposal,
+                        &mut redis_client,
+                    )
+                    .await?;
+                    Ok(())
+                })
+            }),
+        };
+
+        log::info!(
+                    "Sending AI task for ministerial prop summarization: {ministrial_prop_id} / {}/ME/{} with priority {priority:?}",
+                    gov_proposal.ministrial_proposal.gp,
+                    gov_proposal.ministrial_proposal.inr
+                );
+
+        if let Err(e) = ai_task_tx.send(summarization_task).await {
+            log::error!("Could not send AI task for ministerial prop summarization: {e:?}");
+        }
+    }
+
+    if enforce_ai_run() && !should_update {
+        log::info!("No need to update further!");
+        return Ok(());
+    }
+
+    log::info!(
+        "Continue updating ministrial proposal related data for proposal {}/ME/{}",
+        gov_proposal.ministrial_proposal.gp,
+        gov_proposal.ministrial_proposal.inr
+    );
+
+    let mut tx = pool.begin().await?;
+
+    if let Err(e) = sqlx::query!(
+        "delete from ministrial_issuer where ministrial_proposal_id = $1",
+        ministrial_prop_id
+    )
+    .execute(&mut *tx)
+    .await
+    {
+        log::error!("Cannot delete all ministrial proposal issuers from {ministrial_prop_id} because of: {e:}");
+    }
+
+    for issuer_id in &gov_proposal.ministerial_issuers {
+        if let Err(e) = sqlx::query!(
+            r#"
+                    INSERT INTO ministrial_issuer (delegate_id, ministrial_proposal_id)
+                    VALUES ($1, $2)
+                    ON CONFLICT (ministrial_proposal_id, delegate_id)
+                    DO NOTHING
+                    "#,
+            *issuer_id,
+            ministrial_prop_id
+        )
+        .execute(&mut *tx)
+        .await
+        {
+            log::error!(
+                "Cannot insert ministrial issuer for {ministrial_prop_id} because of: {e:}"
+            );
+        }
+    }
+
+    if let Err(e) = tx.commit().await {
+        log::error!(
+            "Cannot commit transaction for ministrial issuer replacement: {ministrial_prop_id}, {e:?}"
+        );
+    }
+
+    #[cfg(not(feature = "ai"))]
+    if let Some(new_ministrial_prop_tx) = &new_ministrial_prop_tx {
+        check_and_send_ministrial_email(
+            pool,
+            &gov_proposal,
+            ministrial_prop_id,
+            new_ministrial_prop_tx,
+        )
+        .await;
+    }
+
+    let mut tx = pool.begin().await?;
+
+    if let Err(e) = insert_topics_generic_batch(
+        &mut tx,
+        &gov_proposal.topics,
+        ministrial_prop_id,
+        TopicType::Standard,
+        TableType::MinisterialProposal,
+    )
+    .await
+    {
+        log::error!("Error inserting topics for legis init {ministrial_prop_id}: {e:?}");
+    }
+
+    if let Err(e) = insert_topics_generic_batch(
+        &mut tx,
+        &gov_proposal.eurovoc_topics,
+        ministrial_prop_id,
+        TopicType::Eurovoc,
+        TableType::MinisterialProposal,
+    )
+    .await
+    {
+        log::error!("Error inserting eurovoc topics for legis init {ministrial_prop_id}: {e:?}");
+    }
+    if let Err(e) = insert_topics_generic_batch(
+        &mut tx,
+        &gov_proposal.other_keyword_topics,
+        ministrial_prop_id,
+        TopicType::OtherKeyword,
+        TableType::MinisterialProposal,
+    )
+    .await
+    {
+        log::error!(
+            "Error inserting other keyword topics for legis init {ministrial_prop_id}: {e:?}"
+        );
+    }
+
+    let mut tx = pool.begin().await?;
+    // Insert or update documents
+    if let Err(e) =
+        insert_ministerial_documents_batch(&mut tx, &gov_proposal.documents, ministrial_prop_id)
+            .await
+    {
+        log::error!("Error inserting documents for ministerial prop {ministrial_prop_id}: {e:?}");
+    }
+
+    tx.commit().await?;
+
+    if should_update {
+        if let Some(client) = &app_state.redis_client {
+            if let Err(e) = crate::notify_update_streamed(
+                combx::Index::GovProposals,
+                &gov_proposal,
+                &mut client.clone(),
+            )
+            .await
+            {
+                log::error!("Could not notify for gov prop update!: {e:?}");
+            }
+        }
+    }
+    Ok(())
+}
+
 pub async fn update_ministrial_proposals_in_db2(
     app_state: &AppState,
     ministrial_props: Vec<MinistrialProposal>,
@@ -176,288 +464,21 @@ pub async fn update_ministrial_proposals_in_db2(
         (None, None)
     };
 
-    for (i, ministrial_prop) in ministrial_props.into_iter().enumerate() {
+    for ministrial_prop in ministrial_props.into_iter() {
+        let gp = ministrial_prop.gp.clone();
+        let inr = ministrial_prop.inr;
+        if let Err(e) = update_or_insert_ministerial_proposal(
+            app_state,
+            ai_task_tx.clone(),
+            gov_officials.clone(),
+            ministrial_prop,
+            new_ministrial_prop_tx.clone(),
+        )
+        .await
+        {
+            log::error!("could not update or insert ministerial prop {gp}/{inr} because of {e:}",)
+        }
         // let should_update = crate::should_update_by_time(&ministrial_prop, pool).await;
-        let mut gov_proposal =
-            GovProposal::from_scraped_type((), (ministrial_prop, gov_officials.clone())).await;
-
-        let (should_update, hash) = crate::should_update_by_hash(&gov_proposal, pool).await;
-        if !enforce_ai_run() && !should_update {
-            log::info!(
-                "No need to update ministrial proposal: {}/ME/{}",
-                gov_proposal.ministrial_proposal.gp,
-                gov_proposal.ministrial_proposal.inr
-            );
-            continue;
-        }
-
-        log::info!(
-            "{i} Processing ministrial proposal: {}/ME/{}",
-            gov_proposal.ministrial_proposal.gp,
-            gov_proposal.ministrial_proposal.inr
-        );
-        // log::info!("inserting single ministrial prop");
-
-        let start = Instant::now();
-        // Insert or update the ministrial proposal
-        let ministrial_prop_id = sqlx::query!(
-            r#"
-            INSERT INTO ministrial_proposals (
-                title, inr, emphasis, description, ityp, gp, raw_data_created_at, raw_data_updated_at,
-                due_to, ressort, ressort_shortform, legis_init_gp, legis_init_inr, legis_init_ityp, has_vote_result,
-                updated_at, hash
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-            ON CONFLICT (inr, ityp, gp)
-            DO UPDATE SET
-                title = EXCLUDED.title,
-                emphasis = EXCLUDED.emphasis,
-                description = EXCLUDED.description,
-                raw_data_created_at = EXCLUDED.raw_data_created_at,
-                raw_data_updated_at = EXCLUDED.raw_data_updated_at,
-                due_to = EXCLUDED.due_to,
-                ressort = EXCLUDED.ressort,
-                ressort_shortform = EXCLUDED.ressort_shortform,
-                legis_init_gp = EXCLUDED.legis_init_gp,
-                legis_init_inr = EXCLUDED.legis_init_inr,
-                legis_init_ityp = EXCLUDED.legis_init_ityp,
-                has_vote_result = EXCLUDED.has_vote_result,
-                updated_at = EXCLUDED.updated_at,
-                hash = EXCLUDED.hash
-            RETURNING id
-            "#,
-            gov_proposal.ministrial_proposal.title,
-            gov_proposal.ministrial_proposal.inr,
-            gov_proposal.ministrial_proposal.emphasis,
-            gov_proposal.ministrial_proposal.description,
-            gov_proposal.ministrial_proposal.ityp,
-            gov_proposal.ministrial_proposal.gp,
-            gov_proposal.ministrial_proposal.raw_data_created_at,
-            gov_proposal.ministrial_proposal.raw_data_updated_at,
-            gov_proposal.ministrial_proposal.due_to,
-            gov_proposal.ministrial_proposal.ressort,
-            gov_proposal.ministrial_proposal.ressort_shortform,
-            gov_proposal.ministrial_proposal.legis_init_gp,
-            gov_proposal.ministrial_proposal.legis_init_inr,
-            gov_proposal.ministrial_proposal.legis_init_ityp,
-            gov_proposal.ministrial_proposal.has_vote_result,
-            crate::today_and_time(),
-            hash as i64
-        )
-        .fetch_one(pool)
-        .await?
-        .id;
-        if i % 10 == 0 {
-            log::info!("{i} insertion dur: {:?}", start.elapsed());
-        }
-
-        gov_proposal.id = Some(ministrial_prop_id);
-
-        #[cfg(feature = "ai")]
-        if let Some(ai_task_tx) = &ai_task_tx {
-            use combx::today_and_time;
-
-            use crate::{ai_task::Priority, LATEST_GP};
-
-            let (priority, inner_gov_prop_mail_tx) =
-                if gov_proposal.ministrial_proposal.raw_data_created_at
-                    >= today() - chrono::Duration::days(90)
-                {
-                    (Priority::Highest, new_ministrial_prop_tx.clone())
-                } else if gov_proposal.ministrial_proposal.gp == LATEST_GP {
-                    (Priority::High, None)
-                } else {
-                    (Priority::Lowest, None)
-                };
-
-            let inner_gov_proposal = gov_proposal.clone();
-            let pool = pool.clone();
-            let redis_client = app_state.redis_client.clone();
-            let documents = gov_proposal.documents.clone();
-            let summarization_task = AiTask {
-                input: None,
-                priority,
-                task_id: crate::hash!(),
-                db_entry_id: ministrial_prop_id,
-                rerunnable: false,
-                created_at: today_and_time(),
-                task: Box::new(move |task_args| {
-                    Box::pin(async move {
-                        let ai_summary =
-                            summarize_ministerial_proposal_documents(task_args, &documents).await?;
-
-                        let is_ai_summary_none = ai_summary.is_none();
-                        // not returning on None to still send gov prop
-                        let mut inner_gov_proposal = inner_gov_proposal;
-                        inner_gov_proposal.ai_summary = ai_summary;
-
-                        if let Some(gov_prop_mail_tx) = inner_gov_prop_mail_tx {
-                            check_and_send_ministrial_email(
-                                &pool,
-                                &inner_gov_proposal,
-                                ministrial_prop_id,
-                                &gov_prop_mail_tx,
-                            )
-                            .await;
-                        }
-
-                        if is_ai_summary_none {
-                            return Ok(());
-                        }
-
-                        let Some(mut redis_client) = redis_client else {
-                            return Ok(());
-                        };
-
-                        crate::notify_update_streamed(
-                            combx::Index::GovProposals,
-                            &inner_gov_proposal,
-                            &mut redis_client,
-                        )
-                        .await?;
-                        Ok(())
-                    })
-                }),
-            };
-
-            log::info!(
-                "Sending AI task for ministerial prop summarization: {ministrial_prop_id} / {}/ME/{} with priority {priority:?}",
-                gov_proposal.ministrial_proposal.gp,
-                gov_proposal.ministrial_proposal.inr
-            );
-
-            if let Err(e) = ai_task_tx.send(summarization_task).await {
-                log::error!("Could not send AI task for ministerial prop summarization: {e:?}");
-            }
-        }
-
-        if enforce_ai_run() && !should_update {
-            log::info!("No need to update further!");
-            continue;
-        }
-
-        log::info!(
-            "Continue updating ministrial proposal related data for proposal {}/ME/{}",
-            gov_proposal.ministrial_proposal.gp,
-            gov_proposal.ministrial_proposal.inr
-        );
-
-        let mut tx = pool.begin().await?;
-
-        if let Err(e) = sqlx::query!(
-            "delete from ministrial_issuer where ministrial_proposal_id = $1",
-            ministrial_prop_id
-        )
-        .execute(&mut *tx)
-        .await
-        {
-            log::error!("Cannot delete all ministrial proposal issuers from {ministrial_prop_id} because of: {e:}");
-        }
-
-        for issuer_id in &gov_proposal.ministerial_issuers {
-            if let Err(e) = sqlx::query!(
-                r#"
-                INSERT INTO ministrial_issuer (delegate_id, ministrial_proposal_id)
-                VALUES ($1, $2)
-                ON CONFLICT (ministrial_proposal_id, delegate_id)
-                DO NOTHING
-                "#,
-                *issuer_id,
-                ministrial_prop_id
-            )
-            .execute(&mut *tx)
-            .await
-            {
-                log::error!(
-                    "Cannot insert ministrial issuer for {ministrial_prop_id} because of: {e:}"
-                );
-            }
-        }
-
-        if let Err(e) = tx.commit().await {
-            log::error!(
-                "Cannot commit transaction for ministrial issuer replacement: {ministrial_prop_id}, {e:?}"
-            );
-        }
-
-        #[cfg(not(feature = "ai"))]
-        if let Some(new_ministrial_prop_tx) = &new_ministrial_prop_tx {
-            check_and_send_ministrial_email(
-                pool,
-                &gov_proposal,
-                ministrial_prop_id,
-                new_ministrial_prop_tx,
-            )
-            .await;
-        }
-
-        let mut tx = pool.begin().await?;
-
-        if let Err(e) = insert_topics_generic_batch(
-            &mut tx,
-            &gov_proposal.topics,
-            ministrial_prop_id,
-            TopicType::Standard,
-            TableType::MinisterialProposal,
-        )
-        .await
-        {
-            log::error!("Error inserting topics for legis init {ministrial_prop_id}: {e:?}");
-        }
-
-        if let Err(e) = insert_topics_generic_batch(
-            &mut tx,
-            &gov_proposal.eurovoc_topics,
-            ministrial_prop_id,
-            TopicType::Eurovoc,
-            TableType::MinisterialProposal,
-        )
-        .await
-        {
-            log::error!(
-                "Error inserting eurovoc topics for legis init {ministrial_prop_id}: {e:?}"
-            );
-        }
-        if let Err(e) = insert_topics_generic_batch(
-            &mut tx,
-            &gov_proposal.other_keyword_topics,
-            ministrial_prop_id,
-            TopicType::OtherKeyword,
-            TableType::MinisterialProposal,
-        )
-        .await
-        {
-            log::error!(
-                "Error inserting other keyword topics for legis init {ministrial_prop_id}: {e:?}"
-            );
-        }
-
-        let mut tx = pool.begin().await?;
-        // Insert or update documents
-        if let Err(e) =
-            insert_ministerial_documents_batch(&mut tx, &gov_proposal.documents, ministrial_prop_id)
-                .await
-        {
-            log::error!(
-                "Error inserting documents for ministerial prop {ministrial_prop_id}: {e:?}"
-            );
-        }
-
-        tx.commit().await?;
-
-        if should_update {
-            if let Some(client) = &app_state.redis_client {
-                if let Err(e) = crate::notify_update_streamed(
-                    combx::Index::GovProposals,
-                    &gov_proposal,
-                    &mut client.clone(),
-                )
-                .await
-                {
-                    log::error!("Could not notify for gov prop update!: {e:?}");
-                }
-            }
-        }
     }
 
     drop(new_ministrial_prop_tx);

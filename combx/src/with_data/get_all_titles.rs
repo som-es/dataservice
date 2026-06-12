@@ -2,11 +2,10 @@ use std::collections::HashSet;
 
 use sqlx::PgPool;
 
-pub async fn get_all_titles(pg: &PgPool) -> HashSet<String> {
+pub async fn get_all_titles(pg: &PgPool) -> sqlx::Result<HashSet<String>> {
     let names = sqlx::query!("select name from delegates where name like '%.%'")
         .fetch_all(pg)
-        .await
-        .unwrap();
+        .await?;
 
     let mut unique_titles = HashSet::<String>::new();
 
@@ -19,7 +18,7 @@ pub async fn get_all_titles(pg: &PgPool) -> HashSet<String> {
                 .map(ToString::to_string),
         );
     }
-    unique_titles
+    Ok(unique_titles)
 }
 
 #[cfg(test)]

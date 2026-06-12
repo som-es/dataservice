@@ -71,8 +71,7 @@ pub async fn match_all_named_votes(
     gp: &str,
 ) -> sqlx::Result<VotedByNameResult> {
     let active_delegates = active_delegates_at_date(pg, voted_on)
-        .await
-        .unwrap()
+        .await?
         .into_iter()
         .collect::<HashSet<_>>();
 

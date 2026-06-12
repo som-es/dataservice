@@ -53,9 +53,8 @@ pub async fn scrape_new_legis_inits(
         // let new_legis_init = new_legis_init.clone();
         let new_vote_result_tx = new_vote_result_tx.clone();
         let ai_task_tx = ai_task_tx.clone();
-        
+
         if handles.len() > max_tasks {
-            
             for handle in handles.drain(..max_tasks) {
                 if let Err(e) = handle.await {
                     if e.is_panic() {

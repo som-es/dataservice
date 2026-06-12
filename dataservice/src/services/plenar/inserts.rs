@@ -10,7 +10,7 @@ use somes_scraper::{
 
 use sqlx::{postgres::PgQueryResult, Executor, Postgres};
 
-use crate::{ApiLimiter, plenar::extract_interjection::extract_and_save_interjections};
+use crate::{plenar::extract_interjection::extract_and_save_interjections, ApiLimiter};
 
 pub async fn insert_plenar_speech_legis_init<'a>(
     pool: impl Executor<'a, Database = Postgres>,
@@ -289,12 +289,12 @@ pub async fn insert_plenar_speech<'a>(
         let updated_spoken_text = if disable_speech_text {
             None
         } else {
-            api_limiter.run(text_extractor
-                .speech_extraction_with_fit(
+            api_limiter
+                .run(text_extractor.speech_extraction_with_fit(
                     &text_html_url,
                     &plenar_speech.speech.delegate_display_name,
-                )
-            ).await
+                ))
+                .await
         };
         if updated_spoken_text.is_none() {
             warn!(

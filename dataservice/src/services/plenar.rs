@@ -1,6 +1,4 @@
-use crate::{
-    scrape_untill_success, should_update::StoredUpdatedAt, ApiLimiter, Shutdown, GPS,
-};
+use crate::{scrape_untill_success, should_update::StoredUpdatedAt, ApiLimiter, Shutdown, GPS};
 use somes_scraper::{plenar::PlenarInfo, AustriaScraper};
 use sqlx::PgPool;
 

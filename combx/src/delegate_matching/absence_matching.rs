@@ -29,16 +29,15 @@ pub async fn absence_matching<'a>(
     absences_names: &[String],
     plenar_date: NaiveDate,
     gp: String,
-) -> MatchResult {
+) -> sqlx::Result<MatchResult> {
     let active_delegates = active_delegates_at_date(pool, plenar_date)
-        .await
-        .unwrap()
+        .await?
         .into_iter()
         .collect::<HashSet<_>>();
 
     let absences_names_owned = absences_names.to_vec();
 
-    tokio::task::spawn_blocking(move || {
+    Ok(tokio::task::spawn_blocking(move || {
         let reversed_names = absences_names_owned
             .iter()
             .map(|x| x.as_str())
@@ -48,7 +47,7 @@ pub async fn absence_matching<'a>(
         match_delegate_names_with_delegate_ids(&active_delegates, &reversed_names, &gp, plenar_date)
     })
     .await
-    .expect("Blocking task panicked")
+    .expect("Blocking task panicked"))
 }
 
 #[cfg(test)]

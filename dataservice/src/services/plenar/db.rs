@@ -2,11 +2,16 @@ use combx::absence_matching;
 use somes_scraper::{plenar::PlenarInfo, AustriaScraper, Scraper};
 use sqlx::PgPool;
 
-use crate::{ApiLimiter, plenar::{
-    insert_call_to_order, insert_debate, insert_plenar_info, insert_plenar_speech,
-}};
+use crate::{
+    plenar::{insert_call_to_order, insert_debate, insert_plenar_info, insert_plenar_speech},
+    ApiLimiter,
+};
 
-pub async fn update_plenar_infos_in_db(plenar_info: &PlenarInfo, pg_pool: &PgPool, api_limiter: ApiLimiter) {
+pub async fn update_plenar_infos_in_db(
+    plenar_info: &PlenarInfo,
+    pg_pool: &PgPool,
+    api_limiter: ApiLimiter,
+) {
     log::info!("Updating plenar infos in database...");
 
     // disable with setting
@@ -86,33 +91,40 @@ pub async fn update_plenar_infos_in_db(plenar_info: &PlenarInfo, pg_pool: &PgPoo
     }
 
     if let Some(absences) = &plenar_info.absences {
-        let matching = absence_matching(
+        match absence_matching(
             pg_pool,
             absences,
             plenar_info.created_at.date_naive(),
             plenar_info.gp.clone(),
         )
-        .await;
-        for match_res in matching
-            .correctly_matched
-            .iter()
-            .chain(matching.lev_or_deep_split_matched.iter())
+        .await
         {
-            if let Err(e) = sqlx::query!(
-                    "
-                    INSERT INTO absences (lev, similiarity_score, searched_with, matched_with, delegate_id, manually_matched, plenary_session_id)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)
-                    ON CONFLICT (delegate_id, plenary_session_id)
-                    DO UPDATE SET
-                        lev = EXCLUDED.lev,
-                        similiarity_score = EXCLUDED.similiarity_score,
-                        searched_with = EXCLUDED.searched_with,
-                        matched_with = EXCLUDED.matched_with,
-                        manually_matched = EXCLUDED.manually_matched
-                    ", match_res.lev as i64, match_res.similiarity_score as i64, match_res.searched_with, match_res.matched_with, match_res.delegate_id as i32, match_res.manually_matched, plenar_id
-                ).execute(pg_pool).await {
-                    log::error!("Error inserting absene {e:?} for absence {match_res:?}");
+            Ok(matching) => {
+                for match_res in matching
+                    .correctly_matched
+                    .iter()
+                    .chain(matching.lev_or_deep_split_matched.iter())
+                {
+                    if let Err(e) = sqlx::query!(
+                        "
+                        INSERT INTO absences (lev, similiarity_score, searched_with, matched_with, delegate_id, manually_matched, plenary_session_id)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7)
+                        ON CONFLICT (delegate_id, plenary_session_id)
+                        DO UPDATE SET
+                            lev = EXCLUDED.lev,
+                            similiarity_score = EXCLUDED.similiarity_score,
+                            searched_with = EXCLUDED.searched_with,
+                            matched_with = EXCLUDED.matched_with,
+                            manually_matched = EXCLUDED.manually_matched
+                        ", match_res.lev as i64, match_res.similiarity_score as i64, match_res.searched_with, match_res.matched_with, match_res.delegate_id as i32, match_res.manually_matched, plenar_id
+                    ).execute(pg_pool).await {
+                        log::error!("Error inserting absene {e:?} for absence {match_res:?}");
+                    }
                 }
+            }
+            Err(e) => {
+                log::error!("could not match absences: {e:?}");
+            }
         }
     }
 }

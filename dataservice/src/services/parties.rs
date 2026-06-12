@@ -67,11 +67,7 @@ pub async fn parties_once(pg_pool: &PgPool, parliament_api_limiter: ApiLimiter) 
     }
 }
 
-pub async fn run_shut(
-    mut shutdown: Shutdown,
-    pg_pool: PgPool,
-    parliament_api_limiter: ApiLimiter,
-) {
+pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool, parliament_api_limiter: ApiLimiter) {
     let party_sleep = std::env::var("PARTY_SLEEP")
         .unwrap_or_else(|_| "10000".to_string())
         .parse()

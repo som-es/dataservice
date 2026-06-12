@@ -9,8 +9,8 @@ use somes_scraper::{delegates::DelegateScraper, AustriaScraper, Delegate, GovOff
 use sqlx::{postgres::PgQueryResult, query, PgPool};
 
 use crate::{
-    enforce_ai_run, services::scrape_untill_success, should_update_by_hash, AppState, CompareHash,
-    ApiLimiter, Shutdown,
+    enforce_ai_run, services::scrape_untill_success, should_update_by_hash, ApiLimiter, AppState,
+    CompareHash, Shutdown,
 };
 
 async fn scrape_new_delegates_bs(

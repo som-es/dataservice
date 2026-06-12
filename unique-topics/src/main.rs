@@ -433,7 +433,9 @@ fn place_ai_nodes(
         let secondary_index = anchors.get(1).map(|anchor| anchor.eurovoc_index);
         let group_key = (anchor.eurovoc_index, secondary_index);
         let group_order = *group_orders.entry(group_key).or_insert_with(|| {
-            let next_order = primary_group_counts.entry(anchor.eurovoc_index).or_default();
+            let next_order = primary_group_counts
+                .entry(anchor.eurovoc_index)
+                .or_default();
             let order = *next_order;
             *next_order += 1;
             order
@@ -448,8 +450,12 @@ fn place_ai_nodes(
         let similarity_radius = CLUSTER_MIN_RADIUS
             + (1.0 - normalized_similarity).powf(SIMILARITY_RADIUS_EXPONENT)
                 * (CLUSTER_MAX_RADIUS - CLUSTER_MIN_RADIUS);
-        let group_direction =
-            anchor_group_direction(primary_center, secondary_index, group_order, eurovoc_positions);
+        let group_direction = anchor_group_direction(
+            primary_center,
+            secondary_index,
+            group_order,
+            eurovoc_positions,
+        );
         let semantic_offset = (semantic_center - primary_center) * INTER_CLUSTER_PULL;
         let subgroup_offset = group_direction
             * (SUBCLUSTER_BASE_OFFSET + similarity_radius * SUBCLUSTER_RADIUS_FACTOR);
