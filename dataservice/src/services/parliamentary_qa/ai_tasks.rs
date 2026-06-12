@@ -18,7 +18,7 @@ pub async fn extract_question(
         .make_llm_request_with_schema::<QuestionEntryOutput>(
             input,
             format!(
-                r##"Bringe die folgende Anfrage in das angegebene JSON-Schema. Extrahiere ALLE Fragen.
+                r##"Bringe die folgende Anfrage in das angegebene maschinenlesbare JSON-Schema, daher musst du Felder nicht erklären. Extrahiere ALLE Fragen.
                 Klassifiziere das Thema anhand dieser Liste (max 10): {unique_topics:?}
                 Schreibe eine Zusammenfassung der Fragen in 'question_summary', und eine ausführlichere in 'detailed_question_summary'.
                 Die 'info' summaries sollen Zusammenfassungen über den Anlass der Fragestellung beinhalten.
@@ -70,16 +70,17 @@ pub async fn extract_answer(
         .make_llm_request_with_schema::<AnswerEntryOutput>(
             input,
             format!(
-                r##"Bringe die folgende Anfrage in das angegebene JSON-Schema.
+                r##"Bringe die folgende Anfrage in das angegebene maschinenlesbare JSON-Schema, daher musst du deine Felder nicht erklären.
                 Klassifiziere das Thema anhand dieser Liste (max 10): {unique_topics:?}
                 Schreibe eine Zusammenfassung der Fragen in 'question_summary', und eine ausführlichere in 'detailed_question_summary'.
                 Die 'full_answer' summaries sollen einen Überblick über die Fragebeantwortung geben.
-                Speichere immer eine Roh-Version, die 1:1 der Antwort entspricht in 'raw_answer'.
+                Speichere immer eine Roh-Version, die ausschließlich der gegebenen Antwort entspricht, in 'raw_answer' ab.
                 'short_title' muss einen sprechenden, user-facing Titel entsprechen.
                 Jede Antwort soll auch entsprechende Zusammenfassungen erhalten (Felder mit 'answer_summary').
                 Trage bei den Referenzen zu einer 'affected_question' immer die konkrete Identifikation ein.
                 Es können bei einer Antwort mehrere Referenzen betroffen sein 'answering_questions_references'.
-                Falls der Fragebeantworter andere parlamentarische Antworten für eine Fragebeantwortung referenziert, dann speichere diese in 'other_written_answer_refs' ab.
+                Falls der Fragebeantworter andere parlamentarische Antworten für eine Fragebeantwortung referenziert, dann speichere diese in 'other_written_answer_refs' ab. 'gp' soll dabei nur die römische Zahl beinhalten
+                Achte zwingend auf eine saubere und konsequente Trennung der gegebenen Fragen und Antworten und vermische sie nicht .
                 Beispiel-Fragen:
                     z.B. 3. Wird Rust dominieren?
                             a) wenn ja, gehe kurz auf die Vorteile ein
@@ -88,7 +89,7 @@ pub async fn extract_answer(
                                 ii) OOP languages
                 Antwort:
                     z.B. Ich kann Ihnen nur ausdrücklich sagen, dass Java einfach deutlich besser ist.
-                Daraus ergeben sich folgende Referenzen:
+                Daraus ergeben sich folgende Referenzen. Gib dabei immer den absoluten Pfad an!
                     z.B.
                         QuestionRef {{ question_assignment_confidence: VeryConfident, affected_question: [Number(3)] }}
                         QuestionRef {{ question_assignment_confidence: VeryConfident, affected_question: [Number(3), String('b')] }}
@@ -120,7 +121,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_parliamentary_question_extraction() {
-        let init_with_level = simple_logger::init_with_level(log::Level::Info).unwrap();
+        simple_logger::init_with_level(log::Level::Info).unwrap();
         let somai_client =
             SomAiClient::new("http://10.30.0.164:8000", "API_USER", "supersicher123!")
                 .await

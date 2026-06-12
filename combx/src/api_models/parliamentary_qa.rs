@@ -70,7 +70,8 @@ pub struct AnswerRef {
 )]
 pub struct QuestionRef {
     pub question_assignment_confidence: Confidence,
-    pub affected_question: Vec<Count>,
+    #[schemars(length(min = 1, max = 10))]
+    pub affected_question_absolute_path: Vec<Count>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
