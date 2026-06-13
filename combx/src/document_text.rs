@@ -9,6 +9,8 @@ use crate::{extract_images_from_pdf, pdf};
 
 #[cfg(not(feature = "tesseract"))]
 use crate::image_to_text;
+#[cfg(not(feature = "tesseract"))]
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct TextDocument {
@@ -203,12 +205,18 @@ pub async fn extract_text_from_document(
                 }
             }
             #[cfg(not(feature = "tesseract"))]
-            match extract_text_from_original_pdf_document(document_url.as_str(), ocr_engine?).await
+            match extract_text_from_original_pdf_document(
+                document_url.as_str(),
+                ocr_engine.ok_or_else(|| {
+                    Box::new(crate::Error::Custom("no ocr engine available".into()))
+                })?,
+            )
+            .await
             {
-                Ok(text) => Some(text),
+                Ok(text) => Ok(text),
                 Err(e) => {
                     log::error!("Cannot process original document {document:?} because of {e:?}");
-                    None
+                    return Err(e);
                 }
             }
         }

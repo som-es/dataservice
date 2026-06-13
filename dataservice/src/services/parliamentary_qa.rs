@@ -134,7 +134,7 @@ async fn handle_question(
             priority: crate::ai_task::Priority::Medium,
             task_id: crate::hash!(),
             db_entry_id: question_id as i32,
-            rerunnable: false,
+            rerunnable: true,
             created_at: combx::today_and_time(),
             task: Box::new(move |task_args| {
                 Box::pin(async move {

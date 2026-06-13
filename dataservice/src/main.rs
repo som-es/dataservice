@@ -40,7 +40,7 @@ async fn main() {
     }
 
     #[cfg(not(feature = "tesseract"))]
-    if let Err(e) = combx::download_ocr_models(&model_dir()).await {
+    if let Err(e) = combx::download_ocr_models(&dataservice::model_dir()).await {
         log::error!("Cannot download ocr models: {e:?}");
     }
 

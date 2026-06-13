@@ -13,6 +13,7 @@ pub enum Priority {
     Lowest = 0,
 }
 
+#[derive(Clone)]
 pub struct TaskArgs {
     pub db_entry_id: i32,
     pub ai_task_input: Option<String>,

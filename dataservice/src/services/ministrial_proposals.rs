@@ -268,6 +268,11 @@ pub async fn update_or_insert_ministerial_proposal(
             rerunnable: false,
             created_at: today_and_time(),
             task: Box::new(move |task_args| {
+                let inner_gov_proposal = inner_gov_proposal.clone();
+                let pool = pool.clone();
+                let redis_client = redis_client.clone();
+                let inner_gov_prop_mail_tx = inner_gov_prop_mail_tx.clone();
+                let documents = documents.clone();
                 Box::pin(async move {
                     let ai_summary =
                         summarize_ministerial_proposal_documents(task_args, &documents).await?;

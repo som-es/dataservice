@@ -110,6 +110,7 @@ pub async fn ai_tasks_service(
                 // -> this could also be fixed by storing ai task status in the db, but when to reattempt failed tasks then?
                 // -> task should determine if it should be reattempted or not based on its own logic
                 // mind that some tasks should be able to run multiple times (e.g. political stance analysis)
+                // -> higher prio, rerunnable tasks can still lead to starvation
                 if unique_tasks.contains(&(ai_task.db_entry_id, ai_task.task_id)) {
                     continue;
                 }

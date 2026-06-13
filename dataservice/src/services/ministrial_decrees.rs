@@ -229,6 +229,10 @@ pub async fn insert_ministrial_decree(
                 rerunnable: false,
                 created_at: today_and_time().naive_local(),
                 task: Box::new(move |task_args| {
+                    let inner_decree = inner_decree.clone();
+                    let pool = pool.clone();
+                    let documents = documents.clone();
+                    let new_decree_tx = new_decree_tx.clone();
                     Box::pin(async move {
                         use crate::ministrial_decrees::ai_tasks::summarize_decrees_documents;
 
