@@ -207,7 +207,9 @@ pub async fn insert_ministrial_decree(
 
         #[cfg(feature = "ai")]
         {
-            use crate::{ai_task::Priority, today_and_time, LATEST_GP};
+            use tokio::time::Instant;
+
+            use crate::{ai_task::Priority, LATEST_GP};
 
             let (priority, new_decree_tx) =
                 if decree.publication_date >= (today() - chrono::Duration::days(90)).date_naive() {
@@ -224,10 +226,11 @@ pub async fn insert_ministrial_decree(
             let summarization_task = AiTask {
                 input: None,
                 priority,
+                score: priority.weight(),
                 task_id: crate::hash!(),
                 db_entry_id: decree_id,
-                rerunnable: false,
-                created_at: today_and_time().naive_local(),
+                rerunnable: true,
+                created_at: Instant::now(),
                 task: Box::new(move |task_args| {
                     let inner_decree = inner_decree.clone();
                     let pool = pool.clone();

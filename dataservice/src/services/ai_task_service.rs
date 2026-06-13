@@ -4,13 +4,15 @@ use somai_client::SomAiClient;
 use sqlx::PgPool;
 use tokio::{
     sync::{mpsc::Receiver, RwLock},
-    time::sleep,
+    time::{sleep, Instant},
 };
 
 use crate::{
     ai_task::{AiTask, TaskArgs},
     Shutdown,
 };
+
+const REBUILD_HEAP_SECS: u64 = 10;
 
 pub async fn ai_task_handler(
     tasks: Arc<RwLock<BinaryHeap<AiTask>>>,
@@ -98,6 +100,8 @@ pub async fn ai_tasks_service(
 
         let mut unique_tasks = HashSet::new();
 
+        let mut now = Instant::now();
+
         while !shutdown.is_shutdown() {
             let Ok(ai_task) = ai_task_rx.try_recv() else {
                 sleep(std::time::Duration::from_millis(4)).await;
@@ -111,6 +115,8 @@ pub async fn ai_tasks_service(
                 // -> task should determine if it should be reattempted or not based on its own logic
                 // mind that some tasks should be able to run multiple times (e.g. political stance analysis)
                 // -> higher prio, rerunnable tasks can still lead to starvation
+
+                use std::time::Duration;
                 if unique_tasks.contains(&(ai_task.db_entry_id, ai_task.task_id)) {
                     continue;
                 }
@@ -119,13 +125,28 @@ pub async fn ai_tasks_service(
                 }
                 let mut task_queue_guard = task_queue.write().await;
                 task_queue_guard.push(ai_task);
+
+                if now.elapsed() >= Duration::from_secs(REBUILD_HEAP_SECS) {
+                    let heap = std::mem::replace(&mut *task_queue_guard, BinaryHeap::default());
+                    *task_queue_guard = rebuild_with_aging(heap, Instant::now());
+                    now = Instant::now();
+                }
             }
         }
     }
 }
 
+fn rebuild_with_aging(heap: BinaryHeap<AiTask>, now: Instant) -> BinaryHeap<AiTask> {
+    let mut items = heap.into_vec();
+    for t in &mut items {
+        t.score = t.effective_score(now);
+    }
+    BinaryHeap::from(items)
+}
 #[cfg(test)]
 mod tests {
+    use tokio::time::Instant;
+
     use crate::{ai_task::Priority, today_and_time};
 
     #[tokio::test]
@@ -137,10 +158,11 @@ mod tests {
         let task1 = AiTask {
             input: None,
             priority: Priority::High,
+            score: Priority::High.weight(),
             task_id: 1,
             db_entry_id: 1,
             rerunnable: false,
-            created_at: today_and_time().naive_local(),
+            created_at: Instant::now(),
             task: Box::new(|_args| {
                 Box::pin(async move { Ok(()) })
                     as Pin<Box<dyn Future<Output = combx::Result<()>> + Send>>
@@ -150,10 +172,11 @@ mod tests {
         let task2 = AiTask {
             input: None,
             priority: Priority::Low,
+            score: Priority::Low.weight(),
             task_id: 2,
             db_entry_id: 2,
             rerunnable: false,
-            created_at: today_and_time().naive_local(),
+            created_at: Instant::now(),
             task: Box::new(|_args| {
                 Box::pin(async move { Ok(()) })
                     as Pin<Box<dyn Future<Output = combx::Result<()>> + Send>>

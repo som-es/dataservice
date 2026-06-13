@@ -130,6 +130,7 @@ pub async fn update_or_insert_legis_init_in_db(
     if let Some(ai_task_tx) = &ai_task_tx {
         if db_legis_init.is_voteable_on {
             use combx::today_and_time;
+            use tokio::time::Instant;
 
             use crate::{ai_task::Priority, LATEST_GP};
 
@@ -159,10 +160,11 @@ pub async fn update_or_insert_legis_init_in_db(
             let summarization_task = AiTask {
                 input: None,
                 priority,
+                score: priority.weight(),
                 task_id: crate::hash!(),
                 db_entry_id: legis_init_id,
-                rerunnable: false,
-                created_at: today_and_time(),
+                rerunnable: true,
+                created_at: Instant::now(),
                 task: Box::new(move |task_args| {
                     Box::pin(async move {
                         use crate::legislative_initiatives::summarize_legis_init_documents;

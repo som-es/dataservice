@@ -12,7 +12,10 @@ use somes_scraper::{
     ParliamentaryQAEntity, QaType,
 };
 use sqlx::{types::Json, PgPool};
-use tokio::sync::{mpsc::Sender, Semaphore};
+use tokio::{
+    sync::{mpsc::Sender, Semaphore},
+    time::Instant,
+};
 
 use crate::{ai_task::AiTask, enforce_ai_run, today_and_time, AppState, Shutdown, StoredUpdatedAt};
 
@@ -132,10 +135,11 @@ async fn handle_question(
         .send(AiTask {
             input: None,
             priority: crate::ai_task::Priority::Medium,
+            score: crate::ai_task::Priority::Medium.weight(),
             task_id: crate::hash!(),
             db_entry_id: question_id as i32,
             rerunnable: true,
-            created_at: combx::today_and_time(),
+            created_at: Instant::now(),
             task: Box::new(move |task_args| {
                 Box::pin(async move {
                     use combx::QuestionEntry;
