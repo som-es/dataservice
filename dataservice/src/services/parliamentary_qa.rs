@@ -19,6 +19,8 @@ use tokio::{
 
 use crate::{ai_task::AiTask, enforce_ai_run, today_and_time, AppState, Shutdown, StoredUpdatedAt};
 
+const LATEST_PQA_DAYS: u64 = 65;
+
 async fn pqa_pipeline(
     app_state: AppState,
     ai_task_tx: Sender<AiTask>,
@@ -29,7 +31,7 @@ async fn pqa_pipeline(
     if only_latest {
         scraper.scrape_info.date_start = today_and_time()
             .naive_local()
-            .checked_sub_days(Days::new(30));
+            .checked_sub_days(Days::new(LATEST_PQA_DAYS));
     }
 
     let scraper = Arc::new(scraper);
