@@ -2,7 +2,7 @@
 members = [
     "combx",
     "dataservice",
-    "getdata", "somai-client", "unique-topics",
+    "getdata", "somai-client", "unique-topics", "update-notify",
 ]
 
 [workspace.dependencies]

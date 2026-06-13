@@ -15,7 +15,7 @@ pub enum Priority {
 
 impl Priority {
     pub fn weight(&self) -> u64 {
-        (*self) as u8 as u64 * 100
+        (*self) as u8 as u64 * 655
     }
 }
 

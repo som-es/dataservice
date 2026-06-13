@@ -1,5 +1,4 @@
 use somes_scraper::{parties::Parties, AustriaScraper, Party};
-use tokio::runtime::Handle;
 
 use crate::{scrape_untill_success, ApiLimiter, Shutdown, GPS};
 
@@ -11,7 +10,7 @@ pub async fn update_parties_in_db2(pool: &PgPool, parties: &[Party], gp: &str) {
             r#"
             INSERT INTO parties (name, fraction, color, code, gp)
             VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (code, gp, name) 
+            ON CONFLICT (code, gp, name)
             DO UPDATE SET
                 fraction = EXCLUDED.fraction,
                 code = EXCLUDED.code,

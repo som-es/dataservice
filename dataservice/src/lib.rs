@@ -8,7 +8,7 @@ pub mod services;
 #[cfg(feature = "runner")]
 pub mod shutdown;
 
-use std::{cell::LazyCell, env::VarError, sync::Arc};
+use std::{cell::LazyCell, env::VarError};
 
 use redis::aio::ConnectionManager;
 #[cfg(feature = "runner")]
@@ -17,7 +17,7 @@ pub use services::*;
 #[cfg(feature = "runner")]
 pub use api_limiter::*;
 #[cfg(feature = "runner")]
-use chrono::{DateTime, Local, NaiveDate};
+use chrono::{DateTime, Local};
 #[cfg(feature = "runner")]
 pub use db::*;
 #[cfg(feature = "runner")]
@@ -29,6 +29,9 @@ pub mod location_hasher;
 pub mod ai_task;
 pub mod email;
 pub mod notify_registrars;
+
+pub use update_notify::*;
+
 pub mod should_update;
 pub use should_update::*;
 
