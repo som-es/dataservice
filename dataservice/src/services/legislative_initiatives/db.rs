@@ -129,7 +129,6 @@ pub async fn update_or_insert_legis_init_in_db(
     #[cfg(feature = "ai")]
     if let Some(ai_task_tx) = &ai_task_tx {
         if db_legis_init.is_voteable_on {
-            use combx::today_and_time;
             use tokio::time::Instant;
 
             use crate::{ai_task::Priority, LATEST_GP};

@@ -2,14 +2,58 @@ use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use somes_common_lib::Document;
 use somes_macro::CompositeType;
-use sqlx::{prelude::FromRow, types::Json};
+use sqlx::{
+    prelude::{FromRow, Type},
+    types::Json,
+};
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
-use crate::AbortReason;
+use crate::{AbortReason, DbReference};
 
-#[derive(Hash, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, CompositeType)]
+// #[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Type, Hash, CompositeType)]
+pub struct ParliamentRawData {
+    pub gp: String,
+    pub ityp: String,
+    pub inr: i32,
+    pub issuer_ids: Vec<i64>,
+    pub receiver_ids: Vec<i64>,
+    pub documents: Vec<Document>,
+    pub topics: Vec<String>,
+    pub eurovoc_topics: Vec<String>,
+    pub other_keyword_topics: Vec<String>,
+    pub description: Option<String>,
+    pub title: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub raw_data_created_at: DateTime<Utc>,
+    pub raw_data_updated_at: DateTime<Utc>,
+}
+// #[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Type, Hash, CompositeType)]
+pub struct ParliamentQuestion {
+    pub data: ParliamentRawData,
+    pub ai_question: DbQuestionEntry,
+    pub refs: Vec<DbReference>,
+}
+// #[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Type, Hash, CompositeType)]
+pub struct ParliamentAnswer {
+    pub data: ParliamentRawData,
+    pub ai_answer: DbAnswerEntry,
+    pub refs: Vec<DbReference>,
+}
+// #[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Type, Hash, CompositeType)]
+pub struct ParliamentQuestionResponse {
+    pub question: ParliamentQuestion,
+    pub answer: Vec<ParliamentAnswer>,
+}
+
+#[derive(Hash, Debug, Deserialize, PartialEq, Serialize, Type, Clone, FromRow, CompositeType)]
 pub struct DbAnswerEntry {
     pub id: i64,
     pub pqa_meta_id: i64,
@@ -83,7 +127,7 @@ pub enum Confidence {
     NotConfident,
 }
 
-#[derive(Hash, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, CompositeType)]
+#[derive(Hash, Debug, Deserialize, PartialEq, Serialize, Type, Clone, FromRow, CompositeType)]
 pub struct DbQuestionEntry {
     pub id: i64,
     pub pqa_meta_id: i64,
