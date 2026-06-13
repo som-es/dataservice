@@ -36,21 +36,21 @@ pub struct ParliamentRawData {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Type, Hash, CompositeType)]
 pub struct ParliamentQuestion {
     pub data: ParliamentRawData,
-    pub ai_question: DbQuestionEntry,
+    pub ai_question: Option<DbQuestionEntry>,
     pub refs: Vec<DbReference>,
 }
 // #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Type, Hash, CompositeType)]
 pub struct ParliamentAnswer {
     pub data: ParliamentRawData,
-    pub ai_answer: DbAnswerEntry,
+    pub ai_answer: Option<DbAnswerEntry>,
     pub refs: Vec<DbReference>,
 }
 // #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Type, Hash, CompositeType)]
 pub struct ParliamentQuestionResponse {
-    pub question: ParliamentQuestion,
-    pub answer: Vec<ParliamentAnswer>,
+    pub question: Option<ParliamentQuestion>,
+    pub answer: Option<Vec<ParliamentAnswer>>,
 }
 
 #[derive(Hash, Debug, Deserialize, PartialEq, Serialize, Type, Clone, FromRow, CompositeType)]

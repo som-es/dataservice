@@ -17,7 +17,9 @@ use tokio::{
     time::Instant,
 };
 
-use crate::{ai_task::AiTask, enforce_ai_run, today_and_time, AppState, Shutdown, StoredUpdatedAt};
+use crate::{
+    ai_task::AiTask, enforce_ai_run, today_and_time, AppState, Shutdown, StoredUpdatedAt, GPS,
+};
 
 const LATEST_PQA_DAYS: u64 = 65;
 
@@ -26,60 +28,68 @@ async fn pqa_pipeline(
     ai_task_tx: Sender<AiTask>,
     only_latest: bool,
 ) -> crate::Result<()> {
-    let mut scraper = AustriaScraper::default();
+    for gp in GPS {
+        let mut scraper = AustriaScraper::default();
+        scraper.scrape_info.gp = vec![gp.into()];
 
-    if only_latest {
-        scraper.scrape_info.date_start = today_and_time()
-            .naive_local()
-            .checked_sub_days(Days::new(LATEST_PQA_DAYS));
-    }
+        if only_latest {
+            scraper.scrape_info.date_start = today_and_time()
+                .naive_local()
+                .checked_sub_days(Days::new(LATEST_PQA_DAYS));
+        }
 
-    let scraper = Arc::new(scraper);
+        let scraper = Arc::new(scraper);
 
-    let paths = app_state
-        .parliament_api_limiter
-        .run(scraper.post_parliamentary_qa_payload(true))
-        .await?;
-    let wait = Arc::new(Semaphore::new(16));
-    let mut handles = vec![];
-    for path in scraper.proposal_paths(paths)? {
-        let scraper = scraper.clone();
-        let app_state = app_state.clone();
-        let wait = wait.clone();
-        let ai_task_tx = ai_task_tx.clone();
-        handles.push(tokio::task::spawn(async move {
-            let Ok(qa) = app_state
-                .parliament_api_limiter
-                .run(scraper.get_parliamentary_qa(&path))
-                .await
-            else {
-                log::error!("could not fetch parliamentary qa entry");
-                return Ok(());
-            };
+        let paths = app_state
+            .parliament_api_limiter
+            .run(scraper.post_parliamentary_qa_payload(true))
+            .await?;
+        let wait = Arc::new(Semaphore::new(16));
+        let mut handles = vec![];
+        for path in scraper.proposal_paths(paths)? {
+            let scraper = scraper.clone();
+            let app_state = app_state.clone();
+            let wait = wait.clone();
+            let ai_task_tx = ai_task_tx.clone();
+            handles.push(tokio::task::spawn(async move {
+                let Ok(qa) = app_state
+                    .parliament_api_limiter
+                    .run(scraper.get_parliamentary_qa(&path))
+                    .await
+                else {
+                    log::error!("could not fetch parliamentary qa entry");
+                    return Ok(());
+                };
 
-            let permit = wait.acquire().await.unwrap();
+                let permit = wait.acquire().await.unwrap();
 
-            if qa.qa_type == QaType::Question {
-                if let Err(e) = handle_question(app_state, ai_task_tx, qa, &scraper).await {
-                    log::error!("could not await handle (inner error): {e:?}");
+                if qa.qa_type == QaType::Question {
+                    if let Err(e) =
+                        handle_question(app_state, ai_task_tx, qa, &scraper, only_latest).await
+                    {
+                        log::error!("could not await handle (inner error): {e:?}");
+                    }
+                }
+
+                drop(permit);
+                crate::Result::Ok(())
+            }));
+        }
+
+        for handle in handles {
+            match handle.await {
+                Ok(info) => {
+                    if let Err(e) = info {
+                        log::error!("could not await handle (inner error): {e:?}");
+                    }
+                }
+                Err(e) => {
+                    log::error!("could not await handle (panic?): {e:?}");
                 }
             }
-
-            drop(permit);
-            crate::Result::Ok(())
-        }));
-    }
-
-    for handle in handles {
-        match handle.await {
-            Ok(info) => {
-                if let Err(e) = info {
-                    log::error!("could not await handle (inner error): {e:?}");
-                }
-            }
-            Err(e) => {
-                log::error!("could not await handle (panic?): {e:?}");
-            }
+        }
+        if only_latest {
+            break;
         }
     }
     Ok(())
@@ -107,6 +117,7 @@ async fn handle_question(
     ai_task_tx: Sender<AiTask>,
     question: ParliamentaryQAEntity,
     scraper: &AustriaScraper,
+    is_latest: bool,
 ) -> crate::Result<()> {
     let should_update = crate::should_update_by_time(&question, &app_state.pg_pool).await;
 
@@ -133,7 +144,8 @@ async fn handle_question(
         answers.push((insert_pqa(&app_state.pg_pool, &answer).await?, answer));
     }
 
-    ai_task_tx
+    if is_latest {
+        ai_task_tx
         .send(AiTask {
             input: None,
             priority: crate::ai_task::Priority::Medium,
@@ -262,6 +274,7 @@ async fn handle_question(
             }),
         })
         .await?;
+    }
     Ok(())
 }
 
