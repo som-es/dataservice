@@ -133,7 +133,7 @@ pub fn today_and_time() -> chrono::DateTime<Local> {
 pub async fn connect_pg() -> PgPool {
     PgPoolOptions::new()
         .max_connections(90)
-        .min_connections(10)
+        .min_connections(5)
         .connect(DATABASE_URL)
         .await
         .unwrap()
