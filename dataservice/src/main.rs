@@ -338,6 +338,12 @@ pub async fn run_services(state: &State, config: Config) {
             app_state.clone(),
             llm_ai_task_tx.clone(),
             true,
+        )),
+        tokio::spawn(services::parliamentary_qa_service(
+            Shutdown::new(state.notify_shutdown.subscribe()),
+            app_state.clone(),
+            llm_ai_task_tx.clone(),
+            false,
         ))
     )
     .0
