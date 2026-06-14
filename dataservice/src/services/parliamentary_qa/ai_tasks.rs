@@ -2,7 +2,7 @@ use combx::{
     document_text::{combine_texts, extract_text_from_documents_html_first},
     AnswerEntryOutput, QuestionEntryOutput,
 };
-use combx::{AbortReason, DbQuestionEntry};
+use combx::{AbortReason, DbAiInquiry};
 use somai_client::SomAiClient;
 use somes_common_lib::Document;
 use somes_scraper::ParliamentaryQAEntity;
@@ -22,7 +22,7 @@ pub async fn summarize_and_extract_qa(
 ) -> crate::Result<()> {
     use combx::QuestionEntry;
     let question_entry = sqlx::query_as!(
-        DbQuestionEntry,
+        DbAiInquiry,
         r#"
             select
                 id,
@@ -40,7 +40,7 @@ pub async fn summarize_and_extract_qa(
                 version,
                 generated_at
             from pqa_questions
-            where id = $1
+            where pqa_meta_id = $1
                             "#,
         question_id
     )
@@ -70,14 +70,14 @@ pub async fn summarize_and_extract_qa(
             )
             .await?;
             if extracted_question.abort_reason != AbortReason::None
-                || extracted_question.question_entry.is_none()
+                || extracted_question.complete_inquiry_extraction.is_none()
             {
                 log::error!("(question) No documents? provided in context for question {}, documents: {:?}, abort reason: {:?}, skipping", question_id, question.documents, extracted_question.abort_reason);
                 Err(combx::Error::Custom(
                     "No documents provided in context for question, skipping".to_string(),
                 ))?;
             }
-            let extracted_question = extracted_question.question_entry.unwrap();
+            let extracted_question = extracted_question.complete_inquiry_extraction.unwrap();
 
             insert_question_entry(
                 &task_args.pg_pool,
@@ -126,6 +126,7 @@ pub async fn summarize_and_extract_qa(
             continue;
         }
         let extracted_answer = extracted_answer.answer_entry.unwrap();
+        log::info!("extracted answer: {}", extracted_answer.short_title);
         insert_answer_entry(
             &task_args.pg_pool,
             *answer_id,
@@ -150,7 +151,7 @@ pub async fn extract_question(
         .make_llm_request_with_schema::<QuestionEntryOutput>(
             input,
             format!(
-                r##"Bringe die folgende Anfrage in das angegebene maschinenlesbare JSON-Schema, daher musst du Felder nicht erklären. Extrahiere ALLE Fragen.
+                r##"Bringe die folgende Anfrage in das angegebene maschinenlesbare JSON-Schema (complete_inquiry_extraction), daher musst du Felder nicht erklären. Extrahiere ALLE Fragen.
                 Klassifiziere das Thema anhand dieser Liste (max 10): {unique_topics:?}
                 Schreibe eine Zusammenfassung der Fragen in 'question_summary', und eine ausführlichere in 'detailed_question_summary'.
                 Die 'info' summaries sollen Zusammenfassungen über den Anlass der Fragestellung beinhalten.
@@ -166,11 +167,36 @@ pub async fn extract_question(
 
                 Jede einzelne Frage oder Punkt wird anschließend in `questions' eingetragen.
                     z.B. Question {{ raw_question: 'OOP languages', nth_level: [Number(3), String('b'), String('ii')] }} // beachte wie 'nth_level' eingetragen wurde - auschließlich eine konkrete Ebenen-Referenz!
+                        Im JSON sieht die Referenz vom oberen Beispiel wie folgt aus: (
+                        "nth_level": [
+                                {{
+                                    "kind": "Number",
+                                    "value": 3
+                                }},
+                                {{
+                                    "kind": "String",
+                                    "value": "b"
+                                }},
+                                {{
+                                    "kind": "String",
+                                    "value": "ii"
+                                }}
+                                ],
+                            )
                         Question {{ raw_question: 'Wird Rust dominieren?', nth_level: [Number(3)] }}
-                        Question {{ raw_question: 'wenn nein, erwähne kurz die Alternativen', nth_level: [Number(3), String('b')] }}
+                        Question {{ raw_question: 'wenn nein, erwähne kurz die Alternativen', nth_level: [Number(3), String('b')] }} // Siehst du? In `nth_level` werden AUSCHLIESSLICH die Referenz-Ebenen eingetragen und KEINE Fragen oder Teile davon!
                     und so weiter ...
+                Nächstes Beispiel
+                z.B. 42. Kann es sein, dass LLMs für diese Aufgabe nicht so toll sind?
+                    wenn ja, was sind die Gründe?
 
-                Falls KEINE relevanten Dokumente, die die Anfrage beschreiben, im Kontext gefunden wurden: Setze `question_entry` auf null und `abort_reason` auf 'NoDocumentsProvidedInContext'. Ansonsten, falls `question_entry` NICHT null ist, ist `abort_reason` 'None'.
+                Darauf folgt => (Rust-Darstellung, du musst mit JSON-Format arbeiten)
+                    Question {{ raw_question: 'Kann es sein, dass LLMs für diese Aufgabe nicht so toll sind?', nth_level: [Number(42)] }}
+                    Question {{ raw_question: 'wenn ja, was sind die Gründe?', nth_level: [Number(42), String('a')] }}
+
+                Falls KEINE relevanten Dokumente, die die Anfrage beschreiben, im Kontext gefunden wurden: Setze `complete_inquiry_extraction` auf null und `abort_reason` auf 'NoDocumentsProvidedInContext'.
+                `complete_inquiry_extraction` muss deine Extraktion enthalten!
+                Ansonsten, falls `complete_inquiry_extraction` NICHT null ist - das ist der Normalfall - , ist `abort_reason` 'None'.
                 "##
             ),
             None,
@@ -211,7 +237,7 @@ pub async fn extract_answer(
                 Klassifiziere das Thema anhand dieser Liste (max 10): {unique_topics:?}
                 Schreibe eine Zusammenfassung der Fragen in 'question_summary', und eine ausführlichere in 'detailed_question_summary'.
                 Die 'full_answer' summaries sollen einen Überblick über die Fragebeantwortung geben.
-                Speichere immer eine Roh-Version, die ausschließlich der gegebenen Antwort entspricht, in 'raw_answer' ab.
+                Speichere immer eine Roh-Version, die ausschließlich der gegebenen Antwort entspricht, in 'raw_answer' ab. Übernehme dabei alles GENAU VOM VORLIEGENDEN DOKUMENT. Kürze nichts! Sei NICHT faul!
                 'short_title' muss einen sprechenden, user-facing Titel entsprechen.
                 Jede Antwort soll auch entsprechende Zusammenfassungen erhalten (Felder mit 'answer_summary').
                 Trage bei den Referenzen zu einer 'affected_question' immer die konkrete Identifikation ein.
@@ -231,8 +257,26 @@ pub async fn extract_answer(
                         QuestionRef {{ question_assignment_confidence: VeryConfident, affected_question: [Number(3)] }}
                         QuestionRef {{ question_assignment_confidence: VeryConfident, affected_question: [Number(3), String('b')] }}
                         QuestionRef {{ question_assignment_confidence: VeryConfident, affected_question: [Number(3), String('b'), String('ii')] }}
+                        Im JSON sieht die Referenz vom oberen Beispiel wie folgt aus: (
+                    "affected_question": [
+                            {{
+                                "kind": "Number",
+                                "value": 3
+                            }},
+                            {{
+                                "kind": "String",
+                                "value": "b"
+                            }},
+                            {{
+                                "kind": "String",
+                                "value": "ii"
+                            }}
+                            ],
+                        )
 
-                Falls KEINE relevanten Dokumente, die die Antwort beschreiben, im Kontext gefunden wurden: Setze `answer_entry` auf null und `abort_reason` auf 'NoDocumentsProvidedInContext'. Ansonsten, falls `answer_entry` NICHT null ist, ist `abort_reason` 'None'.
+                Falls KEINE relevanten Dokumente, die die Antwort beschreiben, im Kontext gefunden wurden: Setze `answer_entry` auf null und `abort_reason` auf 'NoDocumentsProvidedInContext'.
+                Ansonsten, falls `answer_entry` NICHT null ist - das ist der Normalfall - ist `abort_reason` 'None'.
+                `answer_entry` muss zwingend deine Extraktion enthalten!
                 Hier sind die tasächlichen Fragen aus der Anfrage, die du den Antworten zuordnen musst:
                 {questions:?}
                 "##

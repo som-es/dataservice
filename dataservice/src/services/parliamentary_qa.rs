@@ -231,16 +231,59 @@ pub async fn run_shut_latest_gp(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use somai_client::SomAiClient;
     use somes_scraper::{parliamentary_questions::ParliamentaryQAScraper, AustriaScraper};
+
+    use crate::{
+        ai_task::TaskArgs,
+        connect_pg2,
+        parliamentary_qa::{insert_qa_and_collect_answers, summarize_and_extract_qa},
+        ApiLimiter, AppState,
+    };
 
     #[tokio::test]
     async fn test_xxviii_j_5810() {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
         let scraper = AustriaScraper::default();
         // XXVIII/J/5810
         let pqa = scraper
             .get_parliamentary_qa("/gegenstand/XXVIII/J/5810")
             .await
             .unwrap();
-        // pqa
+
+        dbg!(&pqa);
+        let pg = connect_pg2().await;
+
+        let somai_client =
+            SomAiClient::new("http://10.30.0.164:8000", "API_USER", "supersicher123!")
+                .await
+                .unwrap();
+        let api_limiter = ApiLimiter::new(1);
+
+        let app_state = AppState {
+            pg_pool: pg.clone(),
+            redis_client: None,
+            parliament_api_limiter: api_limiter,
+            cpu_task_tx: None,
+        };
+
+        let task_args = TaskArgs {
+            db_entry_id: 0,
+            ai_task_input: None,
+            pg_pool: pg.clone(),
+            som_ai_client: Arc::new(somai_client),
+        };
+
+        let (question_id, answers) = insert_qa_and_collect_answers(app_state, &pqa, &scraper)
+            .await
+            .unwrap();
+
+        log::info!("question_id: {question_id}, answers: {answers:?}");
+
+        summarize_and_extract_qa(task_args, &pqa, question_id, &answers)
+            .await
+            .unwrap();
     }
 }

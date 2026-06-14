@@ -35,10 +35,10 @@ pub struct ParliamentRawData {
 }
 // #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Type, Hash, CompositeType)]
-#[sqlx(type_name = "parliament_question")]
-pub struct ParliamentQuestion {
+#[sqlx(type_name = "parliament_inquiry")]
+pub struct ParliamentInquiry {
     pub data: ParliamentRawData,
-    pub ai_question: Option<DbQuestionEntry>,
+    pub ai_question: Option<DbAiInquiry>,
     pub refs: Vec<DbReference>,
 }
 // #[cfg_attr(feature = "utoipa", derive(ToSchema))]
@@ -51,9 +51,9 @@ pub struct ParliamentAnswer {
 }
 // #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Type, Hash, CompositeType)]
-#[sqlx(type_name = "parliament_question_response")]
-pub struct ParliamentQuestionResponse {
-    pub question: Option<ParliamentQuestion>,
+#[sqlx(type_name = "parliament_inquiry_response")]
+pub struct ParliamentInquiryResponse {
+    pub question: Option<ParliamentInquiry>,
     pub answer: Option<Vec<ParliamentAnswer>>,
 }
 
@@ -133,8 +133,8 @@ pub enum Confidence {
 }
 
 #[derive(Hash, Debug, Deserialize, PartialEq, Serialize, Type, Clone, FromRow, CompositeType)]
-#[sqlx(type_name = "db_question_entry")]
-pub struct DbQuestionEntry {
+#[sqlx(type_name = "db_ai_inquiry")]
+pub struct DbAiInquiry {
     pub id: i64,
     pub pqa_meta_id: i64,
     pub short_title: String,
@@ -156,7 +156,7 @@ pub struct DbQuestionEntry {
     JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone, FromRow, CompositeType,
 )]
 pub struct QuestionEntryOutput {
-    pub question_entry: Option<QuestionEntry>,
+    pub complete_inquiry_extraction: Option<QuestionEntry>,
     pub abort_reason: AbortReason,
 }
 
