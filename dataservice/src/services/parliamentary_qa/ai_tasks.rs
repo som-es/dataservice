@@ -25,7 +25,7 @@ pub async fn extract_question(
                 'short_title' muss einen sprechenden, user-facing Titel entsprechen.
                 Die verwendeten Quellen müssen in `info_sources_urls` verwendet werden.
                 Die rohe Frage muss in 'raw_question' abgespeichert werden. Entferne dabei allerdings die Numerierung am Anfang. Achte darauf, dass alle Fragen verarbeitet werden.
-                Trage bei 'nth_level' immer die konkrete Identifikation einer Frage ein. Das Array darf nicht leer sein! Dabei ist die erste Ebene immer eine numerische Numerierung, weitere Ebenen vom folgenden Beispiel ableiten.
+                Trage bei 'nth_level' immer die konkrete Identifikation der Ebenen-Referenz einer Frage ein. NIEMALS die Frage selbst, sondern nur die Referenz! Das Array darf nicht leer sein! Dabei ist die erste Ebene immer eine numerische Numerierung, weitere Ebenen vom folgenden Beispiel ableiten.
                     z.B. 3. Wird Rust dominieren?
                             a) wenn ja, gehe kurz auf die Vorteile ein
                             b) wenn nein, erwähne kurz die Alternativen
@@ -33,7 +33,12 @@ pub async fn extract_question(
                             ii) OOP languages
 
                 Jede einzelne Frage oder Punkt wird anschließend in `questions' eingetragen.
-                    z.B. Question {{ raw_question: 'OOP languages', nth_level: [Number(3), String('b'), String('ii')] }} // beachte wie 'nth_level' eingetragen wurde!
+                    z.B. Question {{ raw_question: 'OOP languages', nth_level: [Number(3), String('b'), String('ii')] }} // beachte wie 'nth_level' eingetragen wurde - auschließlich eine konkrete Ebenen-Referenz!
+                        Question {{ raw_question: 'Wird Rust dominieren?', nth_level: [Number(3)] }}
+                        Question {{ raw_question: 'wenn nein, erwähne kurz die Alternativen', nth_level: [Number(3), String('b')] }}
+                    und so weiter ...
+
+                Falls KEINE relevanten Dokumente, die die Anfrage beschreiben, im Kontext gefunden wurden: Setze `question_entry` auf null und `abort_reason` auf 'NoDocumentsProvidedInContext'. Ansonsten, falls `question_entry` NICHT null ist, ist `abort_reason` 'None'.
                 "##
             ),
             None,
@@ -70,7 +75,7 @@ pub async fn extract_answer(
         .make_llm_request_with_schema::<AnswerEntryOutput>(
             input,
             format!(
-                r##"Bringe die folgende Anfrage in das angegebene maschinenlesbare JSON-Schema, daher musst du deine Felder nicht erklären.
+                r##"Bringe die folgende Anfragebeantwortung in das angegebene maschinenlesbare JSON-Schema, daher musst du deine Felder nicht erklären.
                 Klassifiziere das Thema anhand dieser Liste (max 10): {unique_topics:?}
                 Schreibe eine Zusammenfassung der Fragen in 'question_summary', und eine ausführlichere in 'detailed_question_summary'.
                 Die 'full_answer' summaries sollen einen Überblick über die Fragebeantwortung geben.
@@ -95,7 +100,8 @@ pub async fn extract_answer(
                         QuestionRef {{ question_assignment_confidence: VeryConfident, affected_question: [Number(3), String('b')] }}
                         QuestionRef {{ question_assignment_confidence: VeryConfident, affected_question: [Number(3), String('b'), String('ii')] }}
 
-                Hier sind die tasächlichen Fragen, die du den Antworten zuordnen musst:
+                Falls KEINE relevanten Dokumente, die die Antwort beschreiben, im Kontext gefunden wurden: Setze `answer_entry` auf null und `abort_reason` auf 'NoDocumentsProvidedInContext'. Ansonsten, falls `answer_entry` NICHT null ist, ist `abort_reason` 'None'.
+                Hier sind die tasächlichen Fragen aus der Anfrage, die du den Antworten zuordnen musst:
                 {questions:?}
                 "##
             ),
@@ -130,7 +136,8 @@ mod tests {
         let docs = vec![Document {
             title: Some("Anfrage".into()),
             document_url: Some(
-                "https://www.parlament.gv.at/dokument/XXVII/J/14815/fname_1550801.pdf".into(),
+                // "https://www.parlament.gv.at/dokument/XXVII/J/14815/fname_1550801.pdf".into(),
+                "https://www.parlament.gv.at/dokument/XXVIII/J/5810/fname_1756270.pdf".into(),
             ),
             document_type: Some("DigitalPDF".into()), // using a DigitalPDF here because HTML list items are not counted accordingly (all html tags get simply removed)
         }];
