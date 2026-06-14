@@ -15,6 +15,7 @@ use crate::{AbortReason, DbReference};
 
 // #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Type, Hash, CompositeType)]
+#[sqlx(type_name = "parliament_raw_data")]
 pub struct ParliamentRawData {
     pub gp: String,
     pub ityp: String,
@@ -34,6 +35,7 @@ pub struct ParliamentRawData {
 }
 // #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Type, Hash, CompositeType)]
+#[sqlx(type_name = "parliament_question")]
 pub struct ParliamentQuestion {
     pub data: ParliamentRawData,
     pub ai_question: Option<DbQuestionEntry>,
@@ -41,6 +43,7 @@ pub struct ParliamentQuestion {
 }
 // #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Type, Hash, CompositeType)]
+#[sqlx(type_name = "parliament_answer")]
 pub struct ParliamentAnswer {
     pub data: ParliamentRawData,
     pub ai_answer: Option<DbAnswerEntry>,
@@ -48,12 +51,14 @@ pub struct ParliamentAnswer {
 }
 // #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Type, Hash, CompositeType)]
+#[sqlx(type_name = "parliament_question_response")]
 pub struct ParliamentQuestionResponse {
     pub question: Option<ParliamentQuestion>,
     pub answer: Option<Vec<ParliamentAnswer>>,
 }
 
 #[derive(Hash, Debug, Deserialize, PartialEq, Serialize, Type, Clone, FromRow, CompositeType)]
+#[sqlx(type_name = "db_answer_entry")]
 pub struct DbAnswerEntry {
     pub id: i64,
     pub pqa_meta_id: i64,
@@ -128,6 +133,7 @@ pub enum Confidence {
 }
 
 #[derive(Hash, Debug, Deserialize, PartialEq, Serialize, Type, Clone, FromRow, CompositeType)]
+#[sqlx(type_name = "db_question_entry")]
 pub struct DbQuestionEntry {
     pub id: i64,
     pub pqa_meta_id: i64,
