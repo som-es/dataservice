@@ -2,10 +2,142 @@ use combx::{
     document_text::{combine_texts, extract_text_from_documents_html_first},
     AnswerEntryOutput, QuestionEntryOutput,
 };
+use combx::{AbortReason, DbQuestionEntry};
 use somai_client::SomAiClient;
 use somes_common_lib::Document;
+use somes_scraper::ParliamentaryQAEntity;
+use sqlx::types::Json;
 
-use crate::OCR_ENGINE;
+use crate::{
+    ai_task::TaskArgs,
+    parliamentary_qa::{insert_answer_entry, insert_question_entry},
+    OCR_ENGINE,
+};
+
+pub async fn summarize_and_extract_qa(
+    task_args: TaskArgs,
+    question: &ParliamentaryQAEntity,
+    question_id: i64,
+    answers: &[(i64, ParliamentaryQAEntity)],
+) -> crate::Result<()> {
+    use combx::QuestionEntry;
+    let question_entry = sqlx::query_as!(
+        DbQuestionEntry,
+        r#"
+            select
+                id,
+                pqa_meta_id,
+                short_title,
+                once_sentence_short_info_summary,
+                very_short_info_summary,
+                short_info_summary,
+                info_summary,
+                detailed_info_summary,
+                question_summary,
+                detailed_question_summary,
+                full_question_entry as "full_question_entry: Json<QuestionEntry>",
+                model_used,
+                version,
+                generated_at
+            from pqa_questions
+            where id = $1
+                            "#,
+        question_id
+    )
+    .fetch_optional(&task_args.pg_pool)
+    .await?;
+
+    let unique_topics =
+        sqlx::query_scalar!("select topic_name as topic from unique_eurovoc_topics order by topic")
+            .fetch_all(&task_args.pg_pool)
+            .await?;
+
+    let questions = match question_entry {
+        Some(entry) => entry.full_question_entry.questions.clone(),
+        None => {
+            let extracted_question = extract_question(
+                &task_args.som_ai_client,
+                &unique_topics,
+                &question
+                    .documents
+                    .iter()
+                    .map(|doc| somes_common_lib::Document {
+                        title: Some(doc.title.clone()),
+                        document_url: Some(doc.link.clone()),
+                        document_type: Some(doc.ftype.to_string()),
+                    })
+                    .collect::<Vec<_>>(),
+            )
+            .await?;
+            if extracted_question.abort_reason != AbortReason::None
+                || extracted_question.question_entry.is_none()
+            {
+                log::error!("(question) No documents? provided in context for question {}, documents: {:?}, abort reason: {:?}, skipping", question_id, question.documents, extracted_question.abort_reason);
+                Err(combx::Error::Custom(
+                    "No documents provided in context for question, skipping".to_string(),
+                ))?;
+            }
+            let extracted_question = extracted_question.question_entry.unwrap();
+
+            insert_question_entry(
+                &task_args.pg_pool,
+                question_id,
+                &extracted_question,
+                &task_args.som_ai_client.get_model().await?.result,
+                "1",
+            )
+            .await?;
+            extracted_question.questions
+        }
+    };
+
+    let mut extracted_answers = vec![];
+    for (answer_id, answer) in answers {
+        if sqlx::query_scalar!(
+            "select id from pqa_answers where pqa_meta_id = $1",
+            answer_id
+        )
+        .fetch_optional(&task_args.pg_pool)
+        .await?
+        .is_some()
+        {
+            continue;
+        }
+        let extracted_answer = extract_answer(
+            &task_args.som_ai_client,
+            &unique_topics,
+            &answer
+                .documents
+                .iter()
+                .map(|doc| somes_common_lib::Document {
+                    title: Some(doc.title.clone()),
+                    document_url: Some(doc.link.clone()),
+                    document_type: Some(doc.ftype.to_string()),
+                })
+                .collect::<Vec<_>>(),
+            &questions,
+        )
+        .await?;
+
+        if extracted_answer.abort_reason != AbortReason::None
+            || extracted_answer.answer_entry.is_none()
+        {
+            log::error!("(answer) No documents? provided in context for answer {}, documents: {:?}, abort reason: {:?}, skipping", answer_id, answer.documents, extracted_answer.abort_reason);
+            continue;
+        }
+        let extracted_answer = extracted_answer.answer_entry.unwrap();
+        insert_answer_entry(
+            &task_args.pg_pool,
+            *answer_id,
+            &extracted_answer,
+            &task_args.som_ai_client.get_model().await?.result,
+            "1",
+        )
+        .await?;
+        extracted_answers.push(extracted_answer);
+    }
+    Ok(())
+}
 
 pub async fn extract_question(
     somai_client: &SomAiClient,

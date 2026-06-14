@@ -5,13 +5,12 @@ pub use inserts::*;
 use std::sync::Arc;
 mod patch_references;
 use chrono::Days;
-use combx::{AbortReason, DbQuestionEntry};
 pub use patch_references::*;
 use somes_scraper::{
     parliamentary_questions::ParliamentaryQAScraper, proposals::ProposalScraper, AustriaScraper,
     ParliamentaryQAEntity, QaType,
 };
-use sqlx::{types::Json, PgPool};
+use sqlx::PgPool;
 use tokio::{
     sync::{mpsc::Sender, Semaphore},
     time::Instant,
@@ -125,8 +124,36 @@ async fn handle_question(
         return Ok(());
     }
 
-    let question_id = insert_pqa(&app_state.pg_pool, &question).await?;
+    let (question_id, answers) =
+        insert_qa_and_collect_answers(app_state, &question, scraper).await?;
 
+    if is_latest {
+        ai_task_tx
+            .send(AiTask {
+                input: None,
+                priority: crate::ai_task::Priority::Medium,
+                score: crate::ai_task::Priority::Medium.weight(),
+                task_id: crate::hash!(),
+                db_entry_id: question_id as i32,
+                rerunnable: true,
+                created_at: Instant::now(),
+                task: Box::new(move |task_args| {
+                    Box::pin(async move {
+                        summarize_and_extract_qa(task_args, &question, question_id, &answers).await
+                    })
+                }),
+            })
+            .await?;
+    }
+    Ok(())
+}
+
+async fn insert_qa_and_collect_answers(
+    app_state: AppState,
+    question: &ParliamentaryQAEntity,
+    scraper: &AustriaScraper,
+) -> crate::Result<(i64, Vec<(i64, ParliamentaryQAEntity)>)> {
+    let question_id = insert_pqa(&app_state.pg_pool, question).await?;
     let mut answers = vec![];
     for reference in question
         .references
@@ -143,139 +170,7 @@ async fn handle_question(
 
         answers.push((insert_pqa(&app_state.pg_pool, &answer).await?, answer));
     }
-
-    if is_latest {
-        ai_task_tx
-        .send(AiTask {
-            input: None,
-            priority: crate::ai_task::Priority::Medium,
-            score: crate::ai_task::Priority::Medium.weight(),
-            task_id: crate::hash!(),
-            db_entry_id: question_id as i32,
-            rerunnable: true,
-            created_at: Instant::now(),
-            task: Box::new(move |task_args| {
-                Box::pin(async move {
-                    use combx::QuestionEntry;
-                    let question_entry = sqlx::query_as!(
-                        DbQuestionEntry,
-                        r#"
-                        select
-                            id,
-                            pqa_meta_id,
-                            short_title,
-                            once_sentence_short_info_summary,
-                            very_short_info_summary,
-                            short_info_summary,
-                            info_summary,
-                            detailed_info_summary,
-                            question_summary,
-                            detailed_question_summary,
-                            full_question_entry as "full_question_entry: Json<QuestionEntry>",
-                            model_used,
-                            version,
-                            generated_at
-                        from pqa_questions
-                        where id = $1
-                        "#,
-                        question_id
-                    )
-                    .fetch_optional(&task_args.pg_pool)
-                    .await?;
-
-                    let unique_topics = sqlx::query_scalar!(
-                        "select topic_name as topic from unique_eurovoc_topics order by topic"
-                    )
-                    .fetch_all(&task_args.pg_pool)
-                    .await?;
-
-                    let questions = match question_entry {
-                        Some(entry) => entry.full_question_entry.questions.clone(),
-                        None => {
-                            let extracted_question = extract_question(
-                                &task_args.som_ai_client,
-                                &unique_topics,
-                                &question
-                                    .documents
-                                    .iter()
-                                    .map(|doc| somes_common_lib::Document {
-                                        title: Some(doc.title.clone()),
-                                        document_url: Some(doc.link.clone()),
-                                        document_type: Some(doc.ftype.to_string()),
-                                    })
-                                    .collect::<Vec<_>>(),
-                            )
-                            .await?;
-                            if extracted_question.abort_reason != AbortReason::None || extracted_question.question_entry.is_none() {
-                                log::error!("(question) No documents? provided in context for question {}, documents: {:?}, abort reason: {:?}, skipping", question_id, question.documents, extracted_question.abort_reason);
-                                Err(combx::Error::Custom("No documents provided in context for question, skipping".to_string()))?;
-                            }
-                            let extracted_question = extracted_question.question_entry.unwrap();
-
-                            insert_question_entry(
-                                &task_args.pg_pool,
-                                question_id,
-                                &extracted_question,
-                                &task_args.som_ai_client.get_model().await?.result,
-                                "1",
-                            )
-                            .await?;
-                            extracted_question.questions
-                        }
-                    };
-
-                    let mut extracted_answers = vec![];
-                    for (answer_id, answer) in answers {
-                        if sqlx::query_scalar!(
-                            "select id from pqa_answers where pqa_meta_id = $1",
-                            answer_id
-                        )
-                        .fetch_optional(&task_args.pg_pool)
-                        .await?
-                        .is_some()
-                        {
-                            continue;
-                        }
-                        let extracted_answer = extract_answer(
-                            &task_args.som_ai_client,
-                            &unique_topics,
-                            &answer
-                                .documents
-                                .iter()
-                                .map(|doc| somes_common_lib::Document {
-                                    title: Some(doc.title.clone()),
-                                    document_url: Some(doc.link.clone()),
-                                    document_type: Some(doc.ftype.to_string()),
-                                })
-                                .collect::<Vec<_>>(),
-                            &questions,
-                        )
-                        .await?;
-
-                        if extracted_answer.abort_reason != AbortReason::None || extracted_answer.answer_entry.is_none() {
-                            log::error!("(answer) No documents? provided in context for answer {}, documents: {:?}, abort reason: {:?}, skipping", answer_id, answer.documents, extracted_answer.abort_reason);
-                            continue
-                        }
-                        let extracted_answer = extracted_answer.answer_entry.unwrap();
-                        insert_answer_entry(
-                            &task_args.pg_pool,
-                            answer_id,
-                            &extracted_answer,
-                            &task_args.som_ai_client.get_model().await?.result,
-                            "1",
-                        )
-                        .await?;
-                        extracted_answers.push(extracted_answer);
-                    }
-
-                    //
-                    Ok(())
-                })
-            }),
-        })
-        .await?;
-    }
-    Ok(())
+    Ok((question_id, answers))
 }
 
 pub async fn run_shut_latest_gp(
@@ -331,5 +226,21 @@ pub async fn run_shut_latest_gp(
                 tokio::time::sleep(tokio::time::Duration::from_secs(sleep)).await;
             } => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use somes_scraper::{parliamentary_questions::ParliamentaryQAScraper, AustriaScraper};
+
+    #[tokio::test]
+    async fn test_xxviii_j_5810() {
+        let scraper = AustriaScraper::default();
+        // XXVIII/J/5810
+        let pqa = scraper
+            .get_parliamentary_qa("/gegenstand/XXVIII/J/5810")
+            .await
+            .unwrap();
+        // pqa
     }
 }
