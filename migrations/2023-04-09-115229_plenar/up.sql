@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS plenar_infos (
     title varchar(255) not null,
     description varchar(255) not null,
     legislative_period varchar(9) not null,
+    absences_doc_url text,
     UNIQUE (inr, legislative_period)
 );
 
@@ -48,10 +49,10 @@ CREATE TABLE IF NOT EXISTS plenar_speeches (
 );
 
 -- index is too large for speech text
-DO $$ 
+DO $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.table_constraints 
-               WHERE constraint_name = 'plenar_speeches_spoken_text_key' 
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints
+               WHERE constraint_name = 'plenar_speeches_spoken_text_key'
                AND table_name = 'plenar_speeches') THEN
         ALTER TABLE plenar_speeches DROP CONSTRAINT plenar_speeches_spoken_text_key;
     END IF;

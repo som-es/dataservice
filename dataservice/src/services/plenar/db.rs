@@ -93,7 +93,7 @@ pub async fn update_plenar_infos_in_db(
     if let Some(absences) = &plenar_info.absences {
         match absence_matching(
             pg_pool,
-            absences,
+            &absences.absences,
             plenar_info.created_at.date_naive(),
             plenar_info.gp.clone(),
         )

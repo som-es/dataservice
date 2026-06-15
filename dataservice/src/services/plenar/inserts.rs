@@ -53,8 +53,8 @@ pub async fn insert_plenar_info<'a>(
 ) -> Result<i32, sqlx::Error> {
     let result = sqlx::query!(
         r#"
-        INSERT INTO plenar_infos (inr, title, description, raw_data_created_at, legislative_period, raw_data_updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO plenar_infos (inr, title, description, raw_data_created_at, legislative_period, raw_data_updated_at, absences_doc_url)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (inr, legislative_period)
         DO UPDATE SET
             title = EXCLUDED.title,
@@ -69,7 +69,8 @@ pub async fn insert_plenar_info<'a>(
         plenar_info.description,
         plenar_info.created_at,
         plenar_info.gp,
-        plenar_info.updated_at
+        plenar_info.updated_at,
+        plenar_info.absences.as_ref().map(|absences| &absences.source_document.link)
     )
     .fetch_one(pool)
     .await?;
