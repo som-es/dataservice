@@ -61,7 +61,8 @@ pub async fn insert_plenar_info<'a>(
             description = EXCLUDED.description,
             raw_data_updated_at = EXCLUDED.raw_data_updated_at,
             raw_data_created_at = EXCLUDED.raw_data_created_at,
-            updated_at = now()
+            updated_at = now(),
+            absences_doc_url = EXCLUDED.absences_doc_url
         RETURNING id
         "#,
         plenar_info.inr as i32,
