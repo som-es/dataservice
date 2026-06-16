@@ -177,11 +177,16 @@ pub struct DbContact {
 )]
 // #[diesel(primary_key(id))]
 pub struct DbPlenar {
+    pub id: i32,
     pub inr: i32,
     pub title: String,
     pub description: String,
-    pub add_date: NaiveDateTime,
+    pub raw_data_created_at: DateTime<Utc>,
+    pub raw_data_updated_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
     pub legislative_period: String,
+    pub absences_doc_url: Option<String>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
