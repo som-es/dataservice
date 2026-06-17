@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use chrono::Months;
 use somes_scraper::{
     dates::{DateFilter, DateRange, Dates, Gremium, ParliamentDate, Terminart},
@@ -38,13 +40,41 @@ pub async fn save_dates(
         .await
         .unwrap_or_default();
     // println!("{only_latest}, len: {}", dates.len());
+    let mut grouped_dates: HashMap<Option<String>, Vec<ParliamentDate>> = HashMap::new();
     for date in dates {
-        save_date(date, pg_pool).await?
+        grouped_dates
+            .entry(date.year_month.clone())
+            .or_default()
+            .push(date);
     }
+    for (year_month, date_group) in grouped_dates {
+        let mut tx = pg_pool.begin().await?;
+
+        sqlx::query!(
+            "DELETE FROM dates_topics WHERE date_id IN (SELECT id FROM dates WHERE year_month = $1)",
+            year_month
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        sqlx::query!("DELETE FROM dates WHERE year_month = $1", year_month)
+            .execute(&mut *tx)
+            .await?;
+
+        for date in date_group {
+            save_date(date, &mut *tx).await?;
+        }
+
+        tx.commit().await?;
+    }
+
     Ok(())
 }
 
-pub async fn save_date(date: ParliamentDate, pg_pool: &PgPool) -> crate::Result<()> {
+pub async fn save_date(
+    date: ParliamentDate,
+    executor: &mut sqlx::PgConnection,
+) -> crate::Result<()> {
     let rec = sqlx::query!(
         r#"
         INSERT INTO dates (
@@ -108,14 +138,10 @@ pub async fn save_date(date: ParliamentDate, pg_pool: &PgPool) -> crate::Result<
         date.day_with_date,
         date.tour_format
     )
-    .fetch_one(pg_pool)
+    .fetch_one(&mut *executor) // Pass the borrowed executor here
     .await?;
 
     let date_id = rec.id;
-
-    // sqlx::query!("DELETE FROM dates_topics WHERE date_id = $1", date_id)
-    //     .execute(&mut tx)
-    //     .await?;
 
     for topic in &date.topics {
         sqlx::query!(
@@ -127,7 +153,7 @@ pub async fn save_date(date: ParliamentDate, pg_pool: &PgPool) -> crate::Result<
             date_id,
             topic
         )
-        .execute(pg_pool)
+        .execute(&mut *executor)
         .await?;
     }
     Ok(())

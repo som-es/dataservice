@@ -1,6 +1,6 @@
 use dataservice::{
     ai_task::AiTask, connect_pg, delegates::delegate_count, services, setup_app_data, ApiLimiter,
-    AppState, Shutdown, REDIS_URL,
+    AppState, Shutdown, DATABASE_URL, REDIS_URL,
 };
 use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
@@ -26,6 +26,8 @@ struct Args {
     /// Runs only voteables for vote results
     #[arg(long, default_value_t = false)]
     only_voteable: bool,
+    #[arg(long, default_value_t = log::Level::Error)]
+    log_level: log::Level,
 }
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 32)]
@@ -33,7 +35,7 @@ async fn main() {
     let _ = dotenvy::dotenv().ok();
     let args = Args::parse();
 
-    simple_logger::init_with_level(log::Level::Error).unwrap();
+    simple_logger::init_with_level(args.log_level).unwrap();
 
     if let Err(e) = setup_app_data().await {
         log::error!("Cannot create app data directory: {e:?}");
@@ -78,6 +80,10 @@ pub async fn run_services(state: &State, config: Config) {
     let (llm_ai_task_tx, llm_ai_task_rx) = tokio::sync::mpsc::channel::<AiTask>(16536 * 22);
     let (cpu_ai_task_tx, cpu_ai_task_rx) = tokio::sync::mpsc::channel::<AiTask>(16536 * 22);
 
+    log::info!(
+        "Connecting to database {}",
+        DATABASE_URL.split("@").last().unwrap_or_default()
+    );
     let pool = connect_pg().await;
     let redis_client = redis::Client::open(REDIS_URL);
 

@@ -42,11 +42,8 @@ pub mod combx {
     pub use combx::*;
 }
 
-// pub(self) const LEGIS_INIT_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| {
-//     dotenv!("LEGIS_INIT_STILL_SEND_DAYS")
-//         .parse::<i64>()
-//         .unwrap_or(10)
-// });
+#[cfg(not(feature = "tesseract"))]
+use std::sync::Arc;
 
 #[cfg(not(feature = "tesseract"))]
 pub const OCR_ENGINE: LazyCell<Option<Arc<ocrs::OcrEngine>>> = LazyCell::new(|| {
