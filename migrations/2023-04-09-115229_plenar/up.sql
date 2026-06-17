@@ -2,6 +2,7 @@
 CREATE TABLE IF NOT EXISTS plenar_infos (
     -- use serial id -> add inr, and UNIQUE of (inr, ityp, gp)
     id serial primary key,
+    council varchar(255) not null default 'NR',
     raw_data_created_at timestamptz not null,
     raw_data_updated_at timestamptz,
     created_at timestamptz not null default now(),

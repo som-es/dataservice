@@ -151,7 +151,6 @@ pub async fn insert_plenar_speech<'a>(
         ON CONFLICT (debate_id, delegate_id, duration_in_seconds, ty)
         DO UPDATE SET
             opinion = EXCLUDED.opinion,
-            -- spoken_text = EXCLUDED.spoken_text, -- setting this to None on conflict results in fluctuating none counts etc
             duration_in_seconds = EXCLUDED.duration_in_seconds,
             ty = EXCLUDED.ty
         RETURNING id
@@ -160,7 +159,7 @@ pub async fn insert_plenar_speech<'a>(
         val_debate_id,
         opinion,
         None::<String>, // spoken_text is initially None
-        plenar_speech.duration_in_seconds as i32,
+        plenar_speech.duration_in_seconds.map(|duration| duration as i32),
         plenar_speech.ty,
         plenar_speech.speech.delegate_display_name,
     )

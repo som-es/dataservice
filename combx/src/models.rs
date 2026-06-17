@@ -180,6 +180,7 @@ pub struct DbPlenar {
     pub id: i32,
     pub inr: i32,
     pub title: String,
+    pub council: String,
     pub description: String,
     pub raw_data_created_at: DateTime<Utc>,
     pub raw_data_updated_at: Option<DateTime<Utc>>,
