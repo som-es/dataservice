@@ -25,51 +25,55 @@ pub async fn plenar_info_once(
 
     let mut handles = vec![];
 
-    for gp in GPS {
-        let pg_pool = pg_pool.clone();
-        let parliament_api_limiter = parliament_api_limiter.clone();
+    for council in ["NR", "BR"] {
+        for gp in GPS {
+            let pg_pool = pg_pool.clone();
+            let parliament_api_limiter = parliament_api_limiter.clone();
 
-        let handle = tokio::spawn(async move {
-            let mut scraper = AustriaScraper::default();
-            log::info!("PLENAR info once GP: {gp}");
-            scraper.scrape_info.gp = vec![gp.into()];
+            let handle = tokio::spawn(async move {
+                let mut scraper = AustriaScraper::default();
+                log::info!("PLENAR info once GP: {gp}, council: {council}");
+                scraper.scrape_info.gp = vec![gp.into()];
+                scraper.scrape_info.council_type = vec![council.into()];
 
-            let new_plenar_infos = scrape_untill_success::<Vec<PlenarInfo>, _>(|| async {
-                scrape_new_plenar_infos(&scraper, parliament_api_limiter.clone()).await
-            })
-            .await;
+                let new_plenar_infos = scrape_untill_success::<Vec<PlenarInfo>, _>(|| async {
+                    scrape_new_plenar_infos(&scraper, parliament_api_limiter.clone()).await
+                })
+                .await;
 
-            let mut inner_handles: Vec<tokio::task::JoinHandle<()>> = vec![];
+                let mut inner_handles: Vec<tokio::task::JoinHandle<()>> = vec![];
 
-            for plenar_info in new_plenar_infos.into_iter() {
-                if inner_handles.len() > MAX_TASKS {
-                    log::info!("awaiting {MAX_TASKS} plenar handles");
-                    for handle in inner_handles.drain(..) {
-                        if let Err(e) = handle.await {
-                            log::error!("could not await plenar info handle: {e:?}");
+                for plenar_info in new_plenar_infos.into_iter() {
+                    if inner_handles.len() > MAX_TASKS {
+                        log::info!("awaiting {MAX_TASKS} plenar handles");
+                        for handle in inner_handles.drain(..) {
+                            if let Err(e) = handle.await {
+                                log::error!("could not await plenar info handle: {e:?}");
+                            }
                         }
                     }
+
+                    let pg_pool = pg_pool.clone();
+                    let parliament_api_limiter = parliament_api_limiter.clone();
+
+                    inner_handles.push(tokio::spawn(async move {
+                        update_plenar_infos_in_db(&plenar_info, &pg_pool, parliament_api_limiter)
+                            .await;
+                    }));
                 }
 
-                let pg_pool = pg_pool.clone();
-                let parliament_api_limiter = parliament_api_limiter.clone();
-
-                inner_handles.push(tokio::spawn(async move {
-                    update_plenar_infos_in_db(&plenar_info, &pg_pool, parliament_api_limiter).await;
-                }));
-            }
-
-            for handle in inner_handles.drain(..) {
-                if let Err(e) = handle.await {
-                    log::error!("could not await plenar info handle: {e:?}");
+                for handle in inner_handles.drain(..) {
+                    if let Err(e) = handle.await {
+                        log::error!("could not await plenar info handle: {e:?}");
+                    }
                 }
+            });
+
+            handles.push(handle);
+
+            if only_latest {
+                break;
             }
-        });
-
-        handles.push(handle);
-
-        if only_latest {
-            break;
         }
     }
 
