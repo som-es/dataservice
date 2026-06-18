@@ -51,13 +51,13 @@ pub async fn all_parties_at_date(
     gp: &str,
 ) -> sqlx::Result<Vec<Party>> {
     let party_names = sqlx::query!("
-       SELECT 
+       SELECT
         party, COUNT(*)
-    FROM 
+    FROM
         mandates
-    WHERE 
+    WHERE
         mandates.is_nr
-        AND mandates.start_date <= $1::date 
+        AND mandates.start_date <= $1::date
         AND (CASE WHEN mandates.end_date IS NULL THEN $1::date ELSE mandates.end_date END) >= $1::date
         AND party is not null
     group by party
@@ -106,7 +106,7 @@ pub async fn all_parties_by_most_recent_gp(pg: &PgPool) -> sqlx::Result<Vec<Part
         FROM
             RankedParties
         WHERE
-            rn = 1; 
+            rn = 1;
     "
     )
     .fetch_all(pg)

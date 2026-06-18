@@ -287,61 +287,56 @@ pub async fn insert_plenar_speech<'a>(
 
     // if let Some(record) = existing_spoken_text {
     // if record.spoken_text.is_none() {
-    if let Some(text_html_url) = plenar_speech.speech.spoken_text_html_urls.first() {
-        let updated_spoken_text = if disable_speech_text {
-            None
-        } else {
-            api_limiter
-                .run(text_extractor.speech_extraction_with_fit(
-                    &text_html_url,
-                    &plenar_speech.speech.delegate_display_name,
-                ))
-                .await
-        };
-        if updated_spoken_text.is_none() {
-            warn!(
-                        "DEBATE_ID: {}, Missing spoken text for plenar speech id: {plenar_speech_id}, and plenar info: {:?}",
-                        val_debate_id, plenar_speech
-                    );
-        }
-        if let Some(updated_spoken_text) = &updated_spoken_text {
-            let (removed_parans, _) =
-                text_utils::remove_paran_contents(updated_spoken_text, '(', ')');
-            log::info!("removed parans: {removed_parans:?}");
-            if let Err(e) = extract_and_save_interjections(
-                removed_parans,
-                plenar_speech_id as i64,
-                plenar_speech.speech.delegate_id as i64,
-                plenar_date,
-                pool,
+    let updated_spoken_text = if disable_speech_text {
+        None
+    } else {
+        text_extractor
+            .full_speech_extraction(
+                &plenar_speech.speech.spoken_text_html_urls,
+                &plenar_speech.speech.delegate_display_name,
             )
             .await
-            {
-                log::error!(
-                    "Could not extract and save interjections for {plenar_speech_id}: {e:?}"
-                )
-            }
-        }
+    };
 
-        sqlx::query!(
-            r#"
-                    UPDATE plenar_speeches
-                    SET spoken_text = $1
-                    WHERE id = $2
-                    "#,
-            updated_spoken_text,
-            plenar_speech_id,
+    if updated_spoken_text.is_none() {
+        warn!(
+            "DEBATE_ID: {}, Missing spoken text for plenar speech id: {plenar_speech_id}, and plenar info: {:?}",
+            val_debate_id, plenar_speech
+        );
+    }
+    if let Some(updated_spoken_text) = &updated_spoken_text {
+        let (removed_parans, _) = text_utils::remove_paran_contents(updated_spoken_text, '(', ')');
+        log::info!("removed parans: {removed_parans:?}");
+        if let Err(e) = extract_and_save_interjections(
+            removed_parans,
+            plenar_speech_id as i64,
+            plenar_speech.speech.delegate_id as i64,
+            plenar_date,
+            pool,
         )
-        .execute(&mut **pool)
-        .await?;
-    } else {
+        .await
+        {
+            log::error!("Could not extract and save interjections for {plenar_speech_id}: {e:?}")
+        }
+    }
+
+    sqlx::query!(
+        r#"
+        UPDATE plenar_speeches
+        SET spoken_text = $1
+        WHERE id = $2
+        "#,
+        updated_spoken_text,
+        plenar_speech_id,
+    )
+    .execute(&mut **pool)
+    .await?;
+    if plenar_speech.speech.spoken_text_html_urls.is_empty() {
         warn!(
             "DEBATE_ID: {}, No spoken text html urls for plenar speech: {:?}",
             val_debate_id, plenar_speech
         );
     }
-    // }
-    // }
 
     Ok(())
 }
