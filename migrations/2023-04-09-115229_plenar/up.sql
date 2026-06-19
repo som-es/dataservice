@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS plenar_speeches (
     opinion varchar(255) default 'none',
     spoken_text text,
     summarized_spoken_text text,
-    duration_in_seconds int not null,
+    duration_in_seconds int,
     ty varchar(40) not null,
     delegate_display_name varchar(255) not null,
     FOREIGN KEY (debate_id) REFERENCES debates(id),

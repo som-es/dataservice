@@ -29,7 +29,7 @@ pub async fn absence_matching<'a>(
     absences_names: &[String],
     plenar_date: NaiveDate,
     gp: String,
-) -> sqlx::Result<MatchResult> {
+) -> crate::Result<MatchResult> {
     let active_delegates = active_delegates_at_date(pool, plenar_date)
         .await?
         .into_iter()
@@ -46,8 +46,7 @@ pub async fn absence_matching<'a>(
 
         match_delegate_names_with_delegate_ids(&active_delegates, &reversed_names, &gp, plenar_date)
     })
-    .await
-    .expect("Blocking task panicked"))
+    .await?)
 }
 
 #[cfg(test)]
@@ -80,10 +79,11 @@ mod tests {
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
-            &plenar_info
+            &&plenar_info
                 .absences
                 .as_ref()
                 .unwrap()
+                .absences
                 .iter()
                 .map(|x| x.as_str())
                 .map(reverse_name)
@@ -118,10 +118,11 @@ mod tests {
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
-            &plenar_info
+            &&plenar_info
                 .absences
                 .as_ref()
                 .unwrap()
+                .absences
                 .iter()
                 .map(|x| x.as_str())
                 .map(reverse_name)

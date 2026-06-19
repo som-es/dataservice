@@ -639,10 +639,11 @@ mod tests {
 
                 let res = match_delegate_names_with_delegate_ids(
                     &active_delegates,
-                    &plenar_info
+                    &&plenar_info
                         .absences
                         .as_ref()
                         .unwrap()
+                        .absences
                         .iter()
                         .map(|x| x.as_str())
                         .map(reverse_name)
@@ -688,10 +689,11 @@ mod tests {
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
-            &plenar_info
+            &&plenar_info
                 .absences
                 .as_ref()
                 .unwrap()
+                .absences
                 .iter()
                 .map(|x| x.as_str())
                 .map(reverse_name)
