@@ -6,6 +6,7 @@ use crate::models::DbDelegate;
 pub async fn active_delegates_at_date<'a>(
     pg: impl Executor<'a, Database = Postgres>,
     at: NaiveDate,
+    function: &str,
 ) -> sqlx::Result<Vec<DbDelegate>> {
     query_as!(
         DbDelegate,
@@ -17,10 +18,11 @@ pub async fn active_delegates_at_date<'a>(
         inner join
             delegates on delegates.id = mandates.delegate_id
         where
-            mandates.name like '%Abge%National%'
+            mandates.function = $2
         and start_date <= $1::date
         and (case when end_date is null then $1::date else end_date end) >= $1::date;",
-        at
+        at,
+        function
     )
     .fetch_all(pg)
     .await

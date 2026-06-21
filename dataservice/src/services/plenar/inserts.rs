@@ -117,6 +117,7 @@ pub async fn insert_plenar_speech<'a>(
     text_extractor: &mut TextExtractor,
     api_limiter: &ApiLimiter,
     plenar_date: DateTime<Utc>,
+    council: &str,
 ) -> Result<(), sqlx::Error> {
     log::info!("insert plenar speech");
     let disable_speech_text =
@@ -313,6 +314,7 @@ pub async fn insert_plenar_speech<'a>(
             plenar_speech.speech.delegate_id as i64,
             plenar_date,
             pool,
+            council,
         )
         .await
         {

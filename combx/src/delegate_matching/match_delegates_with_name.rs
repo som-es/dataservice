@@ -331,7 +331,7 @@ mod tests {
             .unwrap();
 
         let pg = connect_pg().await;
-        let active_delegates = active_delegates_at_date(&pg, init.nr_plenary_activity_date)
+        let active_delegates = active_delegates_at_date(&pg, init.nr_plenary_activity_date, "NR")
             .await
             .unwrap()
             .into_iter()
@@ -372,7 +372,7 @@ mod tests {
         let delegate_names = ["Ablinger", "Amon", "Aubauer", "Auer Jakob", "Auer Josef", "Bartenstein", "Bayr", "Becher", "Binder-Maier", "Brosz Dieter", "Brunner Christiane", "Buchmayr", "Cap", "Cortolezis-Schlager", "Csörgits", "Donabauer Karl", "Donnerbauer Heribert", "Durchschlag", "Einwallner", "Eßl", "Fazekas", "Franz", "Fuhrmann", "Fürntrath-Moretti", "Gahr", "Gartlehner", "Gaßner", "Gerstl", "Gessl-Ranftl", "Glaser", "Glawischnig-Piesczek", "Grillitsch", "Grünewald", "Haberzettl", "Hakel Elisabeth", "Hakl Karin", "Hammer", "Haubner Peter", "Hechtl", "Heinzl", "Hell", "Höfinger", "Höllerer", "Hörl", "Hornek", "Huainigg", "Ikrath", "Jarmer", "Jarolim", "Kaipel", "Katzian", "Keck", "Kirchgatterer", "Klikovits", "Köfer", "Kogler", "Königsberger-Ludwig", "Kopf", "Korun", "Kößl", "Krainer", "Kräuter", "Krist", "Kuntzl", "Kuzdas", "Lapp", "Lettenbichler", "Lichtenecker", "Lipitsch", "Lohfeyer", "Lopatka", "Lueger Angela", "Maier Johann", "Marek", "Matznetter", "Mayer Elmar", "Mayer Peter", "Moser", "Muchitsch", "Musiol", "Muttonen", "Neugebauer Fritz", "Oberhauser", "Obernosterer", "Öllinger", "Pendl", "Pilz", "Pirklhuber", "Plessl", "Prähauser", "Prammer", "Praßl", "Preiner", "Prinz", "Rädler Johann", "Rasinger", "Riepl", "Rudas", "Sacher", "Schatz", "Schickhofer", "Schittenhelm", "Schmuckenschlager", "Schönegger Bernd", "Schönpass Rosemarie", "Schopf", "Schultes", "Schwentner", "Silhavy", "Singer", "Spindelberger", "Stauber Peter", "Steindl Konrad", "Steinhauser", "Steßl-Mühlbacher", "Stummvoll", "Tamandl", "Van der Bellen", "Weninger", "Windbüchler-Souschill", "Windisch", "Wittmann Peter", "Wöginger", "Wurm", "Zinggl"].iter().map(|name| name.to_string()).collect::<Vec<_>>();
         let date = NaiveDate::from_ymd_opt(2012, 1, 10).unwrap();
         let pg = connect_pg().await;
-        let active_delegates = active_delegates_at_date(&pg, date)
+        let active_delegates = active_delegates_at_date(&pg, date, "NR")
             .await
             .unwrap()
             .into_iter()
@@ -403,7 +403,7 @@ mod tests {
             .unwrap();
 
         let pg = connect_pg().await;
-        let active_delegates = active_delegates_at_date(&pg, init.nr_plenary_activity_date)
+        let active_delegates = active_delegates_at_date(&pg, init.nr_plenary_activity_date, "NR")
             .await
             .unwrap()
             .into_iter()
@@ -472,11 +472,12 @@ mod tests {
             };
 
             let pg = connect_pg().await;
-            let active_delegates = active_delegates_at_date(&pg, init.nr_plenary_activity_date)
-                .await
-                .unwrap()
-                .into_iter()
-                .collect::<HashSet<_>>();
+            let active_delegates =
+                active_delegates_at_date(&pg, init.nr_plenary_activity_date, "NR")
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .collect::<HashSet<_>>();
 
             let delegate_names = pro_contra
                 .pro
@@ -516,7 +517,7 @@ mod tests {
             .unwrap();
 
         let pg = connect_pg().await;
-        let active_delegates = active_delegates_at_date(&pg, init.nr_plenary_activity_date)
+        let active_delegates = active_delegates_at_date(&pg, init.nr_plenary_activity_date, "NR")
             .await
             .unwrap()
             .into_iter()
@@ -553,7 +554,7 @@ mod tests {
             .unwrap();
 
         let pg = connect_pg().await;
-        let active_delegates = active_delegates_at_date(&pg, init.nr_plenary_activity_date)
+        let active_delegates = active_delegates_at_date(&pg, init.nr_plenary_activity_date, "NR")
             .await
             .unwrap()
             .into_iter()
@@ -591,7 +592,7 @@ mod tests {
             .unwrap();
 
         let pg = connect_pg().await;
-        let active_delegates = active_delegates_at_date(&pg, init.nr_plenary_activity_date)
+        let active_delegates = active_delegates_at_date(&pg, init.nr_plenary_activity_date, "NR")
             .await
             .unwrap()
             .into_iter()
@@ -631,7 +632,7 @@ mod tests {
 
                 let pg = connect_pg().await;
                 let active_delegates =
-                    active_delegates_at_date(&pg, plenar_info.created_at.date_naive())
+                    active_delegates_at_date(&pg, plenar_info.created_at.date_naive(), "NR")
                         .await
                         .unwrap()
                         .into_iter()
@@ -681,11 +682,12 @@ mod tests {
         println!("plenar_info: {plenar_info:?}");
 
         let pg = connect_pg().await;
-        let active_delegates = active_delegates_at_date(&pg, plenar_info.created_at.date_naive())
-            .await
-            .unwrap()
-            .into_iter()
-            .collect::<HashSet<_>>();
+        let active_delegates =
+            active_delegates_at_date(&pg, plenar_info.created_at.date_naive(), "NR")
+                .await
+                .unwrap()
+                .into_iter()
+                .collect::<HashSet<_>>();
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,

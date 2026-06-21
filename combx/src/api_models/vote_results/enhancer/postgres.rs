@@ -42,8 +42,9 @@ impl VoteResultEnhancer for PostgresEnhancer {
         votes: &ProContra,
         voted_on: NaiveDate,
         gp: &str,
-    ) -> impl Future<Output = Result<Vec<DbNamedVote>, Self::Error>> {
-        pg_create_db_named_votes(self.source(), votes, voted_on, gp)
+        function: &str,
+    ) -> impl Future<Output = crate::Result<Vec<DbNamedVote>>> {
+        pg_create_db_named_votes(self.source(), votes, voted_on, gp, function)
     }
 
     fn maybe_get_legis_init_info(

@@ -268,6 +268,7 @@ impl VoteResult {
                             pro_contra,
                             legis_init.nr_plenary_activity_date,
                             &legis_init.gp,
+                            "NR",
                         )
                         .await
                         .ok(),

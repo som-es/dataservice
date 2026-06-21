@@ -30,7 +30,8 @@ pub trait VoteResultEnhancer: Enhancer {
         votes: &ProContra,
         voted_on: NaiveDate,
         gp: &str,
-    ) -> impl Future<Output = Result<Vec<DbNamedVote>, Self::Error>>;
+        function: &str,
+    ) -> impl Future<Output = crate::Result<Vec<DbNamedVote>>>;
     fn maybe_get_legis_init_info(
         &self,
         inr: i32,

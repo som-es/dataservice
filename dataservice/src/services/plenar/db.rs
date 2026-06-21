@@ -76,6 +76,7 @@ pub async fn update_plenar_infos_in_db(
                 &mut text_extractor,
                 &api_limiter,
                 plenar_info.created_at,
+                &plenar_info.council,
             )
             .await
             {
@@ -96,6 +97,7 @@ pub async fn update_plenar_infos_in_db(
             &absences.absences,
             plenar_info.created_at.date_naive(),
             plenar_info.gp.clone(),
+            &plenar_info.council,
         )
         .await
         {

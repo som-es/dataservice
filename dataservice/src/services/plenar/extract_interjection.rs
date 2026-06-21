@@ -17,9 +17,10 @@ pub async fn extract_interjections<'a>(
     speaker_delegate_id: i64,
     plenar_date: DateTime<Utc>,
     con: impl Executor<'a, Database = Postgres>,
+    function: &str,
 ) -> Result<Vec<Interjection>, sqlx::Error> {
     let db_delegates: Arc<[DbDelegate]> =
-        Arc::from(active_delegates_at_date(con, plenar_date.date_naive()).await?);
+        Arc::from(active_delegates_at_date(con, plenar_date.date_naive(), function).await?);
     let mut interjections = Vec::with_capacity(paran_contents.len());
     for paran_content in paran_contents {
         let db_delegates = db_delegates.clone();
@@ -47,6 +48,7 @@ pub async fn extract_and_save_interjections<'a>(
     speaker_delegate_id: i64,
     plenar_date: DateTime<Utc>,
     pool: &mut sqlx::Transaction<'a, Postgres>,
+    function: &str,
 ) -> Result<(), sqlx::Error> {
     let interjections = extract_interjections(
         paran_contents,
@@ -54,6 +56,7 @@ pub async fn extract_and_save_interjections<'a>(
         speaker_delegate_id,
         plenar_date,
         &mut **pool,
+        function,
     )
     .await?;
 
@@ -404,6 +407,7 @@ mod tests {
             0,
             plenar_date,
             &pg,
+            "NR",
         )
         .await
         .unwrap();

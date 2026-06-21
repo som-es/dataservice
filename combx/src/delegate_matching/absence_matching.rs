@@ -29,8 +29,9 @@ pub async fn absence_matching<'a>(
     absences_names: &[String],
     plenar_date: NaiveDate,
     gp: String,
+    function: &str,
 ) -> crate::Result<MatchResult> {
-    let active_delegates = active_delegates_at_date(pool, plenar_date)
+    let active_delegates = active_delegates_at_date(pool, plenar_date, function)
         .await?
         .into_iter()
         .collect::<HashSet<_>>();
@@ -56,7 +57,7 @@ mod tests {
     use somes_scraper::{AustriaScraper, plenar::Plenar};
 
     use crate::{
-        connect_pg, match_delegate_names_with_delegate_ids, reverse_name,
+        LevResult, connect_pg, match_delegate_names_with_delegate_ids, reverse_name,
         with_data::active_delegates_at_date,
     };
 
@@ -71,11 +72,15 @@ mod tests {
         println!("plenar_info: {plenar_info:?}");
 
         let pg = connect_pg().await;
-        let active_delegates = active_delegates_at_date(&pg, plenar_info.created_at.date_naive())
-            .await
-            .unwrap()
-            .into_iter()
-            .collect::<HashSet<_>>();
+        let active_delegates = active_delegates_at_date(
+            &pg,
+            plenar_info.created_at.date_naive(),
+            &plenar_info.council,
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .collect::<HashSet<_>>();
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
@@ -110,11 +115,12 @@ mod tests {
         println!("plenar_info: {plenar_info:?}");
 
         let pg = connect_pg().await;
-        let active_delegates = active_delegates_at_date(&pg, plenar_info.created_at.date_naive())
-            .await
-            .unwrap()
-            .into_iter()
-            .collect::<HashSet<_>>();
+        let active_delegates =
+            active_delegates_at_date(&pg, plenar_info.created_at.date_naive(), "NR")
+                .await
+                .unwrap()
+                .into_iter()
+                .collect::<HashSet<_>>();
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
@@ -132,6 +138,76 @@ mod tests {
         );
 
         println!("res: {:?}", res.correctly_matched);
+        println!("res: {:?}", res.lev_or_deep_split_matched);
+        assert!(res.lev_or_deep_split_matched.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_absence_extraction_br_991() {
+        let scraper = AustriaScraper::default();
+
+        let plenar_info = scraper
+            .get_plenar("/gegenstand/BR/BRSITZ/991")
+            .await
+            .unwrap();
+        println!("plenar_info: {plenar_info:?}");
+
+        let pg = connect_pg().await;
+        let active_delegates =
+            active_delegates_at_date(&pg, plenar_info.created_at.date_naive(), "BR")
+                .await
+                .unwrap()
+                .into_iter()
+                .collect::<HashSet<_>>();
+
+        let res = match_delegate_names_with_delegate_ids(
+            &active_delegates,
+            &&plenar_info
+                .absences
+                .as_ref()
+                .unwrap()
+                .absences
+                .iter()
+                .map(|x| x.as_str())
+                .map(reverse_name)
+                .collect::<Vec<_>>(),
+            &plenar_info.gp,
+            plenar_info.created_at.date_naive(),
+        );
+
+        println!("res: {:?}", res.correctly_matched);
+        assert_eq!(
+            res.correctly_matched,
+            vec![
+                LevResult {
+                    deep_split_matched: false,
+                    similiarity_score: 0,
+                    lev: 0,
+                    delegate_id: 86618,
+                    manually_matched: false,
+                    matched_with: "Samt Peter".into(),
+                    searched_with: "Samt Peter".into()
+                },
+                LevResult {
+                    deep_split_matched: false,
+                    similiarity_score: 0,
+                    lev: 0,
+                    delegate_id: 24111,
+                    manually_matched: false,
+                    matched_with: "Theuermann Isabella, Mag.".into(),
+                    searched_with: "Theuermann Isabella".into()
+                },
+                LevResult {
+                    deep_split_matched: false,
+                    similiarity_score: 0,
+                    lev: 0,
+                    delegate_id: 39606,
+                    manually_matched: false,
+                    matched_with: "Viertler Wolfgang, Dr.".into(),
+                    searched_with: "Viertler Wolfgang".into()
+                }
+            ]
+        );
         println!("res: {:?}", res.lev_or_deep_split_matched);
         assert!(res.lev_or_deep_split_matched.is_empty());
     }

@@ -14,8 +14,9 @@ pub async fn pg_create_db_named_votes(
     votes: &ProContra,
     voted_on: NaiveDate,
     gp: &str,
-) -> sqlx::Result<Vec<DbNamedVote>> {
-    let named_votes_compact = match_all_named_votes(pg, votes, voted_on, gp).await?;
+    function: &str,
+) -> crate::Result<Vec<DbNamedVote>> {
+    let named_votes_compact = match_all_named_votes(pg, votes, voted_on, gp, function).await?;
 
     let pro_iter = named_votes_compact.pro.iter().map(|v| DbNamedVote {
         id: 0,
@@ -69,8 +70,9 @@ pub async fn match_all_named_votes(
     votes: &ProContra,
     voted_on: NaiveDate,
     gp: &str,
-) -> sqlx::Result<VotedByNameResult> {
-    let active_delegates = active_delegates_at_date(pg, voted_on)
+    function: &str,
+) -> crate::Result<VotedByNameResult> {
+    let active_delegates = active_delegates_at_date(pg, voted_on, function)
         .await?
         .into_iter()
         .collect::<HashSet<_>>();
@@ -96,8 +98,7 @@ pub async fn match_all_named_votes(
 
         (pro, contra, absent)
     })
-    .await
-    .unwrap();
+    .await?;
 
     // println!(
     //     "lev_or_deep_contra: {:?}",
