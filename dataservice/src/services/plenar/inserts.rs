@@ -161,7 +161,7 @@ pub async fn insert_plenar_speech<'a>(
         val_debate_id,
         opinion,
         None::<String>, // spoken_text is initially None
-        plenar_speech.duration_in_seconds.map(|duration| duration as i32),
+        plenar_speech.duration_in_seconds.map(|duration| duration as i32).unwrap_or_default(),
         plenar_speech.ty,
         plenar_speech.speech.delegate_display_name,
     )
@@ -307,7 +307,6 @@ pub async fn insert_plenar_speech<'a>(
     }
     if let Some(updated_spoken_text) = &updated_spoken_text {
         let (removed_parans, _) = text_utils::remove_paran_contents(updated_spoken_text, '(', ')');
-        log::info!("removed parans: {removed_parans:?}");
         if let Err(e) = extract_and_save_interjections(
             removed_parans,
             plenar_speech_id as i64,
