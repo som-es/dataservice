@@ -348,7 +348,7 @@ mod tests {
         simple_logger::init_with_level(log::Level::Info).unwrap();
         let scraper: AustriaScraper = AustriaScraper::default();
         let res = scraper
-            .get_plenar("/gegenstand/XXVIII/NRSITZ/79")
+            .get_plenar("/gegenstand/XXVIII/NRSITZ/66")
             .await
             .unwrap();
 

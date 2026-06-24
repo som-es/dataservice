@@ -148,13 +148,15 @@ pub async fn insert_plenar_speech<'a>(
 
     let plenar_speech_id = sqlx::query!(
         r#"
-        INSERT INTO plenar_speeches (delegate_id, debate_id, opinion, spoken_text, duration_in_seconds, ty, delegate_display_name)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        ON CONFLICT (debate_id, delegate_id, duration_in_seconds, ty)
+        INSERT INTO plenar_speeches (delegate_id, debate_id, opinion, spoken_text, duration_in_seconds, ty, delegate_display_name, start)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        ON CONFLICT (debate_id, delegate_id, duration_in_seconds, start)
         DO UPDATE SET
             opinion = EXCLUDED.opinion,
             duration_in_seconds = EXCLUDED.duration_in_seconds,
-            ty = EXCLUDED.ty
+            ty = EXCLUDED.ty,
+            delegate_display_name = EXCLUDED.delegate_display_name,
+            start = EXCLUDED.start
         RETURNING id
         "#,
         plenar_speech.speech.delegate_id as i32,
@@ -164,6 +166,7 @@ pub async fn insert_plenar_speech<'a>(
         plenar_speech.duration_in_seconds.map(|duration| duration as i32).unwrap_or_default(),
         plenar_speech.ty,
         plenar_speech.speech.delegate_display_name,
+        plenar_speech.start,
     )
     .fetch_one(&mut **pool)
     .await?
