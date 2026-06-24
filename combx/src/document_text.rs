@@ -227,7 +227,7 @@ pub async fn extract_text_from_document(
 }
 
 pub async fn extract_text_from_html_document(url: &str) -> Option<String> {
-    let mut text_extractor = TextExtractor::new();
+    let mut text_extractor = TextExtractor::default();
     text_extractor.extract_text_from_url(&url, None, true).await
 }
 
