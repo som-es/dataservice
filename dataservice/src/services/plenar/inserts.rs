@@ -80,6 +80,23 @@ pub async fn insert_plenar_info<'a>(
     Ok(result.id)
 }
 
+pub async fn insert_call_to_orders(
+    pg_pool: &sqlx::Pool<sqlx::Postgres>,
+    plenar_id: i32,
+    plenar_info: &PlenarInfo,
+) -> sqlx::Result<()> {
+    let mut tx = pg_pool.begin().await?;
+    sqlx::query!("delete from call_to_order where plenar_id = $1", plenar_id)
+        .execute(&mut *tx)
+        .await?;
+    for call_to_order_entry in &plenar_info.call_to_orders {
+        if let Err(e) = insert_call_to_order(&mut *tx, call_to_order_entry, plenar_id).await {
+            log::error!("Error inserting call to order: '{e}'. Error occured for call to order: {call_to_order_entry:?}");
+        }
+    }
+    Ok(())
+}
+
 pub async fn insert_call_to_order<'a>(
     pool: impl Executor<'a, Database = Postgres>,
     call_to_order: &CallToOrderInfo,
@@ -350,7 +367,7 @@ pub async fn insert_absences(
     plenar_id: i32,
     matching: combx::MatchResult,
 ) -> sqlx::Result<()> {
-    let mut tx = pg_pool.begin().await.unwrap();
+    let mut tx = pg_pool.begin().await?;
 
     sqlx::query!(
         "delete from absences where plenary_session_id = $1",

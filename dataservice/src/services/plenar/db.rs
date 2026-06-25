@@ -4,8 +4,8 @@ use sqlx::PgPool;
 
 use crate::{
     plenar::{
-        insert_absences, insert_call_to_order, insert_debate, insert_plenar_info,
-        insert_plenar_speech,
+        insert_absences, insert_call_to_order, insert_call_to_orders, insert_debate,
+        insert_plenar_info, insert_plenar_speech,
     },
     ApiLimiter,
 };
@@ -36,10 +36,10 @@ pub async fn update_plenar_infos_in_db(
         }
     };
 
-    for call_to_order_entry in &plenar_info.call_to_orders {
-        if let Err(e) = insert_call_to_order(pg_pool, call_to_order_entry, plenar_id).await {
-            log::error!("Error inserting call to order: '{e}'. Error occured for call to order: {call_to_order_entry:?}");
-        }
+    if let Err(e) = insert_call_to_orders(pg_pool, plenar_id, plenar_info).await {
+        log::error!(
+            "could not insert call to orders for plenary session {plenar_id} because of {e:?}"
+        );
     }
 
     log::info!("inserting debates");
