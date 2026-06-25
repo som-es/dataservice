@@ -344,3 +344,41 @@ pub async fn insert_plenar_speech<'a>(
 
     Ok(())
 }
+
+pub async fn insert_absences(
+    pg_pool: &sqlx::Pool<sqlx::Postgres>,
+    plenar_id: i32,
+    matching: combx::MatchResult,
+) -> sqlx::Result<()> {
+    let mut tx = pg_pool.begin().await.unwrap();
+
+    sqlx::query!(
+        "delete from absences where plenary_session_id = $1",
+        plenar_id
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    for match_res in matching
+        .correctly_matched
+        .iter()
+        .chain(matching.lev_or_deep_split_matched.iter())
+    {
+        if let Err(e) = sqlx::query!(
+            "
+                        INSERT INTO absences (lev, similiarity_score, searched_with, matched_with, delegate_id, manually_matched, plenary_session_id)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7)
+                        ON CONFLICT (delegate_id, plenary_session_id)
+                        DO UPDATE SET
+                            lev = EXCLUDED.lev,
+                            similiarity_score = EXCLUDED.similiarity_score,
+                            searched_with = EXCLUDED.searched_with,
+                            matched_with = EXCLUDED.matched_with,
+                            manually_matched = EXCLUDED.manually_matched
+                        ", match_res.lev as i64, match_res.similiarity_score as i64, match_res.searched_with, match_res.matched_with, match_res.delegate_id as i32, match_res.manually_matched, plenar_id
+        ).execute(&mut *tx).await {
+            log::error!("Error inserting absene {e:?} for absence {match_res:?}");
+        }
+    }
+    Ok(())
+}
