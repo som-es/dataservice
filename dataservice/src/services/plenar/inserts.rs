@@ -94,7 +94,7 @@ pub async fn insert_call_to_orders(
             log::error!("Error inserting call to order: '{e}'. Error occured for call to order: {call_to_order_entry:?}");
         }
     }
-    Ok(())
+    tx.commit().await
 }
 
 pub async fn insert_call_to_order<'a>(
@@ -383,19 +383,20 @@ pub async fn insert_absences(
     {
         if let Err(e) = sqlx::query!(
             "
-                        INSERT INTO absences (lev, similiarity_score, searched_with, matched_with, delegate_id, manually_matched, plenary_session_id)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7)
-                        ON CONFLICT (delegate_id, plenary_session_id)
-                        DO UPDATE SET
-                            lev = EXCLUDED.lev,
-                            similiarity_score = EXCLUDED.similiarity_score,
-                            searched_with = EXCLUDED.searched_with,
-                            matched_with = EXCLUDED.matched_with,
-                            manually_matched = EXCLUDED.manually_matched
-                        ", match_res.lev as i64, match_res.similiarity_score as i64, match_res.searched_with, match_res.matched_with, match_res.delegate_id as i32, match_res.manually_matched, plenar_id
+            INSERT INTO absences (lev, similiarity_score, searched_with, matched_with, delegate_id, manually_matched, plenary_session_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (delegate_id, plenary_session_id)
+            DO UPDATE SET
+                lev = EXCLUDED.lev,
+                similiarity_score = EXCLUDED.similiarity_score,
+                searched_with = EXCLUDED.searched_with,
+                matched_with = EXCLUDED.matched_with,
+                manually_matched = EXCLUDED.manually_matched
+        ", match_res.lev as i64, match_res.similiarity_score as i64, match_res.searched_with, match_res.matched_with, match_res.delegate_id as i32, match_res.manually_matched, plenar_id
         ).execute(&mut *tx).await {
             log::error!("Error inserting absene {e:?} for absence {match_res:?}");
         }
     }
+    tx.commit().await?;
     Ok(())
 }

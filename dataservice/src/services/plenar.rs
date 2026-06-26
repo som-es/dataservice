@@ -357,6 +357,22 @@ mod tests {
         let parliament_api_limiter = crate::ApiLimiter::new(32);
         update_plenar_infos_in_db(&res, &pool, parliament_api_limiter).await;
     }
+    #[tokio::test]
+    async fn test_brsitz_979_db_insertion() {
+        unsafe { std::env::set_var("MIND_UPDATE_TIME", "false") };
+        unsafe { std::env::set_var("DISABLE_SPEECH_TEXT", "false") };
+        let _ = simple_logger::init_with_level(log::Level::Info);
+        let scraper: AustriaScraper = AustriaScraper::default();
+        let res = scraper
+            .get_plenar("/gegenstand/BR/BRSITZ/979")
+            .await
+            .unwrap();
+
+        let pool = connect_pg().await;
+
+        let parliament_api_limiter = crate::ApiLimiter::new(32);
+        update_plenar_infos_in_db(&res, &pool, parliament_api_limiter).await;
+    }
 
     #[tokio::test]
     async fn test_xxviii_nrsitz_32() {

@@ -4,7 +4,7 @@ use sqlx::PgPool;
 
 use crate::{
     plenar::{
-        insert_absences, insert_call_to_order, insert_call_to_orders, insert_debate,
+        insert_absences, insert_call_to_orders, insert_debate,
         insert_plenar_info, insert_plenar_speech,
     },
     ApiLimiter,
@@ -105,6 +105,7 @@ pub async fn update_plenar_infos_in_db(
         .await
         {
             Ok(matching) => {
+                log::info!("inserting absences: {matching:?}");
                 if let Err(e) = insert_absences(pg_pool, plenar_id, matching).await {
                     log::error!("could not insert absences for plenary session {plenar_id} because of {e:?}");
                 }

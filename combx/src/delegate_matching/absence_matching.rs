@@ -143,6 +143,68 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_absence_extraction_br_979() {
+        let scraper = AustriaScraper::default();
+
+        let plenar_info = scraper
+            .get_plenar("/gegenstand/BR/BRSITZ/979")
+            .await
+            .unwrap();
+        println!("plenar_info: {plenar_info:?}");
+        let src = &plenar_info.absences.as_ref().unwrap().source_document;
+        dbg!(&src);
+
+        let pg = connect_pg().await;
+        let active_delegates =
+            active_delegates_at_date(&pg, plenar_info.created_at.date_naive(), "BR")
+                .await
+                .unwrap()
+                .into_iter()
+                .collect::<HashSet<_>>();
+
+        let res = match_delegate_names_with_delegate_ids(
+            &active_delegates,
+            &&plenar_info
+                .absences
+                .as_ref()
+                .unwrap()
+                .absences
+                .iter()
+                .map(|x| x.as_str())
+                .map(reverse_name)
+                .collect::<Vec<_>>(),
+            &plenar_info.gp,
+            plenar_info.created_at.date_naive(),
+        );
+
+        println!("res: {:?}", res.correctly_matched);
+        assert_eq!(
+            res.correctly_matched,
+            [
+                LevResult {
+                    deep_split_matched: false,
+                    similiarity_score: 0,
+                    lev: 0,
+                    delegate_id: 23967,
+                    manually_matched: false,
+                    matched_with: "Jagl Simone".into(),
+                    searched_with: "Jagl Simone".into()
+                },
+                LevResult {
+                    deep_split_matched: false,
+                    similiarity_score: 0,
+                    lev: 0,
+                    delegate_id: 31963,
+                    manually_matched: false,
+                    matched_with: "Kober Herbert".into(),
+                    searched_with: "Kober Herbert".into()
+                }
+            ]
+        );
+        assert!(res.lev_or_deep_split_matched.is_empty());
+    }
+
+    #[tokio::test]
     async fn test_absence_extraction_br_991() {
         let scraper = AustriaScraper::default();
 
