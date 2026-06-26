@@ -392,13 +392,25 @@ pub fn send_new_legis_info_mail(
                     format!("{} {}", vote.party, symbol)
                 })
                 .collect::<Vec<_>>()
-                .join(", ");
+                .join("  ");
+
+            let vote_date_badge = vote_result
+                .legislative_initiative
+                .vote_date
+                .map(|d| {
+                    format!(
+                        r#"<span class="dm-badge" style="display: inline-block; background-color: #fae9da; color: #000000; font-family: Arial, sans-serif; font-size: 12px; line-height: 16px; font-weight: 600; border-radius: 6px; padding: 4px 8px; margin: 0 6px 6px 0; white-space: nowrap;">{}</span>"#,
+                        d.format("%d.%m.%Y")
+                    )
+                })
+                .unwrap_or_default();
 
             let vote_result_html_entry = VOTE_RESULT_ENTRY_TEMPLATE
                 .replace("{*VOTE_RESULT_DESCRIPTION*}", &vote_description)
                 .replace("{*VOTE_RESULT_GP*}", &vote_result.legislative_initiative.gp)
                 .replace("{*VOTE_RESULT_TYPE*}", vote_type)
                 .replace("{*VOTE_RESULT_OUTCOME*}", vote_outcome)
+                .replace("{*VOTE_RESULT_DATE_BADGE*}", &vote_date_badge)
                 .replace("{*VOTE_RESULT_PARTY_VOTES*}", &party_votes_html)
                 .replace(
                     "{*VOTE_RESULT_SOMES_URL*}",
@@ -523,8 +535,8 @@ mod tests {
         let legis_init = VoteResult::from_legis_init(PostgresEnhancer(pg), legis_init, None).await;
 
         send_new_legis_info_mail(
-            "flurl.nagy@gmail.com",
-            &[&(19106479, legis_init) /* &(10527230, legis_init1)*/],
+            crate::email::TEST_MAIL_RECEIVER,
+            &[&(19106479, legis_init)],
             &seats,
             &delegates,
             colors,
@@ -532,6 +544,6 @@ mod tests {
         )
         .unwrap();
 
-        loop {}
+        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
     }
 }

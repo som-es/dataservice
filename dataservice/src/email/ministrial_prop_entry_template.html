@@ -1,140 +1,124 @@
-<a href="{*PROPOSAL_SOMES_URL*}" style="text-decoration: none; color: inherit; display: block">
+<a href="{*PROPOSAL_SOMES_URL*}" style="text-decoration: none; color: inherit; display: block; margin-top: 12px;">
     <table
         role="presentation"
         width="100%"
         cellspacing="0"
         cellpadding="0"
         border="0"
-        style="
-            margin-top: 20px;
-            font-family: Arial, sans-serif;
-            color: black;
-            table-layout: fixed;
-            width: 100%;
-            border-collapse: separate;
-        "
+        style="font-family: Arial, sans-serif; border-collapse: separate; width: 100%;"
     >
         <tr>
             <td
+                bgcolor="#c3cdd9"
+                class="dm-item-card"
                 style="
-                    border-radius: 0.9rem;
-                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-                    background-color: rgb(195, 205, 217);
-                    padding: 20px;
+                    background-color: #c3cdd9;
+                    border-radius: 10px;
+                    padding: 16px 18px;
+                    color: #1a1a1a;
                 "
             >
-                <table
-                    role="presentation"
-                    width="100%"
-                    cellspacing="0"
-                    cellpadding="0"
-                    border="0"
-                    style="table-layout: fixed; width: 100%"
-                >
+                <!-- Delegate byline: avatar + name -->
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 12px;">
                     <tr>
-                        <!-- LEFT CONTENT -->
-                        <td style="vertical-align: top; padding-right: 10px">
-                            <!-- PROPOSAL DESCRIPTION -->
-                            <div
-                                style="
-                                    font-size: 14px;
-                                    line-height: 1.4;
-                                    margin-bottom: 8px;
-                                    word-wrap: break-word;
-                                    overflow-wrap: break-word;
-                                    word-break: break-word;
-                                "
-                            >
-                                {*PROPOSAL_DESCRIPTION*}
-                            </div>
-
-                            <!-- TAG BADGES (inline-block so they wrap) -->
-                            <div style="font-size: 0; line-height: 0">
-                                <span
-                                    style="
-                                        display: inline-block;
-                                        background-color: rgb(250, 233, 218);
-                                        color: black;
-                                        font-size: 12px;
-                                        line-height: 16px;
-                                        font-weight: 600;
-                                        border-radius: 6px;
-                                        padding: 4px 8px;
-                                        margin: 0 6px 6px 0;
-                                        white-space: nowrap;
-                                    "
-                                    >{*PROPOSAL_MINISTRY*}</span
-                                ><span
-                                    style="
-                                        display: inline-block;
-                                        background-color: rgb(250, 233, 218);
-                                        color: black;
-                                        font-size: 12px;
-                                        line-height: 16px;
-                                        font-weight: 600;
-                                        border-radius: 6px;
-                                        padding: 4px 8px;
-                                        margin: 0 6px 6px 0;
-                                        white-space: nowrap;
-                                    "
-                                    >{*PROPOSAL_DATE*}</span
-                                ><span
-                                    style="
-                                        display: inline-block;
-                                        background-color: rgb(250, 233, 218);
-                                        color: black;
-                                        font-size: 12px;
-                                        line-height: 16px;
-                                        font-weight: 600;
-                                        border-radius: 6px;
-                                        padding: 4px 8px;
-                                        margin: 0 6px 6px 0;
-                                        white-space: nowrap;
-                                    "
-                                    >{*PROPOSAL_GP*}</span
-                                ><span
-                                    style="
-                                        display: inline-block;
-                                        background-color: rgb(250, 233, 218);
-                                        color: black;
-                                        font-size: 12px;
-                                        line-height: 16px;
-                                        font-weight: 600;
-                                        border-radius: 6px;
-                                        padding: 4px 8px;
-                                        margin: 0 6px 6px 0;
-                                        white-space: nowrap;
-                                    "
-                                    >{*PROPOSAL_GOV_OFFICIAL_NAME*}</span
-                                >
-                            </div>
-                        </td>
-
-                        <!-- RIGHT CONTENT: DELEGATE IMAGE -->
-                        <td
-                            width="80"
-                            style="
-                                vertical-align: middle;
-                                width: 80px;
-                                text-align: right;
-                            "
-                        >
+                        <td style="vertical-align: middle; padding-right: 8px; width: 32px;">
                             <img
                                 src="{*PROPOSAL_DELEGATE_IMG_URL*}"
-                                alt="Image of delegate {*PROPOSAL_GOV_OFFICIAL_NAME*}"
-                                width="80"
-                                height="80"
-                                style="
-                                    width: 80px;
-                                    height: 80px;
-                                    border-radius: 50%;
-                                    object-fit: cover;
-                                    display: block;
-                                "
+                                alt="{*PROPOSAL_GOV_OFFICIAL_NAME*}"
+                                width="32"
+                                height="32"
+                                style="display: block; width: 32px; height: 32px; border-radius: 50%; object-fit: cover;"
                             />
+                        </td>
+                        <td style="vertical-align: middle;">
+                            <span
+                                class="dm-author"
+                                style="
+                                    font-family: Arial, sans-serif;
+                                    font-size: 13px;
+                                    font-weight: 600;
+                                    color: #333333;
+                                    line-height: 1.2;
+                                "
+                            >{*PROPOSAL_GOV_OFFICIAL_NAME*}</span>
                         </td>
                     </tr>
                 </table>
+
+                <!-- Description -->
+                <div
+                    class="dm-card-text"
+                    style="
+                        font-family: Arial, sans-serif;
+                        font-size: 14px;
+                        line-height: 1.5;
+                        color: #1a1a1a;
+                        margin-bottom: 12px;
+                        word-wrap: break-word;
+                        overflow-wrap: break-word;
+                        word-break: break-word;
+                    "
+                >
+                    {*PROPOSAL_DESCRIPTION*}
+                </div>
+
+                <!-- Tag badges -->
+                <div style="font-size: 0; line-height: 0; margin-bottom: 10px;">
+                    <span
+                        class="dm-badge"
+                        style="
+                            display: inline-block;
+                            background-color: #fae9da;
+                            color: #000000;
+                            font-family: Arial, sans-serif;
+                            font-size: 12px;
+                            line-height: 16px;
+                            font-weight: 600;
+                            border-radius: 6px;
+                            padding: 4px 8px;
+                            margin: 0 6px 6px 0;
+                            white-space: nowrap;
+                        "
+                        >{*PROPOSAL_MINISTRY*}</span
+                    ><span
+                        class="dm-badge"
+                        style="
+                            display: inline-block;
+                            background-color: #fae9da;
+                            color: #000000;
+                            font-family: Arial, sans-serif;
+                            font-size: 12px;
+                            line-height: 16px;
+                            font-weight: 600;
+                            border-radius: 6px;
+                            padding: 4px 8px;
+                            margin: 0 6px 6px 0;
+                            white-space: nowrap;
+                        "
+                        >{*PROPOSAL_DATE*}</span
+                    ><span
+                        class="dm-badge"
+                        style="
+                            display: inline-block;
+                            background-color: #fae9da;
+                            color: #000000;
+                            font-family: Arial, sans-serif;
+                            font-size: 12px;
+                            line-height: 16px;
+                            font-weight: 600;
+                            border-radius: 6px;
+                            padding: 4px 8px;
+                            margin: 0 6px 6px 0;
+                            white-space: nowrap;
+                        "
+                        >{*PROPOSAL_GP*}</span
+                    >
+                </div>
+
+                <!-- Link -->
+                <div style="margin-top: 2px;">
+                    <span class="dm-link" style="font-family: Arial, sans-serif; font-size: 13px; color: #d8806f; font-weight: 600;">Auf somes ansehen &#8594;</span>
+                </div>
             </td>
         </tr>
     </table>

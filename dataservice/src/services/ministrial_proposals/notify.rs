@@ -264,7 +264,13 @@ mod tests {
             GovProposal::from_ministerial_proposal(ministerial_proposal, gov_officials);
         println!("gov proposal: {gov_proposal:?}");
         let gov_proposals = [&(0, gov_proposal)];
-        send_new_ministrial_prop_info_mail("", &gov_proposals, &simple_gov_officials).unwrap();
-        loop {}
+        send_new_ministrial_prop_info_mail(
+            crate::email::TEST_MAIL_RECEIVER,
+            &gov_proposals,
+            &simple_gov_officials,
+        )
+        .unwrap();
+
+        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
     }
 }
