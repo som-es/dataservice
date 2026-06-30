@@ -333,7 +333,12 @@ fn render_speeches(activity: &RecentActivity) -> String {
         html.push_str(&render_text_entry(
             speech.about.as_deref().unwrap_or("Rede im Plenum"),
             &description,
-            speech.document_url.as_deref(),
+            speech
+                .document_urls
+                .as_ref()
+                .map(|urls| urls.first())
+                .flatten()
+                .map(|url| url.as_str()),
         ));
     }
 

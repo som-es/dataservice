@@ -327,12 +327,17 @@ impl VoteResult {
                     },
                     duration_in_seconds: None,
                     opinion,
-                    document_url: speech
-                        .spoken_text_html_urls
-                        .first()
-                        .map(|html_url| html_url.document_url.clone()),
+                    document_urls: Some(
+                        speech
+                            .spoken_text_html_urls
+                            .iter()
+                            .map(|html_url| html_url.document_url.clone())
+                            .collect(),
+                    ),
+
                     about: None,
                     vote_result_ids: None,
+                    start: None,
                 }
             })
             .collect::<Vec<_>>();

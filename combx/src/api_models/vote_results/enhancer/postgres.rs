@@ -97,8 +97,9 @@ pub async fn pg_get_plenar_speeches(
             END AS infavor,
             duration_in_seconds,
             opinion,
-            document_url,
-            about
+            about,
+            start,
+            COALESCE(array_remove(array_agg(document_url), NULL), ARRAY[]::text[]) AS "document_urls"
         FROM plenar_speeches
         INNER JOIN plenar_speech_links psl ON plenar_speeches.id = psl.plenar_speech_id
         INNER JOIN plenar_speech_legis_inits pl ON pl.speech_id = plenar_speeches.id
@@ -113,7 +114,6 @@ pub async fn pg_get_plenar_speeches(
             delegate_id,
             duration_in_seconds,
             opinion,
-            document_url,
             about
         "#,
         maybe_legis_init_id,
@@ -229,12 +229,13 @@ mod tests {
                 opinion: Some(
                     "Contra".into(),
                 ),
-                document_url: Some(
-                    "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/63/A_-_18_16_03_00898949.html#142".into(),
+                document_urls: Some(
+                    vec!["https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/63/A_-_18_16_03_00898949.html#142".into()],
                 ),
                 about: Some(
                     "Asylstopp-Novelle 2025".into(),
                 ),
+                start: None
             };
         assert!(speeches.contains(&speech));
     }

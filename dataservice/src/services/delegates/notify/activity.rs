@@ -75,7 +75,7 @@ pub async fn collect_recent_activity_by_delegate(
             FROM UNNEST("issued_by_dels: Vec<DbRelatedDelegate>") AS del
             WHERE del.delegate_id = $1::int
         )
-        AND ("legislative_initiative: DbLegislativeInitiativeQuery").is_voteable_on 
+        AND ("legislative_initiative: DbLegislativeInitiativeQuery").is_voteable_on
         AND ("legislative_initiative: DbLegislativeInitiativeQuery").raw_data_created_at >= NOW() - make_interval(days => $2)
         "#,
         delegate_id,

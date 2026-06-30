@@ -1,4 +1,4 @@
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use optional_struct::*;
 use serde::{Deserialize, Serialize};
 use somes_macro::{CompositeType, MeilisearchFilter};
@@ -169,8 +169,9 @@ pub struct DbSpeechWithLink {
     pub infavor: Option<bool>,
     pub duration_in_seconds: Option<i32>,
     pub opinion: Option<String>,
-    pub document_url: Option<String>,
+    pub document_urls: Option<Vec<String>>,
     pub about: Option<String>,
+    pub start: Option<NaiveTime>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
