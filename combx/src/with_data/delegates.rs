@@ -45,7 +45,8 @@ pub async fn extract_last_delegate_speeches(
                 delegate_id,
                 about,
                 opinion,
-                raw_data_created_at
+                raw_data_created_at,
+                start
             ORDER BY raw_data_created_at DESC
             "#,
             delegate_id, last_n_days
@@ -107,7 +108,8 @@ pub async fn extract_delegate_speeches(
                 delegate_id,
                 about,
                 opinion,
-                raw_data_created_at
+                raw_data_created_at,
+                start
             ORDER BY raw_data_created_at DESC, plenar_speeches.id
             OFFSET $2 LIMIT $3
             "#,

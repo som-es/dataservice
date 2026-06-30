@@ -114,7 +114,9 @@ pub async fn pg_get_plenar_speeches(
             delegate_id,
             duration_in_seconds,
             opinion,
-            about
+            about,
+            start,
+            opinion
         "#,
         maybe_legis_init_id,
         db_legis_init.pre_declined_type
