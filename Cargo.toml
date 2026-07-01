@@ -2,6 +2,8 @@
 members = [
     "combx",
     "dataservice",
+    "delegate-question-mail",
+    "delegate-question-mail-listener",
     "getdata", "somai-client", "unique-topics", "update-notify",
 ]
 
