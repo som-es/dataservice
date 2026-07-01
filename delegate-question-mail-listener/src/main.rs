@@ -1,20 +1,43 @@
+use clap::{Parser, ValueEnum};
 use delegate_question_mail::{parse_incoming_reply, IncomingReply};
 use imap::{ClientBuilder, ConnectionMode};
 use sqlx::PgPool;
 use std::{
-    env,
     error::Error,
     io::{BufRead, BufReader, Write},
     net::TcpStream,
     time::Duration,
 };
+use tracing::{debug, error, info, warn};
+use tracing_subscriber::EnvFilter;
 
 type ListenerResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, ValueEnum)]
 enum MailProtocol {
     Imap,
     Pop3,
+}
+
+#[derive(Debug, Parser)]
+#[command(about = "Polls an inbound mailbox for delegate question replies")]
+struct ListenerArgs {
+    #[arg(long, env = "DATASERVICE_URL")]
+    database_url: String,
+    #[arg(long, env = "MAIL_INBOUND_PROTOCOL", value_enum, default_value_t = MailProtocol::Imap)]
+    protocol: MailProtocol,
+    #[arg(long, env = "MAIL_INBOUND_HOST")]
+    host: String,
+    #[arg(long, env = "MAIL_INBOUND_PORT")]
+    port: Option<u16>,
+    #[arg(long, env = "MAIL_INBOUND_USERNAME")]
+    username: String,
+    #[arg(long, env = "MAIL_INBOUND_PASSWORD")]
+    password: String,
+    #[arg(long, env = "MAIL_INBOUND_MAILBOX", default_value = "INBOX")]
+    mailbox: String,
+    #[arg(long, env = "MAIL_INBOUND_POLL_SECONDS", default_value_t = 15)]
+    poll_seconds: u64,
 }
 
 struct ListenerConfig {
@@ -29,43 +52,37 @@ struct ListenerConfig {
 }
 
 impl ListenerConfig {
-    fn from_environment() -> ListenerResult<Self> {
-        let protocol = match required_env("MAIL_INBOUND_PROTOCOL")?
-            .to_ascii_lowercase()
-            .as_str()
-        {
-            "imap" => MailProtocol::Imap,
-            "pop3" => MailProtocol::Pop3,
-            protocol => return Err(format!("unsupported MAIL_INBOUND_PROTOCOL: {protocol}").into()),
-        };
-
-        let port = optional_env("MAIL_INBOUND_PORT")
-            .unwrap_or_else(|| match protocol {
+    fn from_args(args: ListenerArgs) -> Self {
+        let port = args.port.unwrap_or_else(|| {
+            match args.protocol {
                 MailProtocol::Imap => "993".to_string(),
                 MailProtocol::Pop3 => "1110".to_string(),
-            })
-            .parse()?;
-        let poll_interval = optional_env("MAIL_INBOUND_POLL_SECONDS")
-            .unwrap_or_else(|| "15".to_string())
-            .parse::<u64>()?;
+            }
+            .parse()
+            .expect("default port is valid")
+        });
 
-        Ok(Self {
-            database_url: required_env("DATASERVICE_URL")?,
-            protocol,
-            host: required_env("MAIL_INBOUND_HOST")?,
+        Self {
+            database_url: args.database_url,
+            protocol: args.protocol,
+            host: args.host,
             port,
-            username: required_env("MAIL_INBOUND_USERNAME")?,
-            password: required_env("MAIL_INBOUND_PASSWORD")?,
-            mailbox: optional_env("MAIL_INBOUND_MAILBOX").unwrap_or_else(|| "INBOX".to_string()),
-            poll_interval: Duration::from_secs(poll_interval),
-        })
+            username: args.username,
+            password: args.password,
+            mailbox: args.mailbox,
+            poll_interval: Duration::from_secs(args.poll_seconds),
+        }
     }
 }
 
 #[tokio::main]
 async fn main() -> ListenerResult<()> {
     dotenvy::dotenv().ok();
-    let config = ListenerConfig::from_environment()?;
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .init();
+
+    let config = ListenerConfig::from_args(ListenerArgs::parse());
     let pool = PgPool::connect(&config.database_url).await?;
 
     log_startup(&config);
@@ -75,11 +92,11 @@ async fn main() -> ListenerResult<()> {
                 for raw_message in messages {
                     let reply = parse_incoming_reply(&raw_message);
                     if let Err(error) = store_reply(&pool, reply).await {
-                        eprintln!("Could not store incoming reply: {error}");
+                        error!(%error, "could not store incoming reply");
                     }
                 }
             }
-            Err(error) => eprintln!("Could not fetch incoming mail: {error}"),
+            Err(error) => error!(%error, "could not fetch incoming mail"),
         }
 
         tokio::time::sleep(config.poll_interval).await;
@@ -91,10 +108,16 @@ fn log_startup(config: &ListenerConfig) {
         MailProtocol::Imap => "IMAP",
         MailProtocol::Pop3 => "POP3",
     };
-    println!(
-        "Delegate question listener polling {protocol} at {}:{}",
-        config.host, config.port
+    info!(
+        protocol,
+        host = %config.host,
+        port = config.port,
+        poll_seconds = config.poll_interval.as_secs(),
+        "delegate question listener started"
     );
+    if matches!(config.protocol, MailProtocol::Pop3) {
+        warn!("POP3 mode is intended for local Mailpit testing; use IMAP for production mailboxes");
+    }
 }
 
 async fn fetch_messages(config: &ListenerConfig) -> ListenerResult<Vec<Vec<u8>>> {
@@ -218,16 +241,27 @@ fn read_pop3_multiline(reader: &mut BufReader<TcpStream>) -> ListenerResult<Vec<
 
 async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<()> {
     let Some(raw_message_id) = reply.message_id else {
-        eprintln!("Skipping incoming mail without Message-ID");
+        warn!("skipping incoming mail without Message-ID");
         return Ok(());
     };
     if reply.related_message_ids.is_empty() {
+        debug!(
+            raw_message_id,
+            "skipping incoming mail without In-Reply-To/References"
+        );
         return Ok(());
     }
     if reply.body.is_empty() {
-        eprintln!("Skipping empty reply {raw_message_id}");
+        warn!(raw_message_id, "skipping empty reply");
         return Ok(());
     }
+    let Some(sender_email) = reply.sender_email else {
+        warn!(
+            raw_message_id,
+            "skipping incoming mail without From address"
+        );
+        return Ok(());
+    };
 
     let question_id: Option<i64> = sqlx::query_scalar(
         "
@@ -243,9 +277,13 @@ async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<()> 
     .await?;
 
     let Some(question_id) = question_id else {
+        debug!(
+            raw_message_id,
+            related_message_ids = ?reply.related_message_ids,
+            "skipping incoming mail without matching delegate question"
+        );
         return Ok(());
     };
-    let sender_email = reply.sender_email.unwrap_or_default();
 
     let inserted: Option<i64> = sqlx::query_scalar(
         "
@@ -258,7 +296,7 @@ async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<()> 
     .bind(question_id)
     .bind(sender_email)
     .bind(reply.body)
-    .bind(raw_message_id)
+    .bind(&raw_message_id)
     .fetch_optional(pool)
     .await?;
 
@@ -273,16 +311,13 @@ async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<()> 
         .bind(question_id)
         .execute(pool)
         .await?;
-        println!("Stored answer for delegate question {question_id}");
+        info!(
+            question_id,
+            raw_message_id, "stored delegate question answer"
+        );
+    } else {
+        debug!(question_id, raw_message_id, "reply was already stored");
     }
 
     Ok(())
-}
-
-fn required_env(name: &str) -> ListenerResult<String> {
-    env::var(name).map_err(|_| format!("missing required environment variable {name}").into())
-}
-
-fn optional_env(name: &str) -> Option<String> {
-    env::var(name).ok().filter(|value| !value.trim().is_empty())
 }

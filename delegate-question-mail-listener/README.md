@@ -4,6 +4,9 @@ This service polls an inbound mailbox, matches replies through `In-Reply-To` and
 
 The service shares mail parsing and message ID handling with the API through the `delegate-question-mail` library crate.
 
+For production mailboxes, prefer IMAP. POP3 support is kept for local Mailpit testing.
+Messages are not deleted from the mailbox by this service. If storing an answer fails, the same inbound message can be retried on the next poll. Duplicate answers are prevented by the `raw_message_id` unique constraint.
+
 ## Local Mailpit
 
 Mailpit is only used as a local test mailbox. Start it with POP3 enabled and configure the listener as follows:
@@ -21,6 +24,18 @@ The existing `DATASERVICE_URL` variable is also required. Start the listener fro
 
 ```bash
 cargo run -p delegate-question-mail-listener
+```
+
+The same values can also be passed as CLI flags:
+
+```bash
+cargo run -p delegate-question-mail-listener -- \
+  --database-url postgres://postgres:postgres@127.0.0.1/dataservice \
+  --protocol pop3 \
+  --host 127.0.0.1 \
+  --port 1110 \
+  --username test \
+  --password test
 ```
 
 ## Production IMAP
