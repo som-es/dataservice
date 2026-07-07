@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use somes_macro::{CompositeType, MeilisearchFilter};
@@ -5,6 +6,7 @@ use somes_meilisearch_filter::{
     FilterArgument, FilterOp, FilterOptions, build_prefix, to_meilisearch_filters,
 };
 
+use sqlx::types::Json;
 use sqlx::{FromRow, Type};
 
 #[cfg(feature = "utoipa")]
@@ -79,6 +81,36 @@ pub struct SpeechKeypoint {
 pub enum SpeechAbortReason {
     NoSpeechProvidedInContext,
     None,
+}
+
+#[derive(Hash, Debug, Deserialize, PartialEq, Serialize, Type, Clone, FromRow, CompositeType)]
+#[sqlx(type_name = "db_speech_ai_summary")]
+pub struct DbSpeechAiSummary {
+    pub id: i32,
+    pub speech_id: i32,
+    pub short_title: String,
+    pub one_sentence_short_summary: String,
+    pub very_short_summary: String,
+    pub short_summary: String,
+    pub summary: String,
+    pub detailed_summary: String,
+    pub very_detailed_summary: String,
+    pub full_speech_summary: Json<SpeechAiSummary>,
+    pub model_used: String,
+    pub version: String,
+    pub generated_at: DateTime<Utc>,
+}
+
+#[derive(Hash, Debug, Deserialize, PartialEq, Serialize, Type, Clone, FromRow, CompositeType)]
+#[sqlx(type_name = "db_speech_relations")]
+pub struct DbSpeechRelations {
+    pub id: i32,
+    pub speech_ai_summary_id: i32,
+    pub legis_init_id: i32,
+    pub full_speech_relations: Json<SpeechRelations>,
+    pub model_used: String,
+    pub version: String,
+    pub generated_at: DateTime<Utc>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

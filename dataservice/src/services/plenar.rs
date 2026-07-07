@@ -14,6 +14,9 @@ pub use inserts::*;
 mod extract_interjection;
 pub use extract_interjection::*;
 
+mod ai_tasks;
+pub use ai_tasks::*;
+
 const MAX_TASKS: usize = 1;
 
 pub async fn plenar_info_once(
