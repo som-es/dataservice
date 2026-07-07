@@ -344,11 +344,10 @@ pub async fn insert_plenar_speech<'a>(
         );
     }
     if let Some(updated_spoken_text) = &updated_spoken_text {
-        log::info!("{:?}", args.ai_task_tx);
+        #[cfg(feature = "ai")]
         if let Some(ai_task_tx) = args.ai_task_tx
             && args.plenar_date >= today().with_timezone(&Utc) - chrono::Duration::days(365)
         {
-            log::info!("Setting up ai task sending ");
             let priority =
                 if args.plenar_date >= today().with_timezone(&Utc) - chrono::Duration::days(60) {
                     Priority::High
