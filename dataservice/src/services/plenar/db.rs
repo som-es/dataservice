@@ -1,19 +1,20 @@
 use combx::absence_matching;
 use somes_scraper::plenar::PlenarInfo;
 use sqlx::PgPool;
+use tokio::sync::mpsc::Sender;
 
 use crate::{
+    ai_task::AiTask,
     plenar::{
-        insert_absences, insert_call_to_orders, insert_debate,
-        insert_plenar_info, insert_plenar_speech,
+        insert_absences, insert_call_to_orders, insert_debate, insert_plenar_info,
+        insert_plenar_speech, SpeechInsertArgs,
     },
-    ApiLimiter,
 };
 
 pub async fn update_plenar_infos_in_db(
     plenar_info: &PlenarInfo,
     pg_pool: &PgPool,
-    api_limiter: ApiLimiter,
+    ai_task_tx: Option<&Sender<AiTask>>,
 ) {
     log::info!("Updating plenar infos in database...");
 
@@ -70,16 +71,20 @@ pub async fn update_plenar_infos_in_db(
             )
         }*/
 
+        let speech_insert_args = SpeechInsertArgs {
+            corresponding_debate: &debate.info,
+            debate_id,
+            plenar_date: plenar_info.created_at,
+            council: &plenar_info.council,
+            ai_task_tx,
+        };
+
         for plenar_speech in &debate.speeches {
             if let Err(e) = insert_plenar_speech(
                 &mut tx,
                 plenar_speech,
-                &debate.info,
-                debate_id,
                 &mut text_extractor,
-                &api_limiter,
-                plenar_info.created_at,
-                &plenar_info.council,
+                &speech_insert_args,
             )
             .await
             {

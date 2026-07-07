@@ -1,6 +1,10 @@
-use crate::{scrape_untill_success, should_update::StoredUpdatedAt, ApiLimiter, Shutdown, GPS};
+use crate::{
+    ai_task::AiTask, scrape_untill_success, should_update::StoredUpdatedAt, ApiLimiter, Shutdown,
+    GPS,
+};
 use somes_scraper::{plenar::PlenarInfo, AustriaScraper};
 use sqlx::PgPool;
+use tokio::sync::mpsc::Sender;
 
 mod scraping;
 pub use scraping::*;
@@ -22,6 +26,7 @@ const MAX_TASKS: usize = 1;
 pub async fn plenar_info_once(
     pg_pool: &PgPool,
     parliament_api_limiter: ApiLimiter,
+    ai_task_tx: Option<Sender<AiTask>>,
     only_latest: bool,
 ) {
     log::info!("Try scraping plenar info");
@@ -32,6 +37,7 @@ pub async fn plenar_info_once(
         for gp in GPS {
             let pg_pool = pg_pool.clone();
             let parliament_api_limiter = parliament_api_limiter.clone();
+            let ai_task_tx = ai_task_tx.clone();
 
             let handle = tokio::spawn(async move {
                 let mut scraper = AustriaScraper::default();
@@ -57,10 +63,10 @@ pub async fn plenar_info_once(
                     }
 
                     let pg_pool = pg_pool.clone();
-                    let parliament_api_limiter = parliament_api_limiter.clone();
+                    let ai_task_tx = ai_task_tx.clone();
 
                     inner_handles.push(tokio::spawn(async move {
-                        update_plenar_infos_in_db(&plenar_info, &pg_pool, parliament_api_limiter)
+                        update_plenar_infos_in_db(&plenar_info, &pg_pool, ai_task_tx.as_ref())
                             .await;
                     }));
                 }
@@ -107,6 +113,7 @@ pub async fn run_shut_latest(
     mut shutdown: Shutdown,
     pg_pool: PgPool,
     parliament_api_limiter: ApiLimiter,
+    ai_task_tx: Sender<AiTask>,
 ) {
     // insert_all_serially().await;
     // return;
@@ -132,7 +139,8 @@ pub async fn run_shut_latest(
                 let pg_pool = pg_pool.clone();
                 let parliament_api_limiter = parliament_api_limiter.clone();
                 log::info!("Starting latest plenar info scraper");
-                plenar_info_once(&pg_pool, parliament_api_limiter, true).await;
+                plenar_info_once(&pg_pool, parliament_api_limiter, Some(ai_task_tx.clone()), true)
+                    .await;
                 // legis_init_once().await;
                 log::info!("Latest Plenar info scraper service sleeps for {plenar_sleep} seconds...");
                 tokio::time::sleep(tokio::time::Duration::from_secs(plenar_sleep)).await;
@@ -145,6 +153,7 @@ pub async fn run_shut(
     mut shutdown: Shutdown,
     pg_pool: PgPool,
     parliament_api_limiter: ApiLimiter,
+    ai_task_tx: Sender<AiTask>,
     only_latest: bool,
 ) {
     if only_latest {
@@ -174,7 +183,8 @@ pub async fn run_shut(
                 let pg_pool = pg_pool.clone();
                 let parliament_api_limiter = parliament_api_limiter.clone();
                 log::info!("Starting plenar info scraper");
-                plenar_info_once(&pg_pool, parliament_api_limiter, false).await;
+                plenar_info_once(&pg_pool, parliament_api_limiter, Some(ai_task_tx.clone()), false)
+                    .await;
                 // legis_init_once().await;
                 log::info!("Plenar info scraper service sleeps for {plenar_sleep} seconds...");
                 tokio::time::sleep(tokio::time::Duration::from_secs(plenar_sleep)).await;
@@ -259,8 +269,7 @@ mod tests {
 
         let pool = connect_pg().await;
 
-        let parliament_api_limiter = crate::ApiLimiter::new(32);
-        update_plenar_infos_in_db(&res, &pool, parliament_api_limiter).await;
+        update_plenar_infos_in_db(&res, &pool, None).await;
     }
 
     #[tokio::test]
@@ -340,8 +349,7 @@ mod tests {
 
         let pool = connect_pg().await;
 
-        let parliament_api_limiter = crate::ApiLimiter::new(32);
-        update_plenar_infos_in_db(&res, &pool, parliament_api_limiter).await;
+        update_plenar_infos_in_db(&res, &pool, None).await;
     }
 
     #[tokio::test]
@@ -357,8 +365,7 @@ mod tests {
 
         let pool = connect_pg().await;
 
-        let parliament_api_limiter = crate::ApiLimiter::new(32);
-        update_plenar_infos_in_db(&res, &pool, parliament_api_limiter).await;
+        update_plenar_infos_in_db(&res, &pool, None).await;
     }
     #[tokio::test]
     async fn test_brsitz_979_db_insertion() {
@@ -373,8 +380,7 @@ mod tests {
 
         let pool = connect_pg().await;
 
-        let parliament_api_limiter = crate::ApiLimiter::new(32);
-        update_plenar_infos_in_db(&res, &pool, parliament_api_limiter).await;
+        update_plenar_infos_in_db(&res, &pool, None).await;
     }
 
     #[tokio::test]

@@ -7,7 +7,10 @@ use sqlx::types::Json;
 
 use crate::ai_task::TaskArgs;
 
-async fn summarize_speech_and_relate(task_args: TaskArgs) -> crate::Result<()> {
+pub async fn summarize_speech_and_relate(
+    task_args: TaskArgs,
+    spoken_text: String,
+) -> crate::Result<()> {
     let summary_entry = sqlx::query!(
         r#"
             select
@@ -24,14 +27,6 @@ async fn summarize_speech_and_relate(task_args: TaskArgs) -> crate::Result<()> {
     let (speech_ai_summary_id, summary) = match summary_entry {
         Some(entry) => (entry.id, entry.full_speech_summary.0),
         None => {
-            let spoken_text = sqlx::query_scalar!(
-                "select spoken_text from plenar_speeches where id = $1",
-                task_args.db_entry_id
-            )
-            .fetch_one(&task_args.pg_pool)
-            .await?
-            .unwrap_or_default();
-
             if spoken_text.len() < 50 {
                 log::error!(
                     "Cannot summarize speech {}, spoken text is too short / empty",

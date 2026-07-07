@@ -7,11 +7,11 @@ use imageproc::{
     rect::Rect,
 };
 use somes_scraper::Party;
-use sqlx::{query, query_as, query_scalar, PgPool};
+use sqlx::{PgPool, query, query_as, query_scalar};
 
 use crate::{
-    email::{send_mail, LEGIS_INIT_EMAIL_TEMPLATE, MAILER, VOTE_RESULT_ENTRY_TEMPLATE},
     LATEST_GP,
+    email::{LEGIS_INIT_EMAIL_TEMPLATE, MAILER, VOTE_RESULT_ENTRY_TEMPLATE, send_mail},
 };
 
 struct ToNotify {
@@ -187,7 +187,7 @@ fn enrich_parliament_with_colors(
 
     for delegate in delegates {
         match (delegate.seat_row, delegate.seat_col, &delegate.party) {
-            (Some(seat_row), Some(seat_col), Some(ref party)) => {
+            (Some(seat_row), Some(seat_col), Some(party)) => {
                 let seat_row = seat_row as usize;
                 let seat_col = seat_col as usize;
                 let color = *votes_to_party_map
@@ -482,7 +482,7 @@ pub fn notify_users(
 #[cfg(test)]
 mod tests {
     use combx::{PostgresEnhancer, VoteResult};
-    use somes_scraper::{legis_init::LegislativeInitiatives, AustriaScraper};
+    use somes_scraper::{AustriaScraper, legis_init::LegislativeInitiatives};
 
     use crate::{
         connect_pg,

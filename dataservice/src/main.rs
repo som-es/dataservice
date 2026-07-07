@@ -120,6 +120,7 @@ pub async fn run_services(state: &State, config: Config) {
             services::plenar::plenar_info_once(
                 &pool,
                 app_state.parliament_api_limiter.clone(),
+                Some(llm_ai_task_tx.clone()),
                 false,
             )
             .await;
@@ -181,8 +182,15 @@ pub async fn run_services(state: &State, config: Config) {
 
             let pool1 = pool.clone();
             let parliament_api_limiter = app_state.parliament_api_limiter.clone();
+            let inner_ai_task_tx = llm_ai_task_tx.clone();
             let plenars = async move {
-                services::plenar::plenar_info_once(&pool1, parliament_api_limiter, true).await;
+                services::plenar::plenar_info_once(
+                    &pool1,
+                    parliament_api_limiter,
+                    Some(inner_ai_task_tx),
+                    true,
+                )
+                .await;
             };
 
             let inner_ai_task_tx = llm_ai_task_tx.clone();
@@ -280,12 +288,14 @@ pub async fn run_services(state: &State, config: Config) {
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone(),
             app_state.parliament_api_limiter.clone(),
+            llm_ai_task_tx.clone(),
             config.only_latest
         )),
         tokio::spawn(services::plenar::run_shut_latest(
             Shutdown::new(state.notify_shutdown.subscribe()),
             pool.clone(),
-            app_state.parliament_api_limiter.clone()
+            app_state.parliament_api_limiter.clone(),
+            llm_ai_task_tx.clone()
         )),
         tokio::spawn(services::delegates::run_shut(
             Shutdown::new(state.notify_shutdown.subscribe()),

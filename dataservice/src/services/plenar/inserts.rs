@@ -3,14 +3,20 @@ use std::collections::HashSet;
 use chrono::{DateTime, Utc};
 use log::warn;
 use somes_scraper::{
+    PlenarSpeech, Reference, TextExtractor,
     call_to_order::CallToOrderInfo,
     plenar::{Debate, DebateInfo, PlenarInfo},
-    text_utils, PlenarSpeech, Reference, TextExtractor,
+    text_utils,
 };
 
-use sqlx::{postgres::PgQueryResult, Executor, Postgres};
+use sqlx::{Executor, Postgres, postgres::PgQueryResult};
+use tokio::{sync::mpsc::Sender, time::Instant};
 
-use crate::{plenar::extract_interjection::extract_and_save_interjections, ApiLimiter};
+use crate::{
+    ai_task::{AiTask, Priority},
+    plenar::extract_interjection::extract_and_save_interjections,
+    today,
+};
 
 pub async fn insert_plenar_speech_legis_init<'a>(
     pool: impl Executor<'a, Database = Postgres>,
@@ -91,7 +97,9 @@ pub async fn insert_call_to_orders(
         .await?;
     for call_to_order_entry in &plenar_info.call_to_orders {
         if let Err(e) = insert_call_to_order(&mut *tx, call_to_order_entry, plenar_id).await {
-            log::error!("Error inserting call to order: '{e}'. Error occured for call to order: {call_to_order_entry:?}");
+            log::error!(
+                "Error inserting call to order: '{e}'. Error occured for call to order: {call_to_order_entry:?}"
+            );
         }
     }
     tx.commit().await
@@ -126,15 +134,19 @@ pub struct DbReference {
     ref_inr: i32,
 }
 
+pub struct SpeechInsertArgs<'a> {
+    pub corresponding_debate: &'a DebateInfo,
+    pub debate_id: i32,
+    pub plenar_date: DateTime<Utc>,
+    pub council: &'a str,
+    pub ai_task_tx: Option<&'a Sender<AiTask>>,
+}
+
 pub async fn insert_plenar_speech<'a>(
     pool: &mut sqlx::Transaction<'a, Postgres>,
     plenar_speech: &PlenarSpeech,
-    corresponding_debate: &DebateInfo,
-    val_debate_id: i32,
     text_extractor: &mut TextExtractor,
-    api_limiter: &ApiLimiter,
-    plenar_date: DateTime<Utc>,
-    council: &str,
+    args: &SpeechInsertArgs<'_>,
 ) -> Result<(), sqlx::Error> {
     log::info!("insert plenar speech");
     let disable_speech_text =
@@ -177,7 +189,7 @@ pub async fn insert_plenar_speech<'a>(
         RETURNING id
         "#,
         plenar_speech.speech.delegate_id as i32,
-        val_debate_id,
+        args.debate_id,
         opinion,
         None::<String>, // spoken_text is initially None
         plenar_speech.duration_in_seconds.map(|duration| duration as i32).unwrap_or_default(),
@@ -189,7 +201,7 @@ pub async fn insert_plenar_speech<'a>(
     .await?
     .id;
 
-    for reference in &corresponding_debate.references {
+    for reference in &args.corresponding_debate.references {
         let legis_init_id = if let Ok(x) = sqlx::query!(
             "select id from legislative_initiatives where gp = $1 and ityp = $2 and inr = $3",
             reference.gp,
@@ -209,7 +221,9 @@ pub async fn insert_plenar_speech<'a>(
             insert_plenar_speech_legis_init(&mut **pool, legis_init_id, plenar_speech_id, reference)
                 .await
         {
-            log::error!("could not insert plenar speech legis init for legis int {legis_init_id:?} and speech {plenar_speech_id}: {e:?}")
+            log::error!(
+                "could not insert plenar speech legis init for legis int {legis_init_id:?} and speech {plenar_speech_id}: {e:?}"
+            )
         }
         if let Some(legis_init_id) = legis_init_id {
             let own_references = sqlx::query_as!(DbReference, "select origin_legis_init_id, ref_gp, ref_ityp, ref_inr from legis_inits_refs where origin_legis_init_id = $1", legis_init_id).fetch_all(&mut **pool).await.unwrap_or_default();
@@ -241,7 +255,9 @@ pub async fn insert_plenar_speech<'a>(
                 )
                 .await
                 {
-                    log::error!("could not insert plenar speech legis init for legis int {legis_init_id:?} and speech {plenar_speech_id}: {e:?}")
+                    log::error!(
+                        "could not insert plenar speech legis init for legis int {legis_init_id:?} and speech {plenar_speech_id}: {e:?}"
+                    )
                 }
             }
         }
@@ -291,7 +307,9 @@ pub async fn insert_plenar_speech<'a>(
                 }
             }
             Err(e) => {
-                log::error!("could not insert plenar speech link for speech {plenar_speech_id} and url {url:?}: {e:?}");
+                log::error!(
+                    "could not insert plenar speech link for speech {plenar_speech_id} and url {url:?}: {e:?}"
+                );
             }
         }
     }
@@ -300,7 +318,7 @@ pub async fn insert_plenar_speech<'a>(
     //     SELECT spoken_text FROM plenar_speeches
     //     WHERE debate_id = $1 AND delegate_id = $2
     //     "#,
-    //     val_debate_id,
+    //     args.debate_id,
     //     plenar_speech.speech.delegate_id as i32
     // )
     // .fetch_optional(pool)
@@ -322,18 +340,52 @@ pub async fn insert_plenar_speech<'a>(
     if updated_spoken_text.is_none() {
         warn!(
             "DEBATE_ID: {}, Missing spoken text for plenar speech id: {plenar_speech_id}, and plenar info: {:?}",
-            val_debate_id, plenar_speech
+            args.debate_id, plenar_speech
         );
     }
     if let Some(updated_spoken_text) = &updated_spoken_text {
+        log::info!("{:?}", args.ai_task_tx);
+        if let Some(ai_task_tx) = args.ai_task_tx
+            && args.plenar_date >= today().with_timezone(&Utc) - chrono::Duration::days(365)
+        {
+            log::info!("Setting up ai task sending ");
+            let priority =
+                if args.plenar_date >= today().with_timezone(&Utc) - chrono::Duration::days(60) {
+                    Priority::High
+                } else {
+                    Priority::Lowest
+                };
+
+            let spoken_text = updated_spoken_text.clone();
+            let summarization_task = AiTask {
+                input: None,
+                priority,
+                score: priority.weight(),
+                task_id: crate::hash!(),
+                db_entry_id: plenar_speech_id,
+                rerunnable: true,
+                created_at: Instant::now(),
+                task: Box::new(move |task_args| {
+                    Box::pin(crate::plenar::summarize_speech_and_relate(
+                        task_args,
+                        spoken_text,
+                    ))
+                }),
+            };
+
+            if let Err(e) = ai_task_tx.send(summarization_task).await {
+                log::error!("Could not send AI task for speech summarization: {e:?}");
+            }
+        }
+
         let (removed_parans, _) = text_utils::remove_paran_contents(updated_spoken_text, '(', ')');
         if let Err(e) = extract_and_save_interjections(
             removed_parans,
             plenar_speech_id as i64,
             plenar_speech.speech.delegate_id as i64,
-            plenar_date,
+            args.plenar_date,
             pool,
-            council,
+            args.council,
         )
         .await
         {
@@ -352,10 +404,13 @@ pub async fn insert_plenar_speech<'a>(
     )
     .execute(&mut **pool)
     .await?;
+
+    if updated_spoken_text.is_some() {}
+
     if plenar_speech.speech.spoken_text_html_urls.is_empty() {
         warn!(
             "DEBATE_ID: {}, No spoken text html urls for plenar speech: {:?}",
-            val_debate_id, plenar_speech
+            args.debate_id, plenar_speech
         );
     }
 

@@ -48,8 +48,8 @@ pub fn api_max_concurrent_tasks_from_env() -> usize {
 mod tests {
     use std::{
         sync::{
-            atomic::{AtomicUsize, Ordering},
             Arc, Mutex, OnceLock,
+            atomic::{AtomicUsize, Ordering},
         },
         time::Duration,
     };
@@ -64,7 +64,7 @@ mod tests {
     #[test]
     fn max_concurrent_tasks_env_defaults_when_unset() {
         let _guard = env_lock().lock().unwrap();
-        std::env::remove_var(API_MAX_CONCURRENT_TASKS_ENV);
+        unsafe { std::env::remove_var(API_MAX_CONCURRENT_TASKS_ENV) };
 
         assert_eq!(
             api_max_concurrent_tasks_from_env(),
@@ -75,18 +75,18 @@ mod tests {
     #[test]
     fn max_concurrent_tasks_env_uses_valid_value() {
         let _guard = env_lock().lock().unwrap();
-        std::env::set_var(API_MAX_CONCURRENT_TASKS_ENV, "12");
+        unsafe { std::env::set_var(API_MAX_CONCURRENT_TASKS_ENV, "13") };
 
         assert_eq!(api_max_concurrent_tasks_from_env(), 12);
 
-        std::env::remove_var(API_MAX_CONCURRENT_TASKS_ENV);
+        unsafe { std::env::remove_var(API_MAX_CONCURRENT_TASKS_ENV) };
     }
 
     #[test]
     fn max_concurrent_tasks_env_defaults_for_zero_negative_and_invalid_values() {
         let _guard = env_lock().lock().unwrap();
         for value in ["0", "-1", "nope"] {
-            std::env::set_var(API_MAX_CONCURRENT_TASKS_ENV, value);
+            unsafe { std::env::set_var(API_MAX_CONCURRENT_TASKS_ENV, value) };
 
             assert_eq!(
                 api_max_concurrent_tasks_from_env(),
@@ -94,7 +94,7 @@ mod tests {
             );
         }
 
-        std::env::remove_var(API_MAX_CONCURRENT_TASKS_ENV);
+        unsafe { std::env::remove_var(API_MAX_CONCURRENT_TASKS_ENV) };
     }
 
     #[tokio::test]

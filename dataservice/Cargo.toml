@@ -1,7 +1,7 @@
 [package]
 name = "dataservice"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -47,8 +47,8 @@ rand = "0.9"
 
 [features]
 # default = ["runner", "vectordb", "ministerial", "ministerial_latest", "legis_init", "legis_init_latest", "ai", "tesseract", "decrees", "dates", "plenar_latest"]
-default = ["plenar", "runner", "ministerial", "ministerial_latest", "legis_init", "legis_init_latest", "ai", "tesseract", "decrees", "dates", "plenar_latest", "parliamentary_qa"]
-# default = ["runner", "plenar"]
+# default = ["plenar", "runner", "ministerial", "ministerial_latest", "legis_init", "legis_init_latest", "ai", "tesseract", "decrees", "dates", "plenar_latest", "parliamentary_qa"]
+default = ["runner", "plenar_latest"]
 # default = ["runner", "plenar"]
 # default = ["runner", "ministerial", "ministerial_latest", "legis_init", "legis_init_latest", "decrees", "dates", "plenar_latest", "plenar"]
 # default = ["runner", "legis_init_latest", "ministerial_latest", "ministerial", "ai"]

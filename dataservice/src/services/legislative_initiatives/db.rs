@@ -4,6 +4,7 @@ use sqlx::PgPool;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
+    AppState,
     ai_task::AiTask,
     enforce_ai_run,
     legislative_initiatives::inserts::{
@@ -11,8 +12,7 @@ use crate::{
         insert_references_batch, insert_votes_batch,
     },
     notify_update_streamed, today,
-    topics::{insert_topics_generic_batch, TableType, TopicType},
-    AppState,
+    topics::{TableType, TopicType, insert_topics_generic_batch},
 };
 
 pub async fn update_or_insert_legis_init_in_db(
@@ -56,73 +56,73 @@ pub async fn update_or_insert_legis_init_in_db(
     };
 
     let legis_init_id = match sqlx::query!(
-            "
-                INSERT INTO legislative_initiatives (
-                    title, inr, emphasis, description, ityp, gp, accepted, nr_plenary_activity_date, raw_data_created_at, raw_data_updated_at,
-                    requires_simple_majority, pre_declined_type, voted_by_name, plenary_session_id, doktyp, is_law,
-                    law_accepted, has_reference, is_voteable_on,
-                    is_urgent, voting, updated_at, vote_date, hash
-                ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24
-                ) ON CONFLICT (inr, ityp, gp)
-                DO UPDATE SET
-                    title = EXCLUDED.title,
-                    emphasis = COALESCE(EXCLUDED.emphasis, legislative_initiatives.emphasis),
-                    description = EXCLUDED.description,
-                    accepted = EXCLUDED.accepted,
-                    nr_plenary_activity_date = EXCLUDED.nr_plenary_activity_date,
-                    raw_data_created_at = EXCLUDED.raw_data_created_at,
-                    raw_data_updated_at = EXCLUDED.raw_data_updated_at,
-                    requires_simple_majority = EXCLUDED.requires_simple_majority,
-                    pre_declined_type = EXCLUDED.pre_declined_type,
-                    voted_by_name = EXCLUDED.voted_by_name,
-                    plenary_session_id = EXCLUDED.plenary_session_id,
-                    doktyp = EXCLUDED.doktyp,
-                    is_law = EXCLUDED.is_law,
-                    law_accepted = EXCLUDED.law_accepted,
-                    has_reference = EXCLUDED.has_reference,
-                    is_voteable_on = EXCLUDED.is_voteable_on,
-                    is_urgent = EXCLUDED.is_urgent,
-                    voting = EXCLUDED.voting,
-                    updated_at = EXCLUDED.updated_at,
-                    vote_date = EXCLUDED.vote_date,
-                    hash = EXCLUDED.hash
-                RETURNING id
-            ",
-            db_legis_init.title,
-            db_legis_init.inr,
-            db_legis_init.emphasis,
-            db_legis_init.description,
-            db_legis_init.ityp,
-            db_legis_init.gp,
-            db_legis_init.accepted,
-            db_legis_init.nr_plenary_activity_date,
-            db_legis_init.raw_data_created_at,
-            db_legis_init.raw_data_updated_at,
-            db_legis_init.requires_simple_majority,
-            db_legis_init.pre_declined_type,
-            db_legis_init.voted_by_name,
-            db_legis_init.plenary_session_id,
-            db_legis_init.doktyp,
-            db_legis_init.is_law,
-            db_legis_init.law_accepted,
-            db_legis_init.has_reference,
-            db_legis_init.is_voteable_on,
-            db_legis_init.is_urgent,
-            db_legis_init.voting.as_ref().map(|voting| voting.to_string()),
-            crate::today_and_time(),
-            db_legis_init.vote_date,
-            hash as i64,
-        )
-        .fetch_one(&mut *tx)
-        .await
-        {
-            Ok(record) => record.id,
-            Err(e) => {
-                log::error!("Error inserting legislative initiative: '{:?}'. Error occurred for legislative initiative: {:?}", e, legis_init);
-                return;
-            }
-        };
+        "
+            INSERT INTO legislative_initiatives (
+                title, inr, emphasis, description, ityp, gp, accepted, nr_plenary_activity_date, raw_data_created_at, raw_data_updated_at,
+                requires_simple_majority, pre_declined_type, voted_by_name, plenary_session_id, doktyp, is_law,
+                law_accepted, has_reference, is_voteable_on,
+                is_urgent, voting, updated_at, vote_date, hash
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24
+            ) ON CONFLICT (inr, ityp, gp)
+            DO UPDATE SET
+                title = EXCLUDED.title,
+                emphasis = COALESCE(EXCLUDED.emphasis, legislative_initiatives.emphasis),
+                description = EXCLUDED.description,
+                accepted = EXCLUDED.accepted,
+                nr_plenary_activity_date = EXCLUDED.nr_plenary_activity_date,
+                raw_data_created_at = EXCLUDED.raw_data_created_at,
+                raw_data_updated_at = EXCLUDED.raw_data_updated_at,
+                requires_simple_majority = EXCLUDED.requires_simple_majority,
+                pre_declined_type = EXCLUDED.pre_declined_type,
+                voted_by_name = EXCLUDED.voted_by_name,
+                plenary_session_id = EXCLUDED.plenary_session_id,
+                doktyp = EXCLUDED.doktyp,
+                is_law = EXCLUDED.is_law,
+                law_accepted = EXCLUDED.law_accepted,
+                has_reference = EXCLUDED.has_reference,
+                is_voteable_on = EXCLUDED.is_voteable_on,
+                is_urgent = EXCLUDED.is_urgent,
+                voting = EXCLUDED.voting,
+                updated_at = EXCLUDED.updated_at,
+                vote_date = EXCLUDED.vote_date,
+                hash = EXCLUDED.hash
+            RETURNING id
+        ",
+        db_legis_init.title,
+        db_legis_init.inr,
+        db_legis_init.emphasis,
+        db_legis_init.description,
+        db_legis_init.ityp,
+        db_legis_init.gp,
+        db_legis_init.accepted,
+        db_legis_init.nr_plenary_activity_date,
+        db_legis_init.raw_data_created_at,
+        db_legis_init.raw_data_updated_at,
+        db_legis_init.requires_simple_majority,
+        db_legis_init.pre_declined_type,
+        db_legis_init.voted_by_name,
+        db_legis_init.plenary_session_id,
+        db_legis_init.doktyp,
+        db_legis_init.is_law,
+        db_legis_init.law_accepted,
+        db_legis_init.has_reference,
+        db_legis_init.is_voteable_on,
+        db_legis_init.is_urgent,
+        db_legis_init.voting.as_ref().map(|voting| voting.to_string()),
+        crate::today_and_time(),
+        db_legis_init.vote_date,
+        hash as i64,
+    )
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(record) => record.id,
+        Err(e) => {
+            log::error!("Error inserting legislative initiative: '{:?}'. Error occurred for legislative initiative: {:?}", e, legis_init);
+            return;
+        }
+    };
 
     vote_result.id = Some(legis_init_id);
 
@@ -131,7 +131,7 @@ pub async fn update_or_insert_legis_init_in_db(
         if db_legis_init.is_voteable_on {
             use tokio::time::Instant;
 
-            use crate::{ai_task::Priority, LATEST_GP};
+            use crate::{LATEST_GP, ai_task::Priority};
 
             let priority =
                 if db_legis_init.raw_data_created_at >= today() - chrono::Duration::days(60) {
