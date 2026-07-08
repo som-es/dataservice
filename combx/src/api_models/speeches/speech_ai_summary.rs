@@ -139,6 +139,16 @@ pub struct SpeechRelations {
     propsal_keypoint_relations: Option<Vec<SpeechRelation>>,
     speech_related_to_proposal_summary: bool,
     speech_related_to_detailed_proposal_summary: bool,
+    #[filter(skip)]
+    stance_to_proposal: Option<Opinion>,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone, Type)]
+pub enum Opinion {
+    Pro,
+    Neutral,
+    Contra,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
