@@ -11,7 +11,7 @@ use crate::DbSpeechWithLink;
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
-// #[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
     Debug,
     Deserialize,
@@ -24,11 +24,14 @@ use utoipa::ToSchema;
     CompositeType,
     MeilisearchFilter,
 )]
+#[sqlx(type_name = "full_speech")]
 pub struct FullSpeech {
-    id: i32,
-    speech: DbSpeechWithLink,
+    pub id: i32,
+    pub debate_id: i32,
+    pub delegate_id: i32,
+    pub speech: DbSpeechWithLink,
     #[filter(skip)]
-    ai_summary: DbSpeechAiSummary,
+    pub ai_summary: Option<DbSpeechAiSummary>,
     #[filter(skip)]
-    relations: DbSpeechRelations,
+    pub relations: Vec<DbSpeechRelations>,
 }

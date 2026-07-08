@@ -72,7 +72,7 @@ pub struct VoteResult {
 
     pub legislative_initiative: DbLegislativeInitiativeQuery,
     pub votes: Vec<DbVote>,
-    pub speeches: Vec<DbSpeechWithLink>,
+    pub speeches: Vec<FullSpeech>,
 
     pub named_votes: Option<DbNamedVotes>,
     pub topics: Vec<Topic>,
@@ -108,7 +108,7 @@ pub struct OptionalVoteResult {
     pub id: Option<i32>,
     pub legislative_initiative: Option<DbLegislativeInitiativeQuery>,
     pub votes: Option<Vec<DbVote>>,
-    pub speeches: Option<Vec<DbSpeechWithLink>>,
+    pub speeches: Option<Vec<FullSpeech>>,
     pub named_votes: Option<DbNamedVotes>,
     pub topics: Option<Vec<Topic>>,
     pub eurovoc_topics: Option<Vec<Topic>>,
@@ -318,26 +318,33 @@ impl VoteResult {
                     Opinion::None => None,
                 };
 
-                DbSpeechWithLink {
+                FullSpeech {
+                    id: 0,
+                    debate_id: 0,
                     delegate_id: speech.delegate_id as i32,
-                    infavor: match speech.opinion {
-                        Opinion::Infavor => Some(true),
-                        Opinion::Against => Some(false),
-                        _ => None,
-                    },
-                    duration_in_seconds: None,
-                    opinion,
-                    document_urls: Some(
-                        speech
-                            .spoken_text_html_urls
-                            .iter()
-                            .map(|html_url| html_url.document_url.clone())
-                            .collect(),
-                    ),
+                    ai_summary: None,
+                    relations: vec![],
+                    speech: DbSpeechWithLink {
+                        delegate_id: speech.delegate_id as i32,
+                        infavor: match speech.opinion {
+                            Opinion::Infavor => Some(true),
+                            Opinion::Against => Some(false),
+                            _ => None,
+                        },
+                        duration_in_seconds: None,
+                        opinion,
+                        document_urls: Some(
+                            speech
+                                .spoken_text_html_urls
+                                .iter()
+                                .map(|html_url| html_url.document_url.clone())
+                                .collect(),
+                        ),
 
-                    about: None,
-                    vote_result_ids: None,
-                    start: None,
+                        about: None,
+                        vote_result_ids: None,
+                        start: None,
+                    },
                 }
             })
             .collect::<Vec<_>>();
@@ -347,7 +354,17 @@ impl VoteResult {
                 .get_plenar_speeches(&db_legis_init, maybe_legis_init_id)
                 .await
             {
-                speeches = plenar_speeches;
+                speeches = plenar_speeches
+                    .into_iter()
+                    .map(|speech| FullSpeech {
+                        id: 0,
+                        debate_id: 0,
+                        delegate_id: speech.delegate_id,
+                        speech,
+                        ai_summary: None,
+                        relations: vec![],
+                    })
+                    .collect();
             }
 
             let absences = db_enhancer
