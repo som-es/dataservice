@@ -4,19 +4,19 @@ pub use notify::*;
 
 use std::collections::{HashMap, HashSet};
 
-use combx::{create_gov_officials_map, DbContact, DbDelegate, DbMandate};
-use somes_scraper::{delegates::DelegateScraper, AustriaScraper, Delegate, GovOfficial, Mandate};
-use sqlx::{postgres::PgQueryResult, query, PgPool};
+use combx::{DbContact, DbDelegate, DbMandate, create_gov_officials_map};
+use somes_scraper::{AustriaScraper, Delegate, GovOfficial, Mandate, delegates::DelegateScraper};
+use sqlx::{PgPool, postgres::PgQueryResult, query};
 
 use crate::{
-    enforce_ai_run, services::scrape_untill_success, should_update_by_hash, ApiLimiter, AppState,
-    CompareHash, Shutdown,
+    ApiLimiter, AppState, CompareHash, Shutdown, enforce_ai_run, services::scrape_untill_success,
+    should_update_by_hash,
 };
 
-async fn scrape_new_delegates_bs(
+async fn scrape_new_delegates_bs<S: DelegateScraper + Default + Send + Sync>(
     parliament_api_limiter: ApiLimiter,
 ) -> crate::Result<Vec<Delegate>> {
-    let scraper = AustriaScraper::default();
+    let scraper = S::default();
 
     let mut delegates = vec![];
 
@@ -35,11 +35,11 @@ async fn scrape_new_delegates_bs(
     Ok(delegates)
 }
 
-async fn scrape_new_delegates(
+async fn scrape_new_delegates<S: DelegateScraper + Default + Send + Sync>(
     prev_delegates: &HashSet<Delegate>,
     parliament_api_limiter: ApiLimiter,
 ) -> crate::Result<Vec<Delegate>> {
-    let scraper = AustriaScraper::default();
+    let scraper = S::default();
 
     let mut delegates = vec![];
 
@@ -462,7 +462,9 @@ pub async fn insert_mandate(
     }
     if name_lowercase.contains("minister") || name_lowercase.contains("kanzler") {
         if !mandate.is_gov {
-            log::warn!("Could be a minister or kanzler thing, but no GOV in mandate!!! mandate: {mandate:?}, delegate: {delegate_id}");
+            log::warn!(
+                "Could be a minister or kanzler thing, but no GOV in mandate!!! mandate: {mandate:?}, delegate: {delegate_id}"
+            );
         }
     }
 
@@ -516,7 +518,7 @@ pub async fn insert_mandate(
     //     .execute(conn)
 }
 
-pub async fn delegates_once(
+pub async fn delegates_once<S: DelegateScraper + Default + Send + Sync>(
     prev_delegates: &HashSet<Delegate>,
     pg_pool: AppState,
 ) -> Vec<Delegate> {
@@ -524,12 +526,12 @@ pub async fn delegates_once(
 
     let parliament_api_limiter = pg_pool.parliament_api_limiter.clone();
     let new_delegates_bs = scrape_untill_success::<Vec<Delegate>, _>(|| async {
-        scrape_new_delegates_bs(parliament_api_limiter.clone()).await
+        scrape_new_delegates_bs::<S>(parliament_api_limiter.clone()).await
     })
     .await;
 
     let mut new_delegates = scrape_untill_success::<Vec<Delegate>, _>(|| async {
-        scrape_new_delegates(&prev_delegates, pg_pool.parliament_api_limiter.clone()).await
+        scrape_new_delegates::<S>(&prev_delegates, pg_pool.parliament_api_limiter.clone()).await
     })
     .await;
 
@@ -546,7 +548,10 @@ pub async fn delegates_once(
     new_delegates
 }
 
-pub async fn run_shut(mut shutdown: Shutdown, pg_pool: AppState) {
+pub async fn run_shut<S: DelegateScraper + Default + Send + Sync>(
+    mut shutdown: Shutdown,
+    pg_pool: AppState,
+) {
     let prev_delegates = HashSet::new();
 
     while !shutdown.is_shutdown() {
@@ -558,7 +563,7 @@ pub async fn run_shut(mut shutdown: Shutdown, pg_pool: AppState) {
             _ = async {
                 log::info!("Starting delegates scraper");
 
-                delegates_once(&prev_delegates, pg_pool.clone()).await;
+                delegates_once::<S>(&prev_delegates, pg_pool.clone()).await;
                 log::info!("Delegates scraper service sleeps for 3 hours");
                 tokio::time::sleep(tokio::time::Duration::from_secs(60 * 60 * 3)).await;
                 // prev_delegates.extend(delegates_once(&prev_delegates).await);

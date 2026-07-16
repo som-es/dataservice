@@ -1,6 +1,6 @@
 use dataservice::{
-    ai_task::AiTask, connect_pg, delegates::delegate_count, services, setup_app_data, ApiLimiter,
-    AppState, Shutdown, DATABASE_URL, REDIS_URL,
+    ApiLimiter, AppState, DATABASE_URL, REDIS_URL, Shutdown, ai_task::AiTask, connect_pg,
+    delegates::delegate_count, services, setup_app_data,
 };
 use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
@@ -76,45 +76,42 @@ pub fn decree_pages() -> usize {
         })
 }
 
-pub async fn run_services(state: &State, config: Config) {
-    let (llm_ai_task_tx, llm_ai_task_rx) = tokio::sync::mpsc::channel::<AiTask>(16536 * 22);
-    let (cpu_ai_task_tx, cpu_ai_task_rx) = tokio::sync::mpsc::channel::<AiTask>(16536 * 22);
+#[cfg(not(feature = "eu"))]
+pub async fn run_eu_services(notify_shutdown: tokio::sync::broadcast::Sender<()>, _config: Config) {
+}
 
-    log::info!(
-        "Connecting to database {}",
-        DATABASE_URL.split("@").last().unwrap_or_default()
-    );
-    let pool = connect_pg().await;
-    let redis_client = redis::Client::open(REDIS_URL);
-
-    match &redis_client {
-        Ok(client) => {
-            if client.get_connection().is_err() {
-                log::error!("Could not establish redis database connection!");
-            }
-        }
-        Err(e) => {
-            log::error!("Could not create redis client: {e}");
+#[cfg(feature = "eu")]
+pub async fn run_eu_services(notify_shutdown: tokio::sync::broadcast::Sender<()>, config: Config) {
+    let (llm_ai_task_tx, llm_ai_task_rx, cpu_ai_task_rx, pool, app_state) = setup().await;
+    {
+        if delegate_count(&pool).await == Some(0) {
+            log::info!("Delegates are 0, start scraping ...");
+            let hs = std::collections::HashSet::new();
+            let _res = services::delegates::delegates_once::<
+                somes_scraper::eu_parliament::EuParliamentScraper,
+            >(&hs, app_state.clone())
+            .await;
         }
     }
-    let redis_client = redis_client;
-    let redis_client = match redis_client {
-        Ok(redis_client) => redis_client.get_connection_manager().await,
-        Err(e) => Err(e),
-    }
-    .ok();
-    let app_state = AppState {
-        pg_pool: pool.clone(),
-        redis_client,
-        parliament_api_limiter: ApiLimiter::from_env(),
-        cpu_task_tx: Some(cpu_ai_task_tx.clone()),
-    };
+}
+
+#[cfg(not(feature = "austria"))]
+pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>, _config: Config) {
+}
+
+#[cfg(feature = "austria")]
+pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>, config: Config) {
+    let (llm_ai_task_tx, llm_ai_task_rx, cpu_ai_task_rx, pool, app_state) = setup().await;
 
     {
         if delegate_count(&pool).await == Some(0) {
             log::info!("Delegates are 0, start scraping ...");
             let hs = std::collections::HashSet::new();
-            let _res = services::delegates::delegates_once(&hs, app_state.clone()).await;
+            let _res = services::delegates::delegates_once::<somes_scraper::AustriaScraper>(
+                &hs,
+                app_state.clone(),
+            )
+            .await;
             services::parties::parties_once(&pool, app_state.parliament_api_limiter.clone()).await;
 
             services::plenar::plenar_info_once(
@@ -252,13 +249,13 @@ pub async fn run_services(state: &State, config: Config) {
     tokio::join!(
         // services::proposals::run(),
         tokio::spawn(services::legislative_initiatives::run_shut_every_gp(
-            Shutdown::new(state.notify_shutdown.subscribe()),
+            Shutdown::new(notify_shutdown.subscribe()),
             app_state.clone(),
             llm_ai_task_tx.clone(),
             config.only_latest,
         )),
         tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
-            Shutdown::new(state.notify_shutdown.subscribe()),
+            Shutdown::new(notify_shutdown.subscribe()),
             app_state.clone(),
             llm_ai_task_tx.clone(),
             latest_legis_init_sleep + 5000,
@@ -266,7 +263,7 @@ pub async fn run_services(state: &State, config: Config) {
             false, // also fetches everything that isn't a law
         )),
         tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
-            Shutdown::new(state.notify_shutdown.subscribe()),
+            Shutdown::new(notify_shutdown.subscribe()),
             app_state.clone(),
             llm_ai_task_tx.clone(),
             latest_legis_init_sleep + 60,
@@ -274,41 +271,43 @@ pub async fn run_services(state: &State, config: Config) {
             FETCH_ONLY_LAWS,
         )),
         tokio::spawn(services::ministrial_proposals::run_shut_every_gp(
-            Shutdown::new(state.notify_shutdown.subscribe()),
+            Shutdown::new(notify_shutdown.subscribe()),
             app_state.clone(),
             config.only_latest,
             llm_ai_task_tx.clone(),
         )),
         tokio::spawn(services::ministrial_proposals::run_shut_latest_gp(
-            Shutdown::new(state.notify_shutdown.subscribe()),
+            Shutdown::new(notify_shutdown.subscribe()),
             app_state.clone(),
             llm_ai_task_tx.clone(),
         )),
         tokio::spawn(services::plenar::run_shut(
-            Shutdown::new(state.notify_shutdown.subscribe()),
+            Shutdown::new(notify_shutdown.subscribe()),
             pool.clone(),
             app_state.parliament_api_limiter.clone(),
             llm_ai_task_tx.clone(),
             config.only_latest
         )),
         tokio::spawn(services::plenar::run_shut_latest(
-            Shutdown::new(state.notify_shutdown.subscribe()),
+            Shutdown::new(notify_shutdown.subscribe()),
             pool.clone(),
             app_state.parliament_api_limiter.clone(),
             llm_ai_task_tx.clone()
         )),
-        tokio::spawn(services::delegates::run_shut(
-            Shutdown::new(state.notify_shutdown.subscribe()),
-            app_state.clone()
-        )),
+        tokio::spawn(
+            services::delegates::run_shut::<somes_scraper::AustriaScraper>(
+                Shutdown::new(notify_shutdown.subscribe()),
+                app_state.clone()
+            )
+        ),
         tokio::spawn(services::parties::run_shut(
-            Shutdown::new(state.notify_shutdown.subscribe()),
+            Shutdown::new(notify_shutdown.subscribe()),
             pool.clone(),
             app_state.parliament_api_limiter.clone()
         )),
         // latest
         tokio::spawn(services::ministrial_decrees::run_shut_pages(
-            Shutdown::new(state.notify_shutdown.subscribe()),
+            Shutdown::new(notify_shutdown.subscribe()),
             app_state.clone(),
             decree_pages() as u32,
             llm_ai_task_tx.clone(),
@@ -316,47 +315,47 @@ pub async fn run_services(state: &State, config: Config) {
         )),
         // latest
         tokio::spawn(services::ministrial_decrees::run_shut_pages(
-            Shutdown::new(state.notify_shutdown.subscribe()),
+            Shutdown::new(notify_shutdown.subscribe()),
             app_state.clone(),
             decree_pages() as u32,
             llm_ai_task_tx.clone(),
             false
         )),
         tokio::spawn(services::dates::run_shut_dates(
-            Shutdown::new(state.notify_shutdown.subscribe()),
+            Shutdown::new(notify_shutdown.subscribe()),
             pool.clone(),
             app_state.parliament_api_limiter.clone()
         )),
         tokio::spawn(services::dates::run_shut_dates_latest(
-            Shutdown::new(state.notify_shutdown.subscribe()),
+            Shutdown::new(notify_shutdown.subscribe()),
             pool.clone(),
             app_state.parliament_api_limiter.clone()
         )),
         tokio::spawn(services::ai_task_service::ai_tasks_service(
-            Shutdown::new(state.notify_shutdown.subscribe()),
+            Shutdown::new(notify_shutdown.subscribe()),
             pool.clone(),
             llm_ai_task_rx,
             1,
         )),
         tokio::spawn(services::ai_task_service::ai_tasks_service(
-            Shutdown::new(state.notify_shutdown.subscribe()),
+            Shutdown::new(notify_shutdown.subscribe()),
             pool.clone(),
             cpu_ai_task_rx,
             16,
         )),
         tokio::spawn(services::political_analysis_service(
-            Shutdown::new(state.notify_shutdown.subscribe()),
+            Shutdown::new(notify_shutdown.subscribe()),
             pool.clone(),
             llm_ai_task_tx.clone(),
         )),
         tokio::spawn(services::parliamentary_qa_service(
-            Shutdown::new(state.notify_shutdown.subscribe()),
+            Shutdown::new(notify_shutdown.subscribe()),
             app_state.clone(),
             llm_ai_task_tx.clone(),
             true,
         )),
         tokio::spawn(services::parliamentary_qa_service(
-            Shutdown::new(state.notify_shutdown.subscribe()),
+            Shutdown::new(notify_shutdown.subscribe()),
             app_state.clone(),
             llm_ai_task_tx.clone(),
             false,
@@ -366,16 +365,74 @@ pub async fn run_services(state: &State, config: Config) {
     .unwrap();
 }
 
+async fn setup() -> (
+    mpsc::Sender<AiTask>,
+    mpsc::Receiver<AiTask>,
+    mpsc::Receiver<AiTask>,
+    sqlx::Pool<sqlx::Postgres>,
+    AppState,
+) {
+    let (llm_ai_task_tx, llm_ai_task_rx) = tokio::sync::mpsc::channel::<AiTask>(16536 * 22);
+    let (cpu_ai_task_tx, cpu_ai_task_rx) = tokio::sync::mpsc::channel::<AiTask>(16536 * 22);
+
+    log::info!(
+        "Connecting to database {}",
+        DATABASE_URL.split("@").last().unwrap_or_default()
+    );
+    let pool = connect_pg().await;
+    let redis_client = redis::Client::open(REDIS_URL);
+
+    match &redis_client {
+        Ok(client) => {
+            if client.get_connection().is_err() {
+                log::error!("Could not establish redis database connection!");
+            }
+        }
+        Err(e) => {
+            log::error!("Could not create redis client: {e}");
+        }
+    }
+    let redis_client = redis_client;
+    let redis_client = match redis_client {
+        Ok(redis_client) => redis_client.get_connection_manager().await,
+        Err(e) => Err(e),
+    }
+    .ok();
+    let app_state = AppState {
+        pg_pool: pool.clone(),
+        redis_client,
+        parliament_api_limiter: ApiLimiter::from_env(),
+        cpu_task_tx: Some(cpu_ai_task_tx.clone()),
+    };
+    (
+        llm_ai_task_tx,
+        llm_ai_task_rx,
+        cpu_ai_task_rx,
+        pool,
+        app_state,
+    )
+}
+
 pub struct State {
     notify_shutdown: broadcast::Sender<()>,
     shutdown_complete_rx: mpsc::Receiver<()>,
     shutdown_complete_tx: mpsc::Sender<()>,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct Config {
     force_fill: bool,
     exit_after_force_fill: bool,
     only_latest: bool,
+}
+
+pub async fn run_services(notify_shutdown: tokio::sync::broadcast::Sender<()>, config: Config) {
+    tokio::join! {
+        tokio::spawn(run_at_services(notify_shutdown.clone(), config)),
+        tokio::spawn(run_eu_services(notify_shutdown.clone(), config))
+    }
+    .0
+    .unwrap();
 }
 
 pub async fn run(shutdown: impl Future, config: Config) {
@@ -392,7 +449,7 @@ pub async fn run(shutdown: impl Future, config: Config) {
         _ = shutdown => {
             println!("Shutdown signal received");
         }
-        _ = run_services(&state, config) => {
+        _ = run_services(state.notify_shutdown.clone(), config) => {
             println!("Services finished");
         }
     }

@@ -3,7 +3,7 @@ use combx::models::*;
 use combx::with_data::delegates::{
     extract_call_to_orders_by_delegate, extract_last_delegate_speeches,
 };
-use combx::{today, DbSpeechWithLink};
+use combx::{DbSpeechWithLink, today};
 use somes_common_lib::{CallToOrder, Document};
 use sqlx::PgPool;
 
