@@ -24,9 +24,9 @@ pub async fn insert_delegates_batch<'a>(
     let texts: Vec<Option<String>> = delegates.iter().map(|d| d.text.clone()).collect();
 
     let res = sqlx::query!(
-        "INSERT INTO legis_init_delegates (legis_init_id, delegate_id, delegate_text) 
-         SELECT * FROM UNNEST($1::int4[], $2::int4[], $3::text[]) 
-         ON CONFLICT (legis_init_id, delegate_id) 
+        "INSERT INTO legis_init_delegates (legis_init_id, delegate_id, delegate_text)
+         SELECT * FROM UNNEST($1::int4[], $2::int4[], $3::text[])
+         ON CONFLICT (legis_init_id, delegate_id)
          DO UPDATE SET delegate_text = EXCLUDED.delegate_text",
         &ids,
         &delegate_ids,
