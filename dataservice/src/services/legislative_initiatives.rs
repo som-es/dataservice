@@ -13,14 +13,14 @@ mod ai_tasks;
 pub use ai_tasks::*;
 
 use somes_scraper::{
-    legis_init::LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES, AustriaScraper, LegislativeInitiative,
+    AustriaScraper, LegislativeInitiative, legis_init::LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES,
 };
-use sqlx::{query, query_scalar, PgPool};
+use sqlx::{PgPool, query, query_scalar};
 use std::sync::{Arc, LazyLock};
 
 use crate::{
-    ai_task::AiTask, should_update::StoredUpdatedAt, today_and_time, AppState, CompareHash,
-    Shutdown, GPS, LATEST_GP,
+    AppState, CompareHash, GPS, LATEST_GP, Shutdown, ai_task::AiTask,
+    should_update::StoredUpdatedAt, today_and_time,
 };
 
 pub(self) const LEGIS_INIT_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| {
@@ -222,11 +222,11 @@ mod tests {
     use combx::{PostgresEnhancer, VoteResult};
     use rand::rand_core::le;
     use somes_scraper::{
-        legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative,
+        AustriaScraper, LegislativeInitiative, legis_init::LegislativeInitiatives,
     };
     use sqlx::postgres::PgPoolOptions;
 
-    use crate::{connect_pg, CompareHash, DATABASE_URL};
+    use crate::{CompareHash, DATABASE_URL, connect_pg2 as connect_pg};
 
     #[test]
     fn test_date_time_parse() {

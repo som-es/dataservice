@@ -82,17 +82,46 @@ pub async fn run_eu_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
 
 #[cfg(feature = "eu")]
 pub async fn run_eu_services(notify_shutdown: tokio::sync::broadcast::Sender<()>, config: Config) {
-    let (llm_ai_task_tx, llm_ai_task_rx, cpu_ai_task_rx, pool, app_state) = setup().await;
+    use dataservice::eu_database_url;
+
+    let (llm_ai_task_tx, llm_ai_task_rx, cpu_ai_task_rx, pool, app_state) =
+        setup(&eu_database_url(), 1).await;
     {
         if delegate_count(&pool).await == Some(0) {
+            use dataservice::parties::PartyService;
+
             log::info!("Delegates are 0, start scraping ...");
             let hs = std::collections::HashSet::new();
             let _res = services::delegates::delegates_once::<
                 somes_scraper::eu_parliament::EuParliamentScraper,
             >(&hs, app_state.clone())
             .await;
+
+            <somes_scraper::eu_parliament::EuParliamentScraper as PartyService>::run(
+                &pool,
+                app_state.parliament_api_limiter.clone(),
+            )
+            .await;
         }
     }
+
+    tokio::join! {
+        tokio::spawn(
+            services::delegates::run_shut::<somes_scraper::eu_parliament::EuParliamentScraper>(
+                Shutdown::new(notify_shutdown.subscribe()),
+                app_state.clone()
+            )
+        ),
+        tokio::spawn(
+            services::parties::run_shut::<somes_scraper::eu_parliament::EuParliamentScraper>(
+                Shutdown::new(notify_shutdown.subscribe()),
+                pool.clone(),
+                app_state.parliament_api_limiter.clone()
+            )
+        ),
+    }
+    .0
+    .unwrap()
 }
 
 #[cfg(not(feature = "austria"))]
@@ -101,7 +130,10 @@ pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
 
 #[cfg(feature = "austria")]
 pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>, config: Config) {
-    let (llm_ai_task_tx, llm_ai_task_rx, cpu_ai_task_rx, pool, app_state) = setup().await;
+    use dataservice::{api_max_concurrent_tasks_from_env, at_database_url};
+
+    let (llm_ai_task_tx, llm_ai_task_rx, cpu_ai_task_rx, pool, app_state) =
+        setup(&at_database_url(), api_max_concurrent_tasks_from_env()).await;
 
     {
         if delegate_count(&pool).await == Some(0) {
@@ -300,11 +332,13 @@ pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
                 app_state.clone()
             )
         ),
-        tokio::spawn(services::parties::run_shut(
-            Shutdown::new(notify_shutdown.subscribe()),
-            pool.clone(),
-            app_state.parliament_api_limiter.clone()
-        )),
+        tokio::spawn(
+            services::parties::run_shut::<somes_scraper::AustriaScraper>(
+                Shutdown::new(notify_shutdown.subscribe()),
+                pool.clone(),
+                app_state.parliament_api_limiter.clone()
+            )
+        ),
         // latest
         tokio::spawn(services::ministrial_decrees::run_shut_pages(
             Shutdown::new(notify_shutdown.subscribe()),
@@ -365,7 +399,10 @@ pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
     .unwrap();
 }
 
-async fn setup() -> (
+async fn setup(
+    database_url: &str,
+    max_api_fetch_tasks: usize,
+) -> (
     mpsc::Sender<AiTask>,
     mpsc::Receiver<AiTask>,
     mpsc::Receiver<AiTask>,
@@ -375,11 +412,9 @@ async fn setup() -> (
     let (llm_ai_task_tx, llm_ai_task_rx) = tokio::sync::mpsc::channel::<AiTask>(16536 * 22);
     let (cpu_ai_task_tx, cpu_ai_task_rx) = tokio::sync::mpsc::channel::<AiTask>(16536 * 22);
 
-    log::info!(
-        "Connecting to database {}",
-        DATABASE_URL.split("@").last().unwrap_or_default()
-    );
-    let pool = connect_pg().await;
+    let db_path = database_url.split("@").last().unwrap_or_default();
+    log::info!("Connecting to database {db_path}",);
+    let pool = connect_pg(database_url).await;
     let redis_client = redis::Client::open(REDIS_URL);
 
     match &redis_client {
@@ -401,7 +436,7 @@ async fn setup() -> (
     let app_state = AppState {
         pg_pool: pool.clone(),
         redis_client,
-        parliament_api_limiter: ApiLimiter::from_env(),
+        parliament_api_limiter: ApiLimiter::new(max_api_fetch_tasks),
         cpu_task_tx: Some(cpu_ai_task_tx.clone()),
     };
     (

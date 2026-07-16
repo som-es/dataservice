@@ -22,7 +22,8 @@ use chrono::{DateTime, Local};
 pub use db::*;
 #[cfg(feature = "runner")]
 pub use shutdown::*;
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use somes_scraper::{AustriaScraper, eu_parliament::EuParliamentScraper};
+use sqlx::{PgPool, postgres::PgPoolOptions};
 
 pub mod location_hasher;
 
@@ -127,11 +128,11 @@ pub fn today_and_time() -> chrono::DateTime<Local> {
     chrono::Local::now()
 }
 
-pub async fn connect_pg() -> PgPool {
+pub async fn connect_pg(db_url: &str) -> PgPool {
     PgPoolOptions::new()
         .max_connections(90)
         .min_connections(5)
-        .connect(DATABASE_URL)
+        .connect(db_url)
         .await
         .unwrap()
 }
@@ -145,15 +146,33 @@ pub async fn connect_pg2() -> PgPool {
         .unwrap()
 }
 
+pub trait Gps {
+    fn gps<'a>() -> &'a [&'static str];
+}
+
+impl Gps for AustriaScraper {
+    fn gps<'a>() -> &'a [&'static str] {
+        &GPS
+    }
+}
+
+impl Gps for EuParliamentScraper {
+    fn gps<'a>() -> &'a [&'static str] {
+        &[
+            "2019", "2020", "2021", "2022", "2023", "2024", "2025", "2026",
+        ]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use sqlx::query;
 
-    use crate::connect_pg;
+    use crate::connect_pg2;
 
     #[tokio::test]
     async fn test_duplicate_spoken_text_check() {
-        let pg = connect_pg().await;
+        let pg = connect_pg2().await;
 
         let res = query!(
             "SELECT spoken_text, COUNT(*) as c

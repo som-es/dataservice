@@ -1,8 +1,8 @@
 use crate::{
-    ai_task::AiTask, scrape_untill_success, should_update::StoredUpdatedAt, ApiLimiter, Shutdown,
-    GPS,
+    ApiLimiter, GPS, Shutdown, ai_task::AiTask, scrape_untill_success,
+    should_update::StoredUpdatedAt,
 };
-use somes_scraper::{plenar::PlenarInfo, AustriaScraper};
+use somes_scraper::{AustriaScraper, plenar::PlenarInfo};
 use sqlx::PgPool;
 use tokio::sync::mpsc::Sender;
 
@@ -203,10 +203,10 @@ mod tests {
     use chrono::NaiveDateTime;
     use combx::GPS;
     use rand::Rng;
-    use somes_scraper::{plenar::Plenar, AustriaScraper};
+    use somes_scraper::{AustriaScraper, plenar::Plenar};
 
     use crate::{
-        connect_pg,
+        connect_pg2 as connect_pg,
         plenar::{scrape_new_plenar_infos, update_plenar_infos_in_db},
     };
 

@@ -1,9 +1,9 @@
 use chrono_tz::Europe::Vienna;
 use combx::GovProposal;
-use sqlx::{query, PgPool};
+use sqlx::{PgPool, query};
 use std::collections::HashMap;
 
-use crate::email::{send_mail, MAILER};
+use crate::email::{MAILER, send_mail};
 
 #[derive(Debug, Clone)]
 pub(crate) struct SimpleGovOfficial {
@@ -225,14 +225,14 @@ pub(crate) fn notify_users(
 mod tests {
     use std::{collections::HashMap, sync::Arc};
 
-    use combx::{create_gov_officials_map, GovProposal};
+    use combx::{GovProposal, create_gov_officials_map};
     use somes_scraper::{
-        ministrial_proposals::{GegenstandInfo, MinistrialProposalScraper},
         AustriaScraper,
+        ministrial_proposals::{GegenstandInfo, MinistrialProposalScraper},
     };
 
     use crate::{
-        connect_pg,
+        connect_pg2,
         ministrial_proposals::{
             notify::get_active_gov_officals, send_new_ministrial_prop_info_mail,
         },
@@ -241,7 +241,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_send_new_ministerial_prop_mail() {
-        let pg_pool = connect_pg().await;
+        let pg_pool = connect_pg2().await;
         let simple_gov_officials = get_active_gov_officals(&pg_pool).await;
 
         let simple_gov_officials = simple_gov_officials

@@ -485,7 +485,7 @@ mod tests {
     use somes_scraper::{AustriaScraper, legis_init::LegislativeInitiatives};
 
     use crate::{
-        connect_pg,
+        connect_pg2,
         legislative_initiatives::notify::{
             create_color_map, generate_parliament_image, get_current_delegates,
             get_current_parties, get_current_seats, send_new_legis_info_mail,
@@ -508,7 +508,7 @@ mod tests {
             .await
             .unwrap();
 
-        let pg = connect_pg().await;
+        let pg = connect_pg2().await;
         let legis_init = VoteResult::from_legis_init(PostgresEnhancer(pg), legis_init, None).await;
         generate_parliament_image(&legis_init.votes, &[20, 28, 37, 43, 48, 54]).await;
     }
@@ -531,7 +531,7 @@ mod tests {
         let delegates = get_current_delegates().await.unwrap_or_default();
         let colors = create_color_map(get_current_parties().await.unwrap_or_default());
 
-        let pg = connect_pg().await;
+        let pg = connect_pg2().await;
         let legis_init = VoteResult::from_legis_init(PostgresEnhancer(pg), legis_init, None).await;
 
         send_new_legis_info_mail(
