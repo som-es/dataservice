@@ -5,7 +5,9 @@ pub use notify::*;
 use std::collections::{HashMap, HashSet};
 
 use combx::{DbContact, DbDelegate, DbMandate, create_gov_officials_map};
-use somes_scraper::{AustriaScraper, Delegate, GovOfficial, Mandate, delegates::DelegateScraper};
+use somes_scraper::{
+    AustriaScraper, Delegate, GovOfficial, Mandate, delegates::DelegateScraper, error::ScraperError,
+};
 use sqlx::{PgPool, postgres::PgQueryResult, query};
 
 use crate::{
@@ -47,12 +49,19 @@ async fn scrape_new_delegates<S: DelegateScraper + Default + Send + Sync>(
         .run(scraper.post_persons_payload())
         .await?;
     for person_path in scraper.person_paths(persons).unwrap_or_default() {
+        log::info!("person path: {person_path:?}");
         // println!("person_path: {person_path}");
-        let Ok(delegate) = parliament_api_limiter
+        let delegate = match parliament_api_limiter
             .run(scraper.get_delegate(person_path))
             .await
-        else {
-            continue;
+        {
+            Ok(delegate) => delegate,
+            Err(e) => {
+                if e == ScraperError::Forbidden {
+                    return Err(Box::new(e));
+                }
+                continue;
+            }
         };
 
         // delegates that were active before but aren't anymore remain (as active) in the database

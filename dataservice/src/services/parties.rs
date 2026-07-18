@@ -64,7 +64,7 @@ pub trait PartyService: Parties + Send + Sync + Default + Gps {
 }
 
 #[async_trait::async_trait]
-impl PartyService for AustriaScraper {
+impl PartyService for EuParliamentScraper {
     async fn run(pg_pool: &PgPool, parliament_api_limiter: ApiLimiter) {
         let scraper = EuParliamentScraper::default();
         scrape_and_update(
@@ -78,7 +78,7 @@ impl PartyService for AustriaScraper {
 }
 
 #[async_trait::async_trait]
-impl PartyService for EuParliamentScraper {
+impl PartyService for AustriaScraper {
     async fn run(pg_pool: &PgPool, parliament_api_limiter: ApiLimiter) {
         parties_once(pg_pool, parliament_api_limiter).await
     }

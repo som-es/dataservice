@@ -1,6 +1,6 @@
 use tokio::sync::mpsc;
 
-use crate::{ai_task::AiTask, AppState, Shutdown};
+use crate::{AppState, Shutdown, ai_task::AiTask};
 
 pub mod ai_task_service;
 pub mod dates;
@@ -45,6 +45,7 @@ where
     O: std::future::Future<Output = crate::Result<T>>,
 {
     let mut new_proposals = f().await;
+    let mut wait_secs = 1;
     while let Err(e) = new_proposals {
         log::warn!(
             "Could not scrape data: {e}, INFO for me: {:?}",
@@ -52,7 +53,11 @@ where
         );
 
         new_proposals = f().await;
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(wait_secs)).await;
+        wait_secs += 1;
+        if wait_secs >= 500 {
+            panic!("could not complete scrape")
+        }
     }
     new_proposals.expect("Above loop always runs till Ok")
 }
