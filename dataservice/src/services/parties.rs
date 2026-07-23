@@ -69,7 +69,7 @@ impl PartyService for EuParliamentScraper {
         let scraper = EuParliamentScraper::default();
         scrape_and_update(
             parliament_api_limiter,
-            "ep-10".into(),
+            "10".into(),
             pg_pool.clone(),
             scraper,
         )

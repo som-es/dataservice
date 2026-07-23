@@ -49,7 +49,7 @@ rand = "0.9"
 [features]
 # default = ["runner", "vectordb", "ministerial", "ministerial_latest", "legis_init", "legis_init_latest", "ai", "tesseract", "decrees", "dates", "plenar_latest"]
 # default = ["plenar", "runner", "ministerial", "ministerial_latest", "legis_init", "legis_init_latest", "ai", "tesseract", "decrees", "dates", "plenar_latest", "parliamentary_qa"]
-default = ["runner", "eu", "parties"]
+default = ["runner", "eu",]
 # default = ["runner", "plenar"]
 # default = ["runner", "ministerial", "ministerial_latest", "legis_init", "legis_init_latest", "decrees", "dates", "plenar_latest", "plenar"]
 # default = ["runner", "legis_init_latest", "ministerial_latest", "ministerial", "ai"]

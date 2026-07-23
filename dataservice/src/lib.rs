@@ -10,6 +10,7 @@ pub mod shutdown;
 
 use std::{cell::LazyCell, env::VarError};
 
+use chrono::Datelike;
 use redis::aio::ConnectionManager;
 #[cfg(feature = "runner")]
 pub use services::*;
@@ -147,20 +148,23 @@ pub async fn connect_pg2() -> PgPool {
 }
 
 pub trait Gps {
-    fn gps<'a>() -> &'a [&'static str];
+    fn gps() -> Vec<String>;
 }
 
 impl Gps for AustriaScraper {
-    fn gps<'a>() -> &'a [&'static str] {
-        &GPS
+    fn gps() -> Vec<String> {
+        GPS.iter().map(|gp| gp.to_string()).collect()
     }
 }
 
 impl Gps for EuParliamentScraper {
-    fn gps<'a>() -> &'a [&'static str] {
-        &[
-            "2019", "2020", "2021", "2022", "2023", "2024", "2025", "2026",
-        ]
+    fn gps() -> Vec<String> {
+        let start = 2014;
+        let end = today().year();
+        (start..=end)
+            .into_iter()
+            .map(|year| year.to_string())
+            .collect()
     }
 }
 

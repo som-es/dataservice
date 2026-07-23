@@ -1,8 +1,12 @@
 mod delegate_qa;
 mod notify;
 pub use notify::*;
+use reqwest::StatusCode;
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    time::Duration,
+};
 
 use combx::{DbContact, DbDelegate, DbMandate, create_gov_officials_map};
 use somes_scraper::{
@@ -37,6 +41,8 @@ async fn scrape_new_delegates_bs<S: DelegateScraper + Default + Send + Sync>(
     Ok(delegates)
 }
 
+const MAX_RETRIES: u32 = 3;
+
 async fn scrape_new_delegates<S: DelegateScraper + Default + Send + Sync>(
     prev_delegates: &HashSet<Delegate>,
     parliament_api_limiter: ApiLimiter,
@@ -49,20 +55,33 @@ async fn scrape_new_delegates<S: DelegateScraper + Default + Send + Sync>(
         .run(scraper.post_persons_payload())
         .await?;
     for person_path in scraper.person_paths(persons).unwrap_or_default() {
-        log::info!("person path: {person_path:?}");
-        // println!("person_path: {person_path}");
-        let delegate = match parliament_api_limiter
-            .run(scraper.get_delegate(person_path))
-            .await
-        {
-            Ok(delegate) => delegate,
-            Err(e) => {
-                if e == ScraperError::Forbidden {
-                    return Err(Box::new(e));
+        let mut attempt = 0;
+        let delegate = loop {
+            match parliament_api_limiter
+                .run(scraper.get_delegate(person_path.clone()))
+                .await
+            {
+                Ok(delegate) => break Some(delegate),
+
+                Err(ScraperError::Forbidden) => return Err(Box::new(ScraperError::Forbidden)),
+
+                Err(ScraperError::TooManyRequests(retry_after)) if attempt < MAX_RETRIES => {
+                    attempt += 1;
+                    let wait = retry_after.unwrap_or(Duration::from_secs(1 << attempt));
+                    log::warn!(
+                        "429 on {person_path:?}, waiting {wait:?} (attempt {attempt}/{MAX_RETRIES})",
+                    );
+                    tokio::time::sleep(wait).await;
                 }
-                continue;
+
+                Err(e) => {
+                    log::error!("Could not scrape delegate {e:?}");
+                    break None;
+                }
             }
         };
+
+        let Some(delegate) = delegate else { continue };
 
         // delegates that were active before but aren't anymore remain (as active) in the database
         /*if !delegate.is_active {

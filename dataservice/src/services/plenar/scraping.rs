@@ -1,14 +1,11 @@
 use std::collections::HashSet;
 
-use somes_scraper::{
-    plenar::{Plenar, PlenarInfo},
-    AustriaScraper,
-};
+use somes_scraper::plenar::{Plenar, PlenarInfo};
 
 use crate::ApiLimiter;
 
-pub async fn scrape_new_plenar_infos(
-    scraper: &AustriaScraper,
+pub async fn scrape_new_plenar_infos<S: Plenar + Sync>(
+    scraper: &S,
     parliament_api_limiter: ApiLimiter,
 ) -> crate::Result<Vec<PlenarInfo>> {
     let raw_plenar = parliament_api_limiter
@@ -18,12 +15,17 @@ pub async fn scrape_new_plenar_infos(
     let mut new_plenar_infos = HashSet::new();
 
     for plenar_path in &plenar_paths {
-        let Ok(plenar_info) = parliament_api_limiter
+        log::info!("plenar path: {plenar_path}");
+
+        let plenar_info = match parliament_api_limiter
             .run(scraper.get_plenar(&plenar_path))
             .await
-        else {
-            log::debug!("Cannot process plenar info: '{plenar_path}'");
-            continue;
+        {
+            Ok(plenar_info) => plenar_info,
+            Err(e) => {
+                log::error!("Cannot process plenar info: '{plenar_path}' because of {e:?}");
+                continue;
+            }
         };
 
         new_plenar_infos.insert(plenar_info);

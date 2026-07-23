@@ -48,7 +48,7 @@ where
     let mut wait_secs = 1;
     while let Err(e) = new_proposals {
         log::warn!(
-            "Could not scrape data: {e}, INFO for me: {:?}",
+            "Could not scrape data: {e:?}, INFO for me: {:?}",
             e.downcast_ref::<reqwest::Error>()
         );
 

@@ -89,6 +89,7 @@ pub async fn run_eu_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
     {
         if delegate_count(&pool).await == Some(0) {
             use dataservice::parties::PartyService;
+            use dataservice::plenar::PlenarService;
 
             log::info!("Delegates are 0, start scraping ...");
             let hs = std::collections::HashSet::new();
@@ -100,6 +101,14 @@ pub async fn run_eu_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
             <somes_scraper::eu_parliament::EuParliamentScraper as PartyService>::run(
                 &pool,
                 app_state.parliament_api_limiter.clone(),
+            )
+            .await;
+
+            <somes_scraper::eu_parliament::EuParliamentScraper as PlenarService>::run(
+                &pool,
+                app_state.parliament_api_limiter.clone(),
+                llm_ai_task_tx.clone(),
+                false,
             )
             .await;
         }
@@ -117,6 +126,15 @@ pub async fn run_eu_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
                 Shutdown::new(notify_shutdown.subscribe()),
                 pool.clone(),
                 app_state.parliament_api_limiter.clone()
+            )
+        ),
+        tokio::spawn(
+            services::plenar::run_shut::<somes_scraper::eu_parliament::EuParliamentScraper>(
+                Shutdown::new(notify_shutdown.subscribe()),
+                pool.clone(),
+                app_state.parliament_api_limiter.clone(),
+                llm_ai_task_tx.clone(),
+                false
             )
         ),
     }
@@ -313,14 +331,14 @@ pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
             app_state.clone(),
             llm_ai_task_tx.clone(),
         )),
-        tokio::spawn(services::plenar::run_shut(
+        tokio::spawn(services::plenar::run_shut::<somes_scraper::AustriaScraper>(
             Shutdown::new(notify_shutdown.subscribe()),
             pool.clone(),
             app_state.parliament_api_limiter.clone(),
             llm_ai_task_tx.clone(),
             config.only_latest
         )),
-        tokio::spawn(services::plenar::run_shut_latest(
+        tokio::spawn(services::plenar::run_shut_latest::<somes_scraper::AustriaScraper>(
             Shutdown::new(notify_shutdown.subscribe()),
             pool.clone(),
             app_state.parliament_api_limiter.clone(),

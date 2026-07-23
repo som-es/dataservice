@@ -1,8 +1,12 @@
 use crate::{
-    ApiLimiter, GPS, Shutdown, ai_task::AiTask, scrape_untill_success,
+    ApiLimiter, GPS, Gps, Shutdown, ai_task::AiTask, scrape_untill_success,
     should_update::StoredUpdatedAt,
 };
-use somes_scraper::{AustriaScraper, plenar::PlenarInfo};
+use somes_scraper::{
+    AustriaScraper,
+    eu_parliament::EuParliamentScraper,
+    plenar::{Plenar, PlenarInfo},
+};
 use sqlx::PgPool;
 use tokio::sync::mpsc::Sender;
 
@@ -93,6 +97,68 @@ pub async fn plenar_info_once(
     }
 }
 
+pub async fn plenar_gps_once<S: Plenar + Gps + Default + Send + Sync>(
+    pg_pool: &PgPool,
+    parliament_api_limiter: ApiLimiter,
+    ai_task_tx: Option<Sender<AiTask>>,
+) {
+    for gp in S::gps().iter().rev() {
+        let mut scraper = S::default();
+        log::info!("PLENAR info once GP: {gp}");
+        scraper.scrape_info_mut().gp = vec![gp.into()];
+
+        let new_plenar_infos = scrape_untill_success::<Vec<PlenarInfo>, _>(|| async {
+            scrape_new_plenar_infos(&scraper, parliament_api_limiter.clone()).await
+        })
+        .await;
+
+        for plenar_info in new_plenar_infos {
+            update_plenar_infos_in_db(&plenar_info, pg_pool, ai_task_tx.as_ref()).await;
+        }
+    }
+}
+
+#[async_trait::async_trait]
+pub trait PlenarService: Plenar + Send + Sync + Default + Gps {
+    async fn run(
+        pg_pool: &PgPool,
+        parliament_api_limiter: ApiLimiter,
+        ai_task_tx: Sender<AiTask>,
+        only_latest: bool,
+    );
+}
+
+#[async_trait::async_trait]
+impl PlenarService for EuParliamentScraper {
+    async fn run(
+        pg_pool: &PgPool,
+        parliament_api_limiter: ApiLimiter,
+        ai_task_tx: Sender<AiTask>,
+        _only_latest: bool,
+    ) {
+        plenar_gps_once::<EuParliamentScraper>(pg_pool, parliament_api_limiter, Some(ai_task_tx))
+            .await;
+    }
+}
+
+#[async_trait::async_trait]
+impl PlenarService for AustriaScraper {
+    async fn run(
+        pg_pool: &PgPool,
+        parliament_api_limiter: ApiLimiter,
+        ai_task_tx: Sender<AiTask>,
+        only_latest: bool,
+    ) {
+        plenar_info_once(
+            pg_pool,
+            parliament_api_limiter,
+            Some(ai_task_tx),
+            only_latest,
+        )
+        .await;
+    }
+}
+
 impl StoredUpdatedAt for PlenarInfo {
     async fn stored_updated_at(&self, pg: &PgPool) -> Option<chrono::DateTime<chrono::Utc>> {
         sqlx::query!(
@@ -109,7 +175,7 @@ impl StoredUpdatedAt for PlenarInfo {
     }
 }
 
-pub async fn run_shut_latest(
+pub async fn run_shut_latest<S: PlenarService>(
     mut shutdown: Shutdown,
     pg_pool: PgPool,
     parliament_api_limiter: ApiLimiter,
@@ -139,8 +205,7 @@ pub async fn run_shut_latest(
                 let pg_pool = pg_pool.clone();
                 let parliament_api_limiter = parliament_api_limiter.clone();
                 log::info!("Starting latest plenar info scraper");
-                plenar_info_once(&pg_pool, parliament_api_limiter, Some(ai_task_tx.clone()), true)
-                    .await;
+                S::run(&pg_pool, parliament_api_limiter.clone(), ai_task_tx.clone(), true).await;
                 // legis_init_once().await;
                 log::info!("Latest Plenar info scraper service sleeps for {plenar_sleep} seconds...");
                 tokio::time::sleep(tokio::time::Duration::from_secs(plenar_sleep)).await;
@@ -149,7 +214,7 @@ pub async fn run_shut_latest(
     }
 }
 
-pub async fn run_shut(
+pub async fn run_shut<S: PlenarService>(
     mut shutdown: Shutdown,
     pg_pool: PgPool,
     parliament_api_limiter: ApiLimiter,
@@ -183,8 +248,7 @@ pub async fn run_shut(
                 let pg_pool = pg_pool.clone();
                 let parliament_api_limiter = parliament_api_limiter.clone();
                 log::info!("Starting plenar info scraper");
-                plenar_info_once(&pg_pool, parliament_api_limiter, Some(ai_task_tx.clone()), false)
-                    .await;
+                S::run(&pg_pool, parliament_api_limiter.clone(), ai_task_tx.clone(), false).await;
                 // legis_init_once().await;
                 log::info!("Plenar info scraper service sleeps for {plenar_sleep} seconds...");
                 tokio::time::sleep(tokio::time::Duration::from_secs(plenar_sleep)).await;
