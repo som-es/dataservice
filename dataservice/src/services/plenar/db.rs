@@ -1,4 +1,4 @@
-use combx::absence_matching;
+use combx::{Parliament, absence_matching};
 use somes_scraper::plenar::PlenarInfo;
 use sqlx::PgPool;
 use tokio::sync::mpsc::Sender;
@@ -15,6 +15,7 @@ pub async fn update_plenar_infos_in_db(
     plenar_info: &PlenarInfo,
     pg_pool: &PgPool,
     ai_task_tx: Option<&Sender<AiTask>>,
+    parliament: Parliament,
 ) {
     log::info!("Updating plenar infos in database...");
 
@@ -100,17 +101,21 @@ pub async fn update_plenar_infos_in_db(
     }
 
     if let Some(absences) = &plenar_info.absences {
+        let mandate_function = match parliament {
+            Parliament::At => plenar_info.council.as_str(),
+            Parliament::Eu => "MEP",
+        };
         match absence_matching(
             pg_pool,
             &absences.absences,
             plenar_info.created_at.date_naive(),
             plenar_info.gp.clone(),
-            &plenar_info.council,
+            mandate_function,
         )
         .await
         {
             Ok(matching) => {
-                log::info!("inserting absences: {matching:?}");
+                log::info!("inserting absences: {:?}", matching.correctly_matched);
                 if let Err(e) = insert_absences(pg_pool, plenar_id, matching).await {
                     log::error!(
                         "could not insert absences for plenary session {plenar_id} because of {e:?}"

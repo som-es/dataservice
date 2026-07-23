@@ -2,6 +2,7 @@ use crate::{
     ApiLimiter, GPS, Gps, Shutdown, ai_task::AiTask, scrape_untill_success,
     should_update::StoredUpdatedAt,
 };
+use combx::Parliament;
 use somes_scraper::{
     AustriaScraper,
     eu_parliament::EuParliamentScraper,
@@ -70,8 +71,13 @@ pub async fn plenar_info_once(
                     let ai_task_tx = ai_task_tx.clone();
 
                     inner_handles.push(tokio::spawn(async move {
-                        update_plenar_infos_in_db(&plenar_info, &pg_pool, ai_task_tx.as_ref())
-                            .await;
+                        update_plenar_infos_in_db(
+                            &plenar_info,
+                            &pg_pool,
+                            ai_task_tx.as_ref(),
+                            Parliament::At,
+                        )
+                        .await;
                     }));
                 }
 
@@ -113,7 +119,8 @@ pub async fn plenar_gps_once<S: Plenar + Gps + Default + Send + Sync>(
         .await;
 
         for plenar_info in new_plenar_infos {
-            update_plenar_infos_in_db(&plenar_info, pg_pool, ai_task_tx.as_ref()).await;
+            update_plenar_infos_in_db(&plenar_info, pg_pool, ai_task_tx.as_ref(), S::PARLIAMENT)
+                .await;
         }
     }
 }
@@ -333,7 +340,7 @@ mod tests {
 
         let pool = connect_pg().await;
 
-        update_plenar_infos_in_db(&res, &pool, None).await;
+        update_plenar_infos_in_db(&res, &pool, None, combx::Parliament::At).await;
     }
 
     #[tokio::test]
@@ -413,7 +420,7 @@ mod tests {
 
         let pool = connect_pg().await;
 
-        update_plenar_infos_in_db(&res, &pool, None).await;
+        update_plenar_infos_in_db(&res, &pool, None, combx::Parliament::At).await;
     }
 
     #[tokio::test]
@@ -429,7 +436,7 @@ mod tests {
 
         let pool = connect_pg().await;
 
-        update_plenar_infos_in_db(&res, &pool, None).await;
+        update_plenar_infos_in_db(&res, &pool, None, combx::Parliament::At).await;
     }
     #[tokio::test]
     async fn test_brsitz_979_db_insertion() {
@@ -444,7 +451,7 @@ mod tests {
 
         let pool = connect_pg().await;
 
-        update_plenar_infos_in_db(&res, &pool, None).await;
+        update_plenar_infos_in_db(&res, &pool, None, combx::Parliament::At).await;
     }
 
     #[tokio::test]

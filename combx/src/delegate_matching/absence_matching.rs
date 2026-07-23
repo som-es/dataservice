@@ -41,6 +41,7 @@ pub async fn absence_matching<'a>(
         absences
             .iter()
             .cloned()
+            .filter(|absence| absence.id.is_some() || !absence.name.is_empty())
             .partition(|absence| match absence.id {
                 Some(id) => {
                     let del = active_delegates.iter().find(|del| del.id as u32 == id).cloned();
@@ -123,7 +124,7 @@ mod tests {
                 .unwrap()
                 .absences
                 .iter()
-                .map(|x| x.as_str())
+                .map(|x| x.name.as_str())
                 .map(reverse_name)
                 .collect::<Vec<_>>(),
             &plenar_info.gp,
@@ -163,7 +164,7 @@ mod tests {
                 .unwrap()
                 .absences
                 .iter()
-                .map(|x| x.as_str())
+                .map(|x| x.name.as_str())
                 .map(reverse_name)
                 .collect::<Vec<_>>(),
             &plenar_info.gp,
@@ -203,7 +204,7 @@ mod tests {
                 .unwrap()
                 .absences
                 .iter()
-                .map(|x| x.as_str())
+                .map(|x| x.name.as_str())
                 .map(reverse_name)
                 .collect::<Vec<_>>(),
             &plenar_info.gp,
@@ -263,7 +264,7 @@ mod tests {
                 .unwrap()
                 .absences
                 .iter()
-                .map(|x| x.as_str())
+                .map(|x| x.name.as_str())
                 .map(reverse_name)
                 .collect::<Vec<_>>(),
             &plenar_info.gp,
