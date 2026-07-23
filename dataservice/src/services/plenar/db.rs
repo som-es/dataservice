@@ -6,8 +6,8 @@ use tokio::sync::mpsc::Sender;
 use crate::{
     ai_task::AiTask,
     plenar::{
-        insert_absences, insert_call_to_orders, insert_debate, insert_plenar_info,
-        insert_plenar_speech, SpeechInsertArgs,
+        SpeechInsertArgs, insert_absences, insert_call_to_orders, insert_debate,
+        insert_plenar_info, insert_plenar_speech,
     },
 };
 
@@ -31,8 +31,8 @@ pub async fn update_plenar_infos_in_db(
         Ok(id) => id,
         Err(e) => {
             log::error!(
-                    "Error inserting plenar info: '{e}'. Error occured for plenar info: {plenar_info:?}. Skipping adding call to orders and debates."
-                );
+                "Error inserting plenar info: '{e}'. Error occured for plenar info: {plenar_info:?}. Skipping adding call to orders and debates."
+            );
             return;
         }
     };
@@ -89,8 +89,8 @@ pub async fn update_plenar_infos_in_db(
             .await
             {
                 log::error!(
-                        "Error inserting plenar speech: '{e}'. Error occured for plenar speech: {plenar_speech:?}"
-                    );
+                    "Error inserting plenar speech: '{e}'. Error occured for plenar speech: {plenar_speech:?}"
+                );
             }
         }
 
@@ -112,7 +112,9 @@ pub async fn update_plenar_infos_in_db(
             Ok(matching) => {
                 log::info!("inserting absences: {matching:?}");
                 if let Err(e) = insert_absences(pg_pool, plenar_id, matching).await {
-                    log::error!("could not insert absences for plenary session {plenar_id} because of {e:?}");
+                    log::error!(
+                        "could not insert absences for plenary session {plenar_id} because of {e:?}"
+                    );
                 }
             }
             Err(e) => {

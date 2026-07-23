@@ -646,7 +646,7 @@ mod tests {
                         .unwrap()
                         .absences
                         .iter()
-                        .map(|x| x.as_str())
+                        .map(|x| x.name.as_str())
                         .map(reverse_name)
                         .collect::<Vec<_>>(),
                     &plenar_info.gp,
@@ -697,7 +697,7 @@ mod tests {
                 .unwrap()
                 .absences
                 .iter()
-                .map(|x| x.as_str())
+                .map(|x| x.name.as_str())
                 .map(reverse_name)
                 .collect::<Vec<_>>(),
             &plenar_info.gp,
