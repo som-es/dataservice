@@ -1,3 +1,4 @@
+use combx::Parliament;
 use dataservice::{
     ApiLimiter, AppState, DATABASE_URL, REDIS_URL, Shutdown, ai_task::AiTask, connect_pg,
     delegates::delegate_count, services, setup_app_data,
@@ -85,7 +86,7 @@ pub async fn run_eu_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
     use dataservice::eu_database_url;
 
     let (llm_ai_task_tx, llm_ai_task_rx, cpu_ai_task_rx, pool, app_state) =
-        setup(&eu_database_url(), 1).await;
+        setup(&eu_database_url(), 1, Parliament::Eu).await;
     {
         if delegate_count(&pool).await == Some(0) {
             use dataservice::parties::PartyService;
@@ -150,8 +151,12 @@ pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
 pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>, config: Config) {
     use dataservice::{api_max_concurrent_tasks_from_env, at_database_url};
 
-    let (llm_ai_task_tx, llm_ai_task_rx, cpu_ai_task_rx, pool, app_state) =
-        setup(&at_database_url(), api_max_concurrent_tasks_from_env()).await;
+    let (llm_ai_task_tx, llm_ai_task_rx, cpu_ai_task_rx, pool, app_state) = setup(
+        &at_database_url(),
+        api_max_concurrent_tasks_from_env(),
+        Parliament::At,
+    )
+    .await;
 
     {
         if delegate_count(&pool).await == Some(0) {
@@ -338,7 +343,9 @@ pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
             llm_ai_task_tx.clone(),
             config.only_latest
         )),
-        tokio::spawn(services::plenar::run_shut_latest::<somes_scraper::AustriaScraper>(
+        tokio::spawn(services::plenar::run_shut_latest::<
+            somes_scraper::AustriaScraper,
+        >(
             Shutdown::new(notify_shutdown.subscribe()),
             pool.clone(),
             app_state.parliament_api_limiter.clone(),
@@ -420,6 +427,7 @@ pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
 async fn setup(
     database_url: &str,
     max_api_fetch_tasks: usize,
+    parliament: Parliament,
 ) -> (
     mpsc::Sender<AiTask>,
     mpsc::Receiver<AiTask>,
@@ -456,6 +464,7 @@ async fn setup(
         redis_client,
         parliament_api_limiter: ApiLimiter::new(max_api_fetch_tasks),
         cpu_task_tx: Some(cpu_ai_task_tx.clone()),
+        parliament,
     };
     (
         llm_ai_task_tx,

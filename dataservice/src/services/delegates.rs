@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use combx::{DbContact, DbDelegate, DbMandate, create_gov_officials_map};
+use combx::{DbContact, DbDelegate, DbMandate, Parliament, create_gov_officials_map};
 use somes_scraper::{
     AustriaScraper, Delegate, GovOfficial, Mandate, delegates::DelegateScraper, error::ScraperError,
 };
@@ -353,6 +353,7 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
                 seat.col as i32,
                 delegate.council.as_ref().map(|x| x.as_str()),
                 pg_pool,
+                app_state.parliament,
             )
             .await
             {
@@ -432,7 +433,12 @@ pub async fn insert_seat(
     seat_col: i32,
     council: Option<&str>,
     pg: &PgPool,
+    parliament: Parliament,
 ) -> sqlx::Result<PgQueryResult> {
+    let gp = match parliament {
+        Parliament::At => crate::LATEST_GP,
+        Parliament::Eu => crate::EU_LATEST_GP,
+    };
     sqlx::query!(
         "
         insert into seat_history(delegate_id, seat_row, seat_col, council, gp) values ($1, $2, $3, $4, $5)
@@ -443,7 +449,7 @@ pub async fn insert_seat(
         seat_row,
         seat_col,
         council,
-        crate::LATEST_GP,
+        gp,
     )
     .execute(pg)
     .await

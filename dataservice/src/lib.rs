@@ -10,6 +10,7 @@ pub mod shutdown;
 
 use std::{cell::LazyCell, env::VarError};
 
+use ::combx::Parliament;
 use chrono::Datelike;
 use redis::aio::ConnectionManager;
 #[cfg(feature = "runner")]
@@ -100,6 +101,7 @@ pub fn tessdata_dir() -> std::result::Result<String, VarError> {
 pub const DATABASE_URL: &str = dotenv!("DATABASE_URL");
 pub const REDIS_URL: &str = dotenv!("REDIS_URL");
 pub const LATEST_GP: &str = dotenv!("LATEST_GP");
+pub const EU_LATEST_GP: &str = dotenv!("EU_LATEST_GP");
 pub const GPS: [&str; 9] = [
     LATEST_GP, "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
 ];
@@ -112,6 +114,7 @@ pub struct AppState {
     pub parliament_api_limiter: ApiLimiter,
     #[cfg(feature = "runner")]
     pub cpu_task_tx: Option<Sender<AiTask>>,
+    pub parliament: Parliament,
 }
 
 #[cfg(feature = "runner")]

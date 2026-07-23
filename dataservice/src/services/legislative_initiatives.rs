@@ -293,6 +293,7 @@ mod tests {
             redis_client: None,
             parliament_api_limiter: crate::ApiLimiter::new(32),
             cpu_task_tx: None,
+            parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,
@@ -314,6 +315,7 @@ mod tests {
             redis_client: None,
             parliament_api_limiter: crate::ApiLimiter::new(32),
             cpu_task_tx: None,
+            parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,
@@ -340,6 +342,7 @@ mod tests {
             redis_client: None,
             parliament_api_limiter: crate::ApiLimiter::new(32),
             cpu_task_tx: None,
+            parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,
@@ -361,6 +364,7 @@ mod tests {
             redis_client: None,
             parliament_api_limiter: crate::ApiLimiter::new(32),
             cpu_task_tx: None,
+            parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,
@@ -382,6 +386,7 @@ mod tests {
             redis_client: None,
             parliament_api_limiter: crate::ApiLimiter::new(32),
             cpu_task_tx: None,
+            parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,
@@ -404,6 +409,7 @@ mod tests {
             redis_client: None,
             parliament_api_limiter: crate::ApiLimiter::new(32),
             cpu_task_tx: None,
+            parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,
@@ -426,6 +432,7 @@ mod tests {
             redis_client: None,
             parliament_api_limiter: crate::ApiLimiter::new(32),
             cpu_task_tx: None,
+            parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,
@@ -450,6 +457,7 @@ mod tests {
             redis_client: None,
             parliament_api_limiter: crate::ApiLimiter::new(32),
             cpu_task_tx: None,
+            parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,
@@ -474,6 +482,7 @@ mod tests {
             redis_client: None,
             parliament_api_limiter: crate::ApiLimiter::new(32),
             cpu_task_tx: None,
+            parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,
@@ -498,6 +507,7 @@ mod tests {
             redis_client: None,
             parliament_api_limiter: crate::ApiLimiter::new(32),
             cpu_task_tx: None,
+            parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
             &app_state, &res, None, None,
