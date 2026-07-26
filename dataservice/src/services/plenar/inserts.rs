@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
+use combx::Parliament;
 use log::warn;
 use somes_scraper::{
     PlenarSpeech, Reference, TextExtractor,
@@ -148,6 +149,7 @@ pub async fn insert_plenar_speech<'a>(
     plenar_speech: &PlenarSpeech,
     text_extractor: &mut TextExtractor,
     args: &SpeechInsertArgs<'_>,
+    parliament: Parliament,
 ) -> Result<(), sqlx::Error> {
     log::info!("insert plenar speech");
     let disable_speech_text =
@@ -330,27 +332,7 @@ pub async fn insert_plenar_speech<'a>(
     let updated_spoken_text = if disable_speech_text {
         None
     } else {
-        let maybe_text = plenar_speech
-            .speech
-            .speech_texts
-            .as_ref()
-            .map(|speech_texts| {
-                speech_texts
-                    .iter()
-                    .find(|speech_text| speech_text.language == Language::En)
-            })
-            .flatten();
-        match maybe_text {
-            Some(text) => Some(text.text.clone()),
-            None => {
-                text_extractor
-                    .full_speech_extraction(
-                        &plenar_speech.speech.spoken_text_html_urls,
-                        &plenar_speech.speech.delegate_display_name,
-                    )
-                    .await
-            }
-        }
+        extract_speech_text(plenar_speech, text_extractor, parliament).await
     };
 
     if updated_spoken_text.is_none() {
@@ -430,6 +412,38 @@ pub async fn insert_plenar_speech<'a>(
     }
 
     Ok(())
+}
+
+async fn extract_speech_text(
+    plenar_speech: &PlenarSpeech,
+    text_extractor: &mut TextExtractor,
+    parliament: Parliament,
+) -> Option<String> {
+    let maybe_text = plenar_speech
+        .speech
+        .speech_texts
+        .as_ref()
+        .map(|speech_texts| {
+            speech_texts
+                .iter()
+                .find(|speech_text| speech_text.language == Language::En)
+        })
+        .flatten();
+
+    if parliament == Parliament::Eu {
+        return maybe_text.map(|text| text.text.clone());
+    }
+    match maybe_text {
+        Some(text) => Some(text.text.clone()),
+        None => {
+            text_extractor
+                .full_speech_extraction(
+                    &plenar_speech.speech.spoken_text_html_urls,
+                    &plenar_speech.speech.delegate_display_name,
+                )
+                .await
+        }
+    }
 }
 
 pub async fn insert_absences(

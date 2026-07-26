@@ -86,6 +86,7 @@ pub async fn update_plenar_infos_in_db(
                 plenar_speech,
                 &mut text_extractor,
                 &speech_insert_args,
+                parliament,
             )
             .await
             {
