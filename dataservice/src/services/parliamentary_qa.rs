@@ -7,17 +7,17 @@ mod patch_references;
 use chrono::Days;
 pub use patch_references::*;
 use somes_scraper::{
-    parliamentary_questions::ParliamentaryQAScraper, proposals::ProposalScraper, AustriaScraper,
-    ParliamentaryQAEntity, QaType,
+    AustriaScraper, ParliamentaryQAEntity, QaType, parliamentary_questions::ParliamentaryQAScraper,
+    proposals::ProposalScraper,
 };
 use sqlx::PgPool;
 use tokio::{
-    sync::{mpsc::Sender, Semaphore},
+    sync::{Semaphore, mpsc::Sender},
     time::Instant,
 };
 
 use crate::{
-    ai_task::AiTask, enforce_ai_run, today_and_time, AppState, Shutdown, StoredUpdatedAt, GPS,
+    AppState, GPS, Shutdown, StoredUpdatedAt, ai_task::AiTask, enforce_ai_run, today_and_time,
 };
 
 const LATEST_PQA_DAYS: u64 = 65;
@@ -234,13 +234,13 @@ mod tests {
     use std::sync::Arc;
 
     use somai_client::SomAiClient;
-    use somes_scraper::{parliamentary_questions::ParliamentaryQAScraper, AustriaScraper};
+    use somes_scraper::{AustriaScraper, parliamentary_questions::ParliamentaryQAScraper};
 
     use crate::{
+        ApiLimiter, AppState,
         ai_task::TaskArgs,
         connect_pg2,
         parliamentary_qa::{insert_qa_and_collect_answers, summarize_and_extract_qa},
-        ApiLimiter, AppState,
     };
 
     #[tokio::test]

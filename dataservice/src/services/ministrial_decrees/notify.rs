@@ -1,10 +1,10 @@
 use chrono_tz::Europe::Vienna;
 use combx::Decree;
-use sqlx::{query, PgPool};
+use sqlx::{PgPool, query};
 use std::collections::HashMap;
 
 use crate::{
-    email::{send_mail, MAILER},
+    email::{MAILER, send_mail},
     ministrial_proposals::SimpleGovOfficial,
 };
 

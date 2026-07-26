@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use combx::{
-    match_delegate_name_with_delegate_id, with_data::active_delegates_at_date, DbDelegate,
-    DelegateMatch, Interjection,
+    DbDelegate, DelegateMatch, Interjection, match_delegate_name_with_delegate_id,
+    with_data::active_delegates_at_date,
 };
-use somes_scraper::text_utils::{remove_paran_contents, ParanContent};
+use somes_scraper::text_utils::{ParanContent, remove_paran_contents};
 use sqlx::{Connection, Executor, Postgres};
 
 const DASH: char = '–';
@@ -280,9 +280,12 @@ mod tests {
             "Abg. Martin Graf: Das war ein Schallmeiner-Schurkenstück! – Abg. Schallmeiner: ... kennt sich der Herr Graf aus, mit den Schurkenstücken! – Unruhe im Saal. – Der Präsident gibt das Glockenzeichen. – Abg. Hirsch: Super.. – Rufe ber der ÖVP: AJA!",
             vec![
                 ("Martin Graf", "Das war ein Schallmeiner-Schurkenstück!"),
-                ("Schallmeiner", "... kennt sich der Herr Graf aus, mit den Schurkenstücken!"),
-                    ("Hirsch", "Super.."),
-                    ("", "AJA!")
+                (
+                    "Schallmeiner",
+                    "... kennt sich der Herr Graf aus, mit den Schurkenstücken!",
+                ),
+                ("Hirsch", "Super.."),
+                ("", "AJA!"),
             ],
         );
     }
@@ -386,8 +389,7 @@ mod tests {
 
     #[tokio::test]
     pub async fn test_interjection_delegate_id_matching_multiple() {
-        let paran_content =
-            "Beifall bei der ÖVP. – Abg. Dr. Plessl: Was sagen Sie zum Vertrag 2002? Eine Nebelgranate! Das Problem Vertragsgestaltung 2002 sprechen Sie gar nicht an! – Abg. Steinacker – auf dem Weg zu ihrem Sitzplatz –: Aus gut mach schlecht!";
+        let paran_content = "Beifall bei der ÖVP. – Abg. Dr. Plessl: Was sagen Sie zum Vertrag 2002? Eine Nebelgranate! Das Problem Vertragsgestaltung 2002 sprechen Sie gar nicht an! – Abg. Steinacker – auf dem Weg zu ihrem Sitzplatz –: Aus gut mach schlecht!";
         let pg = connect_pg2().await;
         let plenar_date = DateTime::<Utc>::from_naive_utc_and_offset(
             NaiveDate::from_ymd_opt(2019, 9, 25)

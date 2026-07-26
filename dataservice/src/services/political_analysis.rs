@@ -8,21 +8,22 @@ use std::sync::Arc;
 use chrono::TimeDelta;
 use combx::today_and_time;
 use qdrant_client::{
-    qdrant::{group_id::Kind, GetPoints, PointId},
     Qdrant,
+    qdrant::{GetPoints, PointId, group_id::Kind},
 };
 use somai_client::SomAiClient;
 use sqlx::PgPool;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
+    Result, Shutdown,
     ai_task::{AiTask, TaskArgs},
     ai_tasks::somai_connect,
     political_analysis::{
         embed_speeches::get_delegate_ids,
-        stance_system::{rag_pipeline, Citation, Stance},
+        stance_system::{Citation, Stance, rag_pipeline},
     },
-    today, Result, Shutdown,
+    today,
 };
 
 pub(super) trait EmbeddingProvider: Send + Sync {

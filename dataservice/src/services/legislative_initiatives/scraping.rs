@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use combx::VoteResult;
-use somes_scraper::{legis_init::LegislativeInitiatives, AustriaScraper, LegislativeInitiative};
+use somes_scraper::{AustriaScraper, LegislativeInitiative, legis_init::LegislativeInitiatives};
 use tokio::sync::mpsc::Sender;
 
 use crate::{
+    AppState,
     ai_task::AiTask,
     legislative_initiatives::{
         notify::{
@@ -13,7 +14,6 @@ use crate::{
         },
         update_or_insert_legis_init_in_db,
     },
-    AppState,
 };
 
 const LEGIS_INIT_MAX_INSERT_TASKS: usize = 8;

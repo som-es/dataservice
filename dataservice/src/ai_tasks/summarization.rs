@@ -1,13 +1,13 @@
 use chrono::Local;
 use combx::{
-    document_text::{combine_texts, extract_text_from_documents_html_first_stripped},
     AiSummary, SummarizeOutput,
+    document_text::{combine_texts, extract_text_from_documents_html_first_stripped},
 };
 use serde_json::json;
 use somai_client::SomAiClient;
 use somes_common_lib::Document;
 
-use crate::{ai_task::TaskArgs, OCR_ENGINE};
+use crate::{OCR_ENGINE, ai_task::TaskArgs};
 
 pub async fn insert_ai_summary_sqlx(
     pool: &sqlx::PgPool,
@@ -58,9 +58,10 @@ pub async fn summarize_documents(
             log::info!("doc collection successful");
             if input.len() < 50 {
                 log::error!(
-            "Cannot summarize legis init {}, input is too short / empty for documents: {:?}",
-            task_args.db_entry_id, docs
-        );
+                    "Cannot summarize legis init {}, input is too short / empty for documents: {:?}",
+                    task_args.db_entry_id,
+                    docs
+                );
                 return Err(Box::new(combx::Error::Custom(
                     "Input too short for summarization".into(),
                 )));

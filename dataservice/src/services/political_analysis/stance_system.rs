@@ -1,13 +1,13 @@
 use crate::{
-    political_analysis::{
-        delegate_context::{collect_delegate_profile, collect_spoken_texts},
-        EmbeddingProvider,
-    },
     LATEST_GP,
+    political_analysis::{
+        EmbeddingProvider,
+        delegate_context::{collect_delegate_profile, collect_spoken_texts},
+    },
 };
 use qdrant_client::Qdrant;
 use schemars::JsonSchema;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use somai_client::SomAiClient;
 use somes_scraper::today;
 use sqlx::prelude::{FromRow, Type};
@@ -117,7 +117,7 @@ mod tests {
     use qdrant_client::Qdrant;
     use somai_client::SomAiClient;
 
-    use crate::political_analysis::stance_system::{rag_pipeline, Stance};
+    use crate::political_analysis::stance_system::{Stance, rag_pipeline};
 
     #[tokio::test]
     async fn test_rag_pipeline() {
@@ -135,8 +135,7 @@ mod tests {
         // let question = "Straftäter:innen sollten härter bestraft werden.";
         let question = "Der Staat sollte weniger ins Wirtschaftsleben eingreifen.";
         let question = "Erbschaften sollten besteuert werden.";
-        let question =
-            "Wichtige Entscheidungen sollten stärker auf nationaler Ebene getroffen werden und nicht auf EU-Ebene. ";
+        let question = "Wichtige Entscheidungen sollten stärker auf nationaler Ebene getroffen werden und nicht auf EU-Ebene. ";
         let question = "Österreich sollte seine Neutralität aufgeben.";
 
         let question = "Österreich sollte sich für die Erweiterung der EU einsetzen.";

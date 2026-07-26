@@ -3,13 +3,13 @@ use std::{collections::BinaryHeap, sync::Arc};
 use somai_client::SomAiClient;
 use sqlx::PgPool;
 use tokio::{
-    sync::{mpsc::Receiver, RwLock},
-    time::{sleep, Instant},
+    sync::{RwLock, mpsc::Receiver},
+    time::{Instant, sleep},
 };
 
 use crate::{
-    ai_task::{AiTask, TaskArgs},
     Shutdown,
+    ai_task::{AiTask, TaskArgs},
 };
 
 const REBUILD_HEAP_SECS: u64 = 10;

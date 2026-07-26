@@ -1,7 +1,7 @@
 use dotenvy_macro::dotenv;
 use lettre::{
-    message::header::ContentType, transport::smtp::authentication::Credentials, Message,
-    SmtpTransport, Transport,
+    Message, SmtpTransport, Transport, message::header::ContentType,
+    transport::smtp::authentication::Credentials,
 };
 use once_cell::sync::Lazy;
 
@@ -139,8 +139,13 @@ mod tests {
         // 1. Delegate activity email
         let delegate_html = make_delegate_entry();
         let delegate_mail = DELEGATE_ACTIVITY_TEMPLATE.replace("{*DELEGATES*}", &delegate_html);
-        send_mail(&MAILER, mail_to, "[Test] Neue Abgeordnetenaktivität auf somes", delegate_mail)
-            .expect("could not send delegate activity preview");
+        send_mail(
+            &MAILER,
+            mail_to,
+            "[Test] Neue Abgeordnetenaktivität auf somes",
+            delegate_mail,
+        )
+        .expect("could not send delegate activity preview");
 
         // 2. Vote result / legis_init email
         let votes_html = format!("{}{}", make_vote_entry(), make_vote_entry());
@@ -148,20 +153,35 @@ mod tests {
             .replace("{*TITLE*}", "Neue Abstimmungsergebnisse")
             .replace("{*DESCRIPTION*}", "Der Nationalrat hat kürzlich verschiedene Abstimmungen gehalten, die zu Ihrer Interessenswahl passen.")
             .replace("{*VOTE_RESULTS*}", &votes_html);
-        send_mail(&MAILER, mail_to, "[Test] Neue Abstimmungsergebnisse auf somes", legis_mail)
-            .expect("could not send legis init preview");
+        send_mail(
+            &MAILER,
+            mail_to,
+            "[Test] Neue Abstimmungsergebnisse auf somes",
+            legis_mail,
+        )
+        .expect("could not send legis init preview");
 
         // 3. Ministerial proposal email
         let props_html = format!("{}{}", make_proposal_entry(), make_proposal_entry());
         let prop_mail = MINISTRIAL_PROP_EMAIL_TEMPLATE.replace("{*MINISTRIAL_PROPS*}", &props_html);
-        send_mail(&MAILER, mail_to, "[Test] Neue Ministerialentwürfe auf somes", prop_mail)
-            .expect("could not send ministerial prop preview");
+        send_mail(
+            &MAILER,
+            mail_to,
+            "[Test] Neue Ministerialentwürfe auf somes",
+            prop_mail,
+        )
+        .expect("could not send ministerial prop preview");
 
         // 4. Decree email
         let decrees_html = format!("{}{}", make_decree_entry(), make_decree_entry());
         let decree_mail = DECREE_EMAIL_TEMPLATE.replace("{*DECREES*}", &decrees_html);
-        send_mail(&MAILER, mail_to, "[Test] Neue Verordnungen auf somes", decree_mail)
-            .expect("could not send decree preview");
+        send_mail(
+            &MAILER,
+            mail_to,
+            "[Test] Neue Verordnungen auf somes",
+            decree_mail,
+        )
+        .expect("could not send decree preview");
 
         println!("All 4 test emails sent to {mail_to}");
     }

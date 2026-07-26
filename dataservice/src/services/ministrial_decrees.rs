@@ -4,17 +4,17 @@ use std::{
 };
 
 use combx::{
-    with_data::gps::{gps, LegislativePeriod},
     Decree, FromScrapedType, Index, PostgresEnhancer,
+    with_data::gps::{LegislativePeriod, gps},
 };
 use dotenvy_macro::dotenv;
-use somes_scraper::{decree::RisScraper, AustriaScraper, Thing};
+use somes_scraper::{AustriaScraper, Thing, decree::RisScraper};
 use sqlx::PgPool;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    ai_task::AiTask, enforce_ai_run, ministrial_proposals::get_active_gov_officals,
-    should_update_by_hash, today, AppState, CompareHash, Shutdown,
+    AppState, CompareHash, Shutdown, ai_task::AiTask, enforce_ai_run,
+    ministrial_proposals::get_active_gov_officals, should_update_by_hash, today,
 };
 
 mod ai_tasks;
@@ -209,7 +209,7 @@ pub async fn insert_ministrial_decree(
         {
             use tokio::time::Instant;
 
-            use crate::{ai_task::Priority, LATEST_GP};
+            use crate::{LATEST_GP, ai_task::Priority};
 
             let (priority, new_decree_tx) =
                 if decree.publication_date >= (today() - chrono::Duration::days(90)).date_naive() {

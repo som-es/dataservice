@@ -1,13 +1,13 @@
-use crate::{political_analysis::EmbeddingProvider, Result};
+use crate::{Result, political_analysis::EmbeddingProvider};
 use chrono::{Datelike, NaiveDate, Utc};
 use combx::Error;
 use qdrant_client::{
-    qdrant::{
-        condition::ConditionOneOf, r#match::MatchValue, with_payload_selector::SelectorOptions,
-        Condition, FieldCondition, Filter, Match, PayloadIncludeSelector, PointId, ScoredPoint,
-        SearchPoints, WithPayloadSelector,
-    },
     Qdrant,
+    qdrant::{
+        Condition, FieldCondition, Filter, Match, PayloadIncludeSelector, PointId, ScoredPoint,
+        SearchPoints, WithPayloadSelector, condition::ConditionOneOf, r#match::MatchValue,
+        with_payload_selector::SelectorOptions,
+    },
 };
 use reqwest::Client as HttpClient;
 use serde_json::Value as JsonValue;

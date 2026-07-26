@@ -1,14 +1,14 @@
-use crate::political_analysis::EmbeddingProvider;
 use crate::Result;
+use crate::political_analysis::EmbeddingProvider;
 use chrono::{Datelike, Utc};
-use qdrant_client::qdrant::points_selector::PointsSelectorOneOf;
+use qdrant_client::Qdrant;
 use qdrant_client::qdrant::r#match::MatchValue;
+use qdrant_client::qdrant::points_selector::PointsSelectorOneOf;
 use qdrant_client::qdrant::{
-    condition::ConditionOneOf, vectors_config::Config, Condition, CreateCollection, Distance,
-    FieldCondition, Filter, Match, VectorParams, VectorsConfig,
+    Condition, CreateCollection, Distance, FieldCondition, Filter, Match, VectorParams,
+    VectorsConfig, condition::ConditionOneOf, vectors_config::Config,
 };
 use qdrant_client::qdrant::{DeletePoints, PointStruct, PointsSelector, UpsertPoints};
-use qdrant_client::Qdrant;
 use serde_json::json;
 use sqlx::PgPool;
 use std::collections::HashMap;

@@ -34,11 +34,11 @@ mod tests {
     use combx::document_text::{combine_texts, extract_text_from_documents_html_first_stripped};
     use somai_client::SomAiClient;
     use somes_scraper::{
-        ministrial_proposals::{GegenstandInfo, MinistrialProposalScraper},
         AustriaScraper,
+        ministrial_proposals::{GegenstandInfo, MinistrialProposalScraper},
     };
 
-    use crate::{ai_tasks::summary_prompt2, today, OCR_ENGINE};
+    use crate::{OCR_ENGINE, ai_tasks::summary_prompt2, today};
 
     use super::*;
 

@@ -44,9 +44,9 @@ pub async fn summarize_decrees_documents(
 mod tests {
     use combx::document_text::{combine_texts, extract_text_from_documents_html_first_stripped};
     use somai_client::SomAiClient;
-    use somes_scraper::{decree::RisScraper, AustriaScraper};
+    use somes_scraper::{AustriaScraper, decree::RisScraper};
 
-    use crate::{ai_tasks::summary_prompt2, OCR_ENGINE};
+    use crate::{OCR_ENGINE, ai_tasks::summary_prompt2};
 
     use super::*;
 

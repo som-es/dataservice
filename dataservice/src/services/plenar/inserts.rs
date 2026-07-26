@@ -5,6 +5,7 @@ use log::warn;
 use somes_scraper::{
     PlenarSpeech, Reference, TextExtractor,
     call_to_order::CallToOrderInfo,
+    language::Language,
     plenar::{Debate, DebateInfo, PlenarInfo},
     text_utils,
 };
@@ -329,12 +330,27 @@ pub async fn insert_plenar_speech<'a>(
     let updated_spoken_text = if disable_speech_text {
         None
     } else {
-        text_extractor
-            .full_speech_extraction(
-                &plenar_speech.speech.spoken_text_html_urls,
-                &plenar_speech.speech.delegate_display_name,
-            )
-            .await
+        let maybe_text = plenar_speech
+            .speech
+            .speech_texts
+            .as_ref()
+            .map(|speech_texts| {
+                speech_texts
+                    .iter()
+                    .find(|speech_text| speech_text.language == Language::En)
+            })
+            .flatten();
+        match maybe_text {
+            Some(text) => Some(text.text.clone()),
+            None => {
+                text_extractor
+                    .full_speech_extraction(
+                        &plenar_speech.speech.spoken_text_html_urls,
+                        &plenar_speech.speech.delegate_display_name,
+                    )
+                    .await
+            }
+        }
     };
 
     if updated_spoken_text.is_none() {
