@@ -159,6 +159,7 @@ mod tests {
         let pro_contra = ProContra {
             pro: vec!["A".to_string()],
             contra: vec!["B".to_string()],
+            abstained: vec![],
         };
 
         let votes = translate_votes(&vec![], &parties, &pro_contra, "gp1").await;
@@ -191,6 +192,7 @@ mod tests {
         let pro_contra = ProContra {
             pro: vec!["Alpha".to_string()],
             contra: vec!["Beta".to_string()],
+            abstained: vec![],
         };
 
         let votes = translate_votes(&vec![], &parties, &pro_contra, "gp1").await;
@@ -244,6 +246,7 @@ mod tests {
         let pro_contra = ProContra {
             pro: vec!["Alpha".to_string()],
             contra: vec!["Beta".to_string()],
+            abstained: vec![],
         };
 
         let votes = translate_votes(&all_parties, &parties_at_date, &pro_contra, "gp1").await;

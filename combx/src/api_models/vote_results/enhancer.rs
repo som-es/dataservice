@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use crate::{DbLegislativeInitiativeQuery, DbNamedVote, DbSpeechWithLink, enhancer::Enhancer};
 use chrono::{DateTime, NaiveDate, Utc};
-use somes_scraper::{LegislativeInitiative, Party, ProContra};
+use somes_scraper::{LegislativeInitiative, NamedVoteProContra, Party, ProContra};
 
 #[derive(Debug, Default)]
 pub struct LegisInitInfo {
@@ -27,7 +27,7 @@ pub trait VoteResultEnhancer: Enhancer {
     ) -> impl Future<Output = (Vec<Party>, HashMap<String, Party>)>;
     fn create_db_named_votes(
         &self,
-        votes: &ProContra,
+        votes: &NamedVoteProContra,
         voted_on: NaiveDate,
         gp: &str,
         function: &str,

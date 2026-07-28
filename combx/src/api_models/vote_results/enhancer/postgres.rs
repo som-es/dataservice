@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::NaiveDate;
-use somes_scraper::{LegislativeInitiative, Party, ProContra};
+use somes_scraper::{LegislativeInitiative, NamedVoteProContra, Party, ProContra};
 use sqlx::PgPool;
 
 use crate::{
@@ -39,7 +39,7 @@ impl VoteResultEnhancer for PostgresEnhancer {
 
     fn create_db_named_votes(
         &self,
-        votes: &ProContra,
+        votes: &NamedVoteProContra,
         voted_on: NaiveDate,
         gp: &str,
         function: &str,

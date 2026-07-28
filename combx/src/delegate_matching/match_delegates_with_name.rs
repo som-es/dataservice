@@ -308,7 +308,10 @@ mod tests {
     use std::collections::HashSet;
 
     use chrono::NaiveDate;
-    use somes_scraper::{AustriaScraper, legis_init::LegislativeInitiatives, plenar::Plenar};
+    use somes_scraper::{
+        AustriaScraper, eu_parliament::EuParliamentScraper, legis_init::LegislativeInitiatives,
+        plenar::Plenar,
+    };
 
     use crate::{connect_pg, reverse_name, today, with_data::active_delegates_at_date};
 
@@ -342,6 +345,7 @@ mod tests {
             .iter()
             .chain(pro_contra.contra.iter())
             .cloned()
+            .map(|val| val.name)
             .collect::<Vec<_>>();
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
@@ -414,6 +418,7 @@ mod tests {
             .iter()
             .chain(pro_contra.contra.iter())
             .cloned()
+            .map(|val| val.name)
             .collect::<Vec<_>>();
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
@@ -484,6 +489,7 @@ mod tests {
                 .iter()
                 .chain(pro_contra.contra.iter())
                 .cloned()
+                .map(|val| val.name)
                 .collect::<Vec<_>>();
             let res = match_delegate_names_with_delegate_ids(
                 &active_delegates,
@@ -525,7 +531,11 @@ mod tests {
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
-            &pro_contra.pro,
+            &pro_contra
+                .pro
+                .iter()
+                .map(|val| val.name.clone())
+                .collect::<Vec<String>>(),
             &init.gp,
             init.nr_plenary_activity_date,
         );
@@ -562,7 +572,11 @@ mod tests {
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
-            &pro_contra.pro,
+            &pro_contra
+                .pro
+                .iter()
+                .map(|val| val.name.clone())
+                .collect::<Vec<String>>(),
             &init.gp,
             init.nr_plenary_activity_date,
         );
@@ -600,7 +614,11 @@ mod tests {
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
-            &pro_contra.pro,
+            &pro_contra
+                .pro
+                .iter()
+                .map(|val| val.name.clone())
+                .collect::<Vec<String>>(),
             &init.gp,
             init.nr_plenary_activity_date,
         );
