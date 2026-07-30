@@ -1,5 +1,5 @@
 use chrono::{Days, Utc};
-use combx::VoteResult;
+use combx::{Parliament, VoteResult};
 use tokio::sync::mpsc::Sender;
 mod db;
 pub mod notify;
@@ -13,13 +13,15 @@ mod ai_tasks;
 pub use ai_tasks::*;
 
 use somes_scraper::{
-    AustriaScraper, LegislativeInitiative, legis_init::LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES,
+    AustriaScraper, LegislativeInitiative,
+    eu_parliament::EuParliamentScraper,
+    legis_init::{LEGIS_IS_PLENARY_VOTEABLE_ON_DOKTYPES, LegislativeInitiatives},
 };
 use sqlx::{PgPool, query, query_scalar};
 use std::sync::{Arc, LazyLock};
 
 use crate::{
-    AppState, CompareHash, GPS, LATEST_GP, Shutdown, ai_task::AiTask,
+    AppState, CompareHash, GPS, Gps, LATEST_GP, Shutdown, ai_task::AiTask,
     should_update::StoredUpdatedAt, today_and_time,
 };
 
@@ -30,7 +32,21 @@ pub(self) const LEGIS_INIT_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| {
         .unwrap_or(10)
 });
 
-pub async fn legis_init_once(
+pub trait VoteResultService:
+    LegislativeInitiatives + Send + Sync + 'static + Gps + Default
+{
+    const RUNS_PARALLEL: bool;
+}
+
+impl VoteResultService for AustriaScraper {
+    const RUNS_PARALLEL: bool = true;
+}
+
+impl VoteResultService for EuParliamentScraper {
+    const RUNS_PARALLEL: bool = false;
+}
+
+pub async fn legis_init_once<S: VoteResultService>(
     only_latest: bool,
     only_voteable: bool,
     pg_pool: &AppState,
@@ -39,17 +55,17 @@ pub async fn legis_init_once(
     log::info!("Try scraping legislative initiatives");
 
     let mut handles = vec![];
-    for gp in GPS {
-        if only_latest && gp != LATEST_GP {
+    for gp in S::gps() {
+        if only_latest && gp != S::LATEST_GP {
             continue;
         }
         let pg_pool = pg_pool.clone();
         let ai_task_tx = ai_task_tx.clone();
 
         let handle = tokio::spawn(async move {
-            let mut scraper = AustriaScraper::default();
+            let mut scraper = S::default();
             log::info!("LEGIS INIT once GP: {gp}");
-            scraper.scrape_info.gp = vec![gp.into()];
+            scraper.scrape_info_mut().gp = vec![gp.clone()];
             if only_latest {
                 let days = if only_voteable {
                     // this number is a magic number -> maybe reason it with average completion time + n or something
@@ -58,11 +74,11 @@ pub async fn legis_init_once(
                 } else {
                     100
                 };
-                scraper.scrape_info.date_start = today_and_time()
+                scraper.scrape_info_mut().date_start = today_and_time()
                     .naive_local()
                     .checked_sub_days(Days::new(days));
             } else {
-                scraper.scrape_info.date_start = None;
+                scraper.scrape_info_mut().date_start = None;
             }
 
             let scraper = Arc::new(scraper);
@@ -76,11 +92,17 @@ pub async fn legis_init_once(
             if let Err(e) = scrape_new_legis_inits(
                 &pg_pool,
                 scraper.clone(),
-                gp,
+                &gp,
                 ai_task_tx,
                 searched_doktyps,
                 only_latest,
                 only_voteable,
+                S::PARLIAMENT,
+                if S::RUNS_PARALLEL {
+                    LEGIS_INIT_MAX_INSERT_TASKS
+                } else {
+                    1
+                },
             )
             .await
             {
@@ -88,7 +110,13 @@ pub async fn legis_init_once(
             }
             log::info!("finished scraping LEGIS INIT once GP: {gp}");
         });
-        handles.push(handle);
+        if S::RUNS_PARALLEL {
+            handles.push(handle);
+        } else {
+            if let Err(e) = handle.await {
+                log::error!("join error: {e:?}");
+            }
+        }
         if only_latest {
             break;
         }
@@ -130,7 +158,7 @@ impl CompareHash for VoteResult {
     }
 }
 
-pub async fn run_shut_latest_gp(
+pub async fn run_shut_latest_gp<S: VoteResultService>(
     mut shutdown: Shutdown,
     app_state: AppState,
     ai_task_tx: Sender<AiTask>,
@@ -152,7 +180,7 @@ pub async fn run_shut_latest_gp(
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative (latest) scraper");
 
-                    legis_init_once(only_latest, only_laws, &app_state, ai_task_ts.clone()).await;
+                    legis_init_once::<S>(only_latest, only_laws, &app_state, ai_task_ts.clone()).await;
                 }).await {
                     log::error!("Error in legislative initiative (latest) scraper: {:?}", e);
                 }
@@ -166,7 +194,7 @@ pub async fn run_shut_latest_gp(
     }
 }
 
-pub async fn run_shut_every_gp(
+pub async fn run_shut_every_gp<S: VoteResultService>(
     mut shutdown: Shutdown,
     app_state: AppState,
     ai_task_tx: Sender<AiTask>,
@@ -199,7 +227,7 @@ pub async fn run_shut_every_gp(
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting legislative initiative scraper");
 
-                    legis_init_once(false, false, &app_state, ai_task_tx.clone()).await;
+                    legis_init_once::<S>(false, false, &app_state, ai_task_tx.clone()).await;
                 }).await {
                     log::error!("Error in legislative initiative scraper: {:?}", e);
                 }
@@ -219,7 +247,7 @@ mod tests {
     };
 
     use chrono::{NaiveDate, NaiveDateTime};
-    use combx::{PostgresEnhancer, VoteResult};
+    use combx::{Parliament, PostgresEnhancer, VoteResult};
     use rand::rand_core::le;
     use somes_scraper::{
         AustriaScraper, LegislativeInitiative, legis_init::LegislativeInitiatives,
@@ -296,7 +324,11 @@ mod tests {
             parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
-            &app_state, &res, None, None,
+            &app_state,
+            &res,
+            None,
+            None,
+            Parliament::At,
         )
         .await;
     }
@@ -318,7 +350,11 @@ mod tests {
             parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
-            &app_state, &res, None, None,
+            &app_state,
+            &res,
+            None,
+            None,
+            Parliament::At,
         )
         .await;
 
@@ -345,7 +381,11 @@ mod tests {
             parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
-            &app_state, &res, None, None,
+            &app_state,
+            &res,
+            None,
+            None,
+            Parliament::At,
         )
         .await;
     }
@@ -367,7 +407,11 @@ mod tests {
             parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
-            &app_state, &res, None, None,
+            &app_state,
+            &res,
+            None,
+            None,
+            Parliament::At,
         )
         .await;
     }
@@ -389,7 +433,11 @@ mod tests {
             parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
-            &app_state, &res, None, None,
+            &app_state,
+            &res,
+            None,
+            None,
+            Parliament::At,
         )
         .await;
     }
@@ -412,7 +460,11 @@ mod tests {
             parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
-            &app_state, &res, None, None,
+            &app_state,
+            &res,
+            None,
+            None,
+            Parliament::At,
         )
         .await;
     }
@@ -435,7 +487,11 @@ mod tests {
             parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
-            &app_state, &res, None, None,
+            &app_state,
+            &res,
+            None,
+            None,
+            Parliament::At,
         )
         .await;
     }
@@ -460,7 +516,11 @@ mod tests {
             parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
-            &app_state, &res, None, None,
+            &app_state,
+            &res,
+            None,
+            None,
+            Parliament::At,
         )
         .await;
     }
@@ -485,7 +545,11 @@ mod tests {
             parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
-            &app_state, &res, None, None,
+            &app_state,
+            &res,
+            None,
+            None,
+            Parliament::At,
         )
         .await;
     }
@@ -510,7 +574,11 @@ mod tests {
             parliament: combx::Parliament::At,
         };
         crate::legislative_initiatives::update_or_insert_legis_init_in_db(
-            &app_state, &res, None, None,
+            &app_state,
+            &res,
+            None,
+            None,
+            Parliament::At,
         )
         .await;
     }
@@ -533,8 +601,13 @@ mod tests {
         // dbg!(&legis_init);
 
         let pool = connect_pg().await;
-        let vote_result =
-            VoteResult::from_legis_init(PostgresEnhancer(pool.clone()), legis_init, None).await;
+        let vote_result = VoteResult::from_legis_init(
+            PostgresEnhancer(pool.clone()),
+            legis_init,
+            Parliament::At,
+            None,
+        )
+        .await;
         let data = serde_json::to_string(&vote_result).unwrap();
         println!("data: {data}");
 

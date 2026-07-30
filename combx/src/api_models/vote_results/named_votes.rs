@@ -28,6 +28,7 @@ pub async fn pg_create_db_named_votes(
         matched_with: v.matched_with.clone(),
         delegate_id: v.delegate_id as i32,
         manually_matched: Some(v.manually_matched),
+        was_abstention: false,
     });
     let contra_iter = named_votes_compact.contra.iter().map(|v| DbNamedVote {
         id: 0,
@@ -39,6 +40,7 @@ pub async fn pg_create_db_named_votes(
         matched_with: v.matched_with.clone(),
         delegate_id: v.delegate_id as i32,
         manually_matched: Some(v.manually_matched),
+        was_abstention: false,
     });
 
     let absent_iter = named_votes_compact.absent.into_iter().map(|v| DbNamedVote {
@@ -51,11 +53,29 @@ pub async fn pg_create_db_named_votes(
         matched_with: v.name,
         delegate_id: v.id as i32,
         manually_matched: Some(false),
+        was_abstention: false,
     });
+
+    let abstention_iter = named_votes_compact
+        .abstention
+        .into_iter()
+        .map(|v| DbNamedVote {
+            id: 0,
+            infavor: None,
+            was_absent: Some(false),
+            lev: v.lev as i64,
+            similiarity_score: v.similiarity_score as i64,
+            searched_with: Some(v.searched_with.clone()),
+            matched_with: v.matched_with.clone(),
+            delegate_id: v.delegate_id as i32,
+            manually_matched: Some(v.manually_matched),
+            was_abstention: true,
+        });
 
     Ok(pro_iter
         .chain(contra_iter)
         .chain(absent_iter)
+        .chain(abstention_iter)
         .collect::<Vec<_>>())
 }
 

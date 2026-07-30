@@ -205,6 +205,30 @@ pub async fn insert_plenar_speech<'a>(
     .id;
 
     for reference in &args.corresponding_debate.references {
+        if parliament == Parliament::Eu {
+            for record in  sqlx::query!(
+                "select gp, ityp, inr, origin_legis_init_id from legis_inits_refs inner join legislative_initiatives li on li.id = origin_legis_init_id where ref_inr = $1 ",
+                reference.inr as i32
+            ).fetch_all(&mut **pool).await.unwrap_or_default() {
+
+                if let Err(e) = insert_plenar_speech_legis_init(
+                    &mut **pool,
+                    Some(record.origin_legis_init_id),
+                    plenar_speech_id,
+                    &Reference {
+                        gp: record.gp,
+                        ityp: record.ityp,
+                        inr: record.inr as u32,
+                    },
+                )
+                .await
+                {
+                    log::error!(
+                        "could not insert plenar speech legis init for legis int {:?} and speech {plenar_speech_id}: {e:?}", record.origin_legis_init_id
+                    )
+                }
+            }
+        }
         let legis_init_id = if let Ok(x) = sqlx::query!(
             "select id from legislative_initiatives where gp = $1 and ityp = $2 and inr = $3",
             reference.gp,

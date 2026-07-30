@@ -82,7 +82,7 @@ pub async fn insert_named_vote_info<'a>(
     match result {
         Ok(record) => Ok(record.id),
         Err(e) => {
-            log::warn!(
+            log::error!(
                 "Error inserting named vote info: '{:?}'. The error occurred for the following named vote info: {:?}",
                 e,
                 named_vote_info
@@ -135,7 +135,7 @@ pub async fn insert_named_votes<'a>(
         .execute(&mut **tx)
         .await
         {
-            log::warn!(
+            log::error!(
                 "Error inserting named vote: '{:?}'. The error occurred for the following named vote: {:?}",
                 e,
                 named_vote

@@ -115,6 +115,16 @@ pub async fn run_eu_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
         }
     }
 
+    let latest_legis_init_sleep = std::env::var("LEGISLATIVE_INITIATIVE_SLEEP_LATEST")
+        .unwrap_or_else(|_| "300".to_string())
+        .parse()
+        .unwrap_or_else(|e| {
+            log::warn!(
+                "Could not parse LEGISLATIVE_INITIATIVE_SLEEP_LATEST env var: {e}. Using default value of 300 seconds"
+            );
+            300
+        });
+
     tokio::join! {
         tokio::spawn(
             services::delegates::run_shut::<somes_scraper::eu_parliament::EuParliamentScraper>(
@@ -138,6 +148,20 @@ pub async fn run_eu_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
                 false
             )
         ),
+        tokio::spawn(services::legislative_initiatives::run_shut_every_gp::<somes_scraper::eu_parliament::EuParliamentScraper>(
+            Shutdown::new(notify_shutdown.subscribe()),
+            app_state.clone(),
+            llm_ai_task_tx.clone(),
+            config.only_latest,
+        )),
+        tokio::spawn(services::legislative_initiatives::run_shut_latest_gp::<somes_scraper::eu_parliament::EuParliamentScraper>(
+            Shutdown::new(notify_shutdown.subscribe()),
+            app_state.clone(),
+            llm_ai_task_tx.clone(),
+            latest_legis_init_sleep + 5000,
+            ONLY_LATEST,
+            false,
+        )),
     }
     .0
     .unwrap()
@@ -176,7 +200,7 @@ pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
                 false,
             )
             .await;
-            services::legislative_initiatives::legis_init_once(
+            services::legislative_initiatives::legis_init_once::<AustriaScraper>(
                 false,
                 true,
                 &app_state,

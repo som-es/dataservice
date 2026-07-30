@@ -17,7 +17,7 @@ use somes_scraper::{LegislativeInitiative, Opinion};
 use sqlx::{FromRow, PgPool, prelude::Type};
 use std::sync::Arc;
 
-use crate::{CombinedData, models::*};
+use crate::{CombinedData, Parliament, models::*};
 use crate::{
     FromScrapedType, Topic, api_models::vote_results::hidden_vote_translation::translate_votes,
 };
@@ -146,7 +146,7 @@ impl<T: VoteResultEnhancer> FromScrapedType<T> for VoteResult {
     type ScrapedType = LegislativeInitiative;
 
     async fn from_scraped_type(db_enhancer: T, ty: Self::ScrapedType) -> Self {
-        Self::from_legis_init(db_enhancer, ty, None).await
+        Self::from_legis_init(db_enhancer, ty, Parliament::At, None).await
     }
 }
 
@@ -158,6 +158,7 @@ impl VoteResult {
     pub async fn from_legis_init(
         db_enhancer: impl VoteResultEnhancer,
         legis_init: LegislativeInitiative,
+        parliament: Parliament,
         somai_client: Option<Arc<SomAiClient>>,
     ) -> Self {
         let plenary_session_id = db_enhancer.retrieve_plenary_session_id(&legis_init).await;
@@ -268,7 +269,10 @@ impl VoteResult {
                             pro_contra,
                             legis_init.nr_plenary_activity_date,
                             &legis_init.gp,
-                            "NR",
+                            match parliament {
+                                Parliament::At => "NR",
+                                Parliament::Eu => "MEP",
+                            },
                         )
                         .await
                         .ok(),

@@ -183,6 +183,7 @@ pub struct DbNamedVote {
     #[filter(make_optional)]
     pub id: i32,
     pub infavor: Option<bool>,
+    pub was_abstention: bool,
     pub was_absent: Option<bool>,
     #[filter(make_optional)]
     pub lev: i64,

@@ -1,4 +1,4 @@
-use combx::{Index, PostgresEnhancer, VoteResult};
+use combx::{Index, Parliament, PostgresEnhancer, VoteResult};
 use somes_scraper::LegislativeInitiative;
 use sqlx::PgPool;
 use tokio::sync::mpsc::Sender;
@@ -20,13 +20,19 @@ pub async fn update_or_insert_legis_init_in_db(
     legis_init: &LegislativeInitiative,
     new_legis_init_tx: Option<Sender<(i32, VoteResult)>>,
     ai_task_tx: Option<Sender<AiTask>>,
+    parliament: Parliament,
 ) {
     let pool = &app_state.pg_pool;
     let start = tokio::time::Instant::now();
 
     let vote_result_start = tokio::time::Instant::now();
-    let mut vote_result =
-        VoteResult::from_legis_init(PostgresEnhancer(pool.clone()), legis_init.clone(), None).await;
+    let mut vote_result = VoteResult::from_legis_init(
+        PostgresEnhancer(pool.clone()),
+        legis_init.clone(),
+        parliament,
+        None,
+    )
+    .await;
 
     log::info!(
         "legis init to vote result conversion duration: {:?}",
@@ -272,7 +278,7 @@ pub async fn update_or_insert_legis_init_in_db(
     }
 
     if let Err(e) = insert_votes_batch(&mut tx, &vote_result.votes, legis_init_id).await {
-        log::warn!("Error inserting votes: '{:?}'.", e);
+        log::error!("Error inserting votes: '{:?}'.", e);
     }
 
     if let Some(named_votes) = &vote_result.named_votes {
