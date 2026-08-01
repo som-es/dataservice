@@ -109,13 +109,14 @@ pub async fn insert_named_votes<'a>(
             "
                 INSERT INTO named_votes (
                     infavor, was_absent, lev, similiarity_score,
-                    searched_with, matched_with, delegate_id, named_vote_info_id, manually_matched
+                    searched_with, matched_with, delegate_id, named_vote_info_id, manually_matched, was_abstention
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
                 ) ON CONFLICT (delegate_id, named_vote_info_id)
                 DO UPDATE SET
                     infavor = EXCLUDED.infavor,
                     was_absent = EXCLUDED.was_absent,
+                    was_abstention = EXCLUDED.was_abstention,
                     lev = EXCLUDED.lev,
                     similiarity_score = EXCLUDED.similiarity_score,
                     searched_with = EXCLUDED.searched_with,
@@ -130,7 +131,8 @@ pub async fn insert_named_votes<'a>(
             named_vote.matched_with,
             named_vote.delegate_id,
             named_vote_info_id,
-            named_vote.manually_matched
+            named_vote.manually_matched,
+            named_vote.was_abstention,
         )
         .execute(&mut **tx)
         .await

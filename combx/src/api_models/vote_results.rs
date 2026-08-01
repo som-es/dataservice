@@ -230,7 +230,9 @@ impl VoteResult {
         {
             let (all_parties, code_to_parties) = db_enhancer
                 .gen_code_to_parties_with_date(
-                    &db_legis_init.nr_plenary_activity_date,
+                    &legis_init
+                        .vote_date
+                        .unwrap_or(legis_init.nr_plenary_activity_date),
                     &db_legis_init.gp,
                 )
                 .await;
@@ -267,7 +269,9 @@ impl VoteResult {
                     Some(pro_contra) => db_enhancer
                         .create_db_named_votes(
                             pro_contra,
-                            legis_init.nr_plenary_activity_date,
+                            legis_init
+                                .vote_date
+                                .unwrap_or(legis_init.nr_plenary_activity_date),
                             &legis_init.gp,
                             match parliament {
                                 Parliament::At => "NR",

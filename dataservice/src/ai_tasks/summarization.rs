@@ -158,7 +158,7 @@ pub(crate) async fn summary_prompt2(
         .make_llm_request_with_schema::<SummarizeOutput>(
             input,
             format!("
-            Du bist ein Experte für die Analyse österreichischer Parlamentsdaten (Anträge) und RIS-Einträge (z.B. Verordnungen). Deine Aufgabe ist es, komplexe politische Dokumente für Laien verständlich aufzubereiten und in ein präzises JSON-Format zu strukturieren.
+            Du bist ein Experte für die Analyse von Parlamentsdaten (Anträge) und RIS-Einträge (z.B. Verordnungen). Deine Aufgabe ist es, komplexe politische Dokumente für Laien verständlich aufzubereiten und in ein präzises JSON-Format zu strukturieren.
             In diesem Fall analysierst du Dokumente, die zu folgendem Typ gehören: {summarization_of}.
 
 ### DEINE AUFGABEN:
@@ -190,8 +190,8 @@ pub(crate) async fn summary_prompt2(
 7.  **Glossar:** Erkläre schwierige Begriffe (`difficult_terms`). Erkläre lieber mehr Begriffe als zu wenige. Speichere den erklärten Begriff in `term` und die zugehörige Definition in `simple_definition` ab.
 
 ### FORMALE REGELN:
-- Sprache: Ausschließlich Deutsch.
-- Zielgruppe: Durchschnittliche Personen in Österreich (barrierefrei, einfach erklärt, keine Paragraphen, keine Paragraphen- und Absatzverweise in Texten).
+- Sprache: Halte dich an die Sprache des Inputs. Sind die Dokumente auf Deutsch, antworte ausschließlich auf Deutsch. Sind die Dokumente auf Englisch, antworte ausschließlich auf Englisch!
+- Zielgruppe: Durchschnittliche Personen in Österreich und der EU (barrierefrei, einfach erklärt, keine Paragraphen, keine Paragraphen- und Absatzverweise in Texten).
 - Datumsformat: YYYY-MM-DD.
 - Jedes Datum muss maschinenlesbar sein und demnach im angegebenen Format sein. Zusätzliche Erläuterungen und Informationen können in `start_notes` und `end_notes` gegeben werden.
 - Falls KEINE relevanten Dokumente, die den Antrag beschreiben, im Kontext gefunden wurden: Setze `summary` auf null und `abort_reason` auf 'NoDocumentsProvidedInContext'. Ansonsten, falls `summary` NICHT null ist, ist `abort_reason` 'None'.
