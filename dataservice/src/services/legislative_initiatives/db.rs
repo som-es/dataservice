@@ -4,7 +4,7 @@ use sqlx::PgPool;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    AppState,
+    AppState, EU_LATEST_GP, LATEST_GP,
     ai_task::AiTask,
     enforce_ai_run,
     legislative_initiatives::inserts::{
@@ -132,12 +132,18 @@ pub async fn update_or_insert_legis_init_in_db(
 
     vote_result.id = Some(legis_init_id);
 
+    let latest_gp = match parliament {
+        Parliament::At => LATEST_GP,
+        Parliament::Eu => EU_LATEST_GP,
+    };
+
     #[cfg(feature = "ai")]
     if let Some(ai_task_tx) = &ai_task_tx {
         if db_legis_init.is_voteable_on {
+            use combx::document_text::clean_eu_documents;
             use tokio::time::Instant;
 
-            use crate::{LATEST_GP, ai_task::Priority};
+            use crate::ai_task::Priority;
 
             let priority =
                 if db_legis_init.raw_data_created_at >= today() - chrono::Duration::days(60) {
@@ -146,13 +152,16 @@ pub async fn update_or_insert_legis_init_in_db(
                     } else {
                         Priority::Higher
                     }
-                } else if db_legis_init.gp == LATEST_GP {
+                } else if db_legis_init.gp == latest_gp {
                     Priority::High
                 } else {
                     Priority::Lowest
                 };
 
-            let documents = vote_result.documents.clone();
+            let documents = match parliament {
+                Parliament::At => vote_result.documents.clone(),
+                Parliament::Eu => clean_eu_documents(vote_result.documents.clone()),
+            };
             let voting = db_legis_init.voting.clone();
             let redis_client = app_state.redis_client.clone();
             let (gp, ityp, inr) = (
@@ -172,6 +181,8 @@ pub async fn update_or_insert_legis_init_in_db(
                 created_at: Instant::now(),
                 task: Box::new(move |task_args| {
                     Box::pin(async move {
+                        use somes_scraper::language::Language;
+
                         use crate::legislative_initiatives::summarize_legis_init_documents;
 
                         let summarization_of = match voting.as_deref() {
@@ -181,10 +192,18 @@ pub async fn update_or_insert_legis_init_in_db(
                             Some(other) => other,
                             None => "Unbekannt",
                         };
+                        let language = match parliament {
+                            Parliament::At => Language::De,
+                            Parliament::Eu => Language::En,
+                        };
                         let pg_pool = task_args.pg_pool.clone();
-                        let ai_summary =
-                            summarize_legis_init_documents(task_args, &documents, summarization_of)
-                                .await?;
+                        let ai_summary = summarize_legis_init_documents(
+                            task_args,
+                            &documents,
+                            summarization_of,
+                            language,
+                        )
+                        .await?;
 
                         let has_ai_summary = ai_summary.is_some();
                         vote_result.ai_summary = ai_summary.clone();

@@ -3,6 +3,14 @@ name = "unique-topics"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "unique-topics"
+path = "src/main.rs"
+
+[[bin]]
+name = "topic-stats"
+path = "src/topic_stats.rs"
+
 [dependencies]
 sqlx = { workspace = true }
 combx = { path = "../combx" }
@@ -14,3 +22,5 @@ eframe = "0.34.3"
 egui_graphs = "0.30.0"
 petgraph = "0.8.3"
 serde = { workspace = true }
+eurovoc = { path = "../../eurovoc", default-features = false, features = ["serde"] }
+

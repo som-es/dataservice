@@ -1,5 +1,6 @@
 use combx::DbAiSummary;
 use somes_common_lib::Document;
+use somes_scraper::language::Language;
 
 use crate::{ai_task::TaskArgs, ai_tasks::summarize_and_save};
 
@@ -36,6 +37,7 @@ pub async fn summarize_decrees_documents(
             .await?;
             Ok(())
         },
+        Language::De,
     )
     .await
 }
@@ -80,8 +82,14 @@ mod tests {
             combine_texts(&extract_text_from_documents_html_first_stripped(&documents, None).await);
         println!("input length: {}", input.len());
 
-        let result =
-            summary_prompt2(&somai_client, input, &unique_topics, "Ministerialentwurf").await;
+        let result = summary_prompt2(
+            &somai_client,
+            input,
+            &unique_topics,
+            "Ministerialentwurf",
+            Language::De,
+        )
+        .await;
         dbg!(result.unwrap());
         // println!("input: {}", &input[..std::cmp::min(5000, input.len())]);
     }

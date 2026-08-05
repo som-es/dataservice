@@ -1,6 +1,7 @@
 use crate::{ai_task::TaskArgs, ai_tasks::summarize_and_save};
 use combx::DbAiSummary;
 use somes_common_lib::Document;
+use somes_scraper::language::Language;
 
 pub async fn summarize_ministerial_proposal_documents(
     task_args: TaskArgs,
@@ -26,7 +27,7 @@ pub async fn summarize_ministerial_proposal_documents(
             .execute(&task_args.pg_pool)
             .await?;
         Ok(())
-    }).await
+    }, Language::De).await
 }
 
 #[cfg(test)]
@@ -35,6 +36,7 @@ mod tests {
     use somai_client::SomAiClient;
     use somes_scraper::{
         AustriaScraper,
+        language::Language,
         ministrial_proposals::{GegenstandInfo, MinistrialProposalScraper},
     };
 
@@ -146,7 +148,14 @@ mod tests {
         let input =
             combine_texts(&extract_text_from_documents_html_first_stripped(&docs, None).await);
 
-        let result = summary_prompt2(&somai_client, input, &unique_topics, "Antrag/Gesetz").await;
+        let result = summary_prompt2(
+            &somai_client,
+            input,
+            &unique_topics,
+            "Antrag/Gesetz",
+            Language::De,
+        )
+        .await;
         assert!(result.is_ok());
         dbg!(result.unwrap());
     }
@@ -188,8 +197,14 @@ mod tests {
             combine_texts(&extract_text_from_documents_html_first_stripped(&documents, None).await);
         println!("input length: {}", input.len());
 
-        let result =
-            summary_prompt2(&somai_client, input, &unique_topics, "Ministerialentwurf").await;
+        let result = summary_prompt2(
+            &somai_client,
+            input,
+            &unique_topics,
+            "Ministerialentwurf",
+            Language::De,
+        )
+        .await;
         dbg!(result.unwrap());
         // println!("input: {}", &input[..std::cmp::min(5000, input.len())]);
     }
@@ -231,8 +246,14 @@ mod tests {
             combine_texts(&extract_text_from_documents_html_first_stripped(&documents, None).await);
         println!("input length: {}", input.len());
 
-        let result =
-            summary_prompt2(&somai_client, input, &unique_topics, "Ministerialentwurf").await;
+        let result = summary_prompt2(
+            &somai_client,
+            input,
+            &unique_topics,
+            "Ministerialentwurf",
+            Language::De,
+        )
+        .await;
         dbg!(result.unwrap());
     }
 }

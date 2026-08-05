@@ -1,11 +1,14 @@
 use chrono::Local;
 use combx::{
-    AiSummary, SummarizeOutput,
+    AiSummary,
+    Error::Custom,
+    SummarizeOutput,
     document_text::{combine_texts, extract_text_from_documents_html_first_stripped},
 };
 use serde_json::json;
 use somai_client::SomAiClient;
 use somes_common_lib::Document;
+use somes_scraper::language::Language;
 
 use crate::{OCR_ENGINE, ai_task::TaskArgs};
 
@@ -45,6 +48,7 @@ pub async fn summarize_documents(
     task_args: &TaskArgs,
     docs: &[Document],
     summarization_of: &str,
+    language: Language,
 ) -> combx::Result<SummarizeOutput> {
     let inner_docs = docs.to_vec();
     match tokio::spawn(async move {
@@ -77,6 +81,7 @@ pub async fn summarize_documents(
                 input,
                 &unique_topics,
                 summarization_of,
+                language,
             )
             .await?;
             return Ok(summary);
@@ -153,56 +158,105 @@ pub(crate) async fn summary_prompt2(
     input: String,
     topics: &[String],
     summarization_of: &str,
+    language: Language,
 ) -> combx::Result<SummarizeOutput> {
+    let prompt = match language {
+        Language::En => {
+            format!(
+r#"You are an expert in analyzing parliamentary data (motions) and RIS entries (e.g., regulations). Your task is to prepare complex political documents in a way that is understandable for laypeople and structure them into a precise JSON format.
+In this case, you are analyzing documents belonging to the following type: {summarization_of}.
+
+### YOUR TASKS:
+1.  **Summary:**
+    - Create a short, catchy title that concisely summarizes the topic of the motion (`short_title`).
+    - Create a shorter summary (maximum 2-3 sentences) for `short_summary`.
+    - Create a more detailed summary for `detailed_summary`. (2x to 3x as long as `short_summary`)
+    - Create an even more detailed summary for `very_detailed_summary`. (3x to 4x as long as `short_summary`)
+    - If paragraph/section references would occur, leave them out. No paragraph references in `short_summary` or `detailed_summary`, as they would confuse laypeople.
+    - Instead of "The motion adds § 21 para. 23 ...", phrase it, for example, as "The motion adds a new regulation that ...".
+2.  **Key Points:** Create 3-8 bullet points (`key_points`). Start at a surface level and gradually become more detailed.
+    - For each point, check whether specific dates of entry into force (`enforcement_start_date`) or expiration dates (`enforcement_end_date`) are stated in the text.
+    - Section or paragraph references must NOT be included in `point`, only in `paragraph_references`. If paragraph references would occur, leave them out of `point` => No paragraph references in the user-facing elements, as they would confuse laypeople.
+    - Provide the raw reference, e.g. '§ 5 para. 2 no. 3' and break it down into `parsed_reference_parts`. (Article => Article, Paragraph => Paragraph, Abs. => Subsection, Z. => Point, so § 5 Abs. 2 Z 3: Paragraph(5), Subsection(2), Point(3)) If a reference spans multiple subsections, list all parts. (Abs. 1-3 => Subsection(1), Subsection(2), Subsection(3), or Abs. 1,4 => Subsection(1), Subsection(4))
+    - `paragraph_references` can only be filled in if a legal text is available. These references serve to make your bullet points traceable!
+3.  **Metadata & Classification:**
+    - Classify the topic using this list (max 10): {topics:?}
+    - Determine the complexity (`complexity_scope_of_proposal`) using the enum values: Highest, High, Medium, Low, Lowest.
+    - Extract general dates for `general_enforcement_start_end`, provided they apply to the motion as a whole.
+4.  **Critical Analysis:**
+    - Create pro and con arguments (`arguments_for`, `arguments_against`).
+    - Determine the tone of the motion (`tone`) from the values: Neutral, Urgent, Aggressive, Optimistic, Bureaucratic.
+5.  **Fiscal Analysis (`fiscal_analysis`):**
+    - Estimate the costs in millions of euros (per year/month), if data is available.
+    - Choose exactly one of these values for `economic_burden`: HighCost, ModerateCost, LowCost, Neutral, RevenueGenerating, Unclear.
+6.  **Societal Relevance:**
+    - Formulate critical political questions (`general_political_questions`).
+    - Create yes/no questions for a political compass test (`political_compass_questions`).
+7.  **Glossary:** Explain difficult terms (`difficult_terms`). Prefer explaining more terms rather than too few. Store the explained term in `term` and the corresponding definition in `simple_definition`.
+
+### FORMAL RULES:
+- Language: Follow the language of the given documents. If the documents are in German, respond exclusively in German. If the documents are in English, respond exclusively in English!
+- Target audience: Average people in Austria and the EU (accessible, simply explained, no paragraphs, no paragraph and subsection references in texts).
+- Date format: YYYY-MM-DD.
+- Every date must be machine-readable and therefore in the specified format. Additional explanations and information can be given in `start_notes` and `end_notes`.
+- If NO relevant documents describing the motion are found in context: Set `summary` to null and `abort_reason` to 'NoDocumentsProvidedInContext'. Otherwise, if `summary` is NOT null, `abort_reason` is 'None'.
+- Adhere strictly to the field names and enum specifications of the provided JSON schema."#
+
+            )
+        }
+        Language::De =>
+        format!("
+                        Du bist ein Experte für die Analyse von Parlamentsdaten (Anträge) und RIS-Einträge (z.B. Verordnungen). Deine Aufgabe ist es, komplexe politische Dokumente für Laien verständlich aufzubereiten und in ein präzises JSON-Format zu strukturieren.
+                        In diesem Fall analysierst du Dokumente, die zu folgendem Typ gehören: {summarization_of}.
+
+            ### DEINE AUFGABEN:
+            1.  **Zusammenfassung:**
+                - Erstelle einen kurzen, sprechenden Titel, der das Thema des Antrags prägnant zusammenfasst (`short_title`).
+                - Erstelle eine kürzere Zusammenfassung (maximal 2-3 Sätze) für `short_summary`.
+                - Erstelle eine detailliertere Zusammenfassung für `detailed_summary`. (2x bis 3x so lang wie `short_summary`)
+                - Erstelle eine noch detailliertere Zusammenfassung für `very_detailed_summary`. (3x bis 4x so lang wie `short_summary`)
+                - Wenn Paragraphenangaben vorhanden wären, lass sie weg. Keine Paragraphenangaben in `short_summary` oder `detailed_summary`, da sie Laien verwirren würden.
+                - Statt „Der Antrag fügte § 21 Abs. 23 hinzu ...“ formuliere lieber z.B. „Der Antrag fügt eine neue Regelung hinzu, die ...“.
+            2.  **Key Points:** Erstelle 3-8 Stichpunkte (`key_points`). Beginne oberflächlich und werde graduell detaillierter.
+                - Prüfe für jeden Punkt, ob spezifische Inkrafttretensdaten (`enforcement_start_date`) oder Ablaufdaten (`enforcement_end_date`) im Text stehen.
+                - Paragrafen- oder Abschnittsangaben dürfen NICHT in `point` angegeben werden, ausschließlich in `paragraph_references`. Wenn Paragraphenangaben vorhanden wären, lass sie aus `point` weg => Keine Paragraphenangaben in den User-Facing-Elementen, da sie Laien verwirren würden.
+                - Gib den rohen Verweis an, z.B. '§ 5 Abs. 2 Z 3' und zerlege ihn in `parsed_reference_parts`. (Artikel => Article, Paragraph => Paragraph, Abs. => Subsection, Z. => Point, also § 5 Abs. 2 Z 3: Paragraph(5), Subsection(2), Point(3)) Falls eine Referenz z.B. über mehrere Subsections geht, gib alle Teile an. (Abs. 1-3 => Subsection(1), Subsection(2), Subsection(3), oder Abs. 1,4 => Subsection(1), Subsection(4))
+                - `paragraph_references` kann nur dann ausgefüllt werden, wenn ein Gesetzestext vorliegt. Diese Referenzen dienen der Nachvollziehbarkeit deiner Stichpunkte!
+            3.  **Metadaten & Einordnung:**
+                - Klassifiziere das Thema anhand dieser Liste (max 10): {topics:?}
+                - Bestimme die Komplexität (`complexity_scope_of_proposal`) unter Verwendung der Enum-Werte: Highest, High, Medium, Low, Lowest.
+                - Extrahiere allgemeine Daten für `general_enforcement_start_end`, sofern sie für den gesamten Antrag gelten.
+            4.  **Kritische Analyse:**
+                - Erstelle Pro- und Contra-Argumente (`arguments_for`, `arguments_against`).
+                - Bestimme den Tonfall des Antrags (`tone`) aus den Werten: Neutral, Urgent, Aggressive, Optimistic, Bureaucratic.
+            5.  **Finanzielle Analyse (`fiscal_analysis`):**
+                - Schätze die Kosten in Millionen Euro (pro Jahr/Monat), falls Daten vorhanden sind.
+                - Wähle für `economic_burden` exakt einen dieser Werte: HighCost, ModerateCost, LowCost, Neutral, RevenueGenerating, Unclear.
+            6.  **Gesellschaftliche Relevanz:**
+                - Formuliere kritische politische Fragen (`general_political_questions`).
+                - Erstelle Ja/Nein-Fragen für einen Polit-Kompass-Test (`political_compass_questions`).
+            7.  **Glossar:** Erkläre schwierige Begriffe (`difficult_terms`). Erkläre lieber mehr Begriffe als zu wenige. Speichere den erklärten Begriff in `term` und die zugehörige Definition in `simple_definition` ab.
+
+            ### FORMALE REGELN:
+            - Sprache: Halte dich an die Sprache der gegebenen Dokumente. Sind die Dokumente auf Deutsch, antworte ausschließlich auf Deutsch. Sind die Dokumente auf Englisch, antworte ausschließlich auf Englisch!
+            - Zielgruppe: Durchschnittliche Personen in Österreich und der EU (barrierefrei, einfach erklärt, keine Paragraphen, keine Paragraphen- und Absatzverweise in Texten).
+            - Datumsformat: YYYY-MM-DD.
+            - Jedes Datum muss maschinenlesbar sein und demnach im angegebenen Format sein. Zusätzliche Erläuterungen und Informationen können in `start_notes` und `end_notes` gegeben werden.
+            - Falls KEINE relevanten Dokumente, die den Antrag beschreiben, im Kontext gefunden wurden: Setze `summary` auf null und `abort_reason` auf 'NoDocumentsProvidedInContext'. Ansonsten, falls `summary` NICHT null ist, ist `abort_reason` 'None'.
+            - Halte dich strikt an die Feldnamen und Enum-Vorgaben des bereitgestellten JSON-Schemas.
+                        "),
+        _ => return Err(Custom("language not supported".into()).into())
+    };
     Ok(somai_client
         .make_llm_request_with_schema::<SummarizeOutput>(
             input,
-            format!("
-            Du bist ein Experte für die Analyse von Parlamentsdaten (Anträge) und RIS-Einträge (z.B. Verordnungen). Deine Aufgabe ist es, komplexe politische Dokumente für Laien verständlich aufzubereiten und in ein präzises JSON-Format zu strukturieren.
-            In diesem Fall analysierst du Dokumente, die zu folgendem Typ gehören: {summarization_of}.
-
-### DEINE AUFGABEN:
-1.  **Zusammenfassung:**
-    - Erstelle einen kurzen, sprechenden Titel, der das Thema des Antrags prägnant zusammenfasst (`short_title`).
-    - Erstelle eine kürzere Zusammenfassung (maximal 2-3 Sätze) für `short_summary`.
-    - Erstelle eine detailliertere Zusammenfassung für `detailed_summary`. (2x bis 3x so lang wie `short_summary`)
-    - Erstelle eine noch detailliertere Zusammenfassung für `very_detailed_summary`. (3x bis 4x so lang wie `short_summary`)
-    - Wenn Paragraphenangaben vorhanden wären, lass sie weg. Keine Paragraphenangaben in `short_summary` oder `detailed_summary`, da sie Laien verwirren würden.
-    - Statt „Der Antrag fügte § 21 Abs. 23 hinzu ...“ formuliere lieber z.B. „Der Antrag fügt eine neue Regelung hinzu, die ...“.
-2.  **Key Points:** Erstelle 3-8 Stichpunkte (`key_points`). Beginne oberflächlich und werde graduell detaillierter.
-    - Prüfe für jeden Punkt, ob spezifische Inkrafttretensdaten (`enforcement_start_date`) oder Ablaufdaten (`enforcement_end_date`) im Text stehen.
-    - Paragrafen- oder Abschnittsangaben dürfen NICHT in `point` angegeben werden, ausschließlich in `paragraph_references`. Wenn Paragraphenangaben vorhanden wären, lass sie aus `point` weg => Keine Paragraphenangaben in den User-Facing-Elementen, da sie Laien verwirren würden.
-    - Gib den rohen Verweis an, z.B. '§ 5 Abs. 2 Z 3' und zerlege ihn in `parsed_reference_parts`. (Artikel => Article, Paragraph => Paragraph, Abs. => Subsection, Z. => Point, also § 5 Abs. 2 Z 3: Paragraph(5), Subsection(2), Point(3)) Falls eine Referenz z.B. über mehrere Subsections geht, gib alle Teile an. (Abs. 1-3 => Subsection(1), Subsection(2), Subsection(3), oder Abs. 1,4 => Subsection(1), Subsection(4))
-    - `paragraph_references` kann nur dann ausgefüllt werden, wenn ein Gesetzestext vorliegt. Diese Referenzen dienen der Nachvollziehbarkeit deiner Stichpunkte!
-3.  **Metadaten & Einordnung:**
-    - Klassifiziere das Thema anhand dieser Liste (max 10): {topics:?}
-    - Bestimme die Komplexität (`complexity_scope_of_proposal`) unter Verwendung der Enum-Werte: Highest, High, Medium, Low, Lowest.
-    - Extrahiere allgemeine Daten für `general_enforcement_start_end`, sofern sie für den gesamten Antrag gelten.
-4.  **Kritische Analyse:**
-    - Erstelle Pro- und Contra-Argumente (`arguments_for`, `arguments_against`).
-    - Bestimme den Tonfall des Antrags (`tone`) aus den Werten: Neutral, Urgent, Aggressive, Optimistic, Bureaucratic.
-5.  **Finanzielle Analyse (`fiscal_analysis`):**
-    - Schätze die Kosten in Millionen Euro (pro Jahr/Monat), falls Daten vorhanden sind.
-    - Wähle für `economic_burden` exakt einen dieser Werte: HighCost, ModerateCost, LowCost, Neutral, RevenueGenerating, Unclear.
-6.  **Gesellschaftliche Relevanz:**
-    - Formuliere kritische politische Fragen (`general_political_questions`).
-    - Erstelle Ja/Nein-Fragen für einen Polit-Kompass-Test (`political_compass_questions`).
-7.  **Glossar:** Erkläre schwierige Begriffe (`difficult_terms`). Erkläre lieber mehr Begriffe als zu wenige. Speichere den erklärten Begriff in `term` und die zugehörige Definition in `simple_definition` ab.
-
-### FORMALE REGELN:
-- Sprache: Halte dich an die Sprache des Inputs. Sind die Dokumente auf Deutsch, antworte ausschließlich auf Deutsch. Sind die Dokumente auf Englisch, antworte ausschließlich auf Englisch!
-- Zielgruppe: Durchschnittliche Personen in Österreich und der EU (barrierefrei, einfach erklärt, keine Paragraphen, keine Paragraphen- und Absatzverweise in Texten).
-- Datumsformat: YYYY-MM-DD.
-- Jedes Datum muss maschinenlesbar sein und demnach im angegebenen Format sein. Zusätzliche Erläuterungen und Informationen können in `start_notes` und `end_notes` gegeben werden.
-- Falls KEINE relevanten Dokumente, die den Antrag beschreiben, im Kontext gefunden wurden: Setze `summary` auf null und `abort_reason` auf 'NoDocumentsProvidedInContext'. Ansonsten, falls `summary` NICHT null ist, ist `abort_reason` 'None'.
-- Halte dich strikt an die Feldnamen und Enum-Vorgaben des bereitgestellten JSON-Schemas.
-            "),
+            prompt,
             None,
             false,
-       Some(|schema: &mut serde_json::Value| {
-            // TODO: activate topic patching when #143 (https://github.com/som-es/somes/issues/143) is done
-            // patch_topics("/properties/summary/properties/topics",schema, &topics);
-        })
+            Some(|schema: &mut serde_json::Value| {
+                // TODO: activate topic patching when #143 (https://github.com/som-es/somes/issues/143) is done
+                // patch_topics("/properties/summary/properties/topics",schema, &topics);
+            }),
         )
         .await?)
 }
