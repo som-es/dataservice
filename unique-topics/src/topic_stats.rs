@@ -1,34 +1,62 @@
 use std::collections::HashSet;
 
 use combx::connect_pg;
-use eurovoc::Eurovoc;
-use unique_topics::{all_unique_eurovoc_topics, hallucinated_ai_topics_by_model};
+use eurovoc::{Eurovoc, FileType};
+use unique_topics::all_unique_eurovoc_topics;
 mod unique_topics;
 
 #[tokio::main]
 async fn main() -> combx::Result<()> {
     let eurovoc = Eurovoc::new(None, None).unwrap();
-    eurovoc.downloader().ensure_data().unwrap();
+    eurovoc.downloader().ensure_data().await.unwrap();
     let pg = connect_pg().await;
 
     let unique_eurovoc_topics = all_unique_eurovoc_topics(&pg).await?;
 
-    let eurovoc_topics = eurovoc.get_topics(&["de"]).unwrap();
+    let eurovoc_topics = eurovoc
+        .get_topics(FileType::Thesaurus, &["de"])
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|topic| (FileType::Thesaurus, topic))
+        .chain(
+            eurovoc
+                .get_topics(FileType::Descriptors, &["de"])
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|topic| (FileType::Descriptors, topic)),
+        )
+        .chain(
+            eurovoc
+                .get_topics(FileType::Domain, &["de"])
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|topic| (FileType::Domain, topic)),
+        )
+        .collect::<Vec<_>>();
 
     let mut used_eurovoc_topics_by_id = HashSet::new();
 
+    let mut unmatchable = HashSet::new();
+
     'outer: for unique_topic in unique_eurovoc_topics.iter() {
-        for topic in &eurovoc_topics {
-            if unique_topic == &topic.label {
-                used_eurovoc_topics_by_id.insert(topic.clone());
+        for (ftype, topic) in &eurovoc_topics {
+            if unique_topic.to_lowercase() == topic.label.to_lowercase() {
+                used_eurovoc_topics_by_id.insert((ftype, topic.clone()));
                 continue 'outer;
             }
         }
-        panic!("could not find id for topic: {unique_topic}");
+        unmatchable.insert(unique_topic);
     }
 
     let text = serde_json::to_string_pretty(&used_eurovoc_topics_by_id).unwrap();
-    tokio::fs::write("./unique_eurovoc_topics", &text).await;
+    tokio::fs::write("./id_unique_eurovoc_topics.json", &text)
+        .await
+        .unwrap();
+
+    dbg!(unmatchable);
 
     Ok(())
 }
