@@ -44,7 +44,9 @@ async fn main() -> combx::Result<()> {
     'outer: for unique_topic in unique_eurovoc_topics.iter() {
         for (ftype, topic) in &eurovoc_topics {
             if unique_topic.to_lowercase() == topic.label.to_lowercase() {
-                used_eurovoc_topics_by_id.insert((ftype, topic.clone()));
+                let mut topic = topic.clone();
+                topic.label = unique_topic.clone();
+                used_eurovoc_topics_by_id.insert((ftype, topic));
                 continue 'outer;
             }
         }

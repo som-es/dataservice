@@ -62,10 +62,9 @@ pub async fn ai_topics_by_model(pg: &PgPool) -> sqlx::Result<HashMap<String, Has
 }
 
 pub async fn all_unique_eurovoc_topics(pg: &PgPool) -> sqlx::Result<HashSet<String>> {
-    sqlx::query_scalar::<_, String>(
+    sqlx::query_scalar!(
         r#"
-        select topic_name
-        from unique_eurovoc_topics
+        select distinct topic from eurovoc_topics_legis_init
         "#,
     )
     .fetch_all(pg)

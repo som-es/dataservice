@@ -23,3 +23,4 @@ schemars = "1.1.0"
 ocrs = "0.11.0"
 tesseract-rs = { version = "0.1.20", features = ["build-tesseract"] }
 chrono-tz = {version="0.10.4", features=["serde"]}
+eurovoc = { path = "../eurovoc", default-features = false, features = ["serde"] }

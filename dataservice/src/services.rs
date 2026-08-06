@@ -14,6 +14,7 @@ pub mod parties;
 pub mod plenar;
 #[cfg(feature = "vectordb")]
 pub mod political_analysis;
+pub mod unique_topics;
 
 pub async fn political_analysis_service(
     _shutdown: Shutdown,
