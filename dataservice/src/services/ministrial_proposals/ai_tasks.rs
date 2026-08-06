@@ -32,7 +32,10 @@ pub async fn summarize_ministerial_proposal_documents(
 
 #[cfg(test)]
 mod tests {
-    use combx::document_text::{combine_texts, extract_text_from_documents_html_first_stripped};
+    use combx::{
+        document_text::{combine_texts, extract_text_from_documents_html_first_stripped},
+        with_data::unique_topics::unique_topics_for_lang,
+    };
     use somai_client::SomAiClient;
     use somes_scraper::{
         AustriaScraper,
@@ -138,12 +141,9 @@ mod tests {
             },
         ];
         let pg_pool = combx::connect_pg().await;
-        let unique_topics = sqlx::query_scalar!(
-            "select topic_name as topic from unique_eurovoc_topics order by topic"
-        )
-        .fetch_all(&pg_pool)
-        .await
-        .unwrap();
+        let unique_topics = unique_topics_for_lang(&pg_pool, Language::De)
+            .await
+            .unwrap();
 
         let input =
             combine_texts(&extract_text_from_documents_html_first_stripped(&docs, None).await);
@@ -177,12 +177,9 @@ mod tests {
             .await
             .unwrap();
         let pg_pool = combx::connect_pg().await;
-        let unique_topics = sqlx::query_scalar!(
-            "select topic_name as topic from unique_eurovoc_topics order by topic"
-        )
-        .fetch_all(&pg_pool)
-        .await
-        .unwrap();
+        let unique_topics = unique_topics_for_lang(&pg_pool, Language::De)
+            .await
+            .unwrap();
         let documents = prop
             .documents
             .iter()
@@ -226,12 +223,9 @@ mod tests {
             .await
             .unwrap();
         let pg_pool = combx::connect_pg().await;
-        let unique_topics = sqlx::query_scalar!(
-            "select topic_name as topic from unique_eurovoc_topics order by topic"
-        )
-        .fetch_all(&pg_pool)
-        .await
-        .unwrap();
+        let unique_topics = unique_topics_for_lang(&pg_pool, Language::De)
+            .await
+            .unwrap();
         let documents = prop
             .documents
             .iter()

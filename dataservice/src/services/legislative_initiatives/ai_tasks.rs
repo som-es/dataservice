@@ -35,7 +35,10 @@ pub async fn summarize_legis_init_documents(
 
 #[cfg(test)]
 mod tests {
-    use combx::document_text::{combine_texts, extract_text_from_documents_html_first_stripped};
+    use combx::{
+        document_text::{combine_texts, extract_text_from_documents_html_first_stripped},
+        with_data::unique_topics::unique_topics_for_lang,
+    };
     use somai_client::SomAiClient;
     use somes_scraper::language::Language;
 
@@ -45,6 +48,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_summary_prompt_eu_20250429() {
+        let pg_pool = combx::connect_pg().await;
+        let unique_topics = unique_topics_for_lang(&pg_pool, Language::En)
+            .await
+            .unwrap();
+        dbg!(&unique_topics);
+
         // let somai_client = SomAiClient::new_local("http://localhost:8000")
         //     .await
         //     .unwrap();
@@ -70,19 +79,17 @@ mod tests {
             Document { title: Some("DRAFT REPORT on the proposal for a regulation of the European Parliament and of the Council amending Regulation (EU) 2021/1232 as regards the extension of its period of application".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmRp-Dft/LIBE-PR-784310/LIBE-PR-784310_en.docx".to_string()), document_type: Some("Unknown".to_string()) },
         ];
 
-        let pg_pool = combx::connect_pg().await;
-        let unique_topics = sqlx::query_scalar!(
-            "select topic_name as topic from unique_eurovoc_topics order by topic"
-        )
-        .fetch_all(&pg_pool)
-        .await
-        .unwrap();
-
         let input =
             combine_texts(&extract_text_from_documents_html_first_stripped(&docs, None).await);
 
-        let result =
-            summary_prompt2(&somai_client, input, &unique_topics, "TBD", Language::En).await;
+        let result = summary_prompt2(
+            &somai_client,
+            input,
+            &unique_topics,
+            "procedure",
+            Language::En,
+        )
+        .await;
         assert!(result.is_ok());
         dbg!(result.unwrap());
     }
@@ -153,12 +160,9 @@ mod tests {
         ];
 
         let pg_pool = combx::connect_pg().await;
-        let unique_topics = sqlx::query_scalar!(
-            "select topic_name as topic from unique_eurovoc_topics order by topic"
-        )
-        .fetch_all(&pg_pool)
-        .await
-        .unwrap();
+        let unique_topics = unique_topics_for_lang(&pg_pool, Language::De)
+            .await
+            .unwrap();
 
         let input =
             combine_texts(&extract_text_from_documents_html_first_stripped(&docs, None).await);
@@ -256,12 +260,9 @@ mod tests {
             },
         ];
         let pg_pool = combx::connect_pg().await;
-        let unique_topics = sqlx::query_scalar!(
-            "select topic_name as topic from unique_eurovoc_topics order by topic"
-        )
-        .fetch_all(&pg_pool)
-        .await
-        .unwrap();
+        let unique_topics = unique_topics_for_lang(&pg_pool, Language::De)
+            .await
+            .unwrap();
         let input = combine_texts(
             &extract_text_from_documents_html_first_stripped(&docs, OCR_ENGINE.clone()).await,
         );
@@ -343,12 +344,9 @@ mod tests {
         ];
 
         let pg_pool = combx::connect_pg().await;
-        let unique_topics = sqlx::query_scalar!(
-            "select topic_name as topic from unique_eurovoc_topics order by topic"
-        )
-        .fetch_all(&pg_pool)
-        .await
-        .unwrap();
+        let unique_topics = unique_topics_for_lang(&pg_pool, Language::De)
+            .await
+            .unwrap();
 
         let input =
             combine_texts(&extract_text_from_documents_html_first_stripped(&docs, None).await);
@@ -381,12 +379,9 @@ mod tests {
         }];
 
         let pg_pool = combx::connect_pg().await;
-        let unique_topics = sqlx::query_scalar!(
-            "select topic_name as topic from unique_eurovoc_topics order by topic"
-        )
-        .fetch_all(&pg_pool)
-        .await
-        .unwrap();
+        let unique_topics = unique_topics_for_lang(&pg_pool, Language::De)
+            .await
+            .unwrap();
 
         let input = combine_texts(
             &extract_text_from_documents_html_first_stripped(&docs, OCR_ENGINE.clone()).await,
@@ -418,12 +413,9 @@ mod tests {
         }];
 
         let pg_pool = combx::connect_pg().await;
-        let unique_topics = sqlx::query_scalar!(
-            "select topic_name as topic from unique_eurovoc_topics order by topic"
-        )
-        .fetch_all(&pg_pool)
-        .await
-        .unwrap();
+        let unique_topics = unique_topics_for_lang(&pg_pool, Language::De)
+            .await
+            .unwrap();
 
         let input = combine_texts(
             &extract_text_from_documents_html_first_stripped(&docs, OCR_ENGINE.clone()).await,
@@ -453,12 +445,9 @@ mod tests {
         }];
         let pg_pool = combx::connect_pg().await;
 
-        let unique_topics = sqlx::query_scalar!(
-            "select topic_name as topic from unique_eurovoc_topics order by topic"
-        )
-        .fetch_all(&pg_pool)
-        .await
-        .unwrap();
+        let unique_topics = unique_topics_for_lang(&pg_pool, Language::De)
+            .await
+            .unwrap();
         let input = combine_texts(
             &extract_text_from_documents_html_first_stripped(&docs, OCR_ENGINE.clone()).await,
         );

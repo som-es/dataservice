@@ -47,10 +47,11 @@ pub async fn summarize_and_extract_qa(
     .fetch_optional(&task_args.pg_pool)
     .await?;
 
-    let unique_topics =
-        sqlx::query_scalar!("select topic_name as topic from unique_eurovoc_topics order by topic")
-            .fetch_all(&task_args.pg_pool)
-            .await?;
+    let unique_topics = sqlx::query_scalar!(
+        "select topic_name as topic from unique_eurovoc_topics where language = 'de' order by topic"
+    )
+    .fetch_all(&task_args.pg_pool)
+    .await?;
 
     let questions = match question_entry {
         Some(entry) => entry.full_question_entry.questions.clone(),
@@ -328,12 +329,7 @@ mod tests {
             document_type: Some("DigitalPDF".into()), // using a DigitalPDF here because HTML list items are not counted accordingly (all html tags get simply removed)
         }];
         let pg_pool = combx::connect_pg().await;
-        let unique_topics = sqlx::query_scalar!(
-            "select topic_name as topic from unique_eurovoc_topics order by topic"
-        )
-        .fetch_all(&pg_pool)
-        .await
-        .unwrap();
+        let unique_topics = unique_topics_for_lang(&task_args.pg_pool, Language::De).await?;
         let result = extract_question(&somai_client, &unique_topics, &docs).await;
         dbg!(&result);
         assert!(result.is_ok());
@@ -355,12 +351,7 @@ mod tests {
             document_type: Some("DigitalPDF".into()),
         }];
         let pg_pool = combx::connect_pg().await;
-        let unique_topics = sqlx::query_scalar!(
-            "select topic_name as topic from unique_eurovoc_topics order by topic"
-        )
-        .fetch_all(&pg_pool)
-        .await
-        .unwrap();
+        let unique_topics = unique_topics_for_lang(&task_args.pg_pool, Language::De).await?;
 
         #[rustfmt::skip]
         let questions =

@@ -180,7 +180,6 @@ impl Gps for EuParliamentScraper {
 
     const LATEST_GP: &'static str = EU_LATEST_GP;
 }
-
 #[cfg(test)]
 mod tests {
     use sqlx::query;

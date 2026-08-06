@@ -44,7 +44,7 @@ pub async fn find_notifiers_legis_init<'a>(
     };
     let mut to_notify_emails = HashMap::new();
     for id in ids {
-        let user_topics = query!("select topic_name from user_topics inner join unique_eurovoc_topics ut on ut.id = topic_id where user_id = $1", id.id).fetch_all(pool).await.unwrap_or_default().into_iter().map(|x| x.topic_name).collect::<Vec<_>>();
+        let user_topics = query!("select topic_name from user_topics inner join unique_eurovoc_topics ut on ut.id_as_hash = topic_id where user_id = $1", id.id).fetch_all(pool).await.unwrap_or_default().into_iter().map(|x| x.topic_name).collect::<Vec<_>>();
 
         let favo_dels = query_scalar!(
             "select delegate_id from favo_dels where user_id = $1",

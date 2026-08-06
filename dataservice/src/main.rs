@@ -1,6 +1,6 @@
 use combx::Parliament;
 use dataservice::{
-    ApiLimiter, AppState, DATABASE_URL, REDIS_URL, Shutdown, ai_task::AiTask, connect_pg,
+    ApiLimiter, AppState, REDIS_URL, Shutdown, ai_task::AiTask, connect_pg,
     delegates::delegate_count, services, setup_app_data,
 };
 use std::future::Future;
@@ -78,15 +78,25 @@ pub fn decree_pages() -> usize {
 }
 
 #[cfg(not(feature = "eu"))]
-pub async fn run_eu_services(notify_shutdown: tokio::sync::broadcast::Sender<()>, _config: Config) {
+pub async fn run_eu_services(
+    _notify_shutdown: tokio::sync::broadcast::Sender<()>,
+    _config: Config,
+) {
 }
 
 #[cfg(feature = "eu")]
 pub async fn run_eu_services(notify_shutdown: tokio::sync::broadcast::Sender<()>, config: Config) {
-    use dataservice::eu_database_url;
+    use dataservice::{eu_database_url, unique_topics};
 
     let (llm_ai_task_tx, llm_ai_task_rx, cpu_ai_task_rx, pool, app_state) =
         setup(&eu_database_url(), 1, Parliament::Eu).await;
+
+    log::info!("Insert unique topics");
+    if let Err(e) = unique_topics::insert_unique_topics(&app_state).await {
+        log::error!("Could not update or insert unique topics: {e:?}");
+        return;
+    }
+
     {
         if delegate_count(&pool).await == Some(0) {
             use dataservice::parties::PartyService;
@@ -168,12 +178,15 @@ pub async fn run_eu_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
 }
 
 #[cfg(not(feature = "austria"))]
-pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>, _config: Config) {
+pub async fn run_at_services(
+    _notify_shutdown: tokio::sync::broadcast::Sender<()>,
+    _config: Config,
+) {
 }
 
 #[cfg(feature = "austria")]
 pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>, config: Config) {
-    use dataservice::{api_max_concurrent_tasks_from_env, at_database_url};
+    use dataservice::{api_max_concurrent_tasks_from_env, at_database_url, unique_topics};
 
     let (llm_ai_task_tx, llm_ai_task_rx, cpu_ai_task_rx, pool, app_state) = setup(
         &at_database_url(),
@@ -181,6 +194,12 @@ pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
         Parliament::At,
     )
     .await;
+
+    log::info!("Insert unique topics");
+    if let Err(e) = unique_topics::insert_unique_topics(&app_state).await {
+        log::error!("Could not update or insert unique topics: {e:?}");
+        return;
+    }
 
     {
         if delegate_count(&pool).await == Some(0) {
@@ -200,7 +219,7 @@ pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
                 false,
             )
             .await;
-            services::legislative_initiatives::legis_init_once::<AustriaScraper>(
+            services::legislative_initiatives::legis_init_once::<somes_scraper::AustriaScraper>(
                 false,
                 true,
                 &app_state,
@@ -246,15 +265,13 @@ pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
         if config.force_fill {
             let app_state1 = app_state.clone();
             let inner_ai_task_tx = llm_ai_task_tx.clone();
-            let legis_inits = async move {
-                services::legislative_initiatives::legis_init_once(
-                    true,
-                    false,
-                    &app_state1,
-                    inner_ai_task_tx.clone(),
-                )
-                .await;
-            };
+            let legis_inits =
+                async move {
+                    services::legislative_initiatives::legis_init_once::<
+                        somes_scraper::AustriaScraper,
+                    >(true, false, &app_state1, inner_ai_task_tx.clone())
+                    .await;
+                };
 
             let pool1 = pool.clone();
             let parliament_api_limiter = app_state.parliament_api_limiter.clone();
@@ -327,13 +344,17 @@ pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
 
     tokio::join!(
         // services::proposals::run(),
-        tokio::spawn(services::legislative_initiatives::run_shut_every_gp(
+        tokio::spawn(services::legislative_initiatives::run_shut_every_gp::<
+            somes_scraper::AustriaScraper,
+        >(
             Shutdown::new(notify_shutdown.subscribe()),
             app_state.clone(),
             llm_ai_task_tx.clone(),
             config.only_latest,
         )),
-        tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
+        tokio::spawn(services::legislative_initiatives::run_shut_latest_gp::<
+            somes_scraper::AustriaScraper,
+        >(
             Shutdown::new(notify_shutdown.subscribe()),
             app_state.clone(),
             llm_ai_task_tx.clone(),
@@ -341,7 +362,9 @@ pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
             ONLY_LATEST,
             false, // also fetches everything that isn't a law
         )),
-        tokio::spawn(services::legislative_initiatives::run_shut_latest_gp(
+        tokio::spawn(services::legislative_initiatives::run_shut_latest_gp::<
+            somes_scraper::AustriaScraper,
+        >(
             Shutdown::new(notify_shutdown.subscribe()),
             app_state.clone(),
             llm_ai_task_tx.clone(),

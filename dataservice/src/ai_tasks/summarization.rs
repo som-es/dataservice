@@ -4,6 +4,7 @@ use combx::{
     Error::Custom,
     SummarizeOutput,
     document_text::{combine_texts, extract_text_from_documents_html_first_stripped},
+    with_data::unique_topics::unique_topics_for_lang,
 };
 use serde_json::json;
 use somai_client::SomAiClient;
@@ -70,11 +71,7 @@ pub async fn summarize_documents(
                     "Input too short for summarization".into(),
                 )));
             }
-            let unique_topics = sqlx::query_scalar!(
-                "select topic_name as topic from unique_eurovoc_topics order by topic"
-            )
-            .fetch_all(&task_args.pg_pool)
-            .await?;
+            let unique_topics = unique_topics_for_lang(&task_args.pg_pool, language).await?;
 
             let summary = summary_prompt2(
                 &task_args.som_ai_client,
@@ -255,7 +252,7 @@ In this case, you are analyzing documents belonging to the following type: {summ
             false,
             Some(|schema: &mut serde_json::Value| {
                 // TODO: activate topic patching when #143 (https://github.com/som-es/somes/issues/143) is done
-                // patch_topics("/properties/summary/properties/topics",schema, &topics);
+                patch_topics("/properties/summary/properties/topics", schema, &topics);
             }),
         )
         .await?)

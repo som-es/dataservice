@@ -2,13 +2,30 @@ use std::collections::HashSet;
 
 use eurovoc::{Eurovoc, FileType};
 use somes_scraper::language::Language;
+use xxhash_rust::xxh3::Xxh3;
 
-use crate::AppState;
+use crate::{AppState, CompareHash};
 
 const ID_UNIQUE_EUROVOC_TOPICS_JSON_STR: &str =
     include_str!("./unique_topics/id_unique_eurovoc_topics.json");
 
-pub async fn unique_topics_insert(app_state: &AppState) -> crate::Result<()> {
+impl CompareHash for eurovoc::Topic {
+    async fn stored_hash(&self, _pg: &sqlx::PgPool) -> Option<u64> {
+        None
+    }
+}
+
+fn stable_hash(unique_topic_id: &str, ftype: &str) -> u64 {
+    let mut hasher = Xxh3::new();
+
+    hasher.update(unique_topic_id.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(ftype.as_bytes());
+
+    hasher.digest()
+}
+
+pub async fn insert_unique_topics(app_state: &AppState) -> crate::Result<()> {
     let (eurovoc, id_unique_topics, languages) = setup().await?;
     let mut unique_topics = HashSet::new();
     for language in languages {
@@ -22,19 +39,22 @@ pub async fn unique_topics_insert(app_state: &AppState) -> crate::Result<()> {
     }
 
     for (ftype, unique_topic) in &unique_topics {
+        let hash = stable_hash(&unique_topic.id, eurovoc_type_str(ftype));
         sqlx::query!(
             r#"
-            insert into unique_eurovoc_topics (topic_name, language, eurovoc_id, eurovoc_type)
-            values ($1, $2, $3, $4)
+            insert into unique_eurovoc_topics (topic_name, language, eurovoc_id, eurovoc_type, id_as_hash)
+            values ($1, $2, $3, $4, $5)
             on conflict (topic_name) do update set
                 language = excluded.language,
                 eurovoc_id = excluded.eurovoc_id,
-                eurovoc_type = excluded.eurovoc_type
+                eurovoc_type = excluded.eurovoc_type,
+                id_as_hash = excluded.id_as_hash
             "#,
             unique_topic.label,
             unique_topic.language,
             unique_topic.id,
             eurovoc_type_str(ftype),
+            hash as i64
         )
         .execute(&app_state.pg_pool)
         .await?;
@@ -84,15 +104,18 @@ async fn extend_unique_topics_for_language(
                     .get_topics(FileType::Thesaurus, &[language])
                     .await?
                     .into_iter()
-                    .map(|topic| (FileType::Domain, topic)),
+                    .map(|topic| (FileType::Thesaurus, topic)),
             )
-            .filter(|(ftype, topic)| {
+            .filter_map(|(ftype, mut topic)| {
                 for (unique_topic_ftype, unique_topic) in id_unique_topics {
-                    if ftype == unique_topic_ftype && topic.id == unique_topic.id {
-                        return true;
+                    if &ftype == unique_topic_ftype && topic.id == unique_topic.id {
+                        if language == Language::De.as_str() && ftype == FileType::Domain {
+                            topic.label = unique_topic.label.clone() 
+                        }
+                        return Some((ftype, topic));
                     }
                 }
-                false
+                None
             })
             .map(|(ftype, mut topic)| {
                 if language == Language::En.as_str() {
@@ -108,23 +131,23 @@ async fn extend_unique_topics_for_language(
 mod tests {
     use std::collections::HashSet;
 
-use crate::unique_topics::{extend_unique_topics_for_language, setup};
-
+    use crate::unique_topics::{extend_unique_topics_for_language, setup};
 
     #[tokio::test]
     async fn test_unique_topics_insert() -> crate::Result<()> {
         let (eurovoc, id_unique_topics, _languages) = setup().await?;
         let mut unique_topics = HashSet::new();
-        extend_unique_topics_for_language(
-            &eurovoc,
-            &id_unique_topics,
-            &mut unique_topics,
-            "en",
-        )
-        .await?;
-        let (_ftype, topic) = unique_topics.iter().find(|topic| topic.1.id == "7355").unwrap();
+        extend_unique_topics_for_language(&eurovoc, &id_unique_topics, &mut unique_topics, "en")
+            .await?;
+        let (_ftype, topic) = unique_topics
+            .iter()
+            .find(|topic| topic.1.id == "7355")
+            .unwrap();
         assert_eq!(topic.label, "pharmacy");
-        let (_ftype, topic) = unique_topics.iter().find(|topic| topic.1.id == "3984").unwrap();
+        let (_ftype, topic) = unique_topics
+            .iter()
+            .find(|topic| topic.1.id == "3984")
+            .unwrap();
         assert_eq!(topic.label, "parliamentary sitting");
         dbg!(unique_topics);
         Ok(())
