@@ -145,18 +145,21 @@ pub async fn update_or_insert_legis_init_in_db(
 
             use crate::ai_task::Priority;
 
-            let priority =
-                if db_legis_init.raw_data_created_at >= today() - chrono::Duration::days(60) {
-                    if db_legis_init.accepted.is_some() {
-                        Priority::Highest
-                    } else {
-                        Priority::Higher
-                    }
-                } else if db_legis_init.gp == latest_gp {
-                    Priority::High
+            let priority = if db_legis_init.raw_data_created_at
+                >= today() - chrono::Duration::days(60)
+                || db_legis_init.vote_date
+                    >= Some((today() - chrono::Duration::days(60)).date_naive())
+            {
+                if db_legis_init.accepted.is_some() {
+                    Priority::Highest
                 } else {
-                    Priority::Lowest
-                };
+                    Priority::Higher
+                }
+            } else if db_legis_init.gp == latest_gp {
+                Priority::High
+            } else {
+                Priority::Lowest
+            };
 
             let documents = match parliament {
                 Parliament::At => vote_result.documents.clone(),
@@ -185,17 +188,22 @@ pub async fn update_or_insert_legis_init_in_db(
 
                         use crate::legislative_initiatives::summarize_legis_init_documents;
 
-                        let summarization_of = match voting.as_deref() {
-                            Some("Law") => "Antrag/Gesetz",
-                            Some("Amendment") => "Abänderungsantrag",
-                            Some("Resolution") => "Entschließungsantrag",
-                            Some(other) => other,
-                            None => "Unbekannt",
-                        };
                         let language = match parliament {
                             Parliament::At => Language::De,
                             Parliament::Eu => Language::En,
                         };
+
+                        let summarization_of = match parliament {
+                            Parliament::At => match voting.as_deref() {
+                                Some("Law") => "Antrag/Gesetz",
+                                Some("Amendment") => "Abänderungsantrag",
+                                Some("Resolution") => "Entschließungsantrag",
+                                Some(other) => other,
+                                None => "Unbekannt",
+                            },
+                            Parliament::Eu => &voting.unwrap_or("Unknown".into()),
+                        };
+
                         let pg_pool = task_args.pg_pool.clone();
                         let ai_summary = summarize_legis_init_documents(
                             task_args,

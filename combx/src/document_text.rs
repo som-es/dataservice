@@ -330,13 +330,7 @@ pub fn clean_eu_documents(docs: Vec<Document>) -> Vec<Document> {
             }
             let lhs_doc_url = doc.title.as_ref().unwrap();
             let rhs_doc_url = other_doc.title.as_ref().unwrap();
-            dbg!(
-                &doc.title,
-                lhs_doc_url,
-                rhs_doc_url,
-                lhs_doc_url.starts_with("DRAFT"),
-                !rhs_doc_url.starts_with("DRAFT")
-            );
+
             if lhs_doc_url.starts_with("DRAFT")
                 && !rhs_doc_url.starts_with("DRAFT")
                 && lhs_doc_url.contains(rhs_doc_url)

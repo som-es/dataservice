@@ -110,7 +110,7 @@ async fn extend_unique_topics_for_language(
                 for (unique_topic_ftype, unique_topic) in id_unique_topics {
                     if &ftype == unique_topic_ftype && topic.id == unique_topic.id {
                         if language == Language::De.as_str() && ftype == FileType::Domain {
-                            topic.label = unique_topic.label.clone() 
+                            topic.label = unique_topic.label.clone()
                         }
                         return Some((ftype, topic));
                     }

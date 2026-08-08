@@ -172,6 +172,12 @@ pub async fn run_eu_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
             ONLY_LATEST,
             false,
         )),
+        tokio::spawn(services::ai_task_service::ai_tasks_service(
+            Shutdown::new(notify_shutdown.subscribe()),
+            pool.clone(),
+            llm_ai_task_rx,
+            1,
+        )),
     }
     .0
     .unwrap()
@@ -265,13 +271,12 @@ pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
         if config.force_fill {
             let app_state1 = app_state.clone();
             let inner_ai_task_tx = llm_ai_task_tx.clone();
-            let legis_inits =
-                async move {
-                    services::legislative_initiatives::legis_init_once::<
+            let legis_inits = async move {
+                services::legislative_initiatives::legis_init_once::<
                         somes_scraper::AustriaScraper,
                     >(true, false, &app_state1, inner_ai_task_tx.clone())
                     .await;
-                };
+            };
 
             let pool1 = pool.clone();
             let parliament_api_limiter = app_state.parliament_api_limiter.clone();
