@@ -204,63 +204,46 @@ pub async fn insert_plenar_speech<'a>(
     .await?
     .id;
 
-    for reference in &args.corresponding_debate.references {
-        if parliament == Parliament::Eu {
-            for record in  sqlx::query!(
-                "select gp, ityp, inr, origin_legis_init_id from legis_inits_refs inner join legislative_initiatives li on li.id = origin_legis_init_id where ref_inr = $1 ",
-                reference.inr as i32
-            ).fetch_all(&mut **pool).await.unwrap_or_default() {
+    sqlx::query!(
+        "delete from plenar_speech_legis_inits where speech_id = $1",
+        plenar_speech_id
+    )
+    .execute(&mut **pool)
+    .await?;
 
-                if let Err(e) = insert_plenar_speech_legis_init(
-                    &mut **pool,
-                    Some(record.origin_legis_init_id),
-                    plenar_speech_id,
-                    &Reference {
-                        gp: record.gp,
-                        ityp: record.ityp,
-                        inr: record.inr as u32,
-                    },
-                )
-                .await
-                {
-                    log::error!(
-                        "could not insert plenar speech legis init for legis int {:?} and speech {plenar_speech_id}: {e:?}", record.origin_legis_init_id
+    for reference in &args.corresponding_debate.references {
+        match parliament {
+            Parliament::Eu => {
+                for record in  sqlx::query!(
+                    "select gp, ityp, inr, origin_legis_init_id from legis_inits_refs inner join legislative_initiatives li on li.id = origin_legis_init_id where ref_inr = $1 and ref_ityp = $2",
+                    reference.inr as i32,
+                    reference.ityp,
+                ).fetch_all(&mut **pool).await.unwrap_or_default() {
+
+                    if let Err(e) = insert_plenar_speech_legis_init(
+                        &mut **pool,
+                        Some(record.origin_legis_init_id),
+                        plenar_speech_id,
+                        &Reference {
+                            gp: record.gp,
+                            ityp: record.ityp,
+                            inr: record.inr as u32,
+                        },
                     )
+                    .await
+                    {
+                        log::error!(
+                            "could not insert plenar speech legis init for legis int {:?} and speech {plenar_speech_id}: {e:?}", record.origin_legis_init_id
+                        )
+                    }
                 }
             }
-        }
-        let legis_init_id = if let Ok(x) = sqlx::query!(
-            "select id from legislative_initiatives where gp = $1 and ityp = $2 and inr = $3",
-            reference.gp,
-            reference.ityp,
-            reference.inr as i32
-        )
-        .fetch_one(&mut **pool)
-        .await
-        {
-            Some(x.id)
-        } else {
-            None
-        };
-
-        // let own_references = i
-        if let Err(e) =
-            insert_plenar_speech_legis_init(&mut **pool, legis_init_id, plenar_speech_id, reference)
-                .await
-        {
-            log::error!(
-                "could not insert plenar speech legis init for legis int {legis_init_id:?} and speech {plenar_speech_id}: {e:?}"
-            )
-        }
-        if let Some(legis_init_id) = legis_init_id {
-            let own_references = sqlx::query_as!(DbReference, "select origin_legis_init_id, ref_gp, ref_ityp, ref_inr from legis_inits_refs where origin_legis_init_id = $1", legis_init_id).fetch_all(&mut **pool).await.unwrap_or_default();
-
-            for reference in own_references {
+            Parliament::At => {
                 let legis_init_id = if let Ok(x) = sqlx::query!(
                     "select id from legislative_initiatives where gp = $1 and ityp = $2 and inr = $3",
-                    reference.ref_gp,
-                    reference.ref_ityp,
-                    reference.ref_inr
+                    reference.gp,
+                    reference.ityp,
+                    reference.inr as i32
                 )
                 .fetch_one(&mut **pool)
                 .await
@@ -270,15 +253,12 @@ pub async fn insert_plenar_speech<'a>(
                     None
                 };
 
+                // let own_references = i
                 if let Err(e) = insert_plenar_speech_legis_init(
                     &mut **pool,
                     legis_init_id,
                     plenar_speech_id,
-                    &Reference {
-                        gp: reference.ref_gp,
-                        ityp: reference.ref_ityp,
-                        inr: reference.ref_inr as u32,
-                    },
+                    reference,
                 )
                 .await
                 {
@@ -286,8 +266,44 @@ pub async fn insert_plenar_speech<'a>(
                         "could not insert plenar speech legis init for legis int {legis_init_id:?} and speech {plenar_speech_id}: {e:?}"
                     )
                 }
+                if let Some(legis_init_id) = legis_init_id {
+                    let own_references = sqlx::query_as!(DbReference, "select origin_legis_init_id, ref_gp, ref_ityp, ref_inr from legis_inits_refs where origin_legis_init_id = $1", legis_init_id).fetch_all(&mut **pool).await.unwrap_or_default();
+
+                    for reference in own_references {
+                        let legis_init_id = if let Ok(x) = sqlx::query!(
+                        "select id from legislative_initiatives where gp = $1 and ityp = $2 and inr = $3",
+                        reference.ref_gp,
+                        reference.ref_ityp,
+                        reference.ref_inr
+                    )
+                    .fetch_one(&mut **pool)
+                    .await
+                    {
+                        Some(x.id)
+                    } else {
+                        None
+                    };
+
+                        if let Err(e) = insert_plenar_speech_legis_init(
+                            &mut **pool,
+                            legis_init_id,
+                            plenar_speech_id,
+                            &Reference {
+                                gp: reference.ref_gp,
+                                ityp: reference.ref_ityp,
+                                inr: reference.ref_inr as u32,
+                            },
+                        )
+                        .await
+                        {
+                            log::error!(
+                                "could not insert plenar speech legis init for legis int {legis_init_id:?} and speech {plenar_speech_id}: {e:?}"
+                            )
+                        }
+                    }
+                }
             }
-        }
+        };
     }
     let mut newly_inserted = HashSet::new();
     // log::info!(
