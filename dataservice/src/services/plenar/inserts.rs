@@ -393,6 +393,11 @@ pub async fn insert_plenar_speech<'a>(
                     Priority::Lowest
                 };
 
+            let language = match parliament {
+                Parliament::At => Language::De,
+                Parliament::Eu => Language::En,
+            };
+
             let spoken_text = updated_spoken_text.clone();
             let summarization_task = AiTask {
                 input: None,
@@ -406,6 +411,7 @@ pub async fn insert_plenar_speech<'a>(
                     Box::pin(crate::plenar::summarize_speech_and_relate(
                         task_args,
                         spoken_text,
+                        language,
                     ))
                 }),
             };

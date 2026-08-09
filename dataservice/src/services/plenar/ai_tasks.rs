@@ -1,8 +1,9 @@
 use combx::{
-    AiSummary, Keypoint, SpeechAbortReason, SpeechAiSummarizeOutput, SpeechAiSummary,
-    SpeechKeypoint, SpeechRelations, SpeechRelationsToProposalOutput,
+    AiSummary, Error::Custom, Keypoint, SpeechAbortReason, SpeechAiSummarizeOutput,
+    SpeechAiSummary, SpeechKeypoint, SpeechRelations, SpeechRelationsToProposalOutput,
 };
 use somai_client::SomAiClient;
+use somes_scraper::language::Language;
 use sqlx::types::Json;
 
 use crate::ai_task::TaskArgs;
@@ -10,6 +11,7 @@ use crate::ai_task::TaskArgs;
 pub async fn summarize_speech_and_relate(
     task_args: TaskArgs,
     spoken_text: String,
+    language: Language,
 ) -> crate::Result<()> {
     let summary_entry = sqlx::query!(
         r#"
@@ -37,7 +39,8 @@ pub async fn summarize_speech_and_relate(
                 ))?;
             }
 
-            let output = speech_summary_prompt(&task_args.som_ai_client, spoken_text).await?;
+            let output =
+                speech_summary_prompt(&task_args.som_ai_client, spoken_text, language).await?;
             if output.abort_reason != SpeechAbortReason::None || output.summary.is_none() {
                 log::error!(
                     "No speech? provided in context for speech {}, abort reason: {:?}, skipping",
@@ -127,40 +130,77 @@ pub async fn summarize_speech_and_relate(
 pub async fn speech_summary_prompt(
     somai_client: &SomAiClient,
     input: String,
+    language: Language,
 ) -> crate::Result<SpeechAiSummarizeOutput> {
+    let system_prompt = match language {
+        Language::De => "
+                        Du bist ein Experte für die Analyse von Parlamentsdaten. Deine Aufgabe ist es, eine Rede aus dem jeweiligen Gremium (EU-Parlament, Nationalrat, ..) für Laien verständlich aufzubereiten und in ein präzises JSON-Format zu strukturieren.
+
+            ### DEINE AUFGABEN:
+            1.  **Zusammenfassung:**
+                - Erstelle einen kurzen, sprechenden Titel, der das Thema und die Position der Rede prägnant zusammenfasst (`short_title`).
+                - Erstelle Zusammenfassungen der Rede in aufsteigender Ausführlichkeit:
+                    - `one_sentence_short_summary`: genau ein Satz.
+                    - `very_short_summary`: maximal 2 Sätze.
+                    - `short_summary`: maximal 2-3 Sätze.
+                    - `summary`: 1,5x bis 2x so lang wie `short_summary`.
+                    - `detailed_summary`: 2x bis 3x so lang wie `short_summary`.
+                    - `very_detailed_summary`: 3x bis 4x so lang wie `short_summary`.
+                - Gib die Kernaussagen und die Position der redenden Person wieder, nicht den Wortlaut.
+            2.  **Key Points:** Erstelle 3-8 Stichpunkte (`key_points`). Beginne oberflächlich und werde graduell detaillierter.
+                - `summarized_point`: der zusammengefasste Stichpunkt.
+                - `unmodified_reference_point`: die unveränderte, wörtliche Textstelle der Rede, auf der der Stichpunkt basiert. Übernehme sie GENAU VOM VORLIEGENDEN TEXT. Kürze nichts! Diese Referenzen dienen der Nachvollziehbarkeit deiner Stichpunkte!
+            3.  **Kritische Analyse (`critical_analysis`):**
+                - Erstelle Argumente, die für bzw. gegen die Position der redenden Person sprechen (`arguments_for`, `arguments_against`).
+                - Bestimme den Tonfall der Rede (`tone`) aus den Werten: Neutral, Urgent, Aggressive, Optimistic, Bureaucratic.
+            4.  **Glossar:** Erkläre schwierige Begriffe (`difficult_terms`). Erkläre lieber mehr Begriffe als zu wenige. Speichere den erklärten Begriff in `term` und die zugehörige Definition in `simple_definition` ab. Achte darauf, dass die Definition direkt beginnt, ohne den eigentlichen zu definierenden Term anfangs zu wiederholen.
+
+            ### FORMALE REGELN:
+            - Sprache: Von dem Input, also der gegebenen Rede, übernehmen.
+            - Zielgruppe: Durchschnittliche Personen in Europa (barrierefrei, einfach erklärt, keine Paragraphenverweise in Texten).
+            - Zwischenrufe und Regieanmerkungen (z.B. 'Beifall bei ...') gehören nicht zum Inhalt der Rede.
+            - Falls KEINE Rede im Kontext gefunden wurde: Setze `summary` auf null und `abort_reason` auf 'NoSpeechProvidedInContext'. Ansonsten, falls `summary` NICHT null ist - das ist der Normalfall - , ist `abort_reason` 'None'.
+            - Halte dich strikt an die Feldnamen und Enum-Vorgaben des bereitgestellten JSON-Schemas.
+        ",
+        Language::En => "
+        You are an expert in analyzing parliamentary data. Your task is to process a speech from the respective body (EU Parliament, National Council, ...) so that it is understandable for laypeople and to structure it into a precise JSON format.
+
+        ### YOUR TASKS:
+
+        1. **Summary:**
+            - Create a short, catchy title that concisely summarizes the topic and position of the speech (`short_title`).
+            - Create summaries of the speech in increasing levels of detail:
+                - `one_sentence_short_summary`: exactly one sentence.
+                - `very_short_summary`: maximum 2 sentences.
+                - `short_summary`: maximum 2-3 sentences.
+                - `summary`: 1.5x to 2x as long as `short_summary`.
+                - `detailed_summary`: 2x to 3x as long as `short_summary`.
+                - `very_detailed_summary`: 3x to 4x as long as `short_summary`.
+            - Convey the core statements and the position of the speaker, not the literal wording.
+
+        2. **Key Points:** Create 3-8 bullet points (`key_points`). Start superficially and become gradually more detailed.
+            - `summarized_point`: the summarized bullet point.
+            - `unmodified_reference_point`: the unchanged, verbatim passage from the speech on which the bullet point is based. Take it EXACTLY FROM THE SOURCE TEXT. Do not shorten anything! These references serve to make your bullet points traceable!
+
+        3. **Critical Analysis (`critical_analysis`):**
+            - Create arguments that speak for or against the speaker's position (`arguments_for`, `arguments_against`).
+            - Determine the tone of the speech (`tone`) from the following values: Neutral, Urgent, Aggressive, Optimistic, Bureaucratic.
+
+        4. **Glossary:** Explain difficult terms (`difficult_terms`). Prefer explaining more terms rather than too few. Store the explained term in `term` and the corresponding definition in `simple_definition`. Make sure the definition begins directly, without repeating the actual term being defined at the start.
+
+        ### FORMAL RULES:
+        - Language: Adopt from the input, i.e., the given speech.
+        - Target audience: Average people in Europe (accessible, simply explained, no references to legal paragraphs in the texts).
+        - Interjections and stage directions (e.g., 'Applause from ...') are not part of the content of the speech.
+        - If NO speech was found in the context: Set `summary` to null and `abort_reason` to 'NoSpeechProvidedInContext'. Otherwise, if `summary` is NOT null — which is the normal case — `abort_reason` is 'None'.
+        - Strictly adhere to the field names and enum specifications of the provided JSON schema.
+        ",
+        _ => return Err(Custom("language not supported".into()).into()),
+    };
     somai_client
         .make_llm_request_with_schema::<SpeechAiSummarizeOutput>(
             input,
-            "
-            Du bist ein Experte für die Analyse österreichischer Parlamentsdaten. Deine Aufgabe ist es, eine Rede aus dem österreichischen Nationalrat für Laien verständlich aufzubereiten und in ein präzises JSON-Format zu strukturieren.
-
-### DEINE AUFGABEN:
-1.  **Zusammenfassung:**
-    - Erstelle einen kurzen, sprechenden Titel, der das Thema und die Position der Rede prägnant zusammenfasst (`short_title`).
-    - Erstelle Zusammenfassungen der Rede in aufsteigender Ausführlichkeit:
-        - `one_sentence_short_summary`: genau ein Satz.
-        - `very_short_summary`: maximal 2 Sätze.
-        - `short_summary`: maximal 2-3 Sätze.
-        - `summary`: 1,5x bis 2x so lang wie `short_summary`.
-        - `detailed_summary`: 2x bis 3x so lang wie `short_summary`.
-        - `very_detailed_summary`: 3x bis 4x so lang wie `short_summary`.
-    - Gib die Kernaussagen und die Position der redenden Person wieder, nicht den Wortlaut.
-2.  **Key Points:** Erstelle 3-8 Stichpunkte (`key_points`). Beginne oberflächlich und werde graduell detaillierter.
-    - `summarized_point`: der zusammengefasste Stichpunkt.
-    - `unmodified_reference_point`: die unveränderte, wörtliche Textstelle der Rede, auf der der Stichpunkt basiert. Übernehme sie GENAU VOM VORLIEGENDEN TEXT. Kürze nichts! Diese Referenzen dienen der Nachvollziehbarkeit deiner Stichpunkte!
-3.  **Kritische Analyse (`critical_analysis`):**
-    - Erstelle Argumente, die für bzw. gegen die Position der redenden Person sprechen (`arguments_for`, `arguments_against`).
-    - Bestimme den Tonfall der Rede (`tone`) aus den Werten: Neutral, Urgent, Aggressive, Optimistic, Bureaucratic.
-4.  **Glossar:** Erkläre schwierige Begriffe (`difficult_terms`). Erkläre lieber mehr Begriffe als zu wenige. Speichere den erklärten Begriff in `term` und die zugehörige Definition in `simple_definition` ab. Achte darauf, dass die Definition direkt beginnt, ohne den eigentlichen zu definierenden Term anfangs zu wiederholen.
-
-### FORMALE REGELN:
-- Sprache: Ausschließlich Deutsch.
-- Zielgruppe: Durchschnittliche Personen in Österreich (barrierefrei, einfach erklärt, keine Paragraphenverweise in Texten).
-- Zwischenrufe und Regieanmerkungen (z.B. 'Beifall bei ...') gehören nicht zum Inhalt der Rede.
-- Falls KEINE Rede im Kontext gefunden wurde: Setze `summary` auf null und `abort_reason` auf 'NoSpeechProvidedInContext'. Ansonsten, falls `summary` NICHT null ist - das ist der Normalfall - , ist `abort_reason` 'None'.
-- Halte dich strikt an die Feldnamen und Enum-Vorgaben des bereitgestellten JSON-Schemas.
-            "
-            .to_string(),
+            system_prompt.to_string(),
             None,
             false,
             Some(|_: &mut serde_json::Value| {}),
@@ -304,6 +344,7 @@ where
 mod tests {
     use combx::{AiSummary, DbAiSummary, Keypoint};
     use somai_client::SomAiClient;
+    use somes_scraper::language::Language;
 
     use crate::plenar::{speech_relations_prompt, speech_summary_prompt};
 
@@ -317,7 +358,8 @@ mod tests {
                 .await
                 .unwrap();
 
-        let result = speech_summary_prompt(&somai_client, SPOKEN_TEXT.to_string()).await;
+        let result =
+            speech_summary_prompt(&somai_client, SPOKEN_TEXT.to_string(), Language::De).await;
         dbg!(&result);
         assert!(result.is_ok());
     }
@@ -339,7 +381,7 @@ mod tests {
         .unwrap()
         .unwrap();
 
-        let result = speech_summary_prompt(&somai_client, spoken_text).await;
+        let result = speech_summary_prompt(&somai_client, spoken_text, Language::De).await;
         dbg!(&result);
         assert!(result.is_ok());
     }
@@ -377,7 +419,7 @@ mod tests {
         dbg!(&db_ai_summary);
         dbg!(&spoken_text);
 
-        let speech_ai_summary = speech_summary_prompt(&somai_client, spoken_text)
+        let speech_ai_summary = speech_summary_prompt(&somai_client, spoken_text, Language::De)
             .await
             .unwrap()
             .summary
@@ -404,7 +446,7 @@ mod tests {
                 .await
                 .unwrap();
 
-        let summary = speech_summary_prompt(&somai_client, SPOKEN_TEXT.to_string())
+        let summary = speech_summary_prompt(&somai_client, SPOKEN_TEXT.to_string(), Language::De)
             .await
             .unwrap()
             .summary
