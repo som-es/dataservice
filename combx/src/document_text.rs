@@ -1,4 +1,8 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    io::Bytes,
+    time::Duration,
+};
 
 #[cfg(not(feature = "tesseract"))]
 use ocrs::OcrEngine;
@@ -231,17 +235,18 @@ pub async fn extract_text_from_html_document(url: &str) -> Option<String> {
     text_extractor.extract_text_from_url(&url, None, true).await
 }
 
+const MAX_RETRIES: u32 = 5;
+const BASE_DELAY_MS: u64 = 500;
+const MAX_DELAY_MS: u64 = 30_000;
+
 pub async fn extract_text_from_pdf_document(url: &str) -> crate::Result<String> {
     let client = http_client()?;
-    let response = client.get(url).send().await?;
-    let contents = response.bytes().await?;
+    let contents = fetch_pdf_bytes_with_retry(&client, url).await?;
 
     let text = tokio::task::spawn_blocking::<_, crate::Result<String>>(move || {
         let doc = poppler::Document::from_data(&contents, None)?;
-
         let num_pages = doc.n_pages();
         let mut full_text = String::new();
-
         for i in 0..num_pages {
             if let Some(page) = doc.page(i) {
                 if let Some(page_text) = page.text() {
@@ -253,9 +258,81 @@ pub async fn extract_text_from_pdf_document(url: &str) -> crate::Result<String> 
         Ok(full_text)
     })
     .await??;
-    log::info!("pdf read ok, got {} chars", text.len());
 
+    log::info!("pdf read ok, got {} chars", text.len());
     Ok(text)
+}
+
+async fn fetch_pdf_bytes_with_retry(client: &reqwest::Client, url: &str) -> crate::Result<Vec<u8>> {
+    let mut attempt = 0;
+
+    loop {
+        attempt += 1;
+        let response = client.get(url).send().await?;
+        let status = response.status();
+
+        if status.is_success() {
+            let content_type = response
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("")
+                .to_string();
+
+            let bytes = response.bytes().await?;
+
+            if !content_type.contains("pdf") && !bytes.starts_with(b"%PDF-") {
+                return Err(format!(
+                    "expected a PDF but got content-type '{}' ({} bytes)",
+                    content_type,
+                    bytes.len()
+                )
+                .into());
+            }
+
+            return Ok(bytes.to_vec());
+        }
+
+        let retryable = status.as_u16() == 429 || status.is_server_error();
+
+        if !retryable || attempt > MAX_RETRIES {
+            let body_snippet = response
+                .text()
+                .await
+                .unwrap_or_default()
+                .chars()
+                .take(200)
+                .collect::<String>();
+            return Err(format!(
+                "failed to fetch pdf: status {} (attempt {}), body: {}",
+                status, attempt, body_snippet
+            )
+            .into());
+        }
+
+        let retry_after = response
+            .headers()
+            .get(reqwest::header::RETRY_AFTER)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<u64>().ok())
+            .map(Duration::from_secs);
+
+        let delay = retry_after.unwrap_or_else(|| {
+            let exp = BASE_DELAY_MS.saturating_mul(1u64 << attempt.min(6));
+            let capped = exp.min(MAX_DELAY_MS);
+            Duration::from_millis(capped)
+        });
+
+        log::warn!(
+            "pdf fetch got status {} (attempt {}/{}), retrying in {:?}",
+            status,
+            attempt,
+            MAX_RETRIES,
+            delay
+        );
+
+        tokio::time::sleep(delay).await;
+    }
 }
 
 #[cfg(feature = "tesseract")]

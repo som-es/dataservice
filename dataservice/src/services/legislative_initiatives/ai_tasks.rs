@@ -36,7 +36,9 @@ pub async fn summarize_legis_init_documents(
 #[cfg(test)]
 mod tests {
     use combx::{
-        document_text::{combine_texts, extract_text_from_documents_html_first_stripped},
+        document_text::{
+            clean_eu_documents, combine_texts, extract_text_from_documents_html_first_stripped,
+        },
         with_data::unique_topics::unique_topics_for_lang,
     };
     use somai_client::SomAiClient;
@@ -45,6 +47,55 @@ mod tests {
     use crate::{OCR_ENGINE, ai_tasks::summary_prompt2};
 
     use super::*;
+
+    #[tokio::test]
+    async fn test_summary_prompt_eu_20230212() {
+        let pg_pool = combx::connect_pg().await;
+        let unique_topics = unique_topics_for_lang(&pg_pool, Language::En)
+            .await
+            .unwrap();
+        dbg!(&unique_topics);
+
+        // let somai_client = SomAiClient::new_local("http://localhost:8000")
+        //     .await
+        //     .unwrap();
+
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let somai_client =
+            SomAiClient::new("http://10.30.0.164:8000", "API_USER", "supersicher123!")
+                .await
+                .unwrap();
+
+        let docs = [
+            Document { title: Some("OPINION on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmOp/LIBE-AD-754988/LIBE-AD-754988_en.docx".to_string()), document_type: Some("Unknown".to_string()) },
+            Document { title: Some("OPINION on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmOp/LIBE-AD-754988/LIBE-AD-754988_en.pdf".to_string()), document_type: Some("DigitalPDF".to_string()) },
+            Document { title: Some("REPORT on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iPlRp/A-10-2026-0185/A-10-2026-0185_en.docx".to_string()), document_type: Some("Unknown".to_string()) },
+            Document { title: Some("REPORT on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iPlRp/A-10-2026-0185/A-10-2026-0185_en.pdf".to_string()), document_type: Some("DigitalPDF".to_string()) },
+            Document { title: Some("DRAFT REPORT on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmRp-Dft/ECON-PR-778136/ECON-PR-778136_en.pdf".to_string()), document_type: Some("DigitalPDF".to_string()) },
+            Document { title: Some("DRAFT REPORT on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmRp-Dft/ECON-PR-778136/ECON-PR-778136_en.docx".to_string()), document_type: Some("Unknown".to_string()) },
+            Document { title: Some("OPINION on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmOp/LIBE-AD-775581/LIBE-AD-775581_en.pdf".to_string()), document_type: Some("DigitalPDF".to_string()) },
+            Document { title: Some("OPINION on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmOp/LIBE-AD-775581/LIBE-AD-775581_en.docx".to_string()), document_type: Some("Unknown".to_string()) },
+            Document { title: Some("DRAFT REPORT on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmRp-Dft/ECON-PR-758954/ECON-PR-758954_en.pdf".to_string()), document_type: Some("DigitalPDF".to_string()) },
+            Document { title: Some("DRAFT REPORT on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmRp-Dft/ECON-PR-758954/ECON-PR-758954_en.docx".to_string()), document_type: Some("Unknown".to_string()) },
+            Document { title: Some("DRAFT OPINION on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmOp-Dft/LIBE-PA-754988/LIBE-PA-754988_en.pdf".to_string()), document_type: Some("DigitalPDF".to_string()) },
+            Document { title: Some("DRAFT OPINION on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmOp-Dft/LIBE-PA-754988/LIBE-PA-754988_en.docx".to_string()), document_type: Some("Unknown".to_string()) },
+        ];
+
+        let docs = clean_eu_documents(docs.to_vec());
+        let input =
+            combine_texts(&extract_text_from_documents_html_first_stripped(&docs, None).await);
+
+        let result = summary_prompt2(
+            &somai_client,
+            input,
+            &unique_topics,
+            "procedure",
+            Language::En,
+        )
+        .await;
+        assert!(result.is_ok());
+        dbg!(result.unwrap());
+    }
 
     #[tokio::test]
     async fn test_summary_prompt_eu_20250429() {
@@ -79,6 +130,7 @@ mod tests {
             Document { title: Some("DRAFT REPORT on the proposal for a regulation of the European Parliament and of the Council amending Regulation (EU) 2021/1232 as regards the extension of its period of application".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmRp-Dft/LIBE-PR-784310/LIBE-PR-784310_en.docx".to_string()), document_type: Some("Unknown".to_string()) },
         ];
 
+        let docs = clean_eu_documents(docs.to_vec());
         let input =
             combine_texts(&extract_text_from_documents_html_first_stripped(&docs, None).await);
 
