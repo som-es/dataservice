@@ -7,7 +7,7 @@ use crate::{
 
 pub fn meilisearch_filters_gov_props(
     gov_prop_filter: OptionalGovProposalFilter,
-    prefix: Option<&str>,
+    prefix: Option<String>,
 ) -> Vec<String> {
     let mut filter_conditions = vec![];
     let prefix = prefix.map(|prefix| prefix.to_string());
