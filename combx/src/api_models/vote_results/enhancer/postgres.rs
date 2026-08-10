@@ -11,7 +11,7 @@ use crate::{
         named_votes::pg_create_db_named_votes,
     },
     enhancer::{Enhancer, PostgresEnhancer},
-    with_data::all_parties_by_most_recent_gp,
+    with_data::{active_delegates_with_party_at_date, all_parties_by_most_recent_gp},
 };
 
 impl VoteResultEnhancer for PostgresEnhancer {
@@ -76,6 +76,14 @@ impl VoteResultEnhancer for PostgresEnhancer {
         db_legis_init: &DbLegislativeInitiativeQuery,
     ) -> impl Future<Output = Result<Vec<i32>, sqlx::Error>> {
         pg_get_referenced_by_other_ids(self.source(), db_legis_init)
+    }
+
+    fn active_delegates_party_at_date(
+        &self,
+        at: NaiveDate,
+        function: &str,
+    ) -> impl Future<Output = Result<Vec<crate::with_data::DelegateParty>, sqlx::Error>> {
+        active_delegates_with_party_at_date(self.source(), at, function)
     }
 }
 

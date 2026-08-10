@@ -155,7 +155,8 @@ fn convert_votes_to_party_color_map(
                     .unwrap()
                     .to_be_bytes(),
             );
-            if x.infavor {
+            // TODO this won't work
+            if x.infavor_count > 0 {
                 rgba.0[3] = 255;
             } else {
                 rgba.0[3] = 50;
@@ -384,7 +385,7 @@ pub fn send_new_legis_info_mail(
                 .votes
                 .iter()
                 .map(|vote| {
-                    let symbol = if vote.infavor {
+                    let symbol = if vote.infavor_count > 0 {
                         "<span style=\"color: #22c55e;\">✓</span>"
                     } else {
                         "<span style=\"color: #ef4444;\">✗</span>"

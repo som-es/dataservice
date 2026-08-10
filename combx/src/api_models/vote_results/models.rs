@@ -142,8 +142,10 @@ pub struct DbLegislativeInitiativeQuery {
 pub struct DbVote {
     pub party: String,
     pub code: Option<String>,
-    pub fraction: i32,
-    pub infavor: bool,
+    pub infavor_count: i32,
+    pub against_count: i32,
+    pub abstention_count: i32,
+    pub absence_count: i32,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

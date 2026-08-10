@@ -27,11 +27,18 @@ pub async fn translate_votes(
             return None;
         };
 
+        let (infavor_count, against_count) = if infavor {
+            (party.fraction as i32, 0)
+        } else {
+            (0, party.fraction as i32)
+        };
         Some(DbVote {
             party: party.name,
             code: Some(code.to_string()),
-            fraction: party.fraction as i32,
-            infavor,
+            infavor_count,
+            against_count,
+            absence_count: 0,
+            abstention_count: 0,
         })
     };
 
@@ -45,12 +52,18 @@ pub async fn translate_votes(
             );
             return None;
         };
-
+        let (infavor_count, against_count) = if infavor {
+            (party.fraction as i32, 0)
+        } else {
+            (0, party.fraction as i32)
+        };
         Some(DbVote {
             party: party.name,
             code: Some(party.code),
-            fraction: party.fraction as i32,
-            infavor,
+            infavor_count,
+            against_count,
+            absence_count: 0,
+            abstention_count: 0,
         })
     };
 
@@ -165,8 +178,16 @@ mod tests {
         let votes = translate_votes(&vec![], &parties, &pro_contra, "gp1").await;
 
         assert_eq!(votes.len(), 2);
-        assert!(votes.iter().any(|v| v.party == "Alpha" && v.infavor));
-        assert!(votes.iter().any(|v| v.party == "Beta" && !v.infavor));
+        assert!(
+            votes
+                .iter()
+                .any(|v| v.party == "Alpha" && v.infavor_count == 1)
+        );
+        assert!(
+            votes
+                .iter()
+                .any(|v| v.party == "Beta" && v.against_count == 2)
+        );
     }
 
     #[tokio::test]
@@ -198,8 +219,16 @@ mod tests {
         let votes = translate_votes(&vec![], &parties, &pro_contra, "gp1").await;
 
         assert_eq!(votes.len(), 2);
-        assert!(votes.iter().any(|v| v.party == "Alpha" && v.infavor));
-        assert!(votes.iter().any(|v| v.party == "Beta" && !v.infavor));
+        assert!(
+            votes
+                .iter()
+                .any(|v| v.party == "Alpha" && v.infavor_count == 1)
+        );
+        assert!(
+            votes
+                .iter()
+                .any(|v| v.party == "Beta" && v.against_count == 2)
+        );
     }
 
     #[tokio::test]
@@ -252,7 +281,15 @@ mod tests {
         let votes = translate_votes(&all_parties, &parties_at_date, &pro_contra, "gp1").await;
 
         assert_eq!(votes.len(), 2);
-        assert!(votes.iter().any(|v| v.party == "Alpha-Gamma" && v.infavor));
-        assert!(votes.iter().any(|v| v.party == "Beta" && !v.infavor));
+        assert!(
+            votes
+                .iter()
+                .any(|v| v.party == "Alpha-Gamma" && v.infavor_count == 1)
+        );
+        assert!(
+            votes
+                .iter()
+                .any(|v| v.party == "Beta" && v.against_count == 2)
+        );
     }
 }

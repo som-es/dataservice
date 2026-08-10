@@ -3,7 +3,10 @@ pub use postgres::*;
 
 use std::collections::HashMap;
 
-use crate::{DbLegislativeInitiativeQuery, DbNamedVote, DbSpeechWithLink, enhancer::Enhancer};
+use crate::{
+    DbLegislativeInitiativeQuery, DbNamedVote, DbSpeechWithLink, enhancer::Enhancer,
+    with_data::DelegateParty,
+};
 use chrono::{DateTime, NaiveDate, Utc};
 use somes_scraper::{LegislativeInitiative, NamedVoteProContra, Party, ProContra};
 
@@ -54,4 +57,10 @@ pub trait VoteResultEnhancer: Enhancer {
         &self,
         db_legis_init: &DbLegislativeInitiativeQuery,
     ) -> impl Future<Output = Result<Vec<i32>, sqlx::Error>>;
+
+    fn active_delegates_party_at_date(
+        &self,
+        at: NaiveDate,
+        function: &str,
+    ) -> impl Future<Output = Result<Vec<DelegateParty>, sqlx::Error>>;
 }

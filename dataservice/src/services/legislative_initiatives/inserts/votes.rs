@@ -22,33 +22,16 @@ pub async fn insert_votes_batch<'a>(
         log::error!("Cannot delete votes from legis init: {legis_init_id} with error {e:?}");
     }
 
-    let parties: Vec<String> = votes.iter().map(|v| v.party.clone()).collect();
-    let fractions: Vec<i32> = votes.iter().map(|v| v.fraction.clone()).collect();
-    let infavors: Vec<bool> = votes.iter().map(|v| v.infavor).collect();
-    let ids = vec![legis_init_id; votes.len()];
+    for vote in votes {}
 
-    let res = sqlx::query!(
-        "
-            INSERT INTO votes (party, fraction, infavor, legislative_initiatives_id)
-            SELECT * FROM UNNEST($1::text[], $2::int4[], $3::bool[], $4::int4[])
-            ON CONFLICT (legislative_initiatives_id, party)
-            DO UPDATE SET fraction = EXCLUDED.fraction, infavor = EXCLUDED.infavor
-        ",
-        &parties,
-        &fractions,
-        &infavors,
-        &ids
-    )
-    .execute(&mut *sp)
-    .await;
-
-    match res {
-        Ok(_) => {
-            sp.commit().await?;
-            Ok(())
-        }
-        Err(e) => Err(e),
-    }
+    todo!()
+    // match res {
+    //     Ok(_) => {
+    //         sp.commit().await?;
+    //         Ok(())
+    //     }
+    //     Err(e) => Err(e),
+    // }
 }
 
 pub async fn insert_named_vote_info<'a>(
