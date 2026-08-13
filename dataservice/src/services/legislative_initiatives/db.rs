@@ -21,7 +21,7 @@ pub async fn update_or_insert_legis_init_in_db(
     new_legis_init_tx: Option<Sender<(i32, VoteResult)>>,
     ai_task_tx: Option<Sender<AiTask>>,
     parliament: Parliament,
-) {
+) -> crate::Result<()> {
     let pool = &app_state.pg_pool;
     let start = tokio::time::Instant::now();
 
@@ -32,7 +32,7 @@ pub async fn update_or_insert_legis_init_in_db(
         parliament,
         None,
     )
-    .await;
+    .await?;
 
     log::info!(
         "legis init to vote result conversion duration: {:?}",
@@ -43,7 +43,7 @@ pub async fn update_or_insert_legis_init_in_db(
 
     if !enforce_ai_run() && !should_update {
         log::info!("No need to update!");
-        return;
+        return Ok(());
     }
     log::info!(
         "ADD legislative initiative: {} {} {}",
@@ -57,7 +57,7 @@ pub async fn update_or_insert_legis_init_in_db(
         Ok(t) => t,
         Err(e) => {
             log::error!("Failed to start transaction for legis init: {:?}", e);
-            return;
+            return Err(e.into());
         }
     };
 
@@ -126,7 +126,7 @@ pub async fn update_or_insert_legis_init_in_db(
         Ok(record) => record.id,
         Err(e) => {
             log::error!("Error inserting legislative initiative: '{:?}'. Error occurred for legislative initiative: {:?}", e, legis_init);
-            return;
+            return Err(e.into());
         }
     };
 
@@ -265,7 +265,7 @@ pub async fn update_or_insert_legis_init_in_db(
 
     if enforce_ai_run() && !should_update {
         log::info!("No need to update further!");
-        return;
+        return Ok(());
     }
 
     if let Some(vote_date) = db_legis_init.vote_date {
@@ -390,6 +390,7 @@ pub async fn update_or_insert_legis_init_in_db(
     }
 
     log::info!("Insertion duration for legis init: {:?}", start.elapsed());
+    Ok(())
 }
 
 async fn check_and_send_legis_init_mail(

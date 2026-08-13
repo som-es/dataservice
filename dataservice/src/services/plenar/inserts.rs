@@ -79,7 +79,7 @@ pub async fn insert_plenar_info<'a>(
         plenar_info.created_at,
         plenar_info.gp,
         plenar_info.updated_at,
-        plenar_info.absences.as_ref().map(|absences| &absences.source_document.link),
+        plenar_info.absences.first().as_ref().map(|absences| &absences.source_document.link),
         plenar_info.council,
     )
     .fetch_one(pool)

@@ -108,14 +108,16 @@ pub async fn scrape_new_legis_inits<S: VoteResultService>(
 
             let Some(legis_init) = legis_init else { return  };
 
-            update_or_insert_legis_init_in_db(
+            if let Err(e) = update_or_insert_legis_init_in_db(
                 &pool,
                 &legis_init,
                 new_vote_result_tx,
                 Some(ai_task_tx),
                 parliament,
             )
-            .await;
+            .await {
+                log::error!("could not update or insert {}/{}/{} because of {e:?}", legis_init.gp, legis_init.ityp, legis_init.inr)
+            }
         }));
     }
 

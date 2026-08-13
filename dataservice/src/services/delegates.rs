@@ -50,6 +50,7 @@ async fn scrape_new_delegates<S: DelegateScraper + Default + Send + Sync>(
     let scraper = S::default();
 
     let mut delegates = vec![];
+    return Ok(vec![]);
 
     let persons = parliament_api_limiter
         .run(scraper.post_persons_payload())

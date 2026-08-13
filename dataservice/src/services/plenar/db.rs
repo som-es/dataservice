@@ -101,14 +101,15 @@ pub async fn update_plenar_infos_in_db(
         }
     }
 
-    if let Some(absences) = &plenar_info.absences {
+    if let Some(absences) = plenar_info.absences.first() {
         let mandate_function = match parliament {
             Parliament::At => plenar_info.council.as_str(),
             Parliament::Eu => "MEP",
         };
+        let absences = absences.absences.first().unwrap();
         match absence_matching(
             pg_pool,
-            &absences.absences,
+            absences,
             plenar_info.created_at.date_naive(),
             plenar_info.gp.clone(),
             mandate_function,

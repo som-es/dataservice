@@ -512,7 +512,8 @@ mod tests {
         let pg = connect_pg2().await;
         let legis_init =
             VoteResult::from_legis_init(PostgresEnhancer(pg), legis_init, Parliament::At, None)
-                .await;
+                .await
+                .unwrap();
         generate_parliament_image(&legis_init.votes, &[20, 28, 37, 43, 48, 54]).await;
     }
 
@@ -537,7 +538,8 @@ mod tests {
         let pg = connect_pg2().await;
         let legis_init =
             VoteResult::from_legis_init(PostgresEnhancer(pg), legis_init, Parliament::At, None)
-                .await;
+                .await
+                .unwrap();
 
         send_new_legis_info_mail(
             crate::email::TEST_MAIL_RECEIVER,

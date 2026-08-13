@@ -607,7 +607,8 @@ mod tests {
             Parliament::At,
             None,
         )
-        .await;
+        .await
+        .unwrap();
         let data = serde_json::to_string(&vote_result).unwrap();
         println!("data: {data}");
 
