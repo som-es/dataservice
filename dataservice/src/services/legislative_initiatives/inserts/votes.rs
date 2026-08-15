@@ -20,18 +20,22 @@ pub async fn insert_votes_batch<'a>(
     .await
     {
         log::error!("Cannot delete votes from legis init: {legis_init_id} with error {e:?}");
+        return Err(e);
     }
 
-    for vote in votes {}
+    for vote in votes {
+        sqlx::query!(
+            "insert into votes (party, legislative_initiatives_id, infavor_count, against_count, abstention_count, absence_count) values ($1, $2, $3, $4, $5, $6)",
+            vote.party,
+            legis_init_id,
+            vote.infavor_count,
+            vote.against_count,
+            vote.abstention_count,
+            vote.absence_count
+        ).execute(&mut *sp).await?;
+    }
 
-    todo!()
-    // match res {
-    //     Ok(_) => {
-    //         sp.commit().await?;
-    //         Ok(())
-    //     }
-    //     Err(e) => Err(e),
-    // }
+    sp.commit().await
 }
 
 pub async fn insert_named_vote_info<'a>(
