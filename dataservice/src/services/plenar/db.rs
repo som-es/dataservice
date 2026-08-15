@@ -101,15 +101,14 @@ pub async fn update_plenar_infos_in_db(
         }
     }
 
-    if let Some(absences) = plenar_info.absences.first() {
+    for absences in plenar_info.absences.iter() {
         let mandate_function = match parliament {
             Parliament::At => plenar_info.council.as_str(),
             Parliament::Eu => "MEP",
         };
-        let absences = absences.absences.first().unwrap();
         match absence_matching(
             pg_pool,
-            absences,
+            &absences.absences,
             plenar_info.created_at.date_naive(),
             plenar_info.gp.clone(),
             mandate_function,
@@ -118,7 +117,15 @@ pub async fn update_plenar_infos_in_db(
         {
             Ok(matching) => {
                 log::info!("inserting absences: {:?}", matching.correctly_matched);
-                if let Err(e) = insert_absences(pg_pool, plenar_id, matching).await {
+                if let Err(e) = insert_absences(
+                    pg_pool,
+                    plenar_id,
+                    matching,
+                    absences.date,
+                    &absences.source_document,
+                )
+                .await
+                {
                     log::error!(
                         "could not insert absences for plenary session {plenar_id} because of {e:?}"
                     );
