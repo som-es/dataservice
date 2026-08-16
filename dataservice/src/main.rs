@@ -450,7 +450,6 @@ pub async fn run_at_services(
         )),
         tokio::spawn(services::ai_task_service::ai_tasks_service(
             Shutdown::new(notify_shutdown.subscribe()),
-            pool.clone(),
             cpu_ai_task_rx,
             16,
         )),
