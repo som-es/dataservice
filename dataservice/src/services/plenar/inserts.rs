@@ -517,14 +517,6 @@ pub async fn insert_absences(
             "
             INSERT INTO absences (lev, similiarity_score, searched_with, matched_with, delegate_id, manually_matched, plenary_session_id, absence_date, document_url)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            ON CONFLICT (delegate_id, plenary_session_id, absence_date)
-            DO UPDATE SET
-                lev = EXCLUDED.lev,
-                similiarity_score = EXCLUDED.similiarity_score,
-                searched_with = EXCLUDED.searched_with,
-                matched_with = EXCLUDED.matched_with,
-                manually_matched = EXCLUDED.manually_matched,
-                document_url = EXCLUDED.document_url
         ",
         match_res.lev as i64,
         match_res.similiarity_score as i64,
