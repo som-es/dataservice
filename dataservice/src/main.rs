@@ -43,6 +43,15 @@ async fn main() {
     if let Err(e) = setup_app_data().await {
         log::error!("Cannot create app data directory: {e:?}");
     }
+    let eurovoc = eurovoc::Eurovoc::new(None, None);
+    match eurovoc {
+        Ok(eurovoc) => {
+            if let Err(e) = eurovoc.downloader().ensure_data().await {
+                log::error!("Could not download eurovoc files: {e:?}");
+            }
+        }
+        Err(e) => log::error!("Could not create eurovoc downloader: {e:?}"),
+    }
 
     #[cfg(not(feature = "tesseract"))]
     if let Err(e) = combx::download_ocr_models(&dataservice::model_dir()).await {
