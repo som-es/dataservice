@@ -50,7 +50,6 @@ async fn scrape_new_delegates<S: DelegateScraper + Default + Send + Sync>(
     let scraper = S::default();
 
     let mut delegates = vec![];
-    return Ok(vec![]);
 
     let persons = parliament_api_limiter
         .run(scraper.post_persons_payload())
@@ -280,14 +279,15 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
         if (enforce_ai_run() || should_update) && false {
             if let Some(ai_task_tx) = &app_state.cpu_task_tx {
                 use tokio::time::Instant;
-
+                let pool = app_state.pg_pool.clone();
                 let task = crate::ai_task::AiTask {
                     input: None,
                     priority: crate::ai_task::Priority::Low,
                     score: crate::ai_task::Priority::Low.weight(),
-                    task_id: crate::hash!(),
+                    task_id: crate::hash!(app_state.parliament),
                     db_entry_id: delegate.id as i32,
                     rerunnable: true,
+                    pool: pool.clone(),
                     created_at: Instant::now(),
                     task: Box::new(move |task_args| {
                         Box::pin(async move {

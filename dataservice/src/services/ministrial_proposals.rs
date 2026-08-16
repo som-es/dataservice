@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
-use chrono::{Months, Utc};
+use chrono::Utc;
 use combx::{FromScrapedType, GovProposal, create_gov_officials_map};
 use dotenvy_macro::dotenv;
 use somes_scraper::{
@@ -261,8 +261,9 @@ pub async fn update_or_insert_ministerial_proposal(
         let summarization_task = AiTask {
             input: None,
             priority,
+            pool: pool.clone(),
             score: priority.weight(),
-            task_id: crate::hash!(),
+            task_id: crate::hash!(app_state.parliament),
             db_entry_id: ministrial_prop_id,
             rerunnable: true,
             created_at: Instant::now(),

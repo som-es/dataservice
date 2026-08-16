@@ -82,6 +82,7 @@ pub async fn update_plenar_infos_in_db(
 
         for plenar_speech in &debate.speeches {
             if let Err(e) = insert_plenar_speech(
+                pg_pool.clone(),
                 &mut tx,
                 plenar_speech,
                 &mut text_extractor,

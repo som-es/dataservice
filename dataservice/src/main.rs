@@ -4,6 +4,8 @@ use dataservice::{
     delegates::delegate_count, services, setup_app_data,
 };
 use std::future::Future;
+#[cfg(feature = "eu")]
+use tokio::sync::mpsc::Sender;
 use tokio::sync::{broadcast, mpsc};
 
 use clap::Parser;
@@ -81,14 +83,19 @@ pub fn decree_pages() -> usize {
 pub async fn run_eu_services(
     _notify_shutdown: tokio::sync::broadcast::Sender<()>,
     _config: Config,
+    _gpu_ai_task_tx: Sender<AiTask>,
 ) {
 }
 
 #[cfg(feature = "eu")]
-pub async fn run_eu_services(notify_shutdown: tokio::sync::broadcast::Sender<()>, config: Config) {
+pub async fn run_eu_services(
+    notify_shutdown: tokio::sync::broadcast::Sender<()>,
+    config: Config,
+    llm_ai_task_tx: Sender<AiTask>,
+) {
     use dataservice::{eu_database_url, unique_topics};
 
-    let (llm_ai_task_tx, llm_ai_task_rx, cpu_ai_task_rx, pool, app_state) =
+    let (_llm_ai_task_tx, _llm_ai_task_rx, cpu_ai_task_rx, pool, app_state) =
         setup(&eu_database_url(), 1, Parliament::Eu).await;
 
     log::info!("Insert unique topics");
@@ -172,12 +179,6 @@ pub async fn run_eu_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
             ONLY_LATEST,
             false,
         )),
-        tokio::spawn(services::ai_task_service::ai_tasks_service(
-            Shutdown::new(notify_shutdown.subscribe()),
-            pool.clone(),
-            llm_ai_task_rx,
-            1,
-        )),
     }
     .0
     .unwrap()
@@ -187,14 +188,19 @@ pub async fn run_eu_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
 pub async fn run_at_services(
     _notify_shutdown: tokio::sync::broadcast::Sender<()>,
     _config: Config,
+    _llm_ai_task_tx: Sender<AiTask>,
 ) {
 }
 
 #[cfg(feature = "austria")]
-pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>, config: Config) {
+pub async fn run_at_services(
+    notify_shutdown: tokio::sync::broadcast::Sender<()>,
+    config: Config,
+    llm_ai_task_tx: Sender<AiTask>,
+) {
     use dataservice::{api_max_concurrent_tasks_from_env, at_database_url, unique_topics};
 
-    let (llm_ai_task_tx, llm_ai_task_rx, cpu_ai_task_rx, pool, app_state) = setup(
+    let (_llm_ai_task_tx, _llm_ai_task_rx, cpu_ai_task_rx, pool, app_state) = setup(
         &at_database_url(),
         api_max_concurrent_tasks_from_env(),
         Parliament::At,
@@ -445,12 +451,6 @@ pub async fn run_at_services(notify_shutdown: tokio::sync::broadcast::Sender<()>
         tokio::spawn(services::ai_task_service::ai_tasks_service(
             Shutdown::new(notify_shutdown.subscribe()),
             pool.clone(),
-            llm_ai_task_rx,
-            1,
-        )),
-        tokio::spawn(services::ai_task_service::ai_tasks_service(
-            Shutdown::new(notify_shutdown.subscribe()),
-            pool.clone(),
             cpu_ai_task_rx,
             16,
         )),
@@ -541,9 +541,16 @@ pub struct Config {
 }
 
 pub async fn run_services(notify_shutdown: tokio::sync::broadcast::Sender<()>, config: Config) {
+    let (llm_ai_task_tx, llm_ai_task_rx) = tokio::sync::mpsc::channel::<AiTask>(16536 * 1024);
+
     tokio::join! {
-        tokio::spawn(run_at_services(notify_shutdown.clone(), config)),
-        tokio::spawn(run_eu_services(notify_shutdown.clone(), config))
+        tokio::spawn(services::ai_task_service::ai_tasks_service(
+            Shutdown::new(notify_shutdown.subscribe()),
+            llm_ai_task_rx,
+            1
+        )),
+        tokio::spawn(run_at_services(notify_shutdown.clone(), config, llm_ai_task_tx.clone())),
+        tokio::spawn(run_eu_services(notify_shutdown.clone(), config, llm_ai_task_tx.clone()))
     }
     .0
     .unwrap();

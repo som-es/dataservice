@@ -11,7 +11,7 @@ use somes_scraper::{
     text_utils,
 };
 
-use sqlx::{Executor, Postgres, postgres::PgQueryResult};
+use sqlx::{Executor, PgPool, Postgres, postgres::PgQueryResult};
 use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{
@@ -145,7 +145,8 @@ pub struct SpeechInsertArgs<'a> {
 }
 
 pub async fn insert_plenar_speech<'a>(
-    pool: &mut sqlx::Transaction<'a, Postgres>,
+    pool: PgPool,
+    tx: &mut sqlx::Transaction<'a, Postgres>,
     plenar_speech: &PlenarSpeech,
     text_extractor: &mut TextExtractor,
     args: &SpeechInsertArgs<'_>,
@@ -167,7 +168,7 @@ pub async fn insert_plenar_speech<'a>(
         "select id from delegates where id = $1",
         plenar_speech.speech.delegate_id as i32
     )
-    .fetch_optional(&mut **pool)
+    .fetch_optional(&mut **tx)
     .await?;
 
     if delegate_exists.is_none() {
@@ -200,7 +201,7 @@ pub async fn insert_plenar_speech<'a>(
         plenar_speech.speech.delegate_display_name,
         plenar_speech.start,
     )
-    .fetch_one(&mut **pool)
+    .fetch_one(&mut **tx)
     .await?
     .id;
 
@@ -208,7 +209,7 @@ pub async fn insert_plenar_speech<'a>(
         "delete from plenar_speech_legis_inits where speech_id = $1",
         plenar_speech_id
     )
-    .execute(&mut **pool)
+    .execute(&mut **tx)
     .await?;
 
     for reference in &args.corresponding_debate.references {
@@ -218,10 +219,10 @@ pub async fn insert_plenar_speech<'a>(
                     "select gp, ityp, inr, origin_legis_init_id from legis_inits_refs inner join legislative_initiatives li on li.id = origin_legis_init_id where ref_inr = $1 and ref_ityp = $2",
                     reference.inr as i32,
                     reference.ityp,
-                ).fetch_all(&mut **pool).await.unwrap_or_default() {
+                ).fetch_all(&mut **tx).await.unwrap_or_default() {
 
                     if let Err(e) = insert_plenar_speech_legis_init(
-                        &mut **pool,
+                        &mut **tx,
                         Some(record.origin_legis_init_id),
                         plenar_speech_id,
                         &Reference {
@@ -245,7 +246,7 @@ pub async fn insert_plenar_speech<'a>(
                     reference.ityp,
                     reference.inr as i32
                 )
-                .fetch_one(&mut **pool)
+                .fetch_one(&mut **tx)
                 .await
                 {
                     Some(x.id)
@@ -255,7 +256,7 @@ pub async fn insert_plenar_speech<'a>(
 
                 // let own_references = i
                 if let Err(e) = insert_plenar_speech_legis_init(
-                    &mut **pool,
+                    &mut **tx,
                     legis_init_id,
                     plenar_speech_id,
                     reference,
@@ -267,7 +268,7 @@ pub async fn insert_plenar_speech<'a>(
                     )
                 }
                 if let Some(legis_init_id) = legis_init_id {
-                    let own_references = sqlx::query_as!(DbReference, "select origin_legis_init_id, ref_gp, ref_ityp, ref_inr from legis_inits_refs where origin_legis_init_id = $1", legis_init_id).fetch_all(&mut **pool).await.unwrap_or_default();
+                    let own_references = sqlx::query_as!(DbReference, "select origin_legis_init_id, ref_gp, ref_ityp, ref_inr from legis_inits_refs where origin_legis_init_id = $1", legis_init_id).fetch_all(&mut **tx).await.unwrap_or_default();
 
                     for reference in own_references {
                         let legis_init_id = if let Ok(x) = sqlx::query!(
@@ -276,7 +277,7 @@ pub async fn insert_plenar_speech<'a>(
                         reference.ref_ityp,
                         reference.ref_inr
                     )
-                    .fetch_one(&mut **pool)
+                    .fetch_one(&mut **tx)
                     .await
                     {
                         Some(x.id)
@@ -285,7 +286,7 @@ pub async fn insert_plenar_speech<'a>(
                     };
 
                         if let Err(e) = insert_plenar_speech_legis_init(
-                            &mut **pool,
+                            &mut **tx,
                             legis_init_id,
                             plenar_speech_id,
                             &Reference {
@@ -317,7 +318,7 @@ pub async fn insert_plenar_speech<'a>(
         "delete from plenar_speech_links where plenar_speech_id = $1",
         plenar_speech_id
     )
-    .execute(&mut **pool)
+    .execute(&mut **tx)
     .await
     {
         log::error!("could not delete plenar speech links for speech {plenar_speech_id}: {e:?}")
@@ -339,7 +340,7 @@ pub async fn insert_plenar_speech<'a>(
             url.site_start.map(|i| i as i32),
             url.site_end.map(|i| i as i32)
         )
-        .fetch_optional(&mut **pool)
+        .fetch_optional(&mut **tx)
         .await;
         match id {
             Ok(id) => {
@@ -402,8 +403,9 @@ pub async fn insert_plenar_speech<'a>(
             let summarization_task = AiTask {
                 input: None,
                 priority,
+                pool,
                 score: priority.weight(),
-                task_id: crate::hash!(),
+                task_id: crate::hash!(parliament),
                 db_entry_id: plenar_speech_id,
                 rerunnable: true,
                 created_at: Instant::now(),
@@ -427,7 +429,7 @@ pub async fn insert_plenar_speech<'a>(
             plenar_speech_id as i64,
             plenar_speech.speech.delegate_id as i64,
             args.plenar_date,
-            pool,
+            tx,
             args.council,
         )
         .await
@@ -445,7 +447,7 @@ pub async fn insert_plenar_speech<'a>(
         updated_spoken_text,
         plenar_speech_id,
     )
-    .execute(&mut **pool)
+    .execute(&mut **tx)
     .await?;
 
     if updated_spoken_text.is_some() {}

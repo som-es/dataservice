@@ -177,8 +177,9 @@ pub async fn update_or_insert_legis_init_in_db(
             let summarization_task = AiTask {
                 input: None,
                 priority,
+                pool: pool.clone(),
                 score: priority.weight(),
-                task_id: crate::hash!(),
+                task_id: crate::hash!(parliament),
                 db_entry_id: legis_init_id,
                 rerunnable: true,
                 created_at: Instant::now(),
