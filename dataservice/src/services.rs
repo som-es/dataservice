@@ -18,11 +18,11 @@ pub mod unique_topics;
 
 pub async fn political_analysis_service(
     _shutdown: Shutdown,
-    _pg_pool: sqlx::PgPool,
+    _app_state: AppState,
     _ai_task_tx: mpsc::Sender<AiTask>,
 ) {
     #[cfg(feature = "vectordb")]
-    political_analysis::run_shut(_shutdown, _pg_pool, _ai_task_tx).await
+    political_analysis::run_shut(_shutdown, _app_state, _ai_task_tx).await
 }
 
 pub async fn parliamentary_qa_service(

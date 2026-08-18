@@ -1,22 +1,18 @@
-mod delegate_context;
+pub mod delegate_context;
 mod embed_speeches;
 mod stance_system;
 mod upload_questions;
 
-use std::sync::Arc;
-
 use chrono::TimeDelta;
-use combx::today_and_time;
 use qdrant_client::{
     Qdrant,
-    qdrant::{GetPoints, PointId, group_id::Kind},
+    qdrant::{GetPoints, PointId},
 };
 use somai_client::SomAiClient;
-use sqlx::PgPool;
-use tokio::sync::mpsc::Sender;
+use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{
-    Result, Shutdown,
+    AppState, Result, Shutdown,
     ai_task::{AiTask, TaskArgs},
     ai_tasks::somai_connect,
     political_analysis::{
@@ -26,7 +22,7 @@ use crate::{
     today,
 };
 
-pub(super) trait EmbeddingProvider: Send + Sync {
+pub trait EmbeddingProvider: Send + Sync {
     /// Generates an embedding for a given chunk of text
     async fn embed_text(&self, text: &str) -> Result<Vec<f64>>;
     /// Returns the dimension of the embeddings produced
@@ -218,7 +214,8 @@ async fn evaluate_and_save_opinion(
     Ok(())
 }
 
-async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Result<()> {
+async fn political_analysis(app_state: AppState, ai_task_tx: &Sender<AiTask>) -> Result<()> {
+    let pg_pool = &app_state.pg_pool;
     let ai_client = somai_connect().await?;
     let used_llm = ai_client.get_model().await?.result;
 
@@ -277,7 +274,7 @@ async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Res
         {
             log::error!("Failed processing delegate {}: {:?}", delegate.id, e);
         }
-
+        let priority = crate::ai_task::Priority::Medium;
         for question in &questions {
             let ai_client = ai_client.clone();
             let qdrant_client = qdrant_client.clone();
@@ -288,12 +285,13 @@ async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Res
 
             let ai_task = AiTask {
                 input: None,
-                priority: crate::ai_task::Priority::Medium,
-                task_id: crate::hash!(),
+                priority,
+                task_id: crate::hash!(app_state.parliament),
                 db_entry_id: entry_id,
-                // rerunnable: !vector_update_skip,
+                score: priority.weight(),
+                pool: app_state.pg_pool.clone(),
                 rerunnable: true,
-                created_at: today_and_time(),
+                created_at: Instant::now(),
                 task: Box::new(move |task_args| {
                     Box::pin(async move {
                         process_delegate_stance(
@@ -320,7 +318,7 @@ async fn political_analysis(pg_pool: &PgPool, ai_task_tx: Sender<AiTask>) -> Res
     Ok(())
 }
 
-pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool, ai_task_tx: Sender<AiTask>) {
+pub async fn run_shut(mut shutdown: Shutdown, app_state: AppState, ai_task_tx: Sender<AiTask>) {
     let political_analysis_sleep = std::env::var("POLITICAL_ANALYSIS_SLEEP")
         .unwrap_or_else(|_| "800".to_string())
         .parse()
@@ -339,9 +337,9 @@ pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool, ai_task_tx: Sende
                 break;
             }
             _ = async {
-                let pg_pool = pg_pool.clone();
+                let app_state = app_state.clone();
                 log::info!("Starting political analysis service");
-                if let Err(e) = political_analysis(&pg_pool, ai_task_tx.clone()).await {
+                if let Err(e) = political_analysis(app_state, &ai_task_tx).await {
                     log::error!("could not complete political analysis run: {e:?}")
                 }
                 // plenar_info_once(&pg_pool, true).await;

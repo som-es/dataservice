@@ -464,7 +464,7 @@ pub async fn run_at_services(
         )),
         tokio::spawn(services::political_analysis_service(
             Shutdown::new(notify_shutdown.subscribe()),
-            pool.clone(),
+            app_state.clone(),
             llm_ai_task_tx.clone(),
         )),
         tokio::spawn(services::parliamentary_qa_service(

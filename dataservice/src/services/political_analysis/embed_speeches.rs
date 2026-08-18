@@ -291,7 +291,7 @@ mod tests {
 
         let qdrant_client = Qdrant::from_url("http://10.30.0.164:6334").build().unwrap();
 
-        let pg_pool = connect_pg().await;
+        let pg_pool = connect_pg(crate::DATABASE_URL).await;
 
         process_all_delegates(&pg_pool, &qdrant_client, &ai_client, "delegates")
             .await

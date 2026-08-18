@@ -20,6 +20,7 @@ pub async fn score_search_results_qdrant(
     delegate_id: i32,
     question: &str,
     max_per: f32,
+    limit: u64,
 ) -> Result<Vec<ScoredPoint>> {
     let query_vector: Vec<f64> = embedder.embed_text(question).await?;
 
@@ -58,7 +59,7 @@ pub async fn score_search_results_qdrant(
                 .into_iter()
                 .map(|val| val as f32)
                 .collect::<Vec<_>>(),
-            limit: 25,
+            limit,
             filter: Some(filter),
             with_payload: Some(payload_selector),
             with_vectors: None,
@@ -164,11 +165,24 @@ pub async fn collect_spoken_texts(
     delegate_id: i32,
     question: &str,
 ) -> Result<String> {
+    let searches =
+        search_points_for_entry(qdrant_client, embedder, delegate_id, question, 25).await?;
+
+    combine_all_speech_snippets(&searches).ok_or(Box::new(Error::Custom(
+        "could not extract speech snippets".into(),
+    )))
+}
+
+pub async fn search_points_for_entry(
+    qdrant_client: &Qdrant,
+    embedder: &impl EmbeddingProvider,
+    delegate_id: i32,
+    question: &str,
+    limit: u64,
+) -> Result<Vec<ScoredPoint>> {
     let rag_idx = question.find("[RAG]").unwrap_or(question.len());
     let processed_question = format!("query: {}", &question[..rag_idx]);
-
     log::info!("RAG QUESTION: {}", processed_question);
-
     let collection_name = "delegates";
     let searches = score_search_results_qdrant(
         qdrant_client,
@@ -177,12 +191,10 @@ pub async fn collect_spoken_texts(
         delegate_id,
         &processed_question,
         0.87,
+        limit,
     )
     .await?;
-
-    combine_all_speech_snippets(&searches).ok_or(Box::new(Error::Custom(
-        "could not extract speech snippets".into(),
-    )))
+    Ok(searches)
 }
 
 pub async fn collect_delegate_profile(
