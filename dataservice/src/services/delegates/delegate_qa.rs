@@ -55,7 +55,7 @@ pub async fn insert_delegate_introduction<'a>(
 
     let id =
         match id {
-            Some(id) => {
+            Some(_id) => {
                 return Ok(());
                 /*sqlx::query!(
                     "DELETE FROM transcriptionsQA WHERE transcription_id = $1",

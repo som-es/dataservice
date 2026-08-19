@@ -450,7 +450,7 @@ pub async fn insert_plenar_speech<'a>(
     .execute(&mut **tx)
     .await?;
 
-    if updated_spoken_text.is_some() {}
+    updated_spoken_text.is_some();
 
     if plenar_speech.speech.spoken_text_html_urls.is_empty() {
         warn!(
@@ -471,12 +471,11 @@ async fn extract_speech_text(
         .speech
         .speech_texts
         .as_ref()
-        .map(|speech_texts| {
+        .and_then(|speech_texts| {
             speech_texts
                 .iter()
                 .find(|speech_text| speech_text.language == Language::En)
-        })
-        .flatten();
+        });
 
     if parliament == Parliament::Eu {
         return maybe_text.map(|text| text.text.clone());

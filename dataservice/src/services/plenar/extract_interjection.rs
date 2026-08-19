@@ -165,7 +165,7 @@ fn extract_interjection(
             true,
         );
 
-        if let Some(best) = delegate_results.get(0) {
+        if let Some(best) = delegate_results.first() {
             let delegate_match = DelegateMatch {
                 similiarity_score: best.similiarity_score as i64,
                 searched_with: best.searched_with.clone(),
@@ -219,18 +219,16 @@ fn extract_interjections_parts(param: &str) -> Vec<(String, String)> {
         let mut pre_skipped = false;
         let mut prev_non_whitespace_char = None;
         for (idx, char) in text_part.char_indices() {
-            if char == DASH {
-                if let Some(check_char) = text_part[idx..].chars().nth(2) {
-                    if check_char.is_uppercase()
+            if char == DASH
+                && let Some(check_char) = text_part[idx..].chars().nth(2)
+                    && (check_char.is_uppercase()
                         || (prev_non_whitespace_char.map(|c: char| c.is_ascii_punctuation()))
-                            .unwrap_or_default()
+                            .unwrap_or_default())
                     {
                         end_idx = idx;
                         pre_skipped = true;
                         break;
                     }
-                }
-            }
             if !char.is_whitespace() {
                 prev_non_whitespace_char = Some(char);
             }

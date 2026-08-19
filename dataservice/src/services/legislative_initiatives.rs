@@ -1,5 +1,5 @@
 use chrono::{Days, Utc};
-use combx::{Parliament, VoteResult};
+use combx::VoteResult;
 use tokio::sync::mpsc::Sender;
 mod db;
 pub mod notify;
@@ -21,11 +21,11 @@ use sqlx::{PgPool, query, query_scalar};
 use std::sync::{Arc, LazyLock};
 
 use crate::{
-    AppState, CompareHash, GPS, Gps, LATEST_GP, Shutdown, ai_task::AiTask,
+    AppState, CompareHash, Gps, Shutdown, ai_task::AiTask,
     should_update::StoredUpdatedAt, today_and_time,
 };
 
-pub(self) const LEGIS_INIT_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| {
+ const LEGIS_INIT_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| {
     std::env::var("LEGIS_INIT_STILL_SEND_DAYS")
         .unwrap_or("10".to_string())
         .parse::<i64>()
@@ -138,7 +138,7 @@ impl StoredUpdatedAt for LegislativeInitiative {
             .await
             .ok()
             .flatten()
-            .map(|x| x.raw_data_updated_at).flatten()
+            .and_then(|x| x.raw_data_updated_at)
     }
 }
 

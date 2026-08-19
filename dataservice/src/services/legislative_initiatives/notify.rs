@@ -57,8 +57,8 @@ pub async fn find_notifiers_legis_init<'a>(
         let relevant_legis_inits = legis_inits
             .iter()
             .filter(|legis_init| {
-                if id.by_person_favo {
-                    if legis_init
+                if id.by_person_favo
+                    && legis_init
                         .1
                         .issued_by_dels
                         .iter()
@@ -66,7 +66,6 @@ pub async fn find_notifiers_legis_init<'a>(
                     {
                         return true;
                     }
-                }
                 if id.by_topics {
                     for topic in &legis_init.1.eurovoc_topics {
                         if user_topics.contains(&topic.topic) {
@@ -187,18 +186,14 @@ fn enrich_parliament_with_colors(
     let votes_to_party_map = convert_votes_to_party_color_map(votes, colors);
 
     for delegate in delegates {
-        match (delegate.seat_row, delegate.seat_col, &delegate.party) {
-            (Some(seat_row), Some(seat_col), Some(party)) => {
-                let seat_row = seat_row as usize;
-                let seat_col = seat_col as usize;
-                let color = *votes_to_party_map
-                    .get(party)
-                    .unwrap_or(&Rgba([125, 125, 125, 255u8]));
-                let len = parliament[seat_row - 1].len();
-                parliament[seat_row - 1][len - seat_col].2 = color;
-            }
-
-            _ => {}
+        if let (Some(seat_row), Some(seat_col), Some(party)) = (delegate.seat_row, delegate.seat_col, &delegate.party) {
+            let seat_row = seat_row as usize;
+            let seat_col = seat_col as usize;
+            let color = *votes_to_party_map
+                .get(party)
+                .unwrap_or(&Rgba([125, 125, 125, 255u8]));
+            let len = parliament[seat_row - 1].len();
+            parliament[seat_row - 1][len - seat_col].2 = color;
         }
     }
 
@@ -328,7 +323,7 @@ pub fn send_new_legis_info_mail(
         for (idx, (_id, vote_result)) in vote_results.iter().enumerate() {
             if idx >= 5 {
                 if vote_results.len() >= 8 {
-                    vote_results_html.push_str(&"Und weitere ...");
+                    vote_results_html.push_str("Und weitere ...");
                 }
                 break;
             }
@@ -407,7 +402,7 @@ pub fn send_new_legis_info_mail(
                 .unwrap_or_default();
 
             let vote_result_html_entry = VOTE_RESULT_ENTRY_TEMPLATE
-                .replace("{*VOTE_RESULT_DESCRIPTION*}", &vote_description)
+                .replace("{*VOTE_RESULT_DESCRIPTION*}", vote_description)
                 .replace("{*VOTE_RESULT_GP*}", &vote_result.legislative_initiative.gp)
                 .replace("{*VOTE_RESULT_TYPE*}", vote_type)
                 .replace("{*VOTE_RESULT_OUTCOME*}", vote_outcome)

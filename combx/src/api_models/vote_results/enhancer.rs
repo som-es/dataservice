@@ -8,7 +8,7 @@ use crate::{
     with_data::DelegateParty,
 };
 use chrono::{DateTime, NaiveDate, Utc};
-use somes_scraper::{LegislativeInitiative, NamedVoteProContra, Party, ProContra};
+use somes_scraper::{LegislativeInitiative, NamedVoteProContra, Party};
 
 #[derive(Debug, Default)]
 pub struct LegisInitInfo {

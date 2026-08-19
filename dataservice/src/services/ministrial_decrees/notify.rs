@@ -76,7 +76,7 @@ pub(crate) fn send_new_decree_info_mail(
         for (idx, (_id, decree)) in decrees.iter().enumerate() {
             if idx >= 5 {
                 if decrees.len() >= 6 {
-                    decrees_html.push_str(&"Und weitere ...");
+                    decrees_html.push_str("Und weitere ...");
                 }
                 break;
             }
@@ -113,7 +113,7 @@ pub(crate) fn send_new_decree_info_mail(
                 .replace("{*DECREE_GOV_OFFICIAL_NAME*}", &gov_official.name)
                 .replace(
                     "{*DECREE_DELEGATE_IMG_URL*}",
-                    &gov_official
+                    gov_official
                         .image_url
                         .as_ref()
                         .unwrap_or(&"https://somes.at/images/somes_logo.png".to_string()),

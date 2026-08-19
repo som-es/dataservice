@@ -123,15 +123,13 @@ async fn save_citations(
 
         let mut text_snippet: Option<String> = None;
 
-        if let Some(point) = qdrant_res.result.first() {
-            if let Some(text_value) = point.payload.get("text") {
-                if let Some(qdrant_client::qdrant::value::Kind::StringValue(text)) =
+        if let Some(point) = qdrant_res.result.first()
+            && let Some(text_value) = point.payload.get("text")
+                && let Some(qdrant_client::qdrant::value::Kind::StringValue(text)) =
                     &text_value.kind
                 {
                     text_snippet = Some(text.clone());
                 }
-            }
-        }
 
         let Ok(parsed_uuid) = uuid::Uuid::parse_str(&citation.point_uuid) else {
             log::warn!("Skipping citation insertion because of malformed uuid: {citation:?}");
@@ -229,7 +227,7 @@ async fn political_analysis(app_state: AppState, ai_task_tx: &Sender<AiTask>) ->
         .parse::<bool>()
         .unwrap_or_default();
 
-    let delegates = get_delegate_ids(&pg_pool).await?;
+    let delegates = get_delegate_ids(pg_pool).await?;
     let questions = sqlx::query_as!(
         Question,
         "SELECT id, question, is_liberal, is_left FROM political_questions"
@@ -296,7 +294,7 @@ async fn political_analysis(app_state: AppState, ai_task_tx: &Sender<AiTask>) ->
                     Box::pin(async move {
                         process_delegate_stance(
                             &task_args,
-                            &*ai_client,
+                            &ai_client,
                             &qdrant_client,
                             delegate_id,
                             question_id,

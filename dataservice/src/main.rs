@@ -104,7 +104,7 @@ pub async fn run_eu_services(
 ) {
     use dataservice::{eu_database_url, unique_topics};
 
-    let (_llm_ai_task_tx, _llm_ai_task_rx, cpu_ai_task_rx, pool, app_state) =
+    let (_llm_ai_task_tx, _llm_ai_task_rx, _cpu_ai_task_rx, pool, app_state) =
         setup(&eu_database_url(), 1, Parliament::Eu).await;
 
     log::info!("Insert unique topics");
@@ -129,7 +129,8 @@ pub async fn run_eu_services(
                 &pool,
                 app_state.parliament_api_limiter.clone(),
             )
-            .await;
+            .await
+            .unwrap();
 
             <somes_scraper::eu_parliament::EuParliamentScraper as PlenarService>::run(
                 &pool,

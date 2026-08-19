@@ -138,8 +138,8 @@ pub async fn update_or_insert_legis_init_in_db(
     };
 
     #[cfg(feature = "ai")]
-    if let Some(ai_task_tx) = &ai_task_tx {
-        if db_legis_init.is_voteable_on {
+    if let Some(ai_task_tx) = &ai_task_tx
+        && db_legis_init.is_voteable_on {
             use combx::document_text::clean_eu_documents;
             use tokio::time::Instant;
 
@@ -262,15 +262,14 @@ pub async fn update_or_insert_legis_init_in_db(
                 log::error!("Could not send AI task for legis init emphasis summarization: {e:?}");
             }
         }
-    }
 
     if enforce_ai_run() && !should_update {
         log::info!("No need to update further!");
         return Ok(());
     }
 
-    if let Some(vote_date) = db_legis_init.vote_date {
-        if should_update && (today().date_naive() - vote_date).abs().num_days() > 30 {
+    if let Some(vote_date) = db_legis_init.vote_date
+        && should_update && (today().date_naive() - vote_date).abs().num_days() > 30 {
             let exists: bool = sqlx::query_scalar!(
                 r#"
                 SELECT EXISTS (
@@ -286,8 +285,8 @@ pub async fn update_or_insert_legis_init_in_db(
             .unwrap_or_default()
             .unwrap_or_default();
 
-            if exists {
-                if let Err(e) = sqlx::query(
+            if exists
+                && let Err(e) = sqlx::query(
                     "REFRESH MATERIALIZED VIEW CONCURRENTLY latest_legislative_initiatives",
                 )
                 .execute(pool)
@@ -295,27 +294,23 @@ pub async fn update_or_insert_legis_init_in_db(
                 {
                     log::error!("Could not refresh latest legislative initiatives view: {e:?}")
                 }
-            }
         }
-    }
 
-    if let Some(refs) = vote_result.references_to.as_ref() {
-        if let Err(e) = insert_references_batch(&mut tx, refs, legis_init_id).await {
+    if let Some(refs) = vote_result.references_to.as_ref()
+        && let Err(e) = insert_references_batch(&mut tx, refs, legis_init_id).await {
             log::error!("Could not insert references for legis init {legis_init_id}: {e:?}")
         }
-    }
 
     if let Err(e) = insert_votes_batch(&mut tx, &vote_result.votes, legis_init_id).await {
         log::error!("Error inserting votes: '{:?}'.", e);
     }
 
-    if let Some(named_votes) = &vote_result.named_votes {
-        if let Ok(named_vote_info_id) =
+    if let Some(named_votes) = &vote_result.named_votes
+        && let Ok(named_vote_info_id) =
             insert_named_vote_info(&mut *tx, &named_votes.named_vote_info, legis_init_id).await
-        {
-            if let Err(e) = insert_named_votes(
+            && let Err(e) = insert_named_votes(
                 &mut tx,
-                &named_votes.named_votes.as_ref().unwrap_or(&vec![]),
+                named_votes.named_votes.as_ref().unwrap_or(&vec![]),
                 named_vote_info_id,
             )
             .await
@@ -324,8 +319,6 @@ pub async fn update_or_insert_legis_init_in_db(
                     "Could not insert any named votes for legis init: {legis_init:?}, error: {e:?}"
                 )
             }
-        }
-    }
 
     #[cfg(not(feature = "ai"))]
     check_and_send_legis_init_mail(new_legis_init_tx, &vote_result, pool, legis_init_id).await;
@@ -379,8 +372,8 @@ pub async fn update_or_insert_legis_init_in_db(
         log::error!("Cannot commit legis init transaction: {e:?}");
     }
 
-    if should_update {
-        if let Some(client) = &app_state.redis_client {
+    if should_update
+        && let Some(client) = &app_state.redis_client {
             // TODO: could use patching approach in the future, currently, the receiver side is reconstructing everything from scratch
             if let Err(e) =
                 notify_update_streamed(Index::VoteResults, &vote_result, &mut client.clone()).await
@@ -388,7 +381,6 @@ pub async fn update_or_insert_legis_init_in_db(
                 log::error!("Could not notify for vote result update!: {e:?}");
             }
         }
-    }
 
     log::info!("Insertion duration for legis init: {:?}", start.elapsed());
     Ok(())

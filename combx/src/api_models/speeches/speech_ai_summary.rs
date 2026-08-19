@@ -2,9 +2,7 @@ use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use somes_macro::{CompositeType, MeilisearchFilter};
-use somes_meilisearch_filter::{
-    FilterArgument, FilterOp, FilterOptions, build_prefix, to_meilisearch_filters,
-};
+use somes_meilisearch_filter::{FilterArgument, FilterOp};
 
 use sqlx::types::Json;
 use sqlx::{FromRow, Type};

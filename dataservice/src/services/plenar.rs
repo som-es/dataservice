@@ -177,8 +177,7 @@ impl StoredUpdatedAt for PlenarInfo {
         .await
         .ok()
         .flatten()
-        .map(|x| x.raw_data_updated_at)
-        .flatten()
+        .and_then(|x| x.raw_data_updated_at)
     }
 }
 

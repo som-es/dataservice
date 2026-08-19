@@ -96,7 +96,7 @@ async fn summary_prompt(
     input: String,
     topics: &[String],
 ) -> combx::Result<SummarizeOutput> {
-    Ok(somai_client
+    somai_client
         .make_llm_request_with_schema::<SummarizeOutput>(input, format!("
                     Du bist ein Experte für politische Zusammenfassungen und Analyse in Österreich für Laien.
                     Bitte fasse die beigefügten Dokumente, die zu einem Antrag, der im österreichischen Nationalrat behandelt wird, gehören, zusammen.
@@ -128,7 +128,7 @@ async fn summary_prompt(
                     Halte dich allgemein an das folgende Datumsformat: YYYY-MM-DD -> Maschinenlesbar!
                     Die Informationen müssen von einer durchschnittlichen Person (aus Österreich) verstanden werden können und barrierfrei sein. Antworte ausschließlich in deutscher Sprache.
                     "), None, false, Some(|_: &mut serde_json::Value| {}))
-        .await?)
+        .await
 }
 
 pub fn patch_topics(
@@ -244,7 +244,7 @@ In this case, you are analyzing documents belonging to the following type: {summ
                         "),
         _ => return Err(Custom("language not supported".into()).into())
     };
-    Ok(somai_client
+    somai_client
         .make_llm_request_with_schema::<SummarizeOutput>(
             input,
             prompt,
@@ -252,8 +252,8 @@ In this case, you are analyzing documents belonging to the following type: {summ
             false,
             Some(|schema: &mut serde_json::Value| {
                 // TODO: activate topic patching when #143 (https://github.com/som-es/somes/issues/143) is done
-                patch_topics("/properties/summary/properties/topics", schema, &topics);
+                patch_topics("/properties/summary/properties/topics", schema, topics);
             }),
         )
-        .await?)
+        .await
 }

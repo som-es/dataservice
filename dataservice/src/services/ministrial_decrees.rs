@@ -194,16 +194,14 @@ pub async fn insert_ministrial_decree(
             check_and_send_decree_email(pg_pool, &decree, decree_id, &new_decree_tx).await;
         }
 
-        if should_update {
-            if let Some(client) = &app_state.redis_client {
-                if let Err(e) =
+        if should_update
+            && let Some(client) = &app_state.redis_client
+                && let Err(e) =
                     crate::notify_update_streamed(Index::Decrees, &decree, &mut client.clone())
                         .await
                 {
                     log::error!("Could not notify for decree update!: {e:?}");
                 }
-            }
-        }
 
         #[cfg(feature = "ai")]
         {

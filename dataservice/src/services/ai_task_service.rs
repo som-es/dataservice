@@ -123,7 +123,7 @@ pub async fn ai_tasks_service(
                 task_queue_guard.push(ai_task);
 
                 if now.elapsed() >= Duration::from_secs(REBUILD_HEAP_SECS) {
-                    let heap = std::mem::replace(&mut *task_queue_guard, BinaryHeap::default());
+                    let heap = std::mem::take(&mut *task_queue_guard);
                     *task_queue_guard = rebuild_with_aging(heap, Instant::now());
                     now = Instant::now();
                 }

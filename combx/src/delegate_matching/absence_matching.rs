@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use chrono::NaiveDate;
 use somes_scraper::plenar::Absence;
-use sqlx::{Executor, PgPool, Postgres};
+use sqlx::{Executor, Postgres};
 
 use crate::{LevResult, with_data::active_delegates_at_date};
 
@@ -118,10 +118,7 @@ mod tests {
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
-            &&plenar_info
-                .absences
-                .as_ref()
-                .unwrap()
+            &&plenar_info.absences[0]
                 .absences
                 .iter()
                 .map(|x| x.name.as_str())
@@ -158,10 +155,7 @@ mod tests {
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
-            &&plenar_info
-                .absences
-                .as_ref()
-                .unwrap()
+            &&plenar_info.absences[0]
                 .absences
                 .iter()
                 .map(|x| x.name.as_str())
@@ -185,7 +179,7 @@ mod tests {
             .await
             .unwrap();
         println!("plenar_info: {plenar_info:?}");
-        let src = &plenar_info.absences.as_ref().unwrap().source_document;
+        let src = &plenar_info.absences[0].source_document;
         dbg!(&src);
 
         let pg = connect_pg().await;
@@ -198,10 +192,7 @@ mod tests {
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
-            &&plenar_info
-                .absences
-                .as_ref()
-                .unwrap()
+            &&plenar_info.absences[0]
                 .absences
                 .iter()
                 .map(|x| x.name.as_str())
@@ -258,10 +249,7 @@ mod tests {
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
-            &&plenar_info
-                .absences
-                .as_ref()
-                .unwrap()
+            &&plenar_info.absences[0]
                 .absences
                 .iter()
                 .map(|x| x.name.as_str())

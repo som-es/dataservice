@@ -135,7 +135,7 @@ pub(crate) fn send_new_ministrial_prop_info_mail(
         for (idx, (_id, ministrial_prop)) in ministrial_props.iter().enumerate() {
             if idx >= 5 {
                 if ministrial_props.len() >= 6 {
-                    ministrial_props_html.push_str(&"Und weitere ...");
+                    ministrial_props_html.push_str("Und weitere ...");
                 }
                 break;
             }
@@ -162,7 +162,7 @@ pub(crate) fn send_new_ministrial_prop_info_mail(
             );
 
             let ministrial_prop_html_entry = crate::email::MINISTRIAL_PROP_ENTRY_TEMPLATE
-                .replace("{*PROPOSAL_DESCRIPTION*}", &description)
+                .replace("{*PROPOSAL_DESCRIPTION*}", description)
                 .replace(
                     "{*PROPOSAL_MINISTRY*}",
                     &ministrial_prop.ministrial_proposal.ressort_shortform,
@@ -175,7 +175,7 @@ pub(crate) fn send_new_ministrial_prop_info_mail(
                 .replace("{*PROPOSAL_GOV_OFFICIAL_NAME*}", &gov_official.name)
                 .replace(
                     "{*PROPOSAL_DELEGATE_IMG_URL*}",
-                    &gov_official
+                    gov_official
                         .image_url
                         .as_ref()
                         .unwrap_or(&"https://somes.at/images/somes_logo.png".to_string()),

@@ -1,6 +1,3 @@
-mod activity;
-pub use activity::*;
-
 mod call_to_orders;
 pub use call_to_orders::*;
 mod named_votes;

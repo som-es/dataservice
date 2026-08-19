@@ -336,8 +336,7 @@ fn render_speeches(activity: &RecentActivity) -> String {
             speech
                 .document_urls
                 .as_ref()
-                .map(|urls| urls.first())
-                .flatten()
+                .and_then(|urls| urls.first())
                 .map(|url| url.as_str()),
         ));
     }

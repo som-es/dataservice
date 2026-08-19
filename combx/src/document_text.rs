@@ -1,6 +1,5 @@
 use std::{
     collections::{HashMap, HashSet},
-    io::Bytes,
     time::Duration,
 };
 
@@ -392,7 +391,7 @@ pub fn clean_eu_documents(docs: Vec<Document>) -> Vec<Document> {
 
     let recent_docs = grouped_by_title
         .into_iter()
-        .flat_map(|(title, mut docs)| {
+        .flat_map(|(_title, mut docs)| {
             docs.sort_by(|a, b| a.document_url.cmp(&b.document_url));
             docs.pop()
         })

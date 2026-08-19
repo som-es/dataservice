@@ -50,7 +50,7 @@ pub async fn parties_once(pg_pool: &PgPool, parliament_api_limiter: ApiLimiter) 
         let handle = tokio::task::spawn(async move {
             let pg_pool = pg_pool;
             let mut scraper = AustriaScraper::default();
-            scraper.scrape_info.gp = vec![gp.clone().into()];
+            scraper.scrape_info.gp = vec![gp.clone()];
 
             scrape_and_update(&parliament_api_limiter, gp, pg_pool, &scraper, &[]).await;
         });
@@ -94,7 +94,8 @@ impl PartyService for EuParliamentScraper {
 #[async_trait::async_trait]
 impl PartyService for AustriaScraper {
     async fn run(pg_pool: &PgPool, parliament_api_limiter: ApiLimiter) -> crate::Result<()> {
-        Ok(parties_once(pg_pool, parliament_api_limiter).await)
+        let _: () = parties_once(pg_pool, parliament_api_limiter).await;
+        Ok(())
     }
 }
 
@@ -117,11 +118,11 @@ async fn scrape_and_update<S: Parties>(
 }
 
 pub async fn run_shut<S: PartyService>(
-    mut shutdown: Shutdown,
-    pg_pool: PgPool,
-    parliament_api_limiter: ApiLimiter,
+    _shutdown: Shutdown,
+    _pg_pool: PgPool,
+    _parliament_api_limiter: ApiLimiter,
 ) {
-    let party_sleep = std::env::var("PARTY_SLEEP")
+    let _party_sleep = std::env::var("PARTY_SLEEP")
         .unwrap_or_else(|_| "10000".to_string())
         .parse()
         .unwrap_or_else(|e| {

@@ -62,7 +62,7 @@ pub async fn save_dates(
             .await?;
 
         for date in date_group {
-            save_date(date, &mut *tx).await?;
+            save_date(date, &mut tx).await?;
         }
 
         tx.commit().await?;

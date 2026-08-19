@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::NaiveDate;
-use somes_scraper::{LegislativeInitiative, NamedVoteProContra, Party, ProContra};
+use somes_scraper::{LegislativeInitiative, NamedVoteProContra, Party};
 use sqlx::PgPool;
 
 use crate::{

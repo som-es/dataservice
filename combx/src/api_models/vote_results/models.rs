@@ -3,12 +3,9 @@ use optional_struct::*;
 use serde::{Deserialize, Serialize};
 use somes_macro::{CompositeType, MeilisearchFilter};
 use somes_meilisearch_filter::{FilterArgument, FilterOp};
-use somes_scraper::filter;
 use sqlx::{FromRow, prelude::Type};
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
-
-use crate::OptionalVoteResultFilter;
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]

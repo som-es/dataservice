@@ -101,7 +101,7 @@ pub async fn rag_pipeline<T: JsonSchema + DeserializeOwned>(
 ) -> crate::Result<T> {
     let prompt = populate_system_prompt(qdrant_client, ai_client, delegate_id, question).await?;
     log::info!("stance prompt length: {}", prompt.len());
-    Ok(ai_client
+    ai_client
         .make_llm_request_with_schema::<T>(
             question.into(),
             prompt,
@@ -109,7 +109,7 @@ pub async fn rag_pipeline<T: JsonSchema + DeserializeOwned>(
             false,
             Some(|_schema: &mut serde_json::Value| {}),
         )
-        .await?)
+        .await
 }
 
 #[cfg(test)]

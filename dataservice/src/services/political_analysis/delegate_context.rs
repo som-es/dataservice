@@ -89,34 +89,31 @@ pub async fn score_search_results_qdrant(
 }
 
 fn extract_qdrant_number(val: Option<&qdrant_client::qdrant::Value>) -> Option<i64> {
-    if let Some(v) = val {
-        if let Some(qdrant_client::qdrant::value::Kind::IntegerValue(s)) = &v.kind {
+    if let Some(v) = val
+        && let Some(qdrant_client::qdrant::value::Kind::IntegerValue(s)) = &v.kind {
             return Some(*s);
         }
-    }
     None
 }
 
 fn extract_qdrant_string(val: Option<&qdrant_client::qdrant::Value>) -> String {
-    if let Some(v) = val {
-        if let Some(qdrant_client::qdrant::value::Kind::StringValue(s)) = &v.kind {
+    if let Some(v) = val
+        && let Some(qdrant_client::qdrant::value::Kind::StringValue(s)) = &v.kind {
             return s.clone();
         }
-    }
     String::new()
 }
 
 fn extract_qdrant_string_array(val: Option<&qdrant_client::qdrant::Value>) -> Vec<String> {
     let mut result = Vec::new();
-    if let Some(v) = val {
-        if let Some(qdrant_client::qdrant::value::Kind::ListValue(list)) = &v.kind {
+    if let Some(v) = val
+        && let Some(qdrant_client::qdrant::value::Kind::ListValue(list)) = &v.kind {
             for item in &list.values {
                 if let Some(qdrant_client::qdrant::value::Kind::StringValue(s)) = &item.kind {
                     result.push(s.clone());
                 }
             }
         }
-    }
     result
 }
 
@@ -124,7 +121,7 @@ pub fn construct_information_from_entity(
     payload: &HashMap<String, qdrant_client::qdrant::Value>,
     id: Option<&PointId>,
 ) -> Option<String> {
-    let id = id.map(|id| id.point_id_options.as_ref()).flatten();
+    let id = id.and_then(|id| id.point_id_options.as_ref());
     let upper_padding = extract_qdrant_string_array(payload.get("upper_padding"));
     let upper_padding = if upper_padding.len() as i32 - 30 > 1 {
         &upper_padding[30..]
@@ -210,9 +207,9 @@ pub async fn collect_delegate_profile(
     // );
     // let qa_info: JsonValue = http_client.get(&qa_url).send().await?.json().await.unwrap();
 
-    if let Some(info_obj) = delegate_info.as_object_mut() {
-        if let Some(birthdate_str) = info_obj.get("birthdate").and_then(|v| v.as_str()) {
-            if let Ok(birth_date) = NaiveDate::parse_from_str(birthdate_str, "%Y-%m-%d") {
+    if let Some(info_obj) = delegate_info.as_object_mut()
+        && let Some(birthdate_str) = info_obj.get("birthdate").and_then(|v| v.as_str())
+            && let Ok(birth_date) = NaiveDate::parse_from_str(birthdate_str, "%Y-%m-%d") {
                 let today = Utc::now().naive_utc().date();
                 let mut age = today.year() - birth_date.year();
 
@@ -222,7 +219,6 @@ pub async fn collect_delegate_profile(
 
                 info_obj.insert("age".to_string(), serde_json::json!(age));
             }
-        }
 
         // let has_qa = match &qa_info {
         //     JsonValue::Null => false,
@@ -234,7 +230,6 @@ pub async fn collect_delegate_profile(
         // if has_qa {
         //     info_obj.insert("vorstellung".to_string(), qa_info);
         // }
-    }
 
     Ok(serde_json::to_string(&delegate_info)?)
 }

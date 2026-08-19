@@ -15,10 +15,10 @@ use somai_client::SomAiClient;
 use somes_common_lib::Document;
 use somes_scraper::{LegislativeInitiative, Opinion};
 use sqlx::{FromRow, PgPool, prelude::Type};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::with_data::{DelegateParty, active_delegates_at_date};
+use crate::with_data::DelegateParty;
 use crate::{CombinedData, Parliament, models::*};
 use crate::{
     FromScrapedType, Topic, api_models::vote_results::hidden_vote_translation::translate_votes,
@@ -156,14 +156,14 @@ impl<T: VoteResultEnhancer> FromScrapedType<T> for VoteResult {
 
 impl VoteResult {
     // move to other crate
-    pub async fn from_db(pool: &PgPool, legis_init_id: i32) -> Self {
+    pub async fn from_db(_pool: &PgPool, _legis_init_id: i32) -> Self {
         todo!()
     }
     pub async fn from_legis_init(
         db_enhancer: impl VoteResultEnhancer,
         legis_init: LegislativeInitiative,
         parliament: Parliament,
-        somai_client: Option<Arc<SomAiClient>>,
+        _somai_client: Option<Arc<SomAiClient>>,
     ) -> crate::Result<Self> {
         let plenary_session_id = db_enhancer.retrieve_plenary_session_id(&legis_init).await;
 
@@ -491,12 +491,8 @@ mod tests {
 
     use somai_client::SomAiClient;
     use somes_common_lib::Document;
-    use somes_scraper::{AustriaScraper, legis_init::LegislativeInitiatives};
 
-    use crate::{
-        OptionalVoteResultFilter,
-        document_text::{combine_texts, extract_text_from_documents_html_first_stripped},
-    };
+    use crate::document_text::{combine_texts, extract_text_from_documents_html_first_stripped};
 
     #[tokio::test]
     async fn test_ai_summary_from_vote_result() {

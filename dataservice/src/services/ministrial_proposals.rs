@@ -34,7 +34,6 @@ mod inserts;
 pub use inserts::*;
 
 mod db;
-pub use db::*;
 
 pub async fn scrape_new_ministrial_props(
     scraper: &AustriaScraper,
@@ -138,8 +137,7 @@ impl StoredUpdatedAt for MinistrialProposal {
         .await
         .ok()
         .flatten()
-        .map(|x| x.raw_data_updated_at)
-        .flatten()
+        .and_then(|x| x.raw_data_updated_at)
     }
 }
 
@@ -187,7 +185,7 @@ pub async fn update_or_insert_ministerial_proposal(
     );
     // log::info!("inserting single ministrial prop");
 
-    let start = Instant::now();
+    let _start = Instant::now();
     // Insert or update the ministrial proposal
     let ministrial_prop_id = sqlx::query!(
                 r#"
@@ -434,9 +432,9 @@ pub async fn update_or_insert_ministerial_proposal(
 
     tx.commit().await?;
 
-    if should_update {
-        if let Some(client) = &app_state.redis_client {
-            if let Err(e) = crate::notify_update_streamed(
+    if should_update
+        && let Some(client) = &app_state.redis_client
+            && let Err(e) = crate::notify_update_streamed(
                 combx::Index::GovProposals,
                 &gov_proposal,
                 &mut client.clone(),
@@ -445,8 +443,6 @@ pub async fn update_or_insert_ministerial_proposal(
             {
                 log::error!("Could not notify for gov prop update!: {e:?}");
             }
-        }
-    }
     Ok(())
 }
 
