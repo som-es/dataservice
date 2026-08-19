@@ -4,7 +4,6 @@ use dataservice::{
     delegates::delegate_count, services, setup_app_data,
 };
 use std::future::Future;
-#[cfg(feature = "eu")]
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{broadcast, mpsc};
 

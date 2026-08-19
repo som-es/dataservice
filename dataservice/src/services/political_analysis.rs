@@ -46,7 +46,7 @@ impl EmbeddingProvider for SomAiClient {
     }
 
     async fn model(&self) -> Result<String> {
-        Ok(self.get_default_embedding_model_name().await?)
+        Ok(self.get_default_embedding_model_name().await?.result)
     }
 }
 
