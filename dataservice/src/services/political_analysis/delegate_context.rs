@@ -90,30 +90,33 @@ pub async fn score_search_results_qdrant(
 
 fn extract_qdrant_number(val: Option<&qdrant_client::qdrant::Value>) -> Option<i64> {
     if let Some(v) = val
-        && let Some(qdrant_client::qdrant::value::Kind::IntegerValue(s)) = &v.kind {
-            return Some(*s);
-        }
+        && let Some(qdrant_client::qdrant::value::Kind::IntegerValue(s)) = &v.kind
+    {
+        return Some(*s);
+    }
     None
 }
 
 fn extract_qdrant_string(val: Option<&qdrant_client::qdrant::Value>) -> String {
     if let Some(v) = val
-        && let Some(qdrant_client::qdrant::value::Kind::StringValue(s)) = &v.kind {
-            return s.clone();
-        }
+        && let Some(qdrant_client::qdrant::value::Kind::StringValue(s)) = &v.kind
+    {
+        return s.clone();
+    }
     String::new()
 }
 
 fn extract_qdrant_string_array(val: Option<&qdrant_client::qdrant::Value>) -> Vec<String> {
     let mut result = Vec::new();
     if let Some(v) = val
-        && let Some(qdrant_client::qdrant::value::Kind::ListValue(list)) = &v.kind {
-            for item in &list.values {
-                if let Some(qdrant_client::qdrant::value::Kind::StringValue(s)) = &item.kind {
-                    result.push(s.clone());
-                }
+        && let Some(qdrant_client::qdrant::value::Kind::ListValue(list)) = &v.kind
+    {
+        for item in &list.values {
+            if let Some(qdrant_client::qdrant::value::Kind::StringValue(s)) = &item.kind {
+                result.push(s.clone());
             }
         }
+    }
     result
 }
 
@@ -122,7 +125,8 @@ pub fn construct_information_from_entity(
     id: Option<&PointId>,
 ) -> Option<String> {
     let id = id.and_then(|id| id.point_id_options.as_ref());
-    let upper_padding = extract_qdrant_string_array(payload.get("upper_padding"));
+    let upper_padding = extract_qdrant_string(payload.get("upper_padding"));
+    let upper_padding = upper_padding.split(" ").collect::<Vec<_>>();
     let upper_padding = if upper_padding.len() as i32 - 30 > 1 {
         &upper_padding[30..]
     } else {
@@ -130,7 +134,8 @@ pub fn construct_information_from_entity(
     }
     .join(" ");
 
-    let lower_padding = extract_qdrant_string_array(payload.get("lower_padding"));
+    let lower_padding = extract_qdrant_string(payload.get("lower_padding"));
+    let lower_padding = lower_padding.split(" ").collect::<Vec<_>>();
     let lower_padding = lower_padding[..std::cmp::min(30, lower_padding.len())].join(" ");
 
     let text = extract_qdrant_string(payload.get("text"));
@@ -139,9 +144,10 @@ pub fn construct_information_from_entity(
     let gp = extract_qdrant_string(payload.get("gp"));
     let inr = extract_qdrant_number(payload.get("inr"))?;
     let speech_id = extract_qdrant_number(payload.get("speech_id"))?;
+    let document_urls = extract_qdrant_string_array(payload.get("document_urls"));
 
     Some(format!(
-        "Redesnippet zur Debatte '{about}': '{upper_padding} {text} {lower_padding}' vom {date}, in der Nationalratssitzung {gp}/{inr}. Rede-ID: {speech_id}, Point-ID: {id:?}"
+        "Redesnippet zur Debatte '{about}': '{upper_padding} {text} {lower_padding}' vom {date}, in der Nationalratssitzung {gp}/{inr}. Rede-ID: {speech_id}, Point-ID: {id:?}, Rede-Text-Dokument-URLs: {document_urls:?}"
     ))
 }
 
@@ -209,27 +215,28 @@ pub async fn collect_delegate_profile(
 
     if let Some(info_obj) = delegate_info.as_object_mut()
         && let Some(birthdate_str) = info_obj.get("birthdate").and_then(|v| v.as_str())
-            && let Ok(birth_date) = NaiveDate::parse_from_str(birthdate_str, "%Y-%m-%d") {
-                let today = Utc::now().naive_utc().date();
-                let mut age = today.year() - birth_date.year();
+        && let Ok(birth_date) = NaiveDate::parse_from_str(birthdate_str, "%Y-%m-%d")
+    {
+        let today = Utc::now().naive_utc().date();
+        let mut age = today.year() - birth_date.year();
 
-                if (today.month(), today.day()) < (birth_date.month(), birth_date.day()) {
-                    age -= 1;
-                }
+        if (today.month(), today.day()) < (birth_date.month(), birth_date.day()) {
+            age -= 1;
+        }
 
-                info_obj.insert("age".to_string(), serde_json::json!(age));
-            }
+        info_obj.insert("age".to_string(), serde_json::json!(age));
+    }
 
-        // let has_qa = match &qa_info {
-        //     JsonValue::Null => false,
-        //     JsonValue::Array(arr) => !arr.is_empty(),
-        //     JsonValue::Object(obj) => !obj.is_empty(),
-        //     _ => true,
-        // };
+    // let has_qa = match &qa_info {
+    //     JsonValue::Null => false,
+    //     JsonValue::Array(arr) => !arr.is_empty(),
+    //     JsonValue::Object(obj) => !obj.is_empty(),
+    //     _ => true,
+    // };
 
-        // if has_qa {
-        //     info_obj.insert("vorstellung".to_string(), qa_info);
-        // }
+    // if has_qa {
+    //     info_obj.insert("vorstellung".to_string(), qa_info);
+    // }
 
     Ok(serde_json::to_string(&delegate_info)?)
 }
@@ -239,7 +246,7 @@ mod tests {
     use qdrant_client::Qdrant;
     use somai_client::SomAiClient;
 
-    use crate::{connect_pg, political_analysis::delegate_context::collect_spoken_texts};
+    use crate::political_analysis::delegate_context::collect_spoken_texts;
 
     #[tokio::test]
     async fn test_delegate_rag() {
