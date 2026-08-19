@@ -189,6 +189,11 @@ pub async fn run_eu_services(
             ONLY_LATEST,
             false,
         )),
+        tokio::spawn(services::political_analysis_service(
+            Shutdown::new(notify_shutdown.subscribe()),
+            app_state.clone(),
+            llm_ai_task_tx.clone(),
+        )),
     }
     .0
     .unwrap()

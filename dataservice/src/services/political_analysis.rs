@@ -3,12 +3,15 @@ mod embed_speeches;
 mod stance_system;
 mod upload_questions;
 
+use std::ops::ControlFlow;
+
 use chrono::TimeDelta;
 use qdrant_client::{
     Qdrant,
     qdrant::{GetPoints, PointId},
 };
 use somai_client::SomAiClient;
+use somes_scraper::language::Language;
 use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{
@@ -57,9 +60,16 @@ pub async fn process_delegate_stance(
     question_id: i32,
     question_text: &str,
     used_llm: &str,
+    language: Language,
 ) -> crate::Result<()> {
-    let stance =
-        rag_pipeline::<Stance>(ai_client, qdrant_client, delegate_id, question_text).await?;
+    let stance = rag_pipeline::<Stance>(
+        ai_client,
+        qdrant_client,
+        delegate_id,
+        question_text,
+        language,
+    )
+    .await?;
 
     let stance_llm = match stance.stance_detection {
         stance_system::StanceDetection::Postive => "Positive",
@@ -125,11 +135,10 @@ async fn save_citations(
 
         if let Some(point) = qdrant_res.result.first()
             && let Some(text_value) = point.payload.get("text")
-                && let Some(qdrant_client::qdrant::value::Kind::StringValue(text)) =
-                    &text_value.kind
-                {
-                    text_snippet = Some(text.clone());
-                }
+            && let Some(qdrant_client::qdrant::value::Kind::StringValue(text)) = &text_value.kind
+        {
+            text_snippet = Some(text.clone());
+        }
 
         let Ok(parsed_uuid) = uuid::Uuid::parse_str(&citation.point_uuid) else {
             log::warn!("Skipping citation insertion because of malformed uuid: {citation:?}");
@@ -237,41 +246,24 @@ async fn political_analysis(app_state: AppState, ai_task_tx: &Sender<AiTask>) ->
 
     let mut entry_id = 0;
     let today = today().to_utc();
-    for delegate in delegates {
-        // if delegate.id != 8242 {
-        //     continue;
-        // }
-        let last_updated_at = sqlx::query_scalar!(
-            "select updated_at from last_vector_speech_update where delegate_id = $1",
-            delegate.id
-        )
-        .fetch_one(pg_pool)
-        .await;
 
-        let Ok(last_updated_at) = last_updated_at else {
-            log::error!(
-                "could not fetch last_updated for {delegate:?} because of: {last_updated_at:?}"
-            );
-            continue;
-        };
-
-        if !vector_update_skip && today - last_updated_at < TimeDelta::days(30 * 3) {
-            log::info!("Skip delegate {}, time delta too low", delegate.id);
-            continue;
+    let mut to_analyse = vec![];
+    if !vector_update_skip {
+        for delegate in delegates {
+            run_embed_for_delegate(
+                pg_pool,
+                &ai_client,
+                &qdrant_client,
+                vector_update_skip,
+                today,
+                &mut to_analyse,
+                delegate,
+            )
+            .await;
         }
+    }
 
-        if let Err(e) = embed_speeches::process_delegate(
-            pg_pool,
-            &qdrant_client,
-            &*ai_client,
-            "delegates",
-            &delegate,
-            !vector_update_skip,
-        )
-        .await
-        {
-            log::error!("Failed processing delegate {}: {:?}", delegate.id, e);
-        }
+    for delegate in to_analyse {
         let priority = crate::ai_task::Priority::Medium;
         for question in &questions {
             let ai_client = ai_client.clone();
@@ -280,6 +272,11 @@ async fn political_analysis(app_state: AppState, ai_task_tx: &Sender<AiTask>) ->
             let question_id = question.id;
             let delegate_id = delegate.id;
             let used_llm = used_llm.clone();
+
+            let language = match app_state.parliament {
+                combx::Parliament::At => Language::De,
+                combx::Parliament::Eu => Language::En,
+            };
 
             let ai_task = AiTask {
                 input: None,
@@ -300,6 +297,7 @@ async fn political_analysis(app_state: AppState, ai_task_tx: &Sender<AiTask>) ->
                             question_id,
                             &question_text,
                             &used_llm,
+                            language,
                         )
                         .await?;
                         Ok(())
@@ -314,6 +312,50 @@ async fn political_analysis(app_state: AppState, ai_task_tx: &Sender<AiTask>) ->
     }
 
     Ok(())
+}
+
+async fn run_embed_for_delegate(
+    pg_pool: &sqlx::Pool<sqlx::Postgres>,
+    ai_client: &std::sync::Arc<SomAiClient>,
+    qdrant_client: &Qdrant,
+    vector_update_skip: bool,
+    today: chrono::prelude::DateTime<chrono::prelude::Utc>,
+    to_analyse: &mut Vec<embed_speeches::Delegate>,
+    delegate: embed_speeches::Delegate,
+) {
+    let last_updated_at = sqlx::query_scalar!(
+        "select updated_at from last_vector_speech_update where delegate_id = $1",
+        delegate.id
+    )
+    .fetch_optional(pg_pool)
+    .await;
+    let Ok(last_updated_at) = last_updated_at else {
+        log::error!(
+            "could not fetch last_updated for {delegate:?} because of: {last_updated_at:?}"
+        );
+        return;
+    };
+    if today - last_updated_at.unwrap_or(today) < TimeDelta::days(30 * 3)
+        && last_updated_at.is_some()
+    {
+        log::info!("Skip delegate {}, time delta too low", delegate.id);
+        return;
+    }
+    match embed_speeches::process_delegate(
+        pg_pool,
+        qdrant_client,
+        &**ai_client,
+        "delegates",
+        &delegate,
+        !vector_update_skip,
+    )
+    .await
+    {
+        Err(e) => {
+            log::error!("Failed processing delegate {}: {:?}", delegate.id, e);
+        }
+        Ok(()) => to_analyse.push(delegate),
+    };
 }
 
 pub async fn run_shut(mut shutdown: Shutdown, app_state: AppState, ai_task_tx: Sender<AiTask>) {
