@@ -236,6 +236,11 @@ async fn political_analysis(app_state: AppState, ai_task_tx: &Sender<AiTask>) ->
         .parse::<bool>()
         .unwrap_or_default();
 
+    let stance_update_skip = std::env::var("STANCE_UPDATE_SKIP")
+        .unwrap_or("false".into())
+        .parse::<bool>()
+        .unwrap_or_default();
+
     let delegates = get_delegate_ids(pg_pool).await?;
     let questions = sqlx::query_as!(
         Question,
@@ -263,51 +268,53 @@ async fn political_analysis(app_state: AppState, ai_task_tx: &Sender<AiTask>) ->
         }
     }
 
-    for delegate in to_analyse {
-        let priority = crate::ai_task::Priority::Medium;
-        for question in &questions {
-            let ai_client = ai_client.clone();
-            let qdrant_client = qdrant_client.clone();
-            let question_text = question.question.clone();
-            let question_id = question.id;
-            let delegate_id = delegate.id;
-            let used_llm = used_llm.clone();
+    if !stance_update_skip {
+        for delegate in to_analyse {
+            let priority = crate::ai_task::Priority::Medium;
+            for question in &questions {
+                let ai_client = ai_client.clone();
+                let qdrant_client = qdrant_client.clone();
+                let question_text = question.question.clone();
+                let question_id = question.id;
+                let delegate_id = delegate.id;
+                let used_llm = used_llm.clone();
 
-            let language = match app_state.parliament {
-                combx::Parliament::At => Language::De,
-                combx::Parliament::Eu => Language::En,
-            };
+                let language = match app_state.parliament {
+                    combx::Parliament::At => Language::De,
+                    combx::Parliament::Eu => Language::En,
+                };
 
-            let ai_task = AiTask {
-                input: None,
-                priority,
-                task_id: crate::hash!(app_state.parliament),
-                db_entry_id: entry_id,
-                score: priority.weight(),
-                pool: app_state.pg_pool.clone(),
-                rerunnable: true,
-                created_at: Instant::now(),
-                task: Box::new(move |task_args| {
-                    Box::pin(async move {
-                        process_delegate_stance(
-                            &task_args,
-                            &ai_client,
-                            &qdrant_client,
-                            delegate_id,
-                            question_id,
-                            &question_text,
-                            &used_llm,
-                            language,
-                        )
-                        .await?;
-                        Ok(())
-                    })
-                }),
-            };
-            if let Err(e) = ai_task_tx.send(ai_task).await {
-                log::error!("Cannot send ai task: {e:?}")
+                let ai_task = AiTask {
+                    input: None,
+                    priority,
+                    task_id: crate::hash!(app_state.parliament),
+                    db_entry_id: entry_id,
+                    score: priority.weight(),
+                    pool: app_state.pg_pool.clone(),
+                    rerunnable: true,
+                    created_at: Instant::now(),
+                    task: Box::new(move |task_args| {
+                        Box::pin(async move {
+                            process_delegate_stance(
+                                &task_args,
+                                &ai_client,
+                                &qdrant_client,
+                                delegate_id,
+                                question_id,
+                                &question_text,
+                                &used_llm,
+                                language,
+                            )
+                            .await?;
+                            Ok(())
+                        })
+                    }),
+                };
+                if let Err(e) = ai_task_tx.send(ai_task).await {
+                    log::error!("Cannot send ai task: {e:?}")
+                }
+                entry_id += 1;
             }
-            entry_id += 1;
         }
     }
 
