@@ -30,6 +30,7 @@ pub trait EmbeddingProvider: Send + Sync {
     async fn embed_text(&self, text: &str) -> Result<Vec<f64>>;
     /// Returns the dimension of the embeddings produced
     async fn embedding_dim(&self) -> Result<u64>;
+    async fn model(&self) -> Result<String>;
 }
 
 impl EmbeddingProvider for SomAiClient {
@@ -42,6 +43,10 @@ impl EmbeddingProvider for SomAiClient {
 
     async fn embedding_dim(&self) -> Result<u64> {
         Ok(self.embed_text("This is a test").await?.len() as u64)
+    }
+
+    async fn model(&self) -> Result<String> {
+        Ok(self.get_default_embedding_model_name().await?)
     }
 }
 

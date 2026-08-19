@@ -138,6 +138,8 @@ pub async fn process_delegate(
     delegate: &Delegate,
     update_entries: bool,
 ) -> crate::Result<()> {
+    let embedding_name = embedder.model().await?;
+
     // 1. Check if delegate already exists in Qdrant (Scroll with filter)
     let filter = Filter {
         must: vec![Condition {
@@ -204,6 +206,10 @@ pub async fn process_delegate(
             payload.insert("lower_padding".to_string(), json!(lower_padding).into());
             payload.insert("upper_padding".to_string(), json!(upper_padding).into());
             payload.insert("speech_id".to_string(), json!(speech.id).into());
+            payload.insert(
+                "embedding_model_name".to_string(),
+                json!(embedding_name).into(),
+            );
             payload.insert(
                 "document_urls".to_string(),
                 json!(speech.document_urls).into(),
