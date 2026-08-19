@@ -6,6 +6,7 @@ mod upload_questions;
 use std::ops::ControlFlow;
 
 use chrono::TimeDelta;
+use combx::Parliament;
 use qdrant_client::{
     Qdrant,
     qdrant::{GetPoints, PointId},
@@ -19,7 +20,7 @@ use crate::{
     ai_task::{AiTask, TaskArgs},
     ai_tasks::somai_connect,
     political_analysis::{
-        embed_speeches::get_delegate_ids,
+        embed_speeches::{get_delegate_ids, setup_qdrant_collection},
         stance_system::{Citation, Stance, rag_pipeline},
     },
     today,
@@ -50,6 +51,13 @@ impl EmbeddingProvider for SomAiClient {
     }
 }
 
+pub fn collection_name(parliament: Parliament) -> &'static str {
+    match parliament {
+        Parliament::At => "at_delegates",
+        Parliament::Eu => "eu_delegates",
+    }
+}
+
 struct Question {
     id: i32,
     question: String,
@@ -66,6 +74,7 @@ pub async fn process_delegate_stance(
     question_text: &str,
     used_llm: &str,
     language: Language,
+    parliament: Parliament,
 ) -> crate::Result<()> {
     let stance = rag_pipeline::<Stance>(
         ai_client,
@@ -73,6 +82,7 @@ pub async fn process_delegate_stance(
         delegate_id,
         question_text,
         language,
+        parliament,
     )
     .await?;
 
@@ -84,14 +94,15 @@ pub async fn process_delegate_stance(
 
     let answer_id = sqlx::query_scalar!(
         r#"
-        INSERT INTO political_answers(question_id, delegate_id, answer, stance_llm, model_used)
-        VALUES ($1, $2, $3, $4, $5) RETURNING id
+        INSERT INTO political_answers(question_id, delegate_id, answer, stance_llm, model_used, full_stance)
+        VALUES ($1, $2, $3, $4, $5, $6) RETURNING id
         "#,
         question_id,
         delegate_id,
         stance.political_stance,
         stance_llm,
-        used_llm
+        used_llm,
+        serde_json::to_value(&stance)?,
     )
     .fetch_one(&task_args.pg_pool)
     .await?;
@@ -236,6 +247,13 @@ async fn political_analysis(app_state: AppState, ai_task_tx: &Sender<AiTask>) ->
     )
     .build()?;
 
+    setup_qdrant_collection(
+        &qdrant_client,
+        collection_name(app_state.parliament),
+        ai_client.embedding_dim().await?,
+    )
+    .await?;
+
     let vector_update_skip = std::env::var("VECTOR_UPDATE_SKIP")
         .unwrap_or("false".into())
         .parse::<bool>()
@@ -257,7 +275,11 @@ async fn political_analysis(app_state: AppState, ai_task_tx: &Sender<AiTask>) ->
     let mut entry_id = 0;
     let today = today().to_utc();
 
-    let mut to_analyse = vec![];
+    let mut to_analyse = if !stance_update_skip && vector_update_skip {
+        delegates.clone()
+    } else {
+        vec![]
+    };
     if !vector_update_skip {
         for delegate in delegates {
             run_embed_for_delegate(
@@ -268,6 +290,7 @@ async fn political_analysis(app_state: AppState, ai_task_tx: &Sender<AiTask>) ->
                 today,
                 &mut to_analyse,
                 delegate,
+                app_state.parliament,
             )
             .await;
         }
@@ -288,6 +311,7 @@ async fn political_analysis(app_state: AppState, ai_task_tx: &Sender<AiTask>) ->
                     combx::Parliament::At => Language::De,
                     combx::Parliament::Eu => Language::En,
                 };
+                let parliament = app_state.parliament;
 
                 let ai_task = AiTask {
                     input: None,
@@ -309,6 +333,7 @@ async fn political_analysis(app_state: AppState, ai_task_tx: &Sender<AiTask>) ->
                                 &question_text,
                                 &used_llm,
                                 language,
+                                parliament,
                             )
                             .await?;
                             Ok(())
@@ -334,6 +359,7 @@ async fn run_embed_for_delegate(
     today: chrono::prelude::DateTime<chrono::prelude::Utc>,
     to_analyse: &mut Vec<embed_speeches::Delegate>,
     delegate: embed_speeches::Delegate,
+    parliament: Parliament,
 ) {
     let last_updated_at = sqlx::query_scalar!(
         "select updated_at from last_vector_speech_update where delegate_id = $1",
@@ -353,11 +379,12 @@ async fn run_embed_for_delegate(
         log::info!("Skip delegate {}, time delta too low", delegate.id);
         return;
     }
+    let collection_name = collection_name(parliament);
     match embed_speeches::process_delegate(
         pg_pool,
         qdrant_client,
         &**ai_client,
-        "delegates",
+        collection_name,
         &delegate,
         !vector_update_skip,
     )

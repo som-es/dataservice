@@ -33,7 +33,16 @@ pub struct Speech {
 pub async fn get_delegate_ids(pool: &PgPool) -> Result<Vec<Delegate>> {
     let delegates = sqlx::query_as!(
         Delegate,
-        "SELECT id, name FROM delegates WHERE is_active = true"
+        r#"
+        SELECT id, name
+        FROM delegates
+        WHERE EXISTS (
+            SELECT 1
+            FROM mandates
+            WHERE mandates.delegate_id = delegates.id
+              AND mandates.start_date > '2017-01-01'
+        )
+        "#
     )
     .fetch_all(pool)
     .await?;
@@ -60,7 +69,7 @@ pub async fn get_speech_texts(pool: &PgPool, delegate_id: i32) -> Result<Vec<Spe
         FROM plenar_speeches ps
         INNER JOIN debates ON debates.id = ps.debate_id
         INNER JOIN plenar_infos pi ON pi.id = debates.plenar_id
-        LEFT JOIN speeches_html_urls shu ON shu.speech_id = ps.id
+        LEFT JOIN plenar_speech_links shu ON shu.plenar_speech_id = ps.id
         WHERE ps.delegate_id = $1 AND ps.spoken_text IS NOT NULL
         GROUP BY ps.id, ps.spoken_text, debates.about, raw_data_created_at, legislative_period, pi.inr
         "#,

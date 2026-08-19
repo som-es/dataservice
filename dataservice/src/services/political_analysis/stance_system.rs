@@ -5,7 +5,7 @@ use crate::{
         delegate_context::{collect_delegate_profile, collect_spoken_texts},
     },
 };
-use combx::Error::Custom;
+use combx::{Error::Custom, Parliament};
 use qdrant_client::Qdrant;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -100,8 +100,10 @@ pub async fn populate_system_prompt(
     delegate_id: i32,
     question: &str,
     language: Language,
+    parliament: Parliament,
 ) -> crate::Result<String> {
-    let spoken_text = collect_spoken_texts(qdrant_client, embedder, delegate_id, question).await?;
+    let spoken_text =
+        collect_spoken_texts(qdrant_client, embedder, delegate_id, question, parliament).await?;
     let http_client = reqwest::Client::builder().build()?;
     let delegate_profile = collect_delegate_profile(&http_client, delegate_id).await?;
     Ok(match language {
@@ -143,9 +145,17 @@ pub async fn rag_pipeline<T: JsonSchema + DeserializeOwned>(
     delegate_id: i32,
     question: &str,
     language: Language,
+    parliament: Parliament,
 ) -> crate::Result<T> {
-    let prompt =
-        populate_system_prompt(qdrant_client, ai_client, delegate_id, question, language).await?;
+    let prompt = populate_system_prompt(
+        qdrant_client,
+        ai_client,
+        delegate_id,
+        question,
+        language,
+        parliament,
+    )
+    .await?;
     log::info!("stance prompt length: {}", prompt.len());
     ai_client
         .make_llm_request_with_schema::<T>(
@@ -197,6 +207,7 @@ mod tests {
             delegate_id,
             question,
             Language::De,
+            combx::Parliament::At,
         )
         .await
         .unwrap();

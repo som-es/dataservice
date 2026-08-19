@@ -1,6 +1,9 @@
-use crate::{Result, political_analysis::EmbeddingProvider};
+use crate::{
+    Result,
+    political_analysis::{EmbeddingProvider, collection_name},
+};
 use chrono::{Datelike, NaiveDate, Utc};
-use combx::Error;
+use combx::{Error, Parliament};
 use qdrant_client::{
     Qdrant,
     qdrant::{
@@ -167,9 +170,17 @@ pub async fn collect_spoken_texts(
     embedder: &impl EmbeddingProvider,
     delegate_id: i32,
     question: &str,
+    parliament: Parliament,
 ) -> Result<String> {
-    let searches =
-        search_points_for_entry(qdrant_client, embedder, delegate_id, question, 25).await?;
+    let searches = search_points_for_entry(
+        qdrant_client,
+        embedder,
+        delegate_id,
+        question,
+        25,
+        parliament,
+    )
+    .await?;
 
     combine_all_speech_snippets(&searches).ok_or(Box::new(Error::Custom(
         "could not extract speech snippets".into(),
@@ -182,11 +193,12 @@ pub async fn search_points_for_entry(
     delegate_id: i32,
     question: &str,
     limit: u64,
+    parliament: Parliament,
 ) -> Result<Vec<ScoredPoint>> {
     let rag_idx = question.find("[RAG]").unwrap_or(question.len());
     let processed_question = format!("query: {}", &question[..rag_idx]);
     log::info!("RAG QUESTION: {}", processed_question);
-    let collection_name = "delegates";
+    let collection_name = collection_name(parliament);
     let searches = score_search_results_qdrant(
         qdrant_client,
         embedder,
@@ -263,6 +275,7 @@ mod tests {
             // 83148,
             8242,
             "Erbschaften sollten besteuert werden.",
+            combx::Parliament::At,
         )
         .await
         .unwrap();
