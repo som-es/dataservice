@@ -1,6 +1,6 @@
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use upload_political_questions::upload_questions::{
-    GENERATED_QUESTIONS, LONG_QUESTIONS, QUESTIONS, SHORT_QUESTIONS, upload_questions,
+    GENERATED_QUESTIONS, QUESTIONS, USER_QUESTIONS, upload_questions,
 };
 
 pub async fn connect_pg(url: &str) -> PgPool {
@@ -19,7 +19,6 @@ async fn main() -> combx::Result<()> {
     upload_questions(&pool, QUESTIONS).await?;
     upload_questions(&pool, GENERATED_QUESTIONS).await?;
 
-    upload_questions(&pool, SHORT_QUESTIONS).await?;
-    upload_questions(&pool, LONG_QUESTIONS).await?;
+    upload_questions(&pool, USER_QUESTIONS).await?;
     Ok(())
 }

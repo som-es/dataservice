@@ -1,219 +1,9 @@
 use crate::upload_questions::QuestionData;
 
 // ----------------------------------------------------------------------------
-// SHORT_QUESTIONS — 10 Fragen
-// ----------------------------------------------------------------------------
-pub const SHORT_QUESTIONS: &[QuestionData] = &[
-    // --- Wirtschaftsachse (5) ---
-    QuestionData {
-        question: "Sollte der Staat weniger in das Wirtschaftsleben eingreifen?",
-        is_left: Some(false),
-        is_liberal: None,
-        topics: &["Wirtschaft", "Budget und Finanzen"],
-        detailed_topics: &[
-            "Unternehmen und Wettbewerb",
-            "Öffentliche Finanzen und Haushaltspolitik",
-        ],
-        topics_influenced: &[
-            ("Wirtschaft", 0.9),
-            ("Soziales", -0.7),
-            ("Budget und Finanzen", 0.6),
-            ("Arbeit", -0.5),
-        ],
-        detailed_topics_influenced: &[
-            ("Unternehmen und Wettbewerb", 0.9),
-            ("Öffentliche Finanzen und Haushaltspolitik", 0.6),
-            ("Arbeitsrecht", -0.5),
-            ("Soziale Sicherheit", -0.6),
-        ],
-        is_part_of: &["short"],
-    },
-    QuestionData {
-        question: "Sollte der Sozialstaat ausgebaut werden, auch wenn dadurch höhere Steuern und Abgaben notwendig werden?",
-        is_left: Some(true),
-        is_liberal: None,
-        topics: &["Soziales", "Budget und Finanzen"],
-        detailed_topics: &["Sozialpolitik", "Steuerwesen"],
-        topics_influenced: &[
-            ("Soziales", 0.9),
-            ("Budget und Finanzen", -0.8),
-            ("Wirtschaft", -0.6),
-            ("Arbeit", 0.5),
-        ],
-        detailed_topics_influenced: &[
-            ("Sozialpolitik", 0.9),
-            ("Steuerwesen", -0.8),
-            ("Arbeitslosenversicherung", 0.7),
-            ("Soziale Sicherheit", 0.8),
-        ],
-        is_part_of: &["short"],
-    },
-    QuestionData {
-        question: "Sollte die Infrastruktur für Autos weiter ausgebaut werden?",
-        is_left: Some(false),
-        is_liberal: None,
-        topics: &["Verkehr und Infrastruktur", "Klima, Umwelt und Energie"],
-        detailed_topics: &["Straßenverkehr", "Bauindustrie und öffentliches Bauwesen"],
-        topics_influenced: &[
-            ("Verkehr und Infrastruktur", 0.8),
-            ("Klima, Umwelt und Energie", -0.7),
-            ("Wirtschaft", 0.5),
-            ("Soziales", -0.2),
-        ],
-        detailed_topics_influenced: &[
-            ("Straßenverkehr", 0.8),
-            ("Bauindustrie und öffentliches Bauwesen", 0.7),
-            ("Umwelt", -0.7),
-            ("Raumordnung", -0.4),
-        ],
-        is_part_of: &["short"],
-    },
-    QuestionData {
-        question: "Sollten Erbschaften besteuert werden?",
-        is_left: Some(true),
-        is_liberal: None,
-        topics: &["Budget und Finanzen", "Wirtschaft", "Soziales"],
-        detailed_topics: &["Steuerwesen", "Öffentliche Finanzen und Haushaltspolitik"],
-        topics_influenced: &[
-            ("Budget und Finanzen", 0.8),
-            ("Soziales", 0.7),
-            ("Wirtschaft", -0.6),
-            ("Familie und Generationen", -0.3),
-        ],
-        detailed_topics_influenced: &[
-            ("Steuerwesen", 0.8),
-            ("Öffentliche Finanzen und Haushaltspolitik", 0.7),
-            ("Familie", -0.4),
-            ("Bürgerliches Recht", -0.3),
-        ],
-        is_part_of: &["short"],
-    },
-    QuestionData {
-        question: "Sollte das Arbeitslosengeld sinken, je länger es bezogen wird?",
-        is_left: Some(false),
-        is_liberal: None,
-        topics: &["Arbeit", "Soziales"],
-        detailed_topics: &["Arbeitslosenversicherung", "Soziale Sicherheit"],
-        topics_influenced: &[
-            ("Wirtschaft", 0.6),
-            ("Soziales", -0.8),
-            ("Arbeit", -0.7),
-            ("Budget und Finanzen", 0.5),
-        ],
-        detailed_topics_influenced: &[
-            ("Arbeitslosenversicherung", -0.8),
-            ("Soziale Sicherheit", -0.7),
-            ("Beschäftigung und Arbeitsbedingungen", -0.6),
-            ("Steuerwesen", 0.4),
-        ],
-        is_part_of: &["short"],
-    },
-    // --- Gesellschaftsachse (5) ---
-    QuestionData {
-        question: "Sollten Zuwanderer:innen verpflichtet sein, sich an die österreichische Kultur und die hiesigen Gepflogenheiten anzupassen?",
-        is_left: None,
-        is_liberal: Some(false),
-        topics: &["Inneres und Recht", "Soziales"],
-        detailed_topics: &["Integration", "Staatsangehöriger"],
-        topics_influenced: &[
-            ("Inneres und Recht", 0.7),
-            ("Soziales", -0.6),
-            ("Kultur", 0.5),
-            ("Frauen und Gleichbehandlung", -0.4),
-        ],
-        detailed_topics_influenced: &[
-            ("Integration", -0.7),
-            ("Staatsangehöriger", 0.6),
-            ("Menschenrechte", -0.5),
-            ("Ethnische Gruppe", -0.5),
-        ],
-        is_part_of: &["short"],
-    },
-    QuestionData {
-        question: "Sollte die Politik das traditionelle Familienbild aus Vater, Mutter und Kindern stärken?",
-        is_left: None,
-        is_liberal: Some(false),
-        topics: &["Familie und Generationen"],
-        detailed_topics: &["Familie", "Sozialpolitik"],
-        topics_influenced: &[
-            ("Familie und Generationen", 0.8),
-            ("Frauen und Gleichbehandlung", -0.7),
-            ("Soziales", 0.5),
-            ("Bildung", -0.3),
-        ],
-        detailed_topics_influenced: &[
-            ("Familie", 0.8),
-            ("Sozialpolitik", 0.5),
-            ("Gleichbehandlung", -0.7),
-            ("Organisation des Unterrichtswesens", -0.3),
-        ],
-        is_part_of: &["short"],
-    },
-    QuestionData {
-        question: "Sollte Cannabis in Österreich legalisiert werden?",
-        is_left: None,
-        is_liberal: Some(true),
-        topics: &["Gesundheit und Ernährung", "Inneres und Recht"],
-        detailed_topics: &["Strafrecht", "Gesundheit"],
-        topics_influenced: &[
-            ("Inneres und Recht", 0.7),
-            ("Gesundheit und Ernährung", 0.6),
-            ("Soziales", 0.4),
-            ("Wirtschaft", 0.3),
-        ],
-        detailed_topics_influenced: &[
-            ("Strafrecht", 0.7),
-            ("Gesundheit", 0.6),
-            ("Öffentliche Sicherheit", -0.4),
-            ("Handel", 0.3),
-        ],
-        is_part_of: &["short"],
-    },
-    QuestionData {
-        question: "Sollten Schwangerschaftsabbrüche innerhalb der ersten drei Monate von der Krankenkasse bezahlt werden?",
-        is_left: None,
-        is_liberal: Some(true),
-        topics: &["Gesundheit und Ernährung", "Frauen und Gleichbehandlung"],
-        detailed_topics: &["Frau", "Gesundheit"],
-        topics_influenced: &[
-            ("Frauen und Gleichbehandlung", 0.9),
-            ("Gesundheit und Ernährung", 0.7),
-            ("Soziales", 0.5),
-            ("Budget und Finanzen", -0.3),
-        ],
-        detailed_topics_influenced: &[
-            ("Frau", 0.9),
-            ("Gesundheit", 0.7),
-            ("Sozialpolitik", 0.5),
-            ("Krankenpflege", 0.4),
-        ],
-        is_part_of: &["short"],
-    },
-    QuestionData {
-        question: "Sollten Volksbegehren ab einer bestimmten Anzahl an Unterstützungen automatisch zu einer Volksabstimmung führen?",
-        is_left: None,
-        is_liberal: Some(true),
-        topics: &["Parlament und Demokratie"],
-        detailed_topics: &["Direkt gewählte Kammer", "Partizipative Demokratie"],
-        topics_influenced: &[
-            ("Parlament und Demokratie", 0.8),
-            ("Inneres und Recht", -0.4),
-            ("Soziales", 0.3),
-        ],
-        detailed_topics_influenced: &[
-            ("Direkt gewählte Kammer", 0.7),
-            ("Partizipative Demokratie", 0.8),
-            ("Gesetzgebungsverfahren", -0.4),
-            ("Verfassung", 0.3),
-        ],
-        is_part_of: &["short"],
-    },
-];
-
-// ----------------------------------------------------------------------------
 // LONG_QUESTIONS — 30 Fragen
 // ----------------------------------------------------------------------------
-pub const LONG_QUESTIONS: &[QuestionData] = &[
+pub const USER_QUESTIONS: &[QuestionData] = &[
     // =========================================================
     // WIRTSCHAFTSACHSE (12)
     // =========================================================
@@ -238,7 +28,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Arbeitsrecht", -0.5),
             ("Soziale Sicherheit", -0.6),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["short", "long"]),
     },
     QuestionData {
         question: "Sollte der Sozialstaat ausgebaut werden, auch wenn dadurch höhere Steuern und Abgaben notwendig werden?",
@@ -258,7 +48,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Arbeitslosenversicherung", 0.7),
             ("Soziale Sicherheit", 0.8),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["short", "long"]),
     },
     QuestionData {
         question: "Sollte die Infrastruktur für Autos weiter ausgebaut werden?",
@@ -278,7 +68,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Umwelt", -0.7),
             ("Raumordnung", -0.4),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["short", "long"]),
     },
     QuestionData {
         question: "Sollte eine gemeinsame Schule für alle Kinder bis zum Alter von 14 Jahren eingeführt werden?",
@@ -298,7 +88,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Sozialpolitik", 0.5),
             ("Familie", 0.4),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     QuestionData {
         question: "Sollte in Österreich eine 32-Stunden-Woche bei gleichbleibendem Lohn eingeführt werden?",
@@ -318,7 +108,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Industrie", -0.7),
             ("Unternehmen und Wettbewerb", -0.6),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     QuestionData {
         question: "Sollten Erbschaften besteuert werden?",
@@ -338,7 +128,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Familie", -0.4),
             ("Bürgerliches Recht", -0.3),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["short", "long"]),
     },
     QuestionData {
         question: "Sollten Wahlärzt:innen verpflichtet werden, einen Teil ihrer Patient:innen zum Kassentarif zu behandeln?",
@@ -358,7 +148,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Krankenpflege", 0.6),
             ("Unternehmen und Wettbewerb", -0.4),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     QuestionData {
         question: "Soll die Möglichkeit für Vermieter, Mieten zu erhöhen, stärker gesetzlich begrenzt werden?",
@@ -378,7 +168,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Handel", -0.4),
             ("Einkommen", 0.4),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     QuestionData {
         question: "Sollten Unternehmen gesetzlich verpflichtet werden, Produkte reparaturfreundlicher zu gestalten?",
@@ -398,7 +188,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Abfallwirtschaft", 0.5),
             ("Forschung und geistiges Eigentum", -0.3),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     QuestionData {
         question: "Sollte der Staat mehr Schulden aufnehmen, um wichtige Infrastrukturprojekte zu finanzieren?",
@@ -418,7 +208,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Straßen- und Brückenbau", 0.5),
             ("Schienentransport", 0.5),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     QuestionData {
         question: "Sollte der Staat in die Gasinfrastruktur investieren, um die Versorgungssicherheit zu garantieren?",
@@ -438,7 +228,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Umwelt", -0.6),
             ("Haushaltsplan", -0.4),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     QuestionData {
         question: "Sollten staatliche Mittel primär für den Ausbau der Schieneninfrastruktur statt für den Straßenbau verwendet werden?",
@@ -458,7 +248,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Umwelt", 0.6),
             ("Straßen- und Brückenbau", -0.6),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     // =========================================================
     // GESELLSCHAFTSACHSE (12)
@@ -481,7 +271,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Internationale Beziehungen", -0.7),
             ("Handel", -0.4),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     QuestionData {
         question: "Sollte die Politik das traditionelle Familienbild aus Vater, Mutter und Kindern stärken?",
@@ -501,7 +291,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Gleichbehandlung", -0.7),
             ("Organisation des Unterrichtswesens", -0.3),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["short", "long"]),
     },
     QuestionData {
         question: "Sollte Österreich seine Neutralität aufgeben?",
@@ -521,7 +311,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Internationale Beziehungen", 0.8),
             ("Öffentliche Sicherheit", 0.4),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     QuestionData {
         question: "Sollten Zuwanderer:innen verpflichtet sein, sich an die österreichische Kultur und die hiesigen Gepflogenheiten anzupassen?",
@@ -541,7 +331,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Menschenrechte", -0.5),
             ("Ethnische Gruppe", -0.5),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["short", "long"]),
     },
     QuestionData {
         question: "Sollten Straftäter:innen härter bestraft werden?",
@@ -560,7 +350,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Menschenrechte", -0.6),
             ("Opferhilfe", 0.4),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     QuestionData {
         question: "Sollte die ORF-Haushaltsabgabe ersatzlos abgeschafft werden?",
@@ -579,7 +369,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Presse", -0.4),
             ("Öffentliche Finanzen und Haushaltspolitik", 0.5),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     QuestionData {
         question: "Sollten Schwangerschaftsabbrüche innerhalb der ersten drei Monate von der Krankenkasse bezahlt werden?",
@@ -599,7 +389,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Sozialpolitik", 0.5),
             ("Krankenpflege", 0.4),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["short", "long"]),
     },
     QuestionData {
         question: "Sollte Cannabis in Österreich legalisiert werden?",
@@ -619,7 +409,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Öffentliche Sicherheit", -0.4),
             ("Handel", 0.3),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["short", "long"]),
     },
     QuestionData {
         question: "Sollte die Polizei die Möglichkeit erhalten, die Messenger-Dienste von Strafverdächtigen zu überwachen?",
@@ -638,7 +428,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Menschenrechte", -0.7),
             ("Internet", -0.6),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     QuestionData {
         question: "Sollten Volksbegehren ab einer bestimmten Anzahl an Unterstützungen automatisch zu einer Volksabstimmung führen?",
@@ -657,7 +447,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Gesetzgebungsverfahren", -0.4),
             ("Verfassung", 0.3),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["short", "long"]),
     },
     QuestionData {
         question: "Sollten staatliche Dokumente konsequent geschlechtergerechte Sprache verwenden?",
@@ -677,7 +467,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Information und Informationsverarbeitung", 0.4),
             ("Verwaltungsorganisation", 0.3),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     QuestionData {
         question: "Ist die Einführung verpflichtender Deutschförderklassen ein sinnvoller Schritt zur Integration?",
@@ -700,7 +490,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Flüchtling", -0.4),
             ("Primarstufe", 0.3),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     // =========================================================
     // THEMENABDECKUNG OHNE EINDEUTIGE ACHSE (6)
@@ -723,7 +513,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Sekundarstufe", 0.4),
             ("Primarstufe", 0.3),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     QuestionData {
         question: "Soll der Ausbau erneuerbarer Energien Vorrang vor dem Schutz von Naturschutzgebieten haben?",
@@ -743,7 +533,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Raumordnung", 0.4),
             ("Tierschutz", -0.5),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     QuestionData {
         question: "Sollte die Strafbarkeit von Deepfakes im Strafgesetzbuch verankert werden?",
@@ -763,7 +553,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Opferhilfe", 0.5),
             ("Menschenrechte", -0.1),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     QuestionData {
         question: "Sollten Kündigungsfristen gesetzlich vereinheitlicht werden?",
@@ -783,7 +573,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Unternehmen und Wettbewerb", -0.3),
             ("Verwaltungsrecht", 0.3),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     QuestionData {
         question: "Sollte der Staat Vorgaben für die Schreibweise in Schulbüchern machen?",
@@ -806,7 +596,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Verwaltungsorganisation", 0.3),
             ("Frau", 0.2),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
     },
     QuestionData {
         question: "Soll die Bezahlung von Spitzenpolitikern an die Inflation angepasst werden?",
@@ -826,6 +616,26 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Einkommen", 0.4),
             ("Regierung", 0.3),
         ],
-        is_part_of: &["long"],
+        is_part_of: Some(&["long"]),
+    },
+    QuestionData {
+        question: "Sollte das Arbeitslosengeld sinken, je länger es bezogen wird?",
+        is_left: Some(false),
+        is_liberal: None,
+        topics: &["Arbeit", "Soziales"],
+        detailed_topics: &["Arbeitslosenversicherung", "Soziale Sicherheit"],
+        topics_influenced: &[
+            ("Wirtschaft", 0.6),
+            ("Soziales", -0.8),
+            ("Arbeit", -0.7),
+            ("Budget und Finanzen", 0.5),
+        ],
+        detailed_topics_influenced: &[
+            ("Arbeitslosenversicherung", -0.8),
+            ("Soziale Sicherheit", -0.7),
+            ("Beschäftigung und Arbeitsbedingungen", -0.6),
+            ("Steuerwesen", 0.4),
+        ],
+        is_part_of: Some(&["short"]),
     },
 ];

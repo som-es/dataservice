@@ -60,7 +60,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("ausländischer Staatsangehöriger", 0.6),
             ("Gerichtswesen", -0.4),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollten digitale Kompetenzen und Künstliche Intelligenz verpflichtender Bestandteil des Schulunterrichts sein?",
@@ -80,7 +80,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Sekundarstufe", 0.4),
             ("Primarstufe", 0.3),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Soll der Ausbau erneuerbarer Energien Vorrang vor dem Schutz von Naturschutzgebieten haben?",
@@ -100,7 +100,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Raumordnung", 0.4),
             ("Tierschutz", -0.5),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollten Unternehmen gesetzlich verpflichtet werden, Produkte reparaturfreundlicher zu gestalten?",
@@ -120,7 +120,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Abfallwirtschaft", 0.5),
             ("Forschung und geistiges Eigentum", -0.3),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollte der Staat die Möglichkeit zur Selbsttötung durch strengere bürokratische Hürden kontrollieren?",
@@ -140,7 +140,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Verwaltungsrecht", 0.6),
             ("Sozialpolitik", -0.3),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollte der Staat mehr Schulden aufnehmen, um wichtige Infrastrukturprojekte zu finanzieren?",
@@ -160,7 +160,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Straßen- und Brückenbau", 0.5),
             ("Schienentransport", 0.5),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollten staatliche Dokumente konsequent geschlechtergerechte Sprache verwenden?",
@@ -180,7 +180,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Information und Informationsverarbeitung", 0.4),
             ("Verwaltungsorganisation", 0.3),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollte der Staat durch gezielte Steuersenkungen in die Preisgestaltung von Grundnahrungsmitteln eingreifen?",
@@ -200,7 +200,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Einkommen", 0.4),
             ("Haushaltsplan", -0.5),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Ist die Einführung einer neuen Management‑Ebene in Schulen sinnvoll, selbst wenn sie zusätzliche Bürokratie erzeugt?",
@@ -223,7 +223,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Verwaltung und Entlohnung des Personals", 0.4),
             ("Haushaltsplan", -0.3),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Soll eine Befristung von Fahrerlaubnissen nach dem 60. Lebensjahr eingeführt werden?",
@@ -243,7 +243,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Ausweis", 0.4),
             ("Verwaltungskontrolle", 0.3),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Müssen Helm‑Pflichten für alle E‑Klein‑Roller gelten, unabhängig vom Alter?",
@@ -263,7 +263,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Verwaltungsrecht", 0.3),
             ("junger Mensch", 0.3),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Soll der Staat bei stark steigenden Energiepreisen direkte Eingriffe in die Steuerpolitik vornehmen?",
@@ -287,7 +287,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Einkommen", 0.5),
             ("Haushaltsplan", -0.5),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Darf die Regierung in Gefahr‑im‑Verzug‑Situationen Verordnungen erlassen, ohne vorherige Zustimmung des Nationalrats?",
@@ -307,7 +307,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Regierung", 0.6),
             ("Verfassung", -0.5),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Ist die Einführung verpflichtender Deutschförderklassen ein sinnvoller Schritt zur Integration?",
@@ -330,7 +330,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Flüchtling", -0.4),
             ("Primarstufe", 0.3),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollten Arbeitnehmer für Überstunden weniger Steuern auf den Überstundenzuschlag zahlen?",
@@ -350,7 +350,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Haushaltsplan", -0.5),
             ("Finanzwesen", -0.4),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Soll die Bezahlung von Spitzenpolitikern an die Inflation angepasst werden?",
@@ -370,7 +370,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Einkommen", 0.4),
             ("Regierung", 0.3),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollten Kündigungsfristen gesetzlich vereinheitlicht werden?",
@@ -390,7 +390,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Unternehmen und Wettbewerb", -0.3),
             ("Verwaltungsrecht", 0.3),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Soll die Möglichkeit für Vermieter, Mieten zu erhöhen, stärker gesetzlich begrenzt werden?",
@@ -410,7 +410,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Handel", -0.4),
             ("Einkommen", 0.4),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Soll das Kopftuchverbot in Schulen eingeführt werden?",
@@ -430,7 +430,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Frau", -0.4),
             ("Menschenrechte", -0.5),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollte die Gesundheitsversorgung stärker digitalisiert werden, auch wenn das mehr personenbezogene Daten erfordert?",
@@ -453,7 +453,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Information und Informationsverarbeitung", -0.4),
             ("Menschenrechte", -0.3),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Soll Österreich mehr Geld für internationale Entwicklungszusammenarbeit bereitstellen?",
@@ -473,7 +473,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("diplomatische Beziehungen", 0.5),
             ("Vereinte Nationen", 0.4),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     // --- "NOT LAW" FRAGEN ---
     QuestionData {
@@ -498,7 +498,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Handel", -0.7),
             ("Preis", 0.3),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollte der Staat Vorgaben für die Schreibweise in Schulbüchern machen?",
@@ -521,7 +521,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Verwaltungsorganisation", 0.3),
             ("Frau", 0.2),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollte Österreich das Selbstbestimmungsrecht Südtirols aktiv unterstützen?",
@@ -541,7 +541,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Völkerrecht", 0.4),
             ("ethnische Gruppe", 0.5),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollten internationale Steuerabkommen strengere Kontrollen zur Bekämpfung von Steuervermeidung ermöglichen?",
@@ -561,7 +561,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Unternehmen und Wettbewerb", -0.5),
             ("Einkommen", 0.3),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollten die Bundesländer bei der Erreichung nationaler Klimaziele finanziell sanktioniert werden, wenn sie ihre Ziele verfehlen?",
@@ -581,7 +581,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Föderalismus", -0.5),
             ("Energie", 0.4),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollten Behörden und Banken verpflichtet werden, Dienstleistungen auch ohne Internetzugang anzubieten?",
@@ -601,7 +601,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Versicherungswesen", 0.3),
             ("Mensch mit Behinderung", 0.4),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollte der Staat in die Gasinfrastruktur investieren, um die Versorgungssicherheit zu garantieren?",
@@ -621,7 +621,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Umwelt", -0.6),
             ("Haushaltsplan", -0.4),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollten Subventionen an NGOs stärker kontrolliert werden?",
@@ -641,7 +641,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Versammlungsfreiheit", -0.5),
             ("Menschenrechte", -0.4),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollte die Strafbarkeit von Deepfakes im Strafgesetzbuch verankert werden?",
@@ -661,7 +661,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Opferhilfe", 0.5),
             ("Menschenrechte", -0.1),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollte der Staat mehr Ressourcen in die Schulung von Polizei und Justiz für digitale Gewalt investieren?",
@@ -681,7 +681,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Verwaltung und Entlohnung des Personals", 0.4),
             ("Haushaltsplan", -0.3),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollten staatliche Mittel primär für den Ausbau der Schieneninfrastruktur statt für den Straßenbau verwendet werden?",
@@ -701,7 +701,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Umwelt", 0.6),
             ("Straßen- und Brückenbau", -0.6),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollte Österreich die Wirtschaftssanktionen gegen Russland vollständig beenden?",
@@ -721,7 +721,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Völkerrecht", -0.5),
             ("Handel", 0.5),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollte der Staat strengere Gesetze erlassen, um die Verbreitung von Desinformation im Internet zu bekämpfen?",
@@ -744,7 +744,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Menschenrechte", -0.5),
             ("Strafrecht", 0.5),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Soll der Bund allein die Koordination von Krisen- und Blackout-Maßnahmen übernehmen?",
@@ -764,7 +764,7 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Gliedstaat", -0.6),
             ("Exekutive", 0.5),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
     QuestionData {
         question: "Sollte Österreich aktiv Druck auf andere Staaten ausüben, um die Todesstrafe zu verhindern?",
@@ -784,6 +784,6 @@ pub const GENERATED_QUESTIONS: &[QuestionData] = &[
             ("Völkerrecht", 0.5),
             ("Vereinte Nationen", 0.4),
         ],
-        is_part_of: &[],
+        is_part_of: None,
     },
 ];
