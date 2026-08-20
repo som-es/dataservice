@@ -51,6 +51,8 @@ pub async fn score_search_results_qdrant(
                 "date".to_string(),
                 "inr".to_string(),
                 "about".to_string(),
+                "document_urls".to_string(),
+                "embedding_model_name".to_string(),
             ],
         })),
     };
