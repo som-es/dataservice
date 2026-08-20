@@ -26,7 +26,7 @@ pub const SHORT_QUESTIONS: &[QuestionData] = &[
             ("Arbeitsrecht", -0.5),
             ("Soziale Sicherheit", -0.6),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["short"],
     },
     QuestionData {
         question: "Sollte der Sozialstaat ausgebaut werden, auch wenn dadurch höhere Steuern und Abgaben notwendig werden?",
@@ -46,7 +46,7 @@ pub const SHORT_QUESTIONS: &[QuestionData] = &[
             ("Arbeitslosenversicherung", 0.7),
             ("Soziale Sicherheit", 0.8),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["short"],
     },
     QuestionData {
         question: "Sollte die Infrastruktur für Autos weiter ausgebaut werden?",
@@ -66,7 +66,7 @@ pub const SHORT_QUESTIONS: &[QuestionData] = &[
             ("Umwelt", -0.7),
             ("Raumordnung", -0.4),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["short"],
     },
     QuestionData {
         question: "Sollten Erbschaften besteuert werden?",
@@ -86,7 +86,7 @@ pub const SHORT_QUESTIONS: &[QuestionData] = &[
             ("Familie", -0.4),
             ("Bürgerliches Recht", -0.3),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["short"],
     },
     QuestionData {
         question: "Sollte das Arbeitslosengeld sinken, je länger es bezogen wird?",
@@ -106,7 +106,7 @@ pub const SHORT_QUESTIONS: &[QuestionData] = &[
             ("Beschäftigung und Arbeitsbedingungen", -0.6),
             ("Steuerwesen", 0.4),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["short"],
     },
     // --- Gesellschaftsachse (5) ---
     QuestionData {
@@ -127,7 +127,7 @@ pub const SHORT_QUESTIONS: &[QuestionData] = &[
             ("Menschenrechte", -0.5),
             ("Ethnische Gruppe", -0.5),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["short"],
     },
     QuestionData {
         question: "Sollte die Politik das traditionelle Familienbild aus Vater, Mutter und Kindern stärken?",
@@ -147,7 +147,7 @@ pub const SHORT_QUESTIONS: &[QuestionData] = &[
             ("Gleichbehandlung", -0.7),
             ("Organisation des Unterrichtswesens", -0.3),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["short"],
     },
     QuestionData {
         question: "Sollte Cannabis in Österreich legalisiert werden?",
@@ -167,7 +167,7 @@ pub const SHORT_QUESTIONS: &[QuestionData] = &[
             ("Öffentliche Sicherheit", -0.4),
             ("Handel", 0.3),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["short"],
     },
     QuestionData {
         question: "Sollten Schwangerschaftsabbrüche innerhalb der ersten drei Monate von der Krankenkasse bezahlt werden?",
@@ -187,7 +187,7 @@ pub const SHORT_QUESTIONS: &[QuestionData] = &[
             ("Sozialpolitik", 0.5),
             ("Krankenpflege", 0.4),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["short"],
     },
     QuestionData {
         question: "Sollten Volksbegehren ab einer bestimmten Anzahl an Unterstützungen automatisch zu einer Volksabstimmung führen?",
@@ -206,7 +206,7 @@ pub const SHORT_QUESTIONS: &[QuestionData] = &[
             ("Gesetzgebungsverfahren", -0.4),
             ("Verfassung", 0.3),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["short"],
     },
 ];
 
@@ -238,7 +238,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Arbeitsrecht", -0.5),
             ("Soziale Sicherheit", -0.6),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollte der Sozialstaat ausgebaut werden, auch wenn dadurch höhere Steuern und Abgaben notwendig werden?",
@@ -258,7 +258,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Arbeitslosenversicherung", 0.7),
             ("Soziale Sicherheit", 0.8),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollte die Infrastruktur für Autos weiter ausgebaut werden?",
@@ -278,7 +278,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Umwelt", -0.7),
             ("Raumordnung", -0.4),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollte eine gemeinsame Schule für alle Kinder bis zum Alter von 14 Jahren eingeführt werden?",
@@ -298,7 +298,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Sozialpolitik", 0.5),
             ("Familie", 0.4),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollte in Österreich eine 32-Stunden-Woche bei gleichbleibendem Lohn eingeführt werden?",
@@ -318,7 +318,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Industrie", -0.7),
             ("Unternehmen und Wettbewerb", -0.6),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollten Erbschaften besteuert werden?",
@@ -338,7 +338,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Familie", -0.4),
             ("Bürgerliches Recht", -0.3),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollten Wahlärzt:innen verpflichtet werden, einen Teil ihrer Patient:innen zum Kassentarif zu behandeln?",
@@ -358,7 +358,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Krankenpflege", 0.6),
             ("Unternehmen und Wettbewerb", -0.4),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Soll die Möglichkeit für Vermieter, Mieten zu erhöhen, stärker gesetzlich begrenzt werden?",
@@ -378,7 +378,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Handel", -0.4),
             ("Einkommen", 0.4),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollten Unternehmen gesetzlich verpflichtet werden, Produkte reparaturfreundlicher zu gestalten?",
@@ -398,7 +398,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Abfallwirtschaft", 0.5),
             ("Forschung und geistiges Eigentum", -0.3),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollte der Staat mehr Schulden aufnehmen, um wichtige Infrastrukturprojekte zu finanzieren?",
@@ -418,7 +418,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Straßen- und Brückenbau", 0.5),
             ("Schienentransport", 0.5),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollte der Staat in die Gasinfrastruktur investieren, um die Versorgungssicherheit zu garantieren?",
@@ -438,7 +438,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Umwelt", -0.6),
             ("Haushaltsplan", -0.4),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollten staatliche Mittel primär für den Ausbau der Schieneninfrastruktur statt für den Straßenbau verwendet werden?",
@@ -458,7 +458,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Umwelt", 0.6),
             ("Straßen- und Brückenbau", -0.6),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     // =========================================================
     // GESELLSCHAFTSACHSE (12)
@@ -481,7 +481,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Internationale Beziehungen", -0.7),
             ("Handel", -0.4),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollte die Politik das traditionelle Familienbild aus Vater, Mutter und Kindern stärken?",
@@ -501,7 +501,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Gleichbehandlung", -0.7),
             ("Organisation des Unterrichtswesens", -0.3),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollte Österreich seine Neutralität aufgeben?",
@@ -521,7 +521,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Internationale Beziehungen", 0.8),
             ("Öffentliche Sicherheit", 0.4),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollten Zuwanderer:innen verpflichtet sein, sich an die österreichische Kultur und die hiesigen Gepflogenheiten anzupassen?",
@@ -541,7 +541,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Menschenrechte", -0.5),
             ("Ethnische Gruppe", -0.5),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollten Straftäter:innen härter bestraft werden?",
@@ -560,7 +560,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Menschenrechte", -0.6),
             ("Opferhilfe", 0.4),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollte die ORF-Haushaltsabgabe ersatzlos abgeschafft werden?",
@@ -579,7 +579,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Presse", -0.4),
             ("Öffentliche Finanzen und Haushaltspolitik", 0.5),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollten Schwangerschaftsabbrüche innerhalb der ersten drei Monate von der Krankenkasse bezahlt werden?",
@@ -599,7 +599,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Sozialpolitik", 0.5),
             ("Krankenpflege", 0.4),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollte Cannabis in Österreich legalisiert werden?",
@@ -619,7 +619,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Öffentliche Sicherheit", -0.4),
             ("Handel", 0.3),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollte die Polizei die Möglichkeit erhalten, die Messenger-Dienste von Strafverdächtigen zu überwachen?",
@@ -638,7 +638,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Menschenrechte", -0.7),
             ("Internet", -0.6),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollten Volksbegehren ab einer bestimmten Anzahl an Unterstützungen automatisch zu einer Volksabstimmung führen?",
@@ -657,7 +657,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Gesetzgebungsverfahren", -0.4),
             ("Verfassung", 0.3),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollten staatliche Dokumente konsequent geschlechtergerechte Sprache verwenden?",
@@ -677,7 +677,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Information und Informationsverarbeitung", 0.4),
             ("Verwaltungsorganisation", 0.3),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Ist die Einführung verpflichtender Deutschförderklassen ein sinnvoller Schritt zur Integration?",
@@ -700,7 +700,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Flüchtling", -0.4),
             ("Primarstufe", 0.3),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     // =========================================================
     // THEMENABDECKUNG OHNE EINDEUTIGE ACHSE (6)
@@ -723,7 +723,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Sekundarstufe", 0.4),
             ("Primarstufe", 0.3),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Soll der Ausbau erneuerbarer Energien Vorrang vor dem Schutz von Naturschutzgebieten haben?",
@@ -743,7 +743,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Raumordnung", 0.4),
             ("Tierschutz", -0.5),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollte die Strafbarkeit von Deepfakes im Strafgesetzbuch verankert werden?",
@@ -763,7 +763,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Opferhilfe", 0.5),
             ("Menschenrechte", -0.1),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollten Kündigungsfristen gesetzlich vereinheitlicht werden?",
@@ -783,7 +783,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Unternehmen und Wettbewerb", -0.3),
             ("Verwaltungsrecht", 0.3),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Sollte der Staat Vorgaben für die Schreibweise in Schulbüchern machen?",
@@ -806,7 +806,7 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Verwaltungsorganisation", 0.3),
             ("Frau", 0.2),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
     QuestionData {
         question: "Soll die Bezahlung von Spitzenpolitikern an die Inflation angepasst werden?",
@@ -826,6 +826,6 @@ pub const LONG_QUESTIONS: &[QuestionData] = &[
             ("Einkommen", 0.4),
             ("Regierung", 0.3),
         ],
-        is_part_of: Vec::new(),
+        is_part_of: &["long"],
     },
 ];
