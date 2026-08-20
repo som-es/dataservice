@@ -378,8 +378,8 @@ pub async fn insert_plenar_speech<'a>(
 
     if updated_spoken_text.is_none() {
         warn!(
-            "DEBATE_ID: {}, Missing spoken text for plenar speech id: {plenar_speech_id}, and plenar info: {:?}",
-            args.debate_id, plenar_speech
+            "DEBATE_ID: {}, Missing spoken text for plenar speech id: {plenar_speech_id}",
+            args.debate_id
         );
     }
     if let Some(updated_spoken_text) = &updated_spoken_text {
@@ -454,8 +454,8 @@ pub async fn insert_plenar_speech<'a>(
 
     if plenar_speech.speech.spoken_text_html_urls.is_empty() {
         warn!(
-            "DEBATE_ID: {}, No spoken text html urls for plenar speech: {:?}",
-            args.debate_id, plenar_speech
+            "DEBATE_ID: {}, No spoken text html urls for plenar speech: {plenar_speech_id:?}",
+            args.debate_id,
         );
     }
 

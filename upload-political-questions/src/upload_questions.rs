@@ -1,6 +1,9 @@
 mod generated_questions;
 pub use generated_questions::*;
 
+mod user_questions;
+pub use user_questions::*;
+
 use sqlx::PgPool;
 
 pub struct QuestionData {
@@ -11,6 +14,7 @@ pub struct QuestionData {
     pub detailed_topics: &'static [&'static str],
     pub topics_influenced: &'static [(&'static str, f64)],
     pub detailed_topics_influenced: &'static [(&'static str, f64)],
+    pub is_part_of: Vec<String>,
 }
 
 pub const QUESTIONS: &[QuestionData] = &[
@@ -36,6 +40,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Arbeitsrecht", -0.5),
             ("Soziale Sicherheit", -0.6),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Der Sozialstaat sollte ausgebaut werden, auch wenn das höhere Steuern und Abgaben bedeutet.",
@@ -55,6 +60,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Arbeitslosenversicherung", 0.7),
             ("Soziale Sicherheit", 0.8),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Die Politik sollte stärker in die Preise eingreifen, um die Teuerung abzumildern.",
@@ -74,6 +80,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Sozialpolitik", 0.7),
             ("Beschäftigung und Arbeitsbedingungen", 0.4),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Es muss mehr getan werden, um den Klimawandel zu stoppen, auch wenn das für den einzelnen teurer wird.",
@@ -93,6 +100,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Straßenverkehr", -0.4),
             ("Industrie", -0.5),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Die Infrastruktur für Autos sollte ausgebaut werden.",
@@ -112,6 +120,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Umwelt", -0.7),
             ("Raumordnung", -0.4),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Naturschutz darf nicht auf Kosten des Wirtschaftswachstums gehen.",
@@ -131,6 +140,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Industrie", 0.7),
             ("Energie", -0.5),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Eine gemeinsame Schule für alle bis 14 sollte eingeführt werden.",
@@ -150,6 +160,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Sozialpolitik", 0.5),
             ("Familie", 0.4),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Das Arbeitslosengeld sollte sinken, je länger man es bezieht.",
@@ -169,6 +180,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Beschäftigung und Arbeitsbedingungen", -0.6),
             ("Steuerwesen", 0.4),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "In Österreich sollte eine 32-Stunden-Woche eingeführt werden, bei gleichbleibendem Lohn.",
@@ -188,6 +200,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Industrie", -0.7),
             ("Unternehmen und Wettbewerb", -0.6),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Erbschaften sollten besteuert werden.",
@@ -207,6 +220,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Familie", -0.4),
             ("Bürgerliches Recht", -0.3),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Wahlärzt:innen sollten verpflichtet werden, einen Teil ihrer Patient:innen nach dem Kassentarif zu behandeln.",
@@ -226,6 +240,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Krankenpflege", 0.6),
             ("Unternehmen und Wettbewerb", -0.4),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Die Möglichkeit, Wohnungen befristet zu vermieten, sollte eingeschränkt werden.",
@@ -245,6 +260,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Handel", -0.5),
             ("Familie", 0.4),
         ],
+        is_part_of: Vec::new(),
     },
     // --- LIBERAL / AUTHORITARIAN QUESTIONS ---
     QuestionData {
@@ -265,6 +281,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Internationale Beziehungen", -0.7),
             ("Handel", -0.4),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Die Politik sollte das traditionelle Familienbild (Vater, Mutter, Kinder) stärken.",
@@ -284,6 +301,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Gleichbehandlung", -0.7),
             ("Organisation des Unterrichtswesens", -0.3),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Österreich sollte seine Neutralität aufgeben.",
@@ -303,6 +321,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Internationale Beziehungen", 0.8),
             ("Öffentliche Sicherheit", 0.4),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Zuwanderer:innen müssen sich an die österreichische Kultur und Gepflogenheiten anpassen.",
@@ -322,6 +341,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Menschenrechte", -0.5),
             ("Ethnische Gruppe", -0.5),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Straftäter:innen sollten härter bestraft werden.",
@@ -340,6 +360,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Menschenrechte", -0.6),
             ("Opferhilfe", 0.4),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Die Strafen für Klimakleber:innen sollten verschärft werden.",
@@ -358,6 +379,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Versammlungsfreiheit", -0.7),
             ("Umwelt", -0.5),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Österreich sollte den Beitritt zur Nato erwägen.",
@@ -377,6 +399,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Verteidigung", 0.7),
             ("Völkerrecht", 0.5),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Österreich sollte sich im Nahost-Konflikt klar auf die Seite Israels stellen.",
@@ -395,6 +418,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Diplomatische Beziehungen", 0.5),
             ("Religion", -0.4),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Österreich sollte sich für die Erweiterung der EU einsetzen.",
@@ -414,6 +438,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Handel", 0.5),
             ("Verwaltungsreform", -0.4),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Die ORF-Haushaltsabgabe sollte (ersatzlos) abgeschafft werden.",
@@ -432,6 +457,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Presse", -0.4),
             ("Öffentliche Finanzen und Haushaltspolitik", 0.5),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Schwangerschaftsabbrüche innerhalb der ersten drei Monate sollten von der Krankenkasse bezahlt werden.",
@@ -451,6 +477,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Sozialpolitik", 0.5),
             ("Krankenpflege", 0.4),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Um Gewalt gegen Frauen zu bekämpfen, müssen traditionelle Männlichkeitsbilder überwunden werden.",
@@ -470,6 +497,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Strafrecht", 0.5),
             ("Organisation des Unterrichtswesens", 0.4),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Cannabis sollte in Österreich legalisiert werden.",
@@ -489,6 +517,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Öffentliche Sicherheit", -0.4),
             ("Handel", 0.3),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Die Polizei sollte die Möglichkeit bekommen, die Messenger-Dienste (WhatsApp, Signal, ...) von Strafverdächtigen zu überwachen.",
@@ -507,6 +536,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Menschenrechte", -0.7),
             ("Internet", -0.6),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Die Rechte von Beschuldigten im Strafverfahren müssen gestärkt werden.",
@@ -525,6 +555,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Gerichtswesen", 0.5),
             ("Opferhilfe", -0.3),
         ],
+        is_part_of: Vec::new(),
     },
     QuestionData {
         question: "Volksbegehren, die eine bestimmte Anzahl an Unterstützungen erreichen, sollten automatisch zu Volksabstimmungen führen.",
@@ -543,6 +574,7 @@ pub const QUESTIONS: &[QuestionData] = &[
             ("Gesetzgebungsverfahren", -0.4),
             ("Verfassung", 0.3),
         ],
+        is_part_of: Vec::new(),
     },
 ];
 
@@ -555,14 +587,15 @@ pub async fn upload_questions(
     for q in questions {
         let result = sqlx::query!(
             r#"
-            INSERT INTO political_questions (question, is_left, is_liberal)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (question) DO UPDATE SET is_left = EXCLUDED.is_left, is_liberal = EXCLUDED.is_liberal
+            INSERT INTO political_questions (question, is_left, is_liberal, is_part_of)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (question) DO UPDATE SET is_left = EXCLUDED.is_left, is_liberal = EXCLUDED.is_liberal, is_part_of = EXCLUDED.is_part_of
             RETURNING id
             "#,
             q.question,
             q.is_left,
-            q.is_liberal
+            q.is_liberal,
+            &q.is_part_of
         )
         .fetch_optional(&mut *tx)
         .await?;
