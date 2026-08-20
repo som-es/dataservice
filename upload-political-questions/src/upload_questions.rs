@@ -20,7 +20,7 @@ pub struct QuestionData {
 pub const QUESTIONS: &[QuestionData] = &[
     // --- LEFT / RIGHT QUESTIONS ---
     QuestionData {
-        question: "Der Staat sollte weniger ins Wirtschaftsleben eingreifen.",
+        question: "Sollte der Staat weniger in das Wirtschaftsleben eingreifen?",
         is_left: Some(false),
         is_liberal: None,
         topics: &["Wirtschaft", "Budget und Finanzen"],
@@ -43,7 +43,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Der Sozialstaat sollte ausgebaut werden, auch wenn das höhere Steuern und Abgaben bedeutet.",
+        question: "Sollte der Sozialstaat ausgebaut werden, auch wenn dadurch höhere Steuern und Abgaben notwendig werden?",
         is_left: Some(true),
         is_liberal: None,
         topics: &["Soziales", "Budget und Finanzen"],
@@ -63,7 +63,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Die Politik sollte stärker in die Preise eingreifen, um die Teuerung abzumildern.",
+        question: "Sollte die Politik stärker in die Preise eingreifen, um die Teuerung abzumildern?",
         is_left: Some(true),
         is_liberal: None,
         topics: &["Wirtschaft", "Budget und Finanzen", "Soziales"],
@@ -83,7 +83,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Es muss mehr getan werden, um den Klimawandel zu stoppen, auch wenn das für den einzelnen teurer wird.",
+        question: "Sollte mehr gegen den Klimawandel unternommen werden, auch wenn dadurch höhere Kosten für den Einzelnen entstehen?",
         is_left: Some(true),
         is_liberal: None,
         topics: &["Klima, Umwelt und Energie", "Wirtschaft"],
@@ -103,7 +103,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Die Infrastruktur für Autos sollte ausgebaut werden.",
+        question: "Sollte die Infrastruktur für Autos weiter ausgebaut werden?",
         is_left: Some(false),
         is_liberal: None,
         topics: &["Verkehr und Infrastruktur", "Klima, Umwelt und Energie"],
@@ -123,7 +123,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Naturschutz darf nicht auf Kosten des Wirtschaftswachstums gehen.",
+        question: "Sollte der Naturschutz hinter dem Wirtschaftswachstum zurückstehen, wenn beide Ziele miteinander in Konflikt stehen?",
         is_left: Some(false),
         is_liberal: None,
         topics: &["Klima, Umwelt und Energie", "Wirtschaft"],
@@ -143,7 +143,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Eine gemeinsame Schule für alle bis 14 sollte eingeführt werden.",
+        question: "Sollte eine gemeinsame Schule für alle Kinder bis zum Alter von 14 Jahren eingeführt werden?",
         is_left: Some(true),
         is_liberal: None,
         topics: &["Bildung"],
@@ -163,7 +163,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Das Arbeitslosengeld sollte sinken, je länger man es bezieht.",
+        question: "Sollte das Arbeitslosengeld sinken, je länger es bezogen wird?",
         is_left: Some(false),
         is_liberal: None,
         topics: &["Arbeit", "Soziales"],
@@ -183,7 +183,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "In Österreich sollte eine 32-Stunden-Woche eingeführt werden, bei gleichbleibendem Lohn.",
+        question: "Sollte in Österreich eine 32-Stunden-Woche bei gleichbleibendem Lohn eingeführt werden?",
         is_left: Some(true),
         is_liberal: None,
         topics: &["Arbeit", "Wirtschaft"],
@@ -203,7 +203,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Erbschaften sollten besteuert werden.",
+        question: "Sollten Erbschaften besteuert werden?",
         is_left: Some(true),
         is_liberal: None,
         topics: &["Budget und Finanzen", "Wirtschaft", "Soziales"],
@@ -223,7 +223,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Wahlärzt:innen sollten verpflichtet werden, einen Teil ihrer Patient:innen nach dem Kassentarif zu behandeln.",
+        question: "Sollten Wahlärzt:innen verpflichtet werden, einen Teil ihrer Patient:innen zum Kassentarif zu behandeln?",
         is_left: Some(true),
         is_liberal: None,
         topics: &["Gesundheit und Ernährung", "Soziales"],
@@ -243,7 +243,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Die Möglichkeit, Wohnungen befristet zu vermieten, sollte eingeschränkt werden.",
+        question: "Sollte die Möglichkeit eingeschränkt werden, Wohnungen befristet zu vermieten?",
         is_left: Some(true),
         is_liberal: None,
         topics: &["Soziales", "Wirtschaft"],
@@ -264,7 +264,7 @@ pub const QUESTIONS: &[QuestionData] = &[
     },
     // --- LIBERAL / AUTHORITARIAN QUESTIONS ---
     QuestionData {
-        question: "Wichtige Entscheidungen sollten stärker auf nationaler Ebene getroffen werden und nicht auf EU-Ebene.",
+        question: "Sollten wichtige politische Entscheidungen stärker auf nationaler Ebene statt auf EU-Ebene getroffen werden?",
         is_left: None,
         is_liberal: Some(false),
         topics: &["Europäische Union", "Parlament und Demokratie"],
@@ -284,7 +284,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Die Politik sollte das traditionelle Familienbild (Vater, Mutter, Kinder) stärken.",
+        question: "Sollte die Politik das traditionelle Familienbild aus Vater, Mutter und Kindern stärken?",
         is_left: None,
         is_liberal: Some(false),
         topics: &["Familie und Generationen"],
@@ -304,7 +304,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Österreich sollte seine Neutralität aufgeben.",
+        question: "Sollte Österreich seine Neutralität aufgeben?",
         is_left: None,
         is_liberal: Some(true),
         topics: &["Außenpolitik", "Landesverteidigung"],
@@ -324,7 +324,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Zuwanderer:innen müssen sich an die österreichische Kultur und Gepflogenheiten anpassen.",
+        question: "Sollten Zuwanderer:innen verpflichtet sein, sich an die österreichische Kultur und die hiesigen Gepflogenheiten anzupassen?",
         is_left: None,
         is_liberal: Some(false),
         topics: &["Inneres und Recht", "Soziales"],
@@ -344,7 +344,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Straftäter:innen sollten härter bestraft werden.",
+        question: "Sollten Straftäter:innen härter bestraft werden?",
         is_left: None,
         is_liberal: Some(false),
         topics: &["Inneres und Recht"],
@@ -363,7 +363,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Die Strafen für Klimakleber:innen sollten verschärft werden.",
+        question: "Sollten die Strafen für Klimakleber:innen verschärft werden?",
         is_left: None,
         is_liberal: Some(false),
         topics: &["Inneres und Recht", "Klima, Umwelt und Energie"],
@@ -382,7 +382,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Österreich sollte den Beitritt zur Nato erwägen.",
+        question: "Sollte Österreich einen Beitritt zur NATO erwägen?",
         is_left: None,
         is_liberal: Some(true),
         topics: &["Außenpolitik", "Landesverteidigung"],
@@ -402,7 +402,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Österreich sollte sich im Nahost-Konflikt klar auf die Seite Israels stellen.",
+        question: "Sollte Österreich sich im Nahost-Konflikt klar auf die Seite Israels stellen?",
         is_left: None,
         is_liberal: Some(true),
         topics: &["Außenpolitik"],
@@ -421,7 +421,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Österreich sollte sich für die Erweiterung der EU einsetzen.",
+        question: "Sollte Österreich sich für eine Erweiterung der EU einsetzen?",
         is_left: None,
         is_liberal: Some(true),
         topics: &["Europäische Union", "Außenpolitik"],
@@ -441,7 +441,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Die ORF-Haushaltsabgabe sollte (ersatzlos) abgeschafft werden.",
+        question: "Sollte die ORF-Haushaltsabgabe ersatzlos abgeschafft werden?",
         is_left: None,
         is_liberal: Some(false),
         topics: &["Information und Medien"],
@@ -460,7 +460,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Schwangerschaftsabbrüche innerhalb der ersten drei Monate sollten von der Krankenkasse bezahlt werden.",
+        question: "Sollten Schwangerschaftsabbrüche innerhalb der ersten drei Monate von der Krankenkasse bezahlt werden?",
         is_left: None,
         is_liberal: Some(true),
         topics: &["Gesundheit und Ernährung", "Frauen und Gleichbehandlung"],
@@ -480,7 +480,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Um Gewalt gegen Frauen zu bekämpfen, müssen traditionelle Männlichkeitsbilder überwunden werden.",
+        question: "Sollten traditionelle Männlichkeitsbilder überwunden werden, um Gewalt gegen Frauen zu bekämpfen?",
         is_left: None,
         is_liberal: Some(true),
         topics: &["Frauen und Gleichbehandlung", "Inneres und Recht"],
@@ -500,7 +500,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Cannabis sollte in Österreich legalisiert werden.",
+        question: "Sollte Cannabis in Österreich legalisiert werden?",
         is_left: None,
         is_liberal: Some(true),
         topics: &["Gesundheit und Ernährung", "Inneres und Recht"],
@@ -520,7 +520,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Die Polizei sollte die Möglichkeit bekommen, die Messenger-Dienste (WhatsApp, Signal, ...) von Strafverdächtigen zu überwachen.",
+        question: "Sollte die Polizei die Möglichkeit erhalten, die Messenger-Dienste von Strafverdächtigen zu überwachen?",
         is_left: None,
         is_liberal: Some(false),
         topics: &["Inneres und Recht", "Information und Medien"],
@@ -539,7 +539,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Die Rechte von Beschuldigten im Strafverfahren müssen gestärkt werden.",
+        question: "Sollten die Rechte von Beschuldigten im Strafverfahren gestärkt werden?",
         is_left: None,
         is_liberal: Some(true),
         topics: &["Inneres und Recht"],
@@ -558,7 +558,7 @@ pub const QUESTIONS: &[QuestionData] = &[
         is_part_of: None,
     },
     QuestionData {
-        question: "Volksbegehren, die eine bestimmte Anzahl an Unterstützungen erreichen, sollten automatisch zu Volksabstimmungen führen.",
+        question: "Sollten Volksbegehren ab einer bestimmten Anzahl an Unterstützungen automatisch zu einer Volksabstimmung führen?",
         is_left: None,
         is_liberal: Some(true),
         topics: &["Parlament und Demokratie"],
