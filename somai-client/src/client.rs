@@ -173,7 +173,7 @@ impl SomAiClient {
         let mut json_schema =
             serde_json::to_value(&T::json_schema(&mut schema_generator.into_generator()))?;
 
-        if let Some(mut patch) = schema_patch {
+        if let Some(patch) = schema_patch {
             patch(&mut json_schema);
         }
 

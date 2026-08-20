@@ -1,0 +1,13 @@
+[package]
+name = "upload-political-questions"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+combx = { path = "../combx" }
+sqlx = { workspace = true }
+reqwest = {workspace=true }
+serde = { workspace = true }
+serde_json = "1.0.138"
+tokio = { workspace = true }
+dotenvy = { version = "0.15.7" }

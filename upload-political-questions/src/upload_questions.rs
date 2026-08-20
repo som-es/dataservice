@@ -1,3 +1,6 @@
+mod generated_questions;
+pub use generated_questions::*;
+
 use sqlx::PgPool;
 
 pub struct QuestionData {
@@ -543,15 +546,18 @@ pub const QUESTIONS: &[QuestionData] = &[
     },
 ];
 
-pub async fn upload_questions(pool: &PgPool) -> Result<(), sqlx::Error> {
+pub async fn upload_questions(
+    pool: &PgPool,
+    questions: &[QuestionData],
+) -> Result<(), sqlx::Error> {
     let mut tx = pool.begin().await?;
 
-    for q in QUESTIONS {
+    for q in questions {
         let result = sqlx::query!(
             r#"
             INSERT INTO political_questions (question, is_left, is_liberal)
             VALUES ($1, $2, $3)
-            ON CONFLICT (question) DO UPDATE SET question = EXCLUDED.question
+            ON CONFLICT (question) DO UPDATE SET is_left = EXCLUDED.is_left, is_liberal = EXCLUDED.is_liberal
             RETURNING id
             "#,
             q.question,
@@ -564,6 +570,34 @@ pub async fn upload_questions(pool: &PgPool) -> Result<(), sqlx::Error> {
         if let Some(record) = result {
             let question_id = record.id;
             println!("{:?}", question_id);
+
+            sqlx::query!(
+                r#"DELETE FROM political_questions_topics WHERE question_id = $1"#,
+                question_id
+            )
+            .execute(&mut *tx)
+            .await?;
+
+            sqlx::query!(
+                r#"DELETE FROM political_questions_detailed_topics WHERE question_id = $1"#,
+                question_id
+            )
+            .execute(&mut *tx)
+            .await?;
+
+            sqlx::query!(
+                r#"DELETE FROM political_questions_topics_influence WHERE question_id = $1"#,
+                question_id
+            )
+            .execute(&mut *tx)
+            .await?;
+
+            sqlx::query!(
+                r#"DELETE FROM political_questions_detailed_topics_influence WHERE question_id = $1"#,
+                question_id
+            )
+            .execute(&mut *tx)
+            .await?;
 
             for &topic in q.topics {
                 println!("{}", topic);
@@ -628,4 +662,38 @@ pub async fn upload_questions(pool: &PgPool) -> Result<(), sqlx::Error> {
 
     tx.commit().await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::Value;
+
+    #[tokio::test]
+    async fn extract_vote_results() {
+        let vr = reqwest::get(
+            "https://somes.at/api/at/v1/vote_results/search?is_finished=true&search=&page=1&entries_per_page=500&legislative_initiative[is_law][eq]=false&sort=Desc",
+        ).await.unwrap().json::<Value>().await.unwrap();
+        let vote_results = vr["vote_results"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|vote_result| {
+                Some(
+                    vote_result
+                        .get("ai_summary")?
+                        .get("full_summary")?
+                        .get("political_compass_questions")?
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|value| value.as_str().unwrap())
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        for vote_result in &vote_results[..100] {
+            dbg!(vote_result);
+        }
+    }
 }
