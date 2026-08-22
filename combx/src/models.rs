@@ -267,6 +267,16 @@ pub struct DbParty {
     pub color: String,
 }
 
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+pub struct OrientationQuestion {
+    pub id: i32,
+    pub question: String,
+    pub is_left: Option<bool>,
+    pub is_liberal: Option<bool>,
+    pub is_part_of: Option<Vec<String>>,
+}
+
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(

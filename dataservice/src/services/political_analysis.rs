@@ -3,7 +3,7 @@ mod embed_speeches;
 mod stance_system;
 
 use chrono::TimeDelta;
-use combx::Parliament;
+use combx::{OrientationQuestion, Parliament};
 use qdrant_client::{
     Qdrant,
     qdrant::{GetPoints, PointId},
@@ -53,13 +53,6 @@ pub fn collection_name(parliament: Parliament) -> &'static str {
         Parliament::At => "at_delegates",
         Parliament::Eu => "eu_delegates",
     }
-}
-
-struct Question {
-    id: i32,
-    question: String,
-    is_left: Option<bool>,
-    is_liberal: Option<bool>,
 }
 
 pub async fn process_delegate_stance(
@@ -263,8 +256,8 @@ async fn political_analysis(app_state: AppState, ai_task_tx: &Sender<AiTask>) ->
 
     let delegates = get_delegate_ids(pg_pool).await?;
     let questions = sqlx::query_as!(
-        Question,
-        "SELECT id, question, is_liberal, is_left FROM political_questions"
+        OrientationQuestion,
+        "SELECT id, question, is_liberal, is_left, is_part_of FROM political_questions"
     )
     .fetch_all(pg_pool)
     .await?;

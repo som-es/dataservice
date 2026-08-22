@@ -10,3 +10,4 @@ nohup.out
 unique-topics/models
 .fastembed_cache
 .kilo
+.diesel_lock

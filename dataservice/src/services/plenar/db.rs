@@ -51,7 +51,10 @@ pub async fn update_plenar_infos_in_db(
         let debate_id = match insert_debate(pg_pool, debate, plenar_id).await {
             Ok(debate_id) => debate_id,
             Err(e) => {
-                log::error!("Error inserting debate: '{e}'. Error occured for debate: {debate:?}");
+                log::error!(
+                    "Error inserting debate: '{e}'. Error occured for debate: {:?}",
+                    debate.info
+                );
                 continue;
             }
         };
