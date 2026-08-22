@@ -63,9 +63,9 @@ pub async fn find_notifiers_legis_init<'a>(
                         .issued_by_dels
                         .iter()
                         .any(|issued_by_del| favo_dels.contains(&issued_by_del.delegate_id))
-                    {
-                        return true;
-                    }
+                {
+                    return true;
+                }
                 if id.by_topics {
                     for topic in &legis_init.1.eurovoc_topics {
                         if user_topics.contains(&topic.topic) {
@@ -186,7 +186,9 @@ fn enrich_parliament_with_colors(
     let votes_to_party_map = convert_votes_to_party_color_map(votes, colors);
 
     for delegate in delegates {
-        if let (Some(seat_row), Some(seat_col), Some(party)) = (delegate.seat_row, delegate.seat_col, &delegate.party) {
+        if let (Some(seat_row), Some(seat_col), Some(party)) =
+            (delegate.seat_row, delegate.seat_col, &delegate.party)
+        {
             let seat_row = seat_row as usize;
             let seat_col = seat_col as usize;
             let color = *votes_to_party_map
@@ -481,7 +483,7 @@ mod tests {
     use somes_scraper::{AustriaScraper, legis_init::LegislativeInitiatives};
 
     use crate::{
-        connect_pg2,
+        AT_DATABASE_URL, connect_pg2,
         legislative_initiatives::notify::{
             create_color_map, generate_parliament_image, get_current_delegates,
             get_current_parties, get_current_seats, send_new_legis_info_mail,
@@ -504,7 +506,7 @@ mod tests {
             .await
             .unwrap();
 
-        let pg = connect_pg2().await;
+        let pg = connect_pg2(AT_DATABASE_URL).await;
         let legis_init =
             VoteResult::from_legis_init(PostgresEnhancer(pg), legis_init, Parliament::At, None)
                 .await
@@ -530,7 +532,7 @@ mod tests {
         let delegates = get_current_delegates().await.unwrap_or_default();
         let colors = create_color_map(get_current_parties().await.unwrap_or_default());
 
-        let pg = connect_pg2().await;
+        let pg = connect_pg2(AT_DATABASE_URL).await;
         let legis_init =
             VoteResult::from_legis_init(PostgresEnhancer(pg), legis_init, Parliament::At, None)
                 .await

@@ -105,6 +105,26 @@ pub async fn update_plenar_infos_in_db(
         }
     }
 
+    if let Err(e) = insert_all_absences(pg_pool, plenar_id, plenar_info, parliament).await {
+        log::error!("cannot insert all absences: {e:?}");
+    }
+}
+
+pub async fn insert_all_absences(
+    pg_pool: &PgPool,
+    plenar_id: i32,
+    plenar_info: &PlenarInfo,
+    parliament: Parliament,
+) -> sqlx::Result<()> {
+    let mut tx = pg_pool.begin().await?;
+
+    sqlx::query!(
+        "delete from absences where plenary_session_id = $1",
+        plenar_id
+    )
+    .execute(&mut *tx)
+    .await?;
+
     for absences in plenar_info.absences.iter() {
         let mandate_function = match parliament {
             Parliament::At => plenar_info.council.as_str(),
@@ -121,8 +141,9 @@ pub async fn update_plenar_infos_in_db(
         {
             Ok(matching) => {
                 log::info!("inserting absences: {:?}", matching.correctly_matched);
+
                 if let Err(e) = insert_absences(
-                    pg_pool,
+                    &mut tx,
                     plenar_id,
                     matching,
                     absences.date,
@@ -140,4 +161,6 @@ pub async fn update_plenar_infos_in_db(
             }
         }
     }
+    tx.commit().await?;
+    Ok(())
 }

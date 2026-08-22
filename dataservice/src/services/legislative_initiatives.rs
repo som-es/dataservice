@@ -21,11 +21,11 @@ use sqlx::{PgPool, query, query_scalar};
 use std::sync::{Arc, LazyLock};
 
 use crate::{
-    AppState, CompareHash, Gps, Shutdown, ai_task::AiTask,
-    should_update::StoredUpdatedAt, today_and_time,
+    AppState, CompareHash, Gps, Shutdown, ai_task::AiTask, should_update::StoredUpdatedAt,
+    today_and_time,
 };
 
- const LEGIS_INIT_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| {
+const LEGIS_INIT_STILL_SEND_DAYS: LazyLock<i64> = LazyLock::new(|| {
     std::env::var("LEGIS_INIT_STILL_SEND_DAYS")
         .unwrap_or("10".to_string())
         .parse::<i64>()
@@ -254,7 +254,7 @@ mod tests {
     };
     use sqlx::postgres::PgPoolOptions;
 
-    use crate::{CompareHash, DATABASE_URL, connect_pg2 as connect_pg};
+    use crate::{AT_DATABASE_URL, CompareHash, DATABASE_URL, connect_pg2 as connect_pg};
 
     #[test]
     fn test_date_time_parse() {
@@ -270,7 +270,7 @@ mod tests {
             .await
             .unwrap();
 
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
         // crate::legislative_initiatives::update_legis_inits_in_db(&pool, &[res], "XXVII").await;
 
         // println!("s: {:?}", scraper.scrape_info.gp);
@@ -287,7 +287,7 @@ mod tests {
         //     .await
         //     .unwrap();
 
-        // let pool = pollster::block_on(connect_pg());
+        // let pool = pollster::block_on(connect_pg(AT_DATABASE_URL));
         let pool = PgPoolOptions::new()
             .max_connections(150)
             .connect(DATABASE_URL)
@@ -315,7 +315,7 @@ mod tests {
             .await
             .unwrap();
 
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
@@ -341,7 +341,7 @@ mod tests {
             .await
             .unwrap();
 
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
@@ -372,7 +372,7 @@ mod tests {
             .await
             .unwrap();
 
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
@@ -398,7 +398,7 @@ mod tests {
             .await
             .unwrap();
 
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
@@ -424,7 +424,7 @@ mod tests {
             .await
             .unwrap();
 
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
@@ -451,7 +451,7 @@ mod tests {
             .await
             .unwrap();
 
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
@@ -478,7 +478,7 @@ mod tests {
             .await
             .unwrap();
 
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
@@ -507,7 +507,7 @@ mod tests {
 
         log::info!("legis init: {res:?}");
 
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
@@ -536,7 +536,7 @@ mod tests {
 
         log::info!("legis init: {res:?}");
 
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
@@ -565,7 +565,7 @@ mod tests {
 
         log::info!("legis init: {res:?}");
 
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
         let app_state = crate::AppState {
             pg_pool: pool,
             redis_client: None,
@@ -600,7 +600,7 @@ mod tests {
 
         // dbg!(&legis_init);
 
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
         let vote_result = VoteResult::from_legis_init(
             PostgresEnhancer(pool.clone()),
             legis_init,

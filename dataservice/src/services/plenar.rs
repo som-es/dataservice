@@ -276,7 +276,7 @@ mod tests {
     use somes_scraper::{AustriaScraper, plenar::Plenar};
 
     use crate::{
-        connect_pg2 as connect_pg,
+        AT_DATABASE_URL, connect_pg2 as connect_pg,
         plenar::{scrape_new_plenar_infos, update_plenar_infos_in_db},
     };
 
@@ -288,7 +288,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_duplicate_speeches() {
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
 
         println!("stating selecting");
         let speeches = sqlx::query!("select * from plenar_speeches")
@@ -337,7 +337,7 @@ mod tests {
 
         log::info!("legis init: {res:?}");
 
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
 
         update_plenar_infos_in_db(&res, &pool, None, combx::Parliament::At).await;
     }
@@ -417,7 +417,7 @@ mod tests {
             .await
             .unwrap();
 
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
 
         update_plenar_infos_in_db(&res, &pool, None, combx::Parliament::At).await;
     }
@@ -433,7 +433,7 @@ mod tests {
             .await
             .unwrap();
 
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
 
         update_plenar_infos_in_db(&res, &pool, None, combx::Parliament::At).await;
     }
@@ -448,8 +448,26 @@ mod tests {
             .await
             .unwrap();
 
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
 
+        update_plenar_infos_in_db(&res, &pool, None, combx::Parliament::At).await;
+    }
+
+    #[tokio::test]
+    async fn test_nrsitz_91_db_insertion() {
+        unsafe { std::env::set_var("MIND_UPDATE_TIME", "false") };
+        unsafe { std::env::set_var("DISABLE_SPEECH_TEXT", "true") };
+        let _ = simple_logger::init_with_level(log::Level::Info);
+        let scraper: AustriaScraper = AustriaScraper::default();
+        let res = scraper
+            .get_plenar("/gegenstand/XXVIII/NRSITZ/91")
+            .await
+            .unwrap();
+
+        let pool = connect_pg(AT_DATABASE_URL).await;
+        log::info!("absences: {:?}", res.absences);
+
+        log::info!("start update");
         update_plenar_infos_in_db(&res, &pool, None, combx::Parliament::At).await;
     }
 

@@ -221,14 +221,14 @@ fn extract_interjections_parts(param: &str) -> Vec<(String, String)> {
         for (idx, char) in text_part.char_indices() {
             if char == DASH
                 && let Some(check_char) = text_part[idx..].chars().nth(2)
-                    && (check_char.is_uppercase()
-                        || (prev_non_whitespace_char.map(|c: char| c.is_ascii_punctuation()))
-                            .unwrap_or_default())
-                    {
-                        end_idx = idx;
-                        pre_skipped = true;
-                        break;
-                    }
+                && (check_char.is_uppercase()
+                    || (prev_non_whitespace_char.map(|c: char| c.is_ascii_punctuation()))
+                        .unwrap_or_default())
+            {
+                end_idx = idx;
+                pre_skipped = true;
+                break;
+            }
             if !char.is_whitespace() {
                 prev_non_whitespace_char = Some(char);
             }
@@ -255,7 +255,7 @@ fn extract_interjections_parts(param: &str) -> Vec<(String, String)> {
 mod tests {
     use chrono::NaiveDate;
 
-    use crate::connect_pg2;
+    use crate::{AT_DATABASE_URL, connect_pg2};
 
     use super::*;
 
@@ -388,7 +388,7 @@ mod tests {
     #[tokio::test]
     pub async fn test_interjection_delegate_id_matching_multiple() {
         let paran_content = "Beifall bei der ÖVP. – Abg. Dr. Plessl: Was sagen Sie zum Vertrag 2002? Eine Nebelgranate! Das Problem Vertragsgestaltung 2002 sprechen Sie gar nicht an! – Abg. Steinacker – auf dem Weg zu ihrem Sitzplatz –: Aus gut mach schlecht!";
-        let pg = connect_pg2().await;
+        let pg = connect_pg2(AT_DATABASE_URL).await;
         let plenar_date = DateTime::<Utc>::from_naive_utc_and_offset(
             NaiveDate::from_ymd_opt(2019, 9, 25)
                 .unwrap()

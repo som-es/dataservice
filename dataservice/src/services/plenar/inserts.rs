@@ -11,7 +11,7 @@ use somes_scraper::{
     text_utils,
 };
 
-use sqlx::{Executor, PgPool, Postgres, postgres::PgQueryResult};
+use sqlx::{Acquire, Executor, PgPool, Postgres, Transaction, postgres::PgQueryResult};
 use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{
@@ -493,27 +493,22 @@ async fn extract_speech_text(
     }
 }
 
-pub async fn insert_absences(
-    pg_pool: &sqlx::Pool<sqlx::Postgres>,
+pub async fn insert_absences<'a>(
+    tx: &mut Transaction<'a, Postgres>,
     plenar_id: i32,
     matching: combx::MatchResult,
     date: NaiveDate,
     document: &somes_scraper::Document,
 ) -> sqlx::Result<()> {
-    let mut tx = pg_pool.begin().await?;
-
-    sqlx::query!(
-        "delete from absences where plenary_session_id = $1",
-        plenar_id
-    )
-    .execute(&mut *tx)
-    .await?;
+    let mut tx = tx.begin().await?;
+    log::info!("plenar id: {plenar_id}");
 
     for match_res in matching
         .correctly_matched
         .iter()
         .chain(matching.lev_or_deep_split_matched.iter())
     {
+        log::info!("date: {date:?}, match: {match_res:?}");
         if let Err(e) = sqlx::query!(
             "
             INSERT INTO absences (lev, similiarity_score, searched_with, matched_with, delegate_id, manually_matched, plenary_session_id, absence_date, document_url)

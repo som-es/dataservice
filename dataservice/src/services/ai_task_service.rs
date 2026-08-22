@@ -143,7 +143,7 @@ fn rebuild_with_aging(heap: BinaryHeap<AiTask>, now: Instant) -> BinaryHeap<AiTa
 mod tests {
     use tokio::time::Instant;
 
-    use crate::{ai_task::Priority, connect_pg2, today_and_time};
+    use crate::{AT_DATABASE_URL, ai_task::Priority, connect_pg2, today_and_time};
 
     #[tokio::test]
     async fn test_ai_task_ordering() {
@@ -158,7 +158,7 @@ mod tests {
             task_id: 1,
             db_entry_id: 1,
             rerunnable: false,
-            pool: connect_pg2().await,
+            pool: connect_pg2(AT_DATABASE_URL).await,
             created_at: Instant::now(),
             task: Box::new(|_args| {
                 Box::pin(async move { Ok(()) })
@@ -168,7 +168,7 @@ mod tests {
 
         let task2 = AiTask {
             input: None,
-            pool: connect_pg2().await,
+            pool: connect_pg2(AT_DATABASE_URL).await,
             priority: Priority::Low,
             score: Priority::Low.weight(),
             task_id: 2,

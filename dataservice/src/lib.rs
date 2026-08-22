@@ -99,6 +99,8 @@ pub fn tessdata_dir() -> std::result::Result<String, VarError> {
 }
 
 pub const DATABASE_URL: &str = dotenv!("DATABASE_URL");
+pub const AT_DATABASE_URL: &str = dotenv!("AT_DATABASE_URL");
+pub const EU_DATABASE_URL: &str = dotenv!("EU_DATABASE_URL");
 pub const REDIS_URL: &str = dotenv!("REDIS_URL");
 pub const LATEST_GP: &str = dotenv!("LATEST_GP");
 pub const EU_LATEST_GP: &str = dotenv!("EU_LATEST_GP");
@@ -141,11 +143,11 @@ pub async fn connect_pg(db_url: &str) -> PgPool {
         .unwrap()
 }
 
-pub async fn connect_pg2() -> PgPool {
+pub async fn connect_pg2(db_url: &str) -> PgPool {
     PgPoolOptions::new()
         // pool sizes
         .max_connections(6)
-        .connect(DATABASE_URL)
+        .connect(db_url)
         .await
         .unwrap()
 }
@@ -184,11 +186,11 @@ impl Gps for EuParliamentScraper {
 mod tests {
     use sqlx::query;
 
-    use crate::connect_pg2;
+    use crate::{AT_DATABASE_URL, connect_pg2};
 
     #[tokio::test]
     async fn test_duplicate_spoken_text_check() {
-        let pg = connect_pg2().await;
+        let pg = connect_pg2(AT_DATABASE_URL).await;
 
         let res = query!(
             "SELECT spoken_text, COUNT(*) as c

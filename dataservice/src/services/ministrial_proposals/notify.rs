@@ -232,7 +232,7 @@ mod tests {
     };
 
     use crate::{
-        connect_pg2,
+        AT_DATABASE_URL, connect_pg2,
         ministrial_proposals::{
             notify::get_active_gov_officals, send_new_ministrial_prop_info_mail,
         },
@@ -241,7 +241,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_send_new_ministerial_prop_mail() {
-        let pg_pool = connect_pg2().await;
+        let pg_pool = connect_pg2(AT_DATABASE_URL).await;
         let simple_gov_officials = get_active_gov_officals(&pg_pool).await;
 
         let simple_gov_officials = simple_gov_officials
