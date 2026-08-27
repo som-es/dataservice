@@ -53,7 +53,7 @@ pub async fn insert_unique_topics(app_state: &AppState) -> crate::Result<()> {
             r#"
             insert into unique_eurovoc_topics (topic_name, language, eurovoc_id, eurovoc_type, id_as_hash)
             values ($1, $2, $3, $4, $5)
-            on conflict (topic_name) do update set
+            on conflict (topic_name, language) do update set
                 language = excluded.language,
                 eurovoc_id = excluded.eurovoc_id,
                 eurovoc_type = excluded.eurovoc_type,
@@ -75,7 +75,7 @@ pub async fn insert_unique_topics(app_state: &AppState) -> crate::Result<()> {
             r#"
             insert into unique_topics (topic_name, language, eurovoc_id, eurovoc_type, id_as_hash)
             values ($1, $2, $3, $4, $5)
-            on conflict (topic_name) do update set
+            on conflict (topic_name, language) do update set
                 language = excluded.language,
                 eurovoc_id = excluded.eurovoc_id,
                 eurovoc_type = excluded.eurovoc_type,

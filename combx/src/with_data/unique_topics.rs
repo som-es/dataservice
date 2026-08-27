@@ -5,6 +5,31 @@ use sqlx::PgPool;
 
 use crate::{Error::Custom, TopicWithId};
 
+pub struct TopicsMapper {
+    pub unique_eurovoc_topics: EurovocTopics,
+    pub unique_topics: EurovocTopics,
+}
+
+impl TopicsMapper {
+    pub async fn new(pg_pool: &PgPool) -> crate::Result<Self> {
+        let unique_eurovoc_topics = crate::with_data::unique_topics::create_topic_mapping(
+            &pg_pool,
+            crate::with_data::unique_topics::TopicType::Eurovoc,
+        )
+        .await?;
+
+        let unique_topics = crate::with_data::unique_topics::create_topic_mapping(
+            &pg_pool,
+            crate::with_data::unique_topics::TopicType::Parent,
+        )
+        .await?;
+        Ok(Self {
+            unique_eurovoc_topics,
+            unique_topics,
+        })
+    }
+}
+
 pub async fn unique_topics_for_lang(pg: &PgPool, language: Language) -> sqlx::Result<Vec<String>> {
     sqlx::query_scalar!(
         "select topic_name as topic from unique_eurovoc_topics where language = $1 order by topic",
@@ -20,10 +45,39 @@ pub struct EurovocTopics {
     pub id_to_topic: HashMap<(i64, Language), TopicWithId>,
 }
 
-pub async fn eurovoc_topics_map(pg_pool: &PgPool) -> crate::Result<EurovocTopics> {
-    let rows = sqlx::query!("select topic_name, language, id_as_hash from unique_eurovoc_topics")
-        .fetch_all(pg_pool)
-        .await?;
+struct QueryTopic {
+    topic_name: String,
+    language: String,
+    id_as_hash: Option<i64>,
+}
+
+pub enum TopicType {
+    Parent,
+    Eurovoc,
+}
+
+pub async fn create_topic_mapping(
+    pg_pool: &PgPool,
+    topic_type: TopicType,
+) -> crate::Result<EurovocTopics> {
+    let rows = match topic_type {
+        TopicType::Eurovoc => {
+            sqlx::query_as!(
+                QueryTopic,
+                "select topic_name, language, id_as_hash from unique_eurovoc_topics"
+            )
+            .fetch_all(pg_pool)
+            .await?
+        }
+        TopicType::Parent => {
+            sqlx::query_as!(
+                QueryTopic,
+                "select topic_name, language, id_as_hash from unique_topics"
+            )
+            .fetch_all(pg_pool)
+            .await?
+        }
+    };
 
     let mut eurovoc_topics = EurovocTopics::default();
 
