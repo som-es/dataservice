@@ -58,7 +58,7 @@ pub async fn eurovoc_topics_map(pg_pool: &PgPool) -> crate::Result<EurovocTopics
     Ok(eurovoc_topics)
 }
 
-pub fn translate_eurovoc_topics(
+pub fn translate_topics_with_eurovoc(
     eurovoc_topics: &EurovocTopics,
     language: Language,
     german_topics: &HashMap<String, TopicWithId>,

@@ -69,7 +69,7 @@ pub async fn insert_unique_topics(app_state: &AppState) -> crate::Result<()> {
         .await?;
     }
 
-    for (ftype, unique_topic) in &unique_translated_eurovoc_topics {
+    for (ftype, unique_topic) in &unique_translated_topics {
         let hash = stable_hash(&unique_topic.id, eurovoc_type_str(ftype));
         sqlx::query!(
             r#"
