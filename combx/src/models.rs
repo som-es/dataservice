@@ -313,6 +313,7 @@ pub struct Topic {
     Type,
     MeilisearchFilter,
     Hash,
+    Default,
 )]
 pub struct TopicWithId {
     pub topic: String,
