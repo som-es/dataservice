@@ -2,584 +2,16 @@
   [
     "Descriptors",
     {
-      "id": "4106",
-      "label": "Zivildienst",
+      "id": "77",
+      "label": "öffentliche Verwaltung",
       "language": "de"
     }
   ],
   [
     "Descriptors",
     {
-      "id": "4713",
-      "label": "Wein",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "1216",
-      "label": "Strafrecht",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "5061",
-      "label": "Nachtragshaushaltsplan",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "6257",
-      "label": "Vereinfachung der Rechtsvorschriften",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "3461",
-      "label": "internationales Abkommen",
-      "language": "de"
-    }
-  ],
-  [
-    "Domain",
-    {
-      "id": "48",
-      "label": "Verkehr",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4568",
-      "label": "Trentino-Südtirol",
-      "language": "de"
-    }
-  ],
-  [
-    "Domain",
-    {
-      "id": "36",
-      "label": "Wissenschaften",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "1995",
-      "label": "Misstrauensantrag",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "c_1c7d7d1e",
-      "label": "Care-Ökonomie",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2598",
-      "label": "Präsident des Parlaments",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "1528",
-      "label": "junger Mensch",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "6727",
-      "label": "Opferhilfe",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "3547",
-      "label": "gesetzlicher Feiertag",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "1046",
-      "label": "öffentlicher Dienst",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "1303",
-      "label": "parlamentarische Immunität",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "567",
-      "label": "Völkerrecht",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4432",
-      "label": "Fernsehen",
-      "language": "de"
-    }
-  ],
-  [
-    "Domain",
-    {
-      "id": "60",
-      "label": "Agrarerzeugnisse und Lebensmittel",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "2451",
-      "label": "Preis",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "3329",
-      "label": "ehrende Auszeichnung",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4533",
-      "label": "Straßenverkehr",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2085",
-      "label": "Notar",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2459",
-      "label": "Kulturpolitik",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4604",
-      "label": "Interparlamentarische Union",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "637",
-      "label": "Wirtschaft",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "2446",
-      "label": "Steuerwesen",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "3062",
-      "label": "Exekutive",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "4421",
-      "label": "Verwaltung und Entlohnung des Personals",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "800",
-      "label": "Hochschulausbildung",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "679",
-      "label": "vorschulische Erziehung",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "6831",
-      "label": "Bauindustrie und öffentliches Bauwesen",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "3751",
-      "label": "Altersversorgungssystem",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2517",
-      "label": "Sozialpolitik",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2206",
-      "label": "Straßen- und Brückenbau",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "2011",
-      "label": "Zolltarifpolitik",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "6621",
-      "label": "Elektrizitäts- und Kernkraftindustrie",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2022",
-      "label": "Museum",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "5141",
-      "label": "Rechtsanwalt",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "3236",
-      "label": "Informatik",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2812",
-      "label": "öffentliches Eigentum",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "53",
-      "label": "Zusammensetzung des Parlaments",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "2431",
-      "label": "Versicherungswesen",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "3758",
-      "label": "Salz",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "4821",
-      "label": "See- und Binnenschiffsverkehr",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "6896",
-      "label": "Regierungserklärung",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "5641",
-      "label": "Fischerei",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "1158",
-      "label": "Abfallwirtschaft",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "8438",
-      "label": "Geodäsie",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4373",
-      "label": "Tabak",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2599",
-      "label": "Presse",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "1443",
-      "label": "Gewerbeaufsicht",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "1221",
-      "label": "Gerichtswesen",
-      "language": "de"
-    }
-  ],
-  [
-    "Domain",
-    {
-      "id": "24",
-      "label": "Finanzwesen",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2688",
-      "label": "Kunst",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "425",
-      "label": "Zweite Kammer",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "4011",
-      "label": "Unternehmensarten",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "18",
-      "label": "parlamentarischer Ausschuss",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "597",
-      "label": "Wasser",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2053",
-      "label": "Neutralität",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "173",
-      "label": "Haushaltskontrolle",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4091",
-      "label": "öffentliche Anhörung",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "1523",
-      "label": "Wasserbau",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4470",
-      "label": "Tourismus",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "7355",
-      "label": "Apotheke",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "688",
-      "label": "Gleichbehandlung",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "517",
-      "label": "Verwaltungsrecht",
-      "language": "de"
-    }
-  ],
-  [
-    "Domain",
-    {
-      "id": "20",
-      "label": "Handel",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "5396",
-      "label": "Jagd",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "0411",
-      "label": "Politische Partei",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "3231",
-      "label": "Information und Informationsverarbeitung",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "5280",
-      "label": "Frau",
+      "id": "2830",
+      "label": "Tierschutz",
       "language": "de"
     }
   ],
@@ -594,96 +26,48 @@
   [
     "Descriptors",
     {
-      "id": "4514",
-      "label": "Schienentransport",
+      "id": "2598",
+      "label": "Präsident des Parlaments",
       "language": "de"
     }
   ],
   [
     "Descriptors",
     {
-      "id": "148",
-      "label": "Verfassung",
+      "id": "5377",
+      "label": "direkt gewählte Kammer",
       "language": "de"
     }
   ],
   [
     "Descriptors",
     {
-      "id": "799",
-      "label": "Sekundarstufe",
+      "id": "3521",
+      "label": "Staatsangehöriger",
       "language": "de"
     }
   ],
   [
     "Descriptors",
     {
-      "id": "6922",
-      "label": "internationales Arbeitsrecht",
-      "language": "de"
-    }
-  ],
-  [
-    "Domain",
-    {
-      "id": "66",
-      "label": "Energie",
+      "id": "1363",
+      "label": "Filmindustrie",
       "language": "de"
     }
   ],
   [
     "Descriptors",
     {
-      "id": "4050",
-      "label": "soziale Sicherheit",
+      "id": "2206",
+      "label": "Straßen- und Brückenbau",
       "language": "de"
     }
   ],
   [
-    "Descriptors",
+    "Thesaurus",
     {
-      "id": "3984",
-      "label": "Parlamentssitzung",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "3206",
-      "label": "diplomatische Beziehungen",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "5692",
-      "label": "Verfassungsgerichtsbarkeit",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "1114",
-      "label": "Grenze",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4756",
-      "label": "namentliche Abstimmung",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2908",
-      "label": "Volkszählung",
+      "id": "1221",
+      "label": "Gerichtswesen",
       "language": "de"
     }
   ],
@@ -698,184 +82,80 @@
   [
     "Descriptors",
     {
-      "id": "4082",
-      "label": "Maße und Gewichte",
+      "id": "3547",
+      "label": "gesetzlicher Feiertag",
       "language": "de"
     }
   ],
   [
     "Descriptors",
     {
-      "id": "2166",
-      "label": "Verwaltungsorganisation",
+      "id": "793",
+      "label": "Primarstufe",
       "language": "de"
     }
   ],
   [
     "Descriptors",
     {
-      "id": "557",
-      "label": "Arbeitsrecht",
+      "id": "2702",
+      "label": "Gesetzgebungsverfahren",
       "language": "de"
     }
   ],
   [
     "Descriptors",
     {
-      "id": "2246",
-      "label": "Parlamentarier",
+      "id": "5805",
+      "label": "Staatschef",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "3659",
+      "label": "Einkommen",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "6922",
+      "label": "internationales Arbeitsrecht",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "425",
+      "label": "Zweite Kammer",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "3758",
+      "label": "Salz",
       "language": "de"
     }
   ],
   [
     "Thesaurus",
     {
-      "id": "0821",
-      "label": "Verteidigung",
+      "id": "2841",
+      "label": "Gesundheit",
       "language": "de"
     }
   ],
   [
     "Descriptors",
     {
-      "id": "2830",
-      "label": "Tierschutz",
-      "language": "de"
-    }
-  ],
-  [
-    "Domain",
-    {
-      "id": "40",
-      "label": "Unternehmen und Wettbewerb",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2996",
-      "label": "Staatswald",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "77",
-      "label": "öffentliche Verwaltung",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "584",
-      "label": "Menschenrechte",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "2441",
-      "label": "Haushaltsplan",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4865",
-      "label": "Bibliothek",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "338",
-      "label": "Parlamentsdebatte",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "2806",
-      "label": "Familie",
-      "language": "de"
-    }
-  ],
-  [
-    "Domain",
-    {
-      "id": "44",
-      "label": "Beschäftigung und Arbeitsbedingungen",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "3332",
-      "label": "Arbeitslosenversicherung",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4505",
-      "label": "Luftverkehr",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "5900",
-      "label": "Krankenpflege",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "884",
-      "label": "Personenstand",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "121",
-      "label": "Europarat",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "6088",
-      "label": "Internet",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4734",
-      "label": "Weinbau",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "343",
-      "label": "Abfall",
+      "id": "4604",
+      "label": "Interparlamentarische Union",
       "language": "de"
     }
   ],
@@ -890,16 +170,648 @@
   [
     "Descriptors",
     {
-      "id": "8423",
-      "label": "partizipative Demokratie",
+      "id": "3984",
+      "label": "Parlamentssitzung",
       "language": "de"
     }
   ],
   [
     "Descriptors",
     {
-      "id": "2968",
-      "label": "Verwaltungsreform",
+      "id": "338",
+      "label": "Parlamentsdebatte",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "884",
+      "label": "Personenstand",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "3042",
+      "label": "Föderalismus",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1303",
+      "label": "parlamentarische Immunität",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "6621",
+      "label": "Elektrizitäts- und Kernkraftindustrie",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "2436",
+      "label": "Öffentliche Finanzen und Haushaltspolitik",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4871",
+      "label": "Zweikammersystem",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "5692",
+      "label": "Verfassungsgerichtsbarkeit",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "3329",
+      "label": "ehrende Auszeichnung",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2812",
+      "label": "öffentliches Eigentum",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "567",
+      "label": "Völkerrecht",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "0811",
+      "label": "Politik der Zusammenarbeit",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "5280",
+      "label": "Frau",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1114",
+      "label": "Grenze",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "679",
+      "label": "vorschulische Erziehung",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "3461",
+      "label": "internationales Abkommen",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2861",
+      "label": "Veröffentlichung des Gesetzes",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "3228",
+      "label": "Internationale Beziehungen",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "173",
+      "label": "Haushaltskontrolle",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4713",
+      "label": "Wein",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "830",
+      "label": "Öffentlicher Sektor",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2908",
+      "label": "Volkszählung",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "2806",
+      "label": "Familie",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "2446",
+      "label": "Steuerwesen",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4533",
+      "label": "Straßenverkehr",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "5641",
+      "label": "Fischerei",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "601",
+      "label": "Branntwein",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "343",
+      "label": "Abfall",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "3574",
+      "label": "Berufsverband",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1527",
+      "label": "Glücksspiel",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2986",
+      "label": "Flüchtling",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4865",
+      "label": "Bibliothek",
+      "language": "de"
+    }
+  ],
+  [
+    "Domain",
+    {
+      "id": "36",
+      "label": "Wissenschaften",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "4421",
+      "label": "Verwaltung und Entlohnung des Personals",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1579",
+      "label": "Gliedstaat",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4432",
+      "label": "Fernsehen",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2566",
+      "label": "Post- und Fernmeldewesen",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4147",
+      "label": "Sitzungsperiode des Parlaments",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "2441",
+      "label": "Haushaltsplan",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2996",
+      "label": "Staatswald",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2688",
+      "label": "Kunst",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4568",
+      "label": "Trentino-Südtirol",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "799",
+      "label": "Sekundarstufe",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4245",
+      "label": "Sport",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4373",
+      "label": "Tabak",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "0821",
+      "label": "Verteidigung",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "4011",
+      "label": "Unternehmensarten",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "6885",
+      "label": "Staatssymbol",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1157",
+      "label": "Raumordnung",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "6727",
+      "label": "Opferhilfe",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "4821",
+      "label": "See- und Binnenschiffsverkehr",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1528",
+      "label": "junger Mensch",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2053",
+      "label": "Neutralität",
+      "language": "de"
+    }
+  ],
+  [
+    "Domain",
+    {
+      "id": "66",
+      "label": "Energie",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "171",
+      "label": "Verwaltungskontrolle",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "6257",
+      "label": "Vereinfachung der Rechtsvorschriften",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "8438",
+      "label": "Geodäsie",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "3332",
+      "label": "Arbeitslosenversicherung",
+      "language": "de"
+    }
+  ],
+  [
+    "Domain",
+    {
+      "id": "52",
+      "label": "Umwelt",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4045",
+      "label": "öffentliche Sicherheit",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2246",
+      "label": "Parlamentarier",
+      "language": "de"
+    }
+  ],
+  [
+    "Domain",
+    {
+      "id": "68",
+      "label": "Industrie",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1172",
+      "label": "Regierung",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "1216",
+      "label": "Strafrecht",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "0411",
+      "label": "Politische Partei",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4505",
+      "label": "Luftverkehr",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2883",
+      "label": "Hörfunk",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "5900",
+      "label": "Krankenpflege",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4091",
+      "label": "öffentliche Anhörung",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "6088",
+      "label": "Internet",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "2416",
+      "label": "Geld- und Kreditwesen",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2085",
+      "label": "Notar",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "2406",
+      "label": "Währungsbeziehungen",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2496",
+      "label": "Wohnungspolitik",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4702",
+      "label": "Vereinsleben",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1625",
+      "label": "Versammlungsfreiheit",
+      "language": "de"
+    }
+  ],
+  [
+    "Domain",
+    {
+      "id": "24",
+      "label": "Finanzwesen",
+      "language": "de"
+    }
+  ],
+  [
+    "Domain",
+    {
+      "id": "40",
+      "label": "Unternehmen und Wettbewerb",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "1211",
+      "label": "Bürgerliches Recht",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4256",
+      "label": "Statistik",
       "language": "de"
     }
   ],
@@ -914,8 +826,152 @@
   [
     "Descriptors",
     {
-      "id": "2978",
-      "label": "Bodenreform",
+      "id": "3374",
+      "label": "Personalvertretung",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "800",
+      "label": "Hochschulausbildung",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2895",
+      "label": "Ausschussbericht",
+      "language": "de"
+    }
+  ],
+  [
+    "Domain",
+    {
+      "id": "60",
+      "label": "Agrarerzeugnisse und Lebensmittel",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "3236",
+      "label": "Informatik",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2968",
+      "label": "Verwaltungsreform",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "5396",
+      "label": "Jagd",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2599",
+      "label": "Presse",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "688",
+      "label": "Gleichbehandlung",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "6896",
+      "label": "Regierungserklärung",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "121",
+      "label": "Europarat",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "3257",
+      "label": "Religion",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "3503",
+      "label": "völkerrechtliche Verantwortlichkeit",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "5141",
+      "label": "Rechtsanwalt",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4756",
+      "label": "namentliche Abstimmung",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "3062",
+      "label": "Exekutive",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "2011",
+      "label": "Zolltarifpolitik",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2810",
+      "label": "Darstellende Künste",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1539",
+      "label": "Verwaltungsgerichtsbarkeit",
       "language": "de"
     }
   ],
@@ -930,8 +986,424 @@
   [
     "Descriptors",
     {
-      "id": "1527",
-      "label": "Glücksspiel",
+      "id": "4734",
+      "label": "Weinbau",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "2451",
+      "label": "Preis",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4762",
+      "label": "parlamentarische Abstimmung",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "3231",
+      "label": "Information und Informationsverarbeitung",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "c_1c7d7d1e",
+      "label": "Care-Ökonomie",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "517",
+      "label": "Verwaltungsrecht",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4514",
+      "label": "Schienentransport",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "6831",
+      "label": "Bauindustrie und öffentliches Bauwesen",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "18",
+      "label": "parlamentarischer Ausschuss",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "2431",
+      "label": "Versicherungswesen",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1443",
+      "label": "Gewerbeaufsicht",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1336",
+      "label": "Inkompatibilität",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2604",
+      "label": "Familienleistungsausgleich",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "148",
+      "label": "Verfassung",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1380",
+      "label": "Ausbildungsbeihilfe",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "584",
+      "label": "Menschenrechte",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "637",
+      "label": "Wirtschaft",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "3057",
+      "label": "Zivilschutz",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "53",
+      "label": "Zusammensetzung des Parlaments",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "2411",
+      "label": "Geldwirtschaft",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4050",
+      "label": "soziale Sicherheit",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "3144",
+      "label": "Wasserbewirtschaftung",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4470",
+      "label": "Tourismus",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1231",
+      "label": "Mensch mit Behinderung",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2978",
+      "label": "Bodenreform",
+      "language": "de"
+    }
+  ],
+  [
+    "Domain",
+    {
+      "id": "44",
+      "label": "Beschäftigung und Arbeitsbedingungen",
+      "language": "de"
+    }
+  ],
+  [
+    "Domain",
+    {
+      "id": "20",
+      "label": "Handel",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4082",
+      "label": "Maße und Gewichte",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "3206",
+      "label": "diplomatische Beziehungen",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1856",
+      "label": "Tiermedizin",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2475",
+      "label": "Baupolitik",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1411",
+      "label": "Bergbau",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1046",
+      "label": "öffentlicher Dienst",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2022",
+      "label": "Museum",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "695",
+      "label": "Wahl",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "5851",
+      "label": "Geschäftsordnung des Parlaments",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "8423",
+      "label": "partizipative Demokratie",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "3206",
+      "label": "Bildung",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1202",
+      "label": "ethnische Gruppe",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1523",
+      "label": "Wasserbau",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1995",
+      "label": "Misstrauensantrag",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "7355",
+      "label": "Apotheke",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "1158",
+      "label": "Abfallwirtschaft",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "6416",
+      "label": "Forschung und geistiges Eigentum",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "557",
+      "label": "Arbeitsrecht",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2517",
+      "label": "Sozialpolitik",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4106",
+      "label": "Zivildienst",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4060",
+      "label": "Europäische Union",
+      "language": "de"
+    }
+  ],
+  [
+    "Domain",
+    {
+      "id": "48",
+      "label": "Verkehr",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "3751",
+      "label": "Altersversorgungssystem",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4003",
+      "label": "ausländischer Staatsangehöriger",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2459",
+      "label": "Kulturpolitik",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "5061",
+      "label": "Nachtragshaushaltsplan",
       "language": "de"
     }
   ],
@@ -954,56 +1426,24 @@
   [
     "Descriptors",
     {
-      "id": "695",
-      "label": "Wahl",
+      "id": "2492",
+      "label": "Archiv",
       "language": "de"
     }
   ],
   [
     "Descriptors",
     {
-      "id": "1856",
-      "label": "Tiermedizin",
+      "id": "597",
+      "label": "Wasser",
       "language": "de"
     }
   ],
   [
-    "Descriptors",
+    "Custom",
     {
-      "id": "601",
-      "label": "Branntwein",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "3042",
-      "label": "Föderalismus",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2895",
-      "label": "Ausschussbericht",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2566",
-      "label": "Post- und Fernmeldewesen",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "2841",
-      "label": "Gesundheit",
+      "id": "13",
+      "label": "Betreuung von Pflegebedürftigen",
       "language": "de"
     }
   ],
@@ -1018,144 +1458,8 @@
   [
     "Descriptors",
     {
-      "id": "1625",
-      "label": "Versammlungsfreiheit",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "5805",
-      "label": "Staatschef",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "1363",
-      "label": "Filmindustrie",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2475",
-      "label": "Baupolitik",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "0811",
-      "label": "Politik der Zusammenarbeit",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4003",
-      "label": "ausländischer Staatsangehöriger",
-      "language": "de"
-    }
-  ],
-  [
-    "Domain",
-    {
-      "id": "68",
-      "label": "Industrie",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "3574",
-      "label": "Berufsverband",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "3521",
-      "label": "Staatsangehöriger",
-      "language": "de"
-    }
-  ],
-  [
-    "Domain",
-    {
-      "id": "52",
-      "label": "Umwelt",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2492",
-      "label": "Archiv",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4045",
-      "label": "öffentliche Sicherheit",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "6885",
-      "label": "Staatssymbol",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "1579",
-      "label": "Gliedstaat",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4060",
-      "label": "Europäische Union",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "2411",
-      "label": "Geldwirtschaft",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "793",
-      "label": "Primarstufe",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "3503",
-      "label": "völkerrechtliche Verantwortlichkeit",
+      "id": "2166",
+      "label": "Verwaltungsorganisation",
       "language": "de"
     }
   ],
@@ -1164,302 +1468,6 @@
     {
       "id": "4424",
       "label": "Telekommunikation",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "171",
-      "label": "Verwaltungskontrolle",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "3374",
-      "label": "Personalvertretung",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2986",
-      "label": "Flüchtling",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "3257",
-      "label": "Religion",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4147",
-      "label": "Sitzungsperiode des Parlaments",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2883",
-      "label": "Hörfunk",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "6416",
-      "label": "Forschung und geistiges Eigentum",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4871",
-      "label": "Zweikammersystem",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "5377",
-      "label": "direkt gewählte Kammer",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "3659",
-      "label": "Einkommen",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4256",
-      "label": "Statistik",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "1336",
-      "label": "Inkompatibilität",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "1202",
-      "label": "ethnische Gruppe",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2604",
-      "label": "Familienleistungsausgleich",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "3057",
-      "label": "Zivilschutz",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "1539",
-      "label": "Verwaltungsgerichtsbarkeit",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "2406",
-      "label": "Währungsbeziehungen",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2702",
-      "label": "Gesetzgebungsverfahren",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "1157",
-      "label": "Raumordnung",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "2416",
-      "label": "Geld- und Kreditwesen",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "1211",
-      "label": "Bürgerliches Recht",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4762",
-      "label": "parlamentarische Abstimmung",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "5851",
-      "label": "Geschäftsordnung des Parlaments",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "3206",
-      "label": "Bildung",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "1411",
-      "label": "Bergbau",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2496",
-      "label": "Wohnungspolitik",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "3228",
-      "label": "Internationale Beziehungen",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4702",
-      "label": "Vereinsleben",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "830",
-      "label": "Öffentlicher Sektor",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "1231",
-      "label": "Mensch mit Behinderung",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2861",
-      "label": "Veröffentlichung des Gesetzes",
-      "language": "de"
-    }
-  ],
-  [
-    "Thesaurus",
-    {
-      "id": "2436",
-      "label": "Öffentliche Finanzen und Haushaltspolitik",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "2810",
-      "label": "Darstellende Künste",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "4245",
-      "label": "Sport",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "1380",
-      "label": "Ausbildungsbeihilfe",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "3144",
-      "label": "Wasserbewirtschaftung",
-      "language": "de"
-    }
-  ],
-  [
-    "Descriptors",
-    {
-      "id": "1172",
-      "label": "Regierung",
       "language": "de"
     }
   ]

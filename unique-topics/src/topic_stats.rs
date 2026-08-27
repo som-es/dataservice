@@ -84,7 +84,7 @@ async fn main() -> combx::Result<()> {
     } else {
         match args.topic_source {
             TopicSource::Eurovoc => "./id_unique_eurovoc_topics.json",
-            TopicSource::LegisInit => "./id_unique_legis_init_topics.json",
+            TopicSource::LegisInit => "./id_unique_topics.json",
         }
     };
     tokio::fs::write(file_name, &text).await.unwrap();
