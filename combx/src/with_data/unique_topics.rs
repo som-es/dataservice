@@ -43,6 +43,7 @@ pub async fn unique_topics_for_lang(pg: &PgPool, language: Language) -> sqlx::Re
 pub struct EurovocTopics {
     pub lang_to_topics: HashMap<Language, HashMap<String, TopicWithId>>,
     pub id_to_topic: HashMap<(i64, Language), TopicWithId>,
+    pub topic_to_id: HashMap<(String, Language), TopicWithId>,
 }
 
 struct QueryTopic {
@@ -105,7 +106,10 @@ pub async fn create_topic_mapping(
         if let Some(id_as_hash) = row.id_as_hash {
             eurovoc_topics
                 .id_to_topic
-                .insert((id_as_hash, language), topic);
+                .insert((id_as_hash, language), topic.clone());
+            eurovoc_topics
+                .topic_to_id
+                .insert((topic.topic.clone(), language), topic);
         }
     }
 
