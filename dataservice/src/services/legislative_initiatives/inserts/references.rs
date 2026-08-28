@@ -15,7 +15,7 @@ pub async fn insert_references_batch<'a>(
     let init_ids = vec![legislative_initiatives_id; references.len()];
     let gps: Vec<String> = references.iter().map(|r| r.gp.clone()).collect();
     let ityps: Vec<String> = references.iter().map(|r| r.ityp.clone()).collect();
-    let inrs: Vec<i32> = references.iter().map(|r| r.inr as i32).collect();
+    let inrs: Vec<i32> = references.iter().map(|r| r.inr).collect();
 
     let res = sqlx::query!(
         "INSERT INTO legis_inits_refs (origin_legis_init_id, ref_gp, ref_ityp, ref_inr)

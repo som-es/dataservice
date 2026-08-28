@@ -8,15 +8,12 @@ pub async fn insert_documents_batch<'a>(
 ) -> sqlx::Result<()> {
     let mut sp = tx.begin().await?;
 
-    if let Err(e) = sqlx::query!(
+    sqlx::query!(
         "delete from legislative_documents where legislative_initiatives_id = $1",
         legis_init_id
     )
     .execute(&mut *sp)
-    .await
-    {
-        return Err(e);
-    }
+    .await?;
 
     let documents: Vec<&Document> = documents
         .iter()
@@ -30,7 +27,7 @@ pub async fn insert_documents_batch<'a>(
         let urls: Vec<Option<String>> = documents.iter().map(|d| d.document_url.clone()).collect();
         let ids = vec![legis_init_id; titles.len()];
 
-        if let Err(e) = sqlx::query!(
+        sqlx::query!(
             "
                 INSERT INTO legislative_documents (legislative_initiatives_id, title, document_type, document_url) 
                 SELECT * FROM UNNEST($1::int4[], $2::text[], $3::text[], $4::text[])
@@ -43,10 +40,7 @@ pub async fn insert_documents_batch<'a>(
             &ids, &titles as &[Option<String>], &types as &[Option<String>], &urls as &[Option<String>]
         )
         .execute(&mut *sp)
-        .await
-        {
-            return Err(e);
-        }
+        .await?;
     }
 
     sp.commit().await?;

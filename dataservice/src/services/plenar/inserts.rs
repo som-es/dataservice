@@ -1,15 +1,17 @@
 use std::collections::HashSet;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
+use combx::Parliament;
 use log::warn;
 use somes_scraper::{
     PlenarSpeech, Reference, TextExtractor,
     call_to_order::CallToOrderInfo,
+    language::Language,
     plenar::{Debate, DebateInfo, PlenarInfo},
     text_utils,
 };
 
-use sqlx::{Executor, Postgres, postgres::PgQueryResult};
+use sqlx::{Acquire, Executor, PgPool, Postgres, Transaction, postgres::PgQueryResult};
 use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{
@@ -77,7 +79,7 @@ pub async fn insert_plenar_info<'a>(
         plenar_info.created_at,
         plenar_info.gp,
         plenar_info.updated_at,
-        plenar_info.absences.as_ref().map(|absences| &absences.source_document.link),
+        plenar_info.absences.first().as_ref().map(|absences| &absences.source_document.link),
         plenar_info.council,
     )
     .fetch_one(pool)
@@ -143,10 +145,12 @@ pub struct SpeechInsertArgs<'a> {
 }
 
 pub async fn insert_plenar_speech<'a>(
-    pool: &mut sqlx::Transaction<'a, Postgres>,
+    pool: PgPool,
+    tx: &mut sqlx::Transaction<'a, Postgres>,
     plenar_speech: &PlenarSpeech,
     text_extractor: &mut TextExtractor,
     args: &SpeechInsertArgs<'_>,
+    parliament: Parliament,
 ) -> Result<(), sqlx::Error> {
     log::info!("insert plenar speech");
     let disable_speech_text =
@@ -164,7 +168,7 @@ pub async fn insert_plenar_speech<'a>(
         "select id from delegates where id = $1",
         plenar_speech.speech.delegate_id as i32
     )
-    .fetch_optional(&mut **pool)
+    .fetch_optional(&mut **tx)
     .await?;
 
     if delegate_exists.is_none() {
@@ -197,45 +201,52 @@ pub async fn insert_plenar_speech<'a>(
         plenar_speech.speech.delegate_display_name,
         plenar_speech.start,
     )
-    .fetch_one(&mut **pool)
+    .fetch_one(&mut **tx)
     .await?
     .id;
 
+    sqlx::query!(
+        "delete from plenar_speech_legis_inits where speech_id = $1",
+        plenar_speech_id
+    )
+    .execute(&mut **tx)
+    .await?;
+
     for reference in &args.corresponding_debate.references {
-        let legis_init_id = if let Ok(x) = sqlx::query!(
-            "select id from legislative_initiatives where gp = $1 and ityp = $2 and inr = $3",
-            reference.gp,
-            reference.ityp,
-            reference.inr as i32
-        )
-        .fetch_one(&mut **pool)
-        .await
-        {
-            Some(x.id)
-        } else {
-            None
-        };
+        match parliament {
+            Parliament::Eu => {
+                for record in  sqlx::query!(
+                    "select gp, ityp, inr, origin_legis_init_id from legis_inits_refs inner join legislative_initiatives li on li.id = origin_legis_init_id where ref_inr = $1 and ref_ityp = $2",
+                    reference.inr as i32,
+                    reference.ityp,
+                ).fetch_all(&mut **tx).await.unwrap_or_default() {
 
-        // let own_references = i
-        if let Err(e) =
-            insert_plenar_speech_legis_init(&mut **pool, legis_init_id, plenar_speech_id, reference)
-                .await
-        {
-            log::error!(
-                "could not insert plenar speech legis init for legis int {legis_init_id:?} and speech {plenar_speech_id}: {e:?}"
-            )
-        }
-        if let Some(legis_init_id) = legis_init_id {
-            let own_references = sqlx::query_as!(DbReference, "select origin_legis_init_id, ref_gp, ref_ityp, ref_inr from legis_inits_refs where origin_legis_init_id = $1", legis_init_id).fetch_all(&mut **pool).await.unwrap_or_default();
-
-            for reference in own_references {
+                    if let Err(e) = insert_plenar_speech_legis_init(
+                        &mut **tx,
+                        Some(record.origin_legis_init_id),
+                        plenar_speech_id,
+                        &Reference {
+                            gp: record.gp,
+                            ityp: record.ityp,
+                            inr: record.inr as u32,
+                        },
+                    )
+                    .await
+                    {
+                        log::error!(
+                            "could not insert plenar speech legis init for legis int {:?} and speech {plenar_speech_id}: {e:?}", record.origin_legis_init_id
+                        )
+                    }
+                }
+            }
+            Parliament::At => {
                 let legis_init_id = if let Ok(x) = sqlx::query!(
                     "select id from legislative_initiatives where gp = $1 and ityp = $2 and inr = $3",
-                    reference.ref_gp,
-                    reference.ref_ityp,
-                    reference.ref_inr
+                    reference.gp,
+                    reference.ityp,
+                    reference.inr as i32
                 )
-                .fetch_one(&mut **pool)
+                .fetch_one(&mut **tx)
                 .await
                 {
                     Some(x.id)
@@ -243,15 +254,12 @@ pub async fn insert_plenar_speech<'a>(
                     None
                 };
 
+                // let own_references = i
                 if let Err(e) = insert_plenar_speech_legis_init(
-                    &mut **pool,
+                    &mut **tx,
                     legis_init_id,
                     plenar_speech_id,
-                    &Reference {
-                        gp: reference.ref_gp,
-                        ityp: reference.ref_ityp,
-                        inr: reference.ref_inr as u32,
-                    },
+                    reference,
                 )
                 .await
                 {
@@ -259,8 +267,44 @@ pub async fn insert_plenar_speech<'a>(
                         "could not insert plenar speech legis init for legis int {legis_init_id:?} and speech {plenar_speech_id}: {e:?}"
                     )
                 }
+                if let Some(legis_init_id) = legis_init_id {
+                    let own_references = sqlx::query_as!(DbReference, "select origin_legis_init_id, ref_gp, ref_ityp, ref_inr from legis_inits_refs where origin_legis_init_id = $1", legis_init_id).fetch_all(&mut **tx).await.unwrap_or_default();
+
+                    for reference in own_references {
+                        let legis_init_id = if let Ok(x) = sqlx::query!(
+                        "select id from legislative_initiatives where gp = $1 and ityp = $2 and inr = $3",
+                        reference.ref_gp,
+                        reference.ref_ityp,
+                        reference.ref_inr
+                    )
+                    .fetch_one(&mut **tx)
+                    .await
+                    {
+                        Some(x.id)
+                    } else {
+                        None
+                    };
+
+                        if let Err(e) = insert_plenar_speech_legis_init(
+                            &mut **tx,
+                            legis_init_id,
+                            plenar_speech_id,
+                            &Reference {
+                                gp: reference.ref_gp,
+                                ityp: reference.ref_ityp,
+                                inr: reference.ref_inr as u32,
+                            },
+                        )
+                        .await
+                        {
+                            log::error!(
+                                "could not insert plenar speech legis init for legis int {legis_init_id:?} and speech {plenar_speech_id}: {e:?}"
+                            )
+                        }
+                    }
+                }
             }
-        }
+        };
     }
     let mut newly_inserted = HashSet::new();
     // log::info!(
@@ -274,7 +318,7 @@ pub async fn insert_plenar_speech<'a>(
         "delete from plenar_speech_links where plenar_speech_id = $1",
         plenar_speech_id
     )
-    .execute(&mut **pool)
+    .execute(&mut **tx)
     .await
     {
         log::error!("could not delete plenar speech links for speech {plenar_speech_id}: {e:?}")
@@ -296,7 +340,7 @@ pub async fn insert_plenar_speech<'a>(
             url.site_start.map(|i| i as i32),
             url.site_end.map(|i| i as i32)
         )
-        .fetch_optional(&mut **pool)
+        .fetch_optional(&mut **tx)
         .await;
         match id {
             Ok(id) => {
@@ -329,18 +373,13 @@ pub async fn insert_plenar_speech<'a>(
     let updated_spoken_text = if disable_speech_text {
         None
     } else {
-        text_extractor
-            .full_speech_extraction(
-                &plenar_speech.speech.spoken_text_html_urls,
-                &plenar_speech.speech.delegate_display_name,
-            )
-            .await
+        extract_speech_text(plenar_speech, text_extractor, parliament).await
     };
 
     if updated_spoken_text.is_none() {
         warn!(
-            "DEBATE_ID: {}, Missing spoken text for plenar speech id: {plenar_speech_id}, and plenar info: {:?}",
-            args.debate_id, plenar_speech
+            "DEBATE_ID: {}, Missing spoken text for plenar speech id: {plenar_speech_id}",
+            args.debate_id
         );
     }
     if let Some(updated_spoken_text) = &updated_spoken_text {
@@ -355,12 +394,18 @@ pub async fn insert_plenar_speech<'a>(
                     Priority::Lowest
                 };
 
+            let language = match parliament {
+                Parliament::At => Language::De,
+                Parliament::Eu => Language::En,
+            };
+
             let spoken_text = updated_spoken_text.clone();
             let summarization_task = AiTask {
                 input: None,
                 priority,
+                pool,
                 score: priority.weight(),
-                task_id: crate::hash!(),
+                task_id: crate::hash!(parliament),
                 db_entry_id: plenar_speech_id,
                 rerunnable: true,
                 created_at: Instant::now(),
@@ -368,6 +413,7 @@ pub async fn insert_plenar_speech<'a>(
                     Box::pin(crate::plenar::summarize_speech_and_relate(
                         task_args,
                         spoken_text,
+                        language,
                     ))
                 }),
             };
@@ -383,7 +429,7 @@ pub async fn insert_plenar_speech<'a>(
             plenar_speech_id as i64,
             plenar_speech.speech.delegate_id as i64,
             args.plenar_date,
-            pool,
+            tx,
             args.council,
         )
         .await
@@ -401,52 +447,82 @@ pub async fn insert_plenar_speech<'a>(
         updated_spoken_text,
         plenar_speech_id,
     )
-    .execute(&mut **pool)
+    .execute(&mut **tx)
     .await?;
 
-    if updated_spoken_text.is_some() {}
+    updated_spoken_text.is_some();
 
     if plenar_speech.speech.spoken_text_html_urls.is_empty() {
         warn!(
-            "DEBATE_ID: {}, No spoken text html urls for plenar speech: {:?}",
-            args.debate_id, plenar_speech
+            "DEBATE_ID: {}, No spoken text html urls for plenar speech: {plenar_speech_id:?}",
+            args.debate_id,
         );
     }
 
     Ok(())
 }
 
-pub async fn insert_absences(
-    pg_pool: &sqlx::Pool<sqlx::Postgres>,
+async fn extract_speech_text(
+    plenar_speech: &PlenarSpeech,
+    text_extractor: &mut TextExtractor,
+    parliament: Parliament,
+) -> Option<String> {
+    let maybe_text = plenar_speech
+        .speech
+        .speech_texts
+        .as_ref()
+        .and_then(|speech_texts| {
+            speech_texts
+                .iter()
+                .find(|speech_text| speech_text.language == Language::En)
+        });
+
+    if parliament == Parliament::Eu {
+        return maybe_text.map(|text| text.text.clone());
+    }
+    match maybe_text {
+        Some(text) => Some(text.text.clone()),
+        None => {
+            text_extractor
+                .full_speech_extraction(
+                    &plenar_speech.speech.spoken_text_html_urls,
+                    &plenar_speech.speech.delegate_display_name,
+                )
+                .await
+        }
+    }
+}
+
+pub async fn insert_absences<'a>(
+    tx: &mut Transaction<'a, Postgres>,
     plenar_id: i32,
     matching: combx::MatchResult,
+    date: NaiveDate,
+    document: &somes_scraper::Document,
 ) -> sqlx::Result<()> {
-    let mut tx = pg_pool.begin().await?;
-
-    sqlx::query!(
-        "delete from absences where plenary_session_id = $1",
-        plenar_id
-    )
-    .execute(&mut *tx)
-    .await?;
+    let mut tx = tx.begin().await?;
+    log::info!("plenar id: {plenar_id}");
 
     for match_res in matching
         .correctly_matched
         .iter()
         .chain(matching.lev_or_deep_split_matched.iter())
     {
+        log::info!("date: {date:?}, match: {match_res:?}");
         if let Err(e) = sqlx::query!(
             "
-            INSERT INTO absences (lev, similiarity_score, searched_with, matched_with, delegate_id, manually_matched, plenary_session_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (delegate_id, plenary_session_id)
-            DO UPDATE SET
-                lev = EXCLUDED.lev,
-                similiarity_score = EXCLUDED.similiarity_score,
-                searched_with = EXCLUDED.searched_with,
-                matched_with = EXCLUDED.matched_with,
-                manually_matched = EXCLUDED.manually_matched
-        ", match_res.lev as i64, match_res.similiarity_score as i64, match_res.searched_with, match_res.matched_with, match_res.delegate_id as i32, match_res.manually_matched, plenar_id
+            INSERT INTO absences (lev, similiarity_score, searched_with, matched_with, delegate_id, manually_matched, plenary_session_id, absence_date, document_url)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ",
+        match_res.lev as i64,
+        match_res.similiarity_score as i64,
+        match_res.searched_with,
+        match_res.matched_with,
+        match_res.delegate_id as i32,
+        match_res.manually_matched,
+        plenar_id,
+        date,
+        document.link
         ).execute(&mut *tx).await {
             log::error!("Error inserting absene {e:?} for absence {match_res:?}");
         }

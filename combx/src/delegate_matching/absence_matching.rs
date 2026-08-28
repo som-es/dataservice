@@ -1,9 +1,10 @@
 use std::collections::HashSet;
 
 use chrono::NaiveDate;
-use sqlx::{Executor, PgPool, Postgres};
+use somes_scraper::plenar::Absence;
+use sqlx::{Executor, Postgres};
 
-use crate::with_data::active_delegates_at_date;
+use crate::{LevResult, with_data::active_delegates_at_date};
 
 use super::match_delegates_with_name::{MatchResult, match_delegate_names_with_delegate_ids};
 
@@ -26,19 +27,40 @@ pub fn reverse_name(name: &str) -> String {
 
 pub async fn absence_matching<'a>(
     pool: impl Executor<'a, Database = Postgres>,
-    absences_names: &[String],
+    absences: &[Absence],
     plenar_date: NaiveDate,
     gp: String,
     function: &str,
 ) -> crate::Result<MatchResult> {
-    let active_delegates = active_delegates_at_date(pool, plenar_date, function)
+    let mut active_delegates = active_delegates_at_date(pool, plenar_date, function)
         .await?
         .into_iter()
         .collect::<HashSet<_>>();
 
-    let absences_names_owned = absences_names.to_vec();
+    let (already_matched, to_match): (Vec<_>, Vec<_>) =
+        absences
+            .iter()
+            .cloned()
+            .filter(|absence| absence.id.is_some() || !absence.name.is_empty())
+            .partition(|absence| match absence.id {
+                Some(id) => {
+                    let del = active_delegates.iter().find(|del| del.id as u32 == id).cloned();
+                    if let Some(del) = del {
+                        active_delegates.remove(&del);
+                    } else {
+                        log::warn!("should have delegate (was absent) in active dels at date for: {plenar_date}, del: {id}");
+                    }
+                    true
+                }
+                None => false,
+            });
 
-    Ok(tokio::task::spawn_blocking(move || {
+    let absences_names_owned = to_match
+        .into_iter()
+        .map(|absence| absence.name)
+        .collect::<Vec<_>>();
+
+    let mut lev_results = tokio::task::spawn_blocking(move || {
         let reversed_names = absences_names_owned
             .iter()
             .map(|x| x.as_str())
@@ -47,7 +69,19 @@ pub async fn absence_matching<'a>(
 
         match_delegate_names_with_delegate_ids(&active_delegates, &reversed_names, &gp, plenar_date)
     })
-    .await?)
+    .await?;
+    lev_results
+        .correctly_matched
+        .extend(already_matched.iter().map(|absence| LevResult {
+            deep_split_matched: false,
+            similiarity_score: 0,
+            lev: 0,
+            delegate_id: absence.id.unwrap() as usize,
+            manually_matched: false,
+            matched_with: "".into(),
+            searched_with: "".into(),
+        }));
+    Ok(lev_results)
 }
 
 #[cfg(test)]
@@ -84,13 +118,10 @@ mod tests {
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
-            &&plenar_info
-                .absences
-                .as_ref()
-                .unwrap()
+            &&plenar_info.absences[0]
                 .absences
                 .iter()
-                .map(|x| x.as_str())
+                .map(|x| x.name.as_str())
                 .map(reverse_name)
                 .collect::<Vec<_>>(),
             &plenar_info.gp,
@@ -124,13 +155,10 @@ mod tests {
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
-            &&plenar_info
-                .absences
-                .as_ref()
-                .unwrap()
+            &&plenar_info.absences[0]
                 .absences
                 .iter()
-                .map(|x| x.as_str())
+                .map(|x| x.name.as_str())
                 .map(reverse_name)
                 .collect::<Vec<_>>(),
             &plenar_info.gp,
@@ -151,7 +179,7 @@ mod tests {
             .await
             .unwrap();
         println!("plenar_info: {plenar_info:?}");
-        let src = &plenar_info.absences.as_ref().unwrap().source_document;
+        let src = &plenar_info.absences[0].source_document;
         dbg!(&src);
 
         let pg = connect_pg().await;
@@ -164,13 +192,10 @@ mod tests {
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
-            &&plenar_info
-                .absences
-                .as_ref()
-                .unwrap()
+            &&plenar_info.absences[0]
                 .absences
                 .iter()
-                .map(|x| x.as_str())
+                .map(|x| x.name.as_str())
                 .map(reverse_name)
                 .collect::<Vec<_>>(),
             &plenar_info.gp,
@@ -224,13 +249,10 @@ mod tests {
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
-            &&plenar_info
-                .absences
-                .as_ref()
-                .unwrap()
+            &&plenar_info.absences[0]
                 .absences
                 .iter()
-                .map(|x| x.as_str())
+                .map(|x| x.name.as_str())
                 .map(reverse_name)
                 .collect::<Vec<_>>(),
             &plenar_info.gp,

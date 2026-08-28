@@ -1,9 +1,12 @@
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet},
+    time::Duration,
+};
 
 #[cfg(not(feature = "tesseract"))]
 use ocrs::OcrEngine;
 use somes_common_lib::Document;
-use somes_scraper::TextExtractor;
+use somes_scraper::{TextExtractor, http_client};
 
 use crate::{extract_images_from_pdf, pdf};
 
@@ -38,7 +41,7 @@ pub fn combine_texts(documents: &[TextDocument]) -> String {
         .join(" ")
 }
 
-const TOTAL_PROMPT_LENGTH: usize = 256000;
+const TOTAL_PROMPT_LENGTH: usize = 393000;
 
 pub async fn extract_text_from_documents_html_first_stripped(
     documents: &[Document],
@@ -231,15 +234,18 @@ pub async fn extract_text_from_html_document(url: &str) -> Option<String> {
     text_extractor.extract_text_from_url(&url, None, true).await
 }
 
+const MAX_RETRIES: u32 = 5;
+const BASE_DELAY_MS: u64 = 500;
+const MAX_DELAY_MS: u64 = 30_000;
+
 pub async fn extract_text_from_pdf_document(url: &str) -> crate::Result<String> {
-    let contents = reqwest::get(url).await?.bytes().await?;
+    let client = http_client()?;
+    let contents = fetch_pdf_bytes_with_retry(&client, url).await?;
 
     let text = tokio::task::spawn_blocking::<_, crate::Result<String>>(move || {
         let doc = poppler::Document::from_data(&contents, None)?;
-
         let num_pages = doc.n_pages();
         let mut full_text = String::new();
-
         for i in 0..num_pages {
             if let Some(page) = doc.page(i) {
                 if let Some(page_text) = page.text() {
@@ -251,9 +257,81 @@ pub async fn extract_text_from_pdf_document(url: &str) -> crate::Result<String> 
         Ok(full_text)
     })
     .await??;
-    log::info!("pdf read ok, got {} chars", text.len());
 
+    log::info!("pdf read ok, got {} chars", text.len());
     Ok(text)
+}
+
+async fn fetch_pdf_bytes_with_retry(client: &reqwest::Client, url: &str) -> crate::Result<Vec<u8>> {
+    let mut attempt = 0;
+
+    loop {
+        attempt += 1;
+        let response = client.get(url).send().await?;
+        let status = response.status();
+
+        if status.is_success() {
+            let content_type = response
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("")
+                .to_string();
+
+            let bytes = response.bytes().await?;
+
+            if !content_type.contains("pdf") && !bytes.starts_with(b"%PDF-") {
+                return Err(format!(
+                    "expected a PDF but got content-type '{}' ({} bytes)",
+                    content_type,
+                    bytes.len()
+                )
+                .into());
+            }
+
+            return Ok(bytes.to_vec());
+        }
+
+        let retryable = status.as_u16() == 429 || status.is_server_error();
+
+        if !retryable || attempt > MAX_RETRIES {
+            let body_snippet = response
+                .text()
+                .await
+                .unwrap_or_default()
+                .chars()
+                .take(200)
+                .collect::<String>();
+            return Err(format!(
+                "failed to fetch pdf: status {} (attempt {}), body: {}",
+                status, attempt, body_snippet
+            )
+            .into());
+        }
+
+        let retry_after = response
+            .headers()
+            .get(reqwest::header::RETRY_AFTER)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<u64>().ok())
+            .map(Duration::from_secs);
+
+        let delay = retry_after.unwrap_or_else(|| {
+            let exp = BASE_DELAY_MS.saturating_mul(1u64 << attempt.min(6));
+            let capped = exp.min(MAX_DELAY_MS);
+            Duration::from_millis(capped)
+        });
+
+        log::warn!(
+            "pdf fetch got status {} (attempt {}/{}), retrying in {:?}",
+            status,
+            attempt,
+            MAX_RETRIES,
+            delay
+        );
+
+        tokio::time::sleep(delay).await;
+    }
 }
 
 #[cfg(feature = "tesseract")]
@@ -296,11 +374,93 @@ pub async fn extract_text_from_original_pdf_document(
     log::info!("image to text: {:?}", start.elapsed());
     res
 }
+
+pub fn clean_eu_documents(docs: Vec<Document>) -> Vec<Document> {
+    let mut grouped_by_title: HashMap<String, Vec<Document>> = HashMap::new();
+    for doc in docs {
+        let Some(title) = doc.title.clone() else {
+            continue;
+        };
+        if doc.document_type.as_deref() != Some("DigitalPDF") {
+            continue;
+        }
+        if doc.title.is_some() {
+            grouped_by_title.entry(title).or_default().push(doc);
+        }
+    }
+
+    let recent_docs = grouped_by_title
+        .into_iter()
+        .flat_map(|(_title, mut docs)| {
+            docs.sort_by(|a, b| a.document_url.cmp(&b.document_url));
+            docs.pop()
+        })
+        .collect::<Vec<_>>();
+
+    let mut undrafted_docs = HashSet::new();
+    for doc in &recent_docs {
+        let mut updated_doc = doc;
+        for other_doc in &recent_docs {
+            if &doc.document_url == &other_doc.document_url {
+                continue;
+            }
+            let lhs_doc_url = doc.title.as_ref().unwrap();
+            let rhs_doc_url = other_doc.title.as_ref().unwrap();
+
+            if lhs_doc_url.starts_with("DRAFT")
+                && !rhs_doc_url.starts_with("DRAFT")
+                && lhs_doc_url.contains(rhs_doc_url)
+            {
+                updated_doc = other_doc;
+                break;
+            }
+        }
+        undrafted_docs.insert(updated_doc.clone());
+    }
+    undrafted_docs.into_iter().collect()
+}
+
 #[cfg(test)]
 mod tests {
     use poppler::Document as Poppler;
 
     use super::*;
+
+    #[tokio::test]
+    async fn test_extract_html_from_eu_pdf() {
+        let url = "https://data.europarl.europa.eu/distribution/reds_iCmOp-Dft/LIBE-PA-754988/LIBE-PA-754988_en.pdf";
+        let text = extract_text_from_pdf_document(url).await.unwrap();
+        dbg!(text);
+    }
+    #[tokio::test]
+    async fn test_eu_doc_filtering() {
+        let docs = vec![
+            Document { title: Some("OPINION on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmOp/LIBE-AD-754988/LIBE-AD-754988_en.docx".to_string()), document_type: Some("Unknown".to_string()) },
+            Document { title: Some("OPINION on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmOp/LIBE-AD-754988/LIBE-AD-754988_en.pdf".to_string()), document_type: Some("DigitalPDF".to_string()) },
+            Document { title: Some("REPORT on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iPlRp/A-10-2026-0185/A-10-2026-0185_en.docx".to_string()), document_type: Some("Unknown".to_string()) },
+            Document { title: Some("REPORT on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iPlRp/A-10-2026-0185/A-10-2026-0185_en.pdf".to_string()), document_type: Some("DigitalPDF".to_string()) },
+            Document { title: Some("DRAFT REPORT on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmRp-Dft/ECON-PR-778136/ECON-PR-778136_en.pdf".to_string()), document_type: Some("DigitalPDF".to_string()) },
+            Document { title: Some("DRAFT REPORT on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmRp-Dft/ECON-PR-778136/ECON-PR-778136_en.docx".to_string()), document_type: Some("Unknown".to_string()) },
+            Document { title: Some("OPINION on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmOp/LIBE-AD-775581/LIBE-AD-775581_en.pdf".to_string()), document_type: Some("DigitalPDF".to_string()) },
+            Document { title: Some("OPINION on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmOp/LIBE-AD-775581/LIBE-AD-775581_en.docx".to_string()), document_type: Some("Unknown".to_string()) },
+            Document { title: Some("DRAFT REPORT on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmRp-Dft/ECON-PR-758954/ECON-PR-758954_en.pdf".to_string()), document_type: Some("DigitalPDF".to_string()) },
+            Document { title: Some("DRAFT REPORT on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmRp-Dft/ECON-PR-758954/ECON-PR-758954_en.docx".to_string()), document_type: Some("Unknown".to_string()) },
+            Document { title: Some("DRAFT OPINION on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmOp-Dft/LIBE-PA-754988/LIBE-PA-754988_en.pdf".to_string()), document_type: Some("DigitalPDF".to_string()) },
+            Document { title: Some("DRAFT OPINION on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmOp-Dft/LIBE-PA-754988/LIBE-PA-754988_en.docx".to_string()), document_type: Some("Unknown".to_string()) },
+        ];
+        let cleaned = clean_eu_documents(docs);
+        dbg!(cleaned);
+    }
+    #[tokio::test]
+    async fn test_eu_doc_filtering2() {
+        let docs = vec![
+                Document { title: Some("REPORT on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iPlRp/A-10-2026-0185/A-10-2026-0185_en.pdf".to_string()), document_type: Some("DigitalPDF".to_string()) },
+                Document { title: Some("DRAFT REPORT on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmRp-Dft/ECON-PR-778136/ECON-PR-778136_en.pdf".to_string()), document_type: Some("DigitalPDF".to_string()) },
+                Document { title: Some("DRAFT REPORT on the proposal for a regulation of the European Parliament and of the Council on the establishment of the digital euro".to_string()), document_url: Some("https://data.europarl.europa.eu/distribution/reds_iCmRp-Dft/ECON-PR-758954/ECON-PR-758954_en.pdf".to_string()), document_type: Some("DigitalPDF".to_string()) },
+            ];
+        let cleaned = clean_eu_documents(docs);
+        dbg!(cleaned);
+    }
 
     #[tokio::test]
     async fn test_extract_text_from_html_document() {

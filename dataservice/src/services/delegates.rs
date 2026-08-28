@@ -2,21 +2,26 @@ mod delegate_qa;
 mod notify;
 pub use notify::*;
 
-use std::collections::{HashMap, HashSet};
-
-use combx::{create_gov_officials_map, DbContact, DbDelegate, DbMandate};
-use somes_scraper::{delegates::DelegateScraper, AustriaScraper, Delegate, GovOfficial, Mandate};
-use sqlx::{postgres::PgQueryResult, query, PgPool};
-
-use crate::{
-    enforce_ai_run, services::scrape_untill_success, should_update_by_hash, ApiLimiter, AppState,
-    CompareHash, Shutdown,
+use std::{
+    collections::{HashMap, HashSet},
+    time::Duration,
 };
 
-async fn scrape_new_delegates_bs(
+use combx::{DbContact, DbDelegate, DbMandate, Parliament, create_gov_officials_map};
+use somes_scraper::{
+    Delegate, GovOfficial, Mandate, delegates::DelegateScraper, error::ScraperError,
+};
+use sqlx::{PgPool, postgres::PgQueryResult, query};
+
+use crate::{
+    ApiLimiter, AppState, CompareHash, Shutdown, enforce_ai_run, services::scrape_untill_success,
+    should_update_by_hash,
+};
+
+async fn scrape_new_delegates_bs<S: DelegateScraper + Default + Send + Sync>(
     parliament_api_limiter: ApiLimiter,
 ) -> crate::Result<Vec<Delegate>> {
-    let scraper = AustriaScraper::default();
+    let scraper = S::default();
 
     let mut delegates = vec![];
 
@@ -35,11 +40,13 @@ async fn scrape_new_delegates_bs(
     Ok(delegates)
 }
 
-async fn scrape_new_delegates(
+const MAX_RETRIES: u32 = 3;
+
+async fn scrape_new_delegates<S: DelegateScraper + Default + Send + Sync>(
     prev_delegates: &HashSet<Delegate>,
     parliament_api_limiter: ApiLimiter,
 ) -> crate::Result<Vec<Delegate>> {
-    let scraper = AustriaScraper::default();
+    let scraper = S::default();
 
     let mut delegates = vec![];
 
@@ -47,13 +54,33 @@ async fn scrape_new_delegates(
         .run(scraper.post_persons_payload())
         .await?;
     for person_path in scraper.person_paths(persons).unwrap_or_default() {
-        // println!("person_path: {person_path}");
-        let Ok(delegate) = parliament_api_limiter
-            .run(scraper.get_delegate(person_path))
-            .await
-        else {
-            continue;
+        let mut attempt = 0;
+        let delegate = loop {
+            match parliament_api_limiter
+                .run(scraper.get_delegate(person_path.clone()))
+                .await
+            {
+                Ok(delegate) => break Some(delegate),
+
+                Err(ScraperError::Forbidden) => return Err(Box::new(ScraperError::Forbidden)),
+
+                Err(ScraperError::TooManyRequests(retry_after)) if attempt < MAX_RETRIES => {
+                    attempt += 1;
+                    let wait = retry_after.unwrap_or(Duration::from_secs(1 << attempt));
+                    log::warn!(
+                        "429 on {person_path:?}, waiting {wait:?} (attempt {attempt}/{MAX_RETRIES})",
+                    );
+                    tokio::time::sleep(wait).await;
+                }
+
+                Err(e) => {
+                    log::error!("Could not scrape delegate {e:?}");
+                    break None;
+                }
+            }
         };
+
+        let Some(delegate) = delegate else { continue };
 
         // delegates that were active before but aren't anymore remain (as active) in the database
         /*if !delegate.is_active {
@@ -166,22 +193,20 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
             prev_name_till: delegate
                 .prev_name_info
                 .as_ref()
-                .map(|prev_name| prev_name.till)
-                .flatten(),
+                .and_then(|prev_name| prev_name.till),
             party: delegate.party.clone(),
             image_url: delegate.image.as_ref().map(|image| image.url.clone()),
             image_copyright: delegate
                 .image
                 .as_ref()
-                .map(|image| image.copyright.clone())
-                .flatten(),
+                .and_then(|image| image.copyright.clone()),
             constituency: delegate.constituency.clone(),
             council: delegate.council.clone(),
             seat_row: delegate.seat.as_ref().map(|seat| seat.row as i32),
             seat_col: delegate.seat.as_ref().map(|seat| seat.col as i32),
             gender: delegate.gender.to_string_opt(),
             is_active: Some(delegate.is_active),
-            birthdate: delegate.birthdate.clone(),
+            birthdate: delegate.birthdate,
             created_at: None,
             updated_at: None,
             hash: Some(hash as i64),
@@ -248,17 +273,18 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
         }
 
         #[cfg(feature = "ai")]
-        if (enforce_ai_run() || should_update) && false {
-            if let Some(ai_task_tx) = &app_state.cpu_task_tx {
+        if (enforce_ai_run() || should_update) && false
+            && let Some(ai_task_tx) = &app_state.cpu_task_tx {
                 use tokio::time::Instant;
-
+                let pool = app_state.pg_pool.clone();
                 let task = crate::ai_task::AiTask {
                     input: None,
                     priority: crate::ai_task::Priority::Low,
                     score: crate::ai_task::Priority::Low.weight(),
-                    task_id: crate::hash!(),
+                    task_id: crate::hash!(app_state.parliament),
                     db_entry_id: delegate.id as i32,
                     rerunnable: true,
+                    pool: pool.clone(),
                     created_at: Instant::now(),
                     task: Box::new(move |task_args| {
                         Box::pin(async move {
@@ -296,7 +322,6 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
                     );
                 }
             }
-        }
 
         if !should_update {
             continue;
@@ -318,19 +343,19 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
 
         // println!("SQL: {}", debug_query.to_string());
 
-        if let Some(seat) = &delegate.seat {
-            if let Err(e) = insert_seat(
+        if let Some(seat) = &delegate.seat
+            && let Err(e) = insert_seat(
                 delegate.id as i32,
                 seat.row as i32,
                 seat.col as i32,
-                delegate.council.as_ref().map(|x| x.as_str()),
+                delegate.council.as_deref(),
                 pg_pool,
+                app_state.parliament,
             )
             .await
             {
                 log::error!("error adding seat: {e:?}",);
             }
-        }
 
         for mandate in &delegate.mandates {
             if let Err(e) =
@@ -356,8 +381,8 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
         }
 
         if should_update {
-            if let Some(client) = &app_state.redis_client {
-                if let Err(e) = crate::notify_update_streamed(
+            if let Some(client) = &app_state.redis_client
+                && let Err(e) = crate::notify_update_streamed(
                     combx::Index::Delegates,
                     delegate,
                     &mut client.clone(),
@@ -366,7 +391,6 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
                 {
                     log::error!("Could not notify for delegate update!: {e:?}");
                 }
-            }
             if let Err(e) =
                 sqlx::query!("REFRESH MATERIALIZED VIEW CONCURRENTLY delegates_with_mandates;")
                     .execute(pg_pool)
@@ -404,7 +428,12 @@ pub async fn insert_seat(
     seat_col: i32,
     council: Option<&str>,
     pg: &PgPool,
+    parliament: Parliament,
 ) -> sqlx::Result<PgQueryResult> {
+    let gp = match parliament {
+        Parliament::At => crate::LATEST_GP,
+        Parliament::Eu => crate::EU_LATEST_GP,
+    };
     sqlx::query!(
         "
         insert into seat_history(delegate_id, seat_row, seat_col, council, gp) values ($1, $2, $3, $4, $5)
@@ -415,7 +444,7 @@ pub async fn insert_seat(
         seat_row,
         seat_col,
         council,
-        crate::LATEST_GP,
+        gp,
     )
     .execute(pg)
     .await
@@ -453,18 +482,18 @@ pub async fn insert_mandate(
         is_ministry: mandate.is_ministry,
         function: mandate.function.clone(),
     };
-    if name_lowercase.contains("abgeordnete") && mandate.function.as_deref() != Some("AH") {
-        if !mandate.is_nr {
+    if name_lowercase.contains("abgeordnete") && mandate.function.as_deref() != Some("AH")
+        && !mandate.is_nr {
             log::error!(
                 "Mandate name contains 'abgeordnete' but is isn't set to is_nr: {db_mandate:?}"
             );
         }
-    }
-    if name_lowercase.contains("minister") || name_lowercase.contains("kanzler") {
-        if !mandate.is_gov {
-            log::warn!("Could be a minister or kanzler thing, but no GOV in mandate!!! mandate: {mandate:?}, delegate: {delegate_id}");
+    if (name_lowercase.contains("minister") || name_lowercase.contains("kanzler"))
+        && !mandate.is_gov {
+            log::warn!(
+                "Could be a minister or kanzler thing, but no GOV in mandate!!! mandate: {mandate:?}, delegate: {delegate_id}"
+            );
         }
-    }
 
     sqlx::query!(
         "
@@ -516,7 +545,7 @@ pub async fn insert_mandate(
     //     .execute(conn)
 }
 
-pub async fn delegates_once(
+pub async fn delegates_once<S: DelegateScraper + Default + Send + Sync>(
     prev_delegates: &HashSet<Delegate>,
     pg_pool: AppState,
 ) -> Vec<Delegate> {
@@ -524,12 +553,12 @@ pub async fn delegates_once(
 
     let parliament_api_limiter = pg_pool.parliament_api_limiter.clone();
     let new_delegates_bs = scrape_untill_success::<Vec<Delegate>, _>(|| async {
-        scrape_new_delegates_bs(parliament_api_limiter.clone()).await
+        scrape_new_delegates_bs::<S>(parliament_api_limiter.clone()).await
     })
     .await;
 
     let mut new_delegates = scrape_untill_success::<Vec<Delegate>, _>(|| async {
-        scrape_new_delegates(&prev_delegates, pg_pool.parliament_api_limiter.clone()).await
+        scrape_new_delegates::<S>(prev_delegates, pg_pool.parliament_api_limiter.clone()).await
     })
     .await;
 
@@ -546,7 +575,10 @@ pub async fn delegates_once(
     new_delegates
 }
 
-pub async fn run_shut(mut shutdown: Shutdown, pg_pool: AppState) {
+pub async fn run_shut<S: DelegateScraper + Default + Send + Sync>(
+    mut shutdown: Shutdown,
+    pg_pool: AppState,
+) {
     let prev_delegates = HashSet::new();
 
     while !shutdown.is_shutdown() {
@@ -558,7 +590,7 @@ pub async fn run_shut(mut shutdown: Shutdown, pg_pool: AppState) {
             _ = async {
                 log::info!("Starting delegates scraper");
 
-                delegates_once(&prev_delegates, pg_pool.clone()).await;
+                delegates_once::<S>(&prev_delegates, pg_pool.clone()).await;
                 log::info!("Delegates scraper service sleeps for 3 hours");
                 tokio::time::sleep(tokio::time::Duration::from_secs(60 * 60 * 3)).await;
                 // prev_delegates.extend(delegates_once(&prev_delegates).await);

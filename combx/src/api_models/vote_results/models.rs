@@ -3,12 +3,9 @@ use optional_struct::*;
 use serde::{Deserialize, Serialize};
 use somes_macro::{CompositeType, MeilisearchFilter};
 use somes_meilisearch_filter::{FilterArgument, FilterOp};
-use somes_scraper::filter;
 use sqlx::{FromRow, prelude::Type};
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
-
-use crate::OptionalVoteResultFilter;
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
@@ -142,8 +139,10 @@ pub struct DbLegislativeInitiativeQuery {
 pub struct DbVote {
     pub party: String,
     pub code: Option<String>,
-    pub fraction: i32,
-    pub infavor: bool,
+    pub infavor_count: i32,
+    pub against_count: i32,
+    pub abstention_count: i32,
+    pub absence_count: i32,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
@@ -183,6 +182,7 @@ pub struct DbNamedVote {
     #[filter(make_optional)]
     pub id: i32,
     pub infavor: Option<bool>,
+    pub was_abstention: bool,
     pub was_absent: Option<bool>,
     #[filter(make_optional)]
     pub lev: i64,

@@ -1,10 +1,10 @@
-use combx::{Index, PostgresEnhancer, VoteResult};
+use combx::{Index, Parliament, PostgresEnhancer, VoteResult};
 use somes_scraper::LegislativeInitiative;
 use sqlx::PgPool;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    AppState,
+    AppState, EU_LATEST_GP, LATEST_GP,
     ai_task::AiTask,
     enforce_ai_run,
     legislative_initiatives::inserts::{
@@ -20,13 +20,19 @@ pub async fn update_or_insert_legis_init_in_db(
     legis_init: &LegislativeInitiative,
     new_legis_init_tx: Option<Sender<(i32, VoteResult)>>,
     ai_task_tx: Option<Sender<AiTask>>,
-) {
+    parliament: Parliament,
+) -> crate::Result<()> {
     let pool = &app_state.pg_pool;
     let start = tokio::time::Instant::now();
 
     let vote_result_start = tokio::time::Instant::now();
-    let mut vote_result =
-        VoteResult::from_legis_init(PostgresEnhancer(pool.clone()), legis_init.clone(), None).await;
+    let mut vote_result = VoteResult::from_legis_init(
+        PostgresEnhancer(pool.clone()),
+        legis_init.clone(),
+        parliament,
+        None,
+    )
+    .await?;
 
     log::info!(
         "legis init to vote result conversion duration: {:?}",
@@ -37,7 +43,7 @@ pub async fn update_or_insert_legis_init_in_db(
 
     if !enforce_ai_run() && !should_update {
         log::info!("No need to update!");
-        return;
+        return Ok(());
     }
     log::info!(
         "ADD legislative initiative: {} {} {}",
@@ -51,7 +57,7 @@ pub async fn update_or_insert_legis_init_in_db(
         Ok(t) => t,
         Err(e) => {
             log::error!("Failed to start transaction for legis init: {:?}", e);
-            return;
+            return Err(e.into());
         }
     };
 
@@ -120,33 +126,45 @@ pub async fn update_or_insert_legis_init_in_db(
         Ok(record) => record.id,
         Err(e) => {
             log::error!("Error inserting legislative initiative: '{:?}'. Error occurred for legislative initiative: {:?}", e, legis_init);
-            return;
+            return Err(e.into());
         }
     };
 
     vote_result.id = Some(legis_init_id);
 
+    let latest_gp = match parliament {
+        Parliament::At => LATEST_GP,
+        Parliament::Eu => EU_LATEST_GP,
+    };
+
     #[cfg(feature = "ai")]
-    if let Some(ai_task_tx) = &ai_task_tx {
-        if db_legis_init.is_voteable_on {
+    if let Some(ai_task_tx) = &ai_task_tx
+        && db_legis_init.is_voteable_on {
+            use combx::document_text::clean_eu_documents;
             use tokio::time::Instant;
 
-            use crate::{LATEST_GP, ai_task::Priority};
+            use crate::ai_task::Priority;
 
-            let priority =
-                if db_legis_init.raw_data_created_at >= today() - chrono::Duration::days(60) {
-                    if db_legis_init.accepted.is_some() {
-                        Priority::Highest
-                    } else {
-                        Priority::Higher
-                    }
-                } else if db_legis_init.gp == LATEST_GP {
-                    Priority::High
+            let priority = if db_legis_init.raw_data_created_at
+                >= today() - chrono::Duration::days(60)
+                || db_legis_init.vote_date
+                    >= Some((today() - chrono::Duration::days(60)).date_naive())
+            {
+                if db_legis_init.accepted.is_some() {
+                    Priority::Highest
                 } else {
-                    Priority::Lowest
-                };
+                    Priority::Higher
+                }
+            } else if db_legis_init.gp == latest_gp {
+                Priority::High
+            } else {
+                Priority::Lowest
+            };
 
-            let documents = vote_result.documents.clone();
+            let documents = match parliament {
+                Parliament::At => vote_result.documents.clone(),
+                Parliament::Eu => clean_eu_documents(vote_result.documents.clone()),
+            };
             let voting = db_legis_init.voting.clone();
             let redis_client = app_state.redis_client.clone();
             let (gp, ityp, inr) = (
@@ -159,26 +177,42 @@ pub async fn update_or_insert_legis_init_in_db(
             let summarization_task = AiTask {
                 input: None,
                 priority,
+                pool: pool.clone(),
                 score: priority.weight(),
-                task_id: crate::hash!(),
+                task_id: crate::hash!(parliament),
                 db_entry_id: legis_init_id,
                 rerunnable: true,
                 created_at: Instant::now(),
                 task: Box::new(move |task_args| {
                     Box::pin(async move {
+                        use somes_scraper::language::Language;
+
                         use crate::legislative_initiatives::summarize_legis_init_documents;
 
-                        let summarization_of = match voting.as_deref() {
-                            Some("Law") => "Antrag/Gesetz",
-                            Some("Amendment") => "Abänderungsantrag",
-                            Some("Resolution") => "Entschließungsantrag",
-                            Some(other) => other,
-                            None => "Unbekannt",
+                        let language = match parliament {
+                            Parliament::At => Language::De,
+                            Parliament::Eu => Language::En,
                         };
+
+                        let summarization_of = match parliament {
+                            Parliament::At => match voting.as_deref() {
+                                Some("Law") => "Antrag/Gesetz",
+                                Some("Amendment") => "Abänderungsantrag",
+                                Some("Resolution") => "Entschließungsantrag",
+                                Some(other) => other,
+                                None => "Unbekannt",
+                            },
+                            Parliament::Eu => &voting.unwrap_or("Unknown".into()),
+                        };
+
                         let pg_pool = task_args.pg_pool.clone();
-                        let ai_summary =
-                            summarize_legis_init_documents(task_args, &documents, summarization_of)
-                                .await?;
+                        let ai_summary = summarize_legis_init_documents(
+                            task_args,
+                            &documents,
+                            summarization_of,
+                            language,
+                        )
+                        .await?;
 
                         let has_ai_summary = ai_summary.is_some();
                         vote_result.ai_summary = ai_summary.clone();
@@ -228,15 +262,14 @@ pub async fn update_or_insert_legis_init_in_db(
                 log::error!("Could not send AI task for legis init emphasis summarization: {e:?}");
             }
         }
-    }
 
     if enforce_ai_run() && !should_update {
         log::info!("No need to update further!");
-        return;
+        return Ok(());
     }
 
-    if let Some(vote_date) = db_legis_init.vote_date {
-        if should_update && (today().date_naive() - vote_date).abs().num_days() > 30 {
+    if let Some(vote_date) = db_legis_init.vote_date
+        && should_update && (today().date_naive() - vote_date).abs().num_days() > 30 {
             let exists: bool = sqlx::query_scalar!(
                 r#"
                 SELECT EXISTS (
@@ -252,8 +285,8 @@ pub async fn update_or_insert_legis_init_in_db(
             .unwrap_or_default()
             .unwrap_or_default();
 
-            if exists {
-                if let Err(e) = sqlx::query(
+            if exists
+                && let Err(e) = sqlx::query(
                     "REFRESH MATERIALIZED VIEW CONCURRENTLY latest_legislative_initiatives",
                 )
                 .execute(pool)
@@ -261,27 +294,23 @@ pub async fn update_or_insert_legis_init_in_db(
                 {
                     log::error!("Could not refresh latest legislative initiatives view: {e:?}")
                 }
-            }
         }
-    }
 
-    if let Some(refs) = vote_result.references_to.as_ref() {
-        if let Err(e) = insert_references_batch(&mut tx, refs, legis_init_id).await {
+    if let Some(refs) = vote_result.references_to.as_ref()
+        && let Err(e) = insert_references_batch(&mut tx, refs, legis_init_id).await {
             log::error!("Could not insert references for legis init {legis_init_id}: {e:?}")
         }
-    }
 
     if let Err(e) = insert_votes_batch(&mut tx, &vote_result.votes, legis_init_id).await {
-        log::warn!("Error inserting votes: '{:?}'.", e);
+        log::error!("Error inserting votes: '{:?}'.", e);
     }
 
-    if let Some(named_votes) = &vote_result.named_votes {
-        if let Ok(named_vote_info_id) =
+    if let Some(named_votes) = &vote_result.named_votes
+        && let Ok(named_vote_info_id) =
             insert_named_vote_info(&mut *tx, &named_votes.named_vote_info, legis_init_id).await
-        {
-            if let Err(e) = insert_named_votes(
+            && let Err(e) = insert_named_votes(
                 &mut tx,
-                &named_votes.named_votes.as_ref().unwrap_or(&vec![]),
+                named_votes.named_votes.as_ref().unwrap_or(&vec![]),
                 named_vote_info_id,
             )
             .await
@@ -290,8 +319,6 @@ pub async fn update_or_insert_legis_init_in_db(
                     "Could not insert any named votes for legis init: {legis_init:?}, error: {e:?}"
                 )
             }
-        }
-    }
 
     #[cfg(not(feature = "ai"))]
     check_and_send_legis_init_mail(new_legis_init_tx, &vote_result, pool, legis_init_id).await;
@@ -345,8 +372,8 @@ pub async fn update_or_insert_legis_init_in_db(
         log::error!("Cannot commit legis init transaction: {e:?}");
     }
 
-    if should_update {
-        if let Some(client) = &app_state.redis_client {
+    if should_update
+        && let Some(client) = &app_state.redis_client {
             // TODO: could use patching approach in the future, currently, the receiver side is reconstructing everything from scratch
             if let Err(e) =
                 notify_update_streamed(Index::VoteResults, &vote_result, &mut client.clone()).await
@@ -354,9 +381,9 @@ pub async fn update_or_insert_legis_init_in_db(
                 log::error!("Could not notify for vote result update!: {e:?}");
             }
         }
-    }
 
     log::info!("Insertion duration for legis init: {:?}", start.elapsed());
+    Ok(())
 }
 
 async fn check_and_send_legis_init_mail(

@@ -223,7 +223,7 @@ fn render_issued_proposals(activity: &RecentActivity) -> String {
                 votes
                     .iter()
                     .map(|vote| {
-                        let symbol = if vote.infavor {
+                        let symbol = if vote.infavor_count > 0 {
                             "<span style=\"color: #22c55e;\">✓</span>"
                         } else {
                             "<span style=\"color: #ef4444;\">✗</span>"
@@ -336,8 +336,7 @@ fn render_speeches(activity: &RecentActivity) -> String {
             speech
                 .document_urls
                 .as_ref()
-                .map(|urls| urls.first())
-                .flatten()
+                .and_then(|urls| urls.first())
                 .map(|url| url.as_str()),
         ));
     }

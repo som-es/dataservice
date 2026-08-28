@@ -4,17 +4,17 @@ use std::{
 };
 
 use combx::{
-    with_data::gps::{gps, LegislativePeriod},
     Decree, FromScrapedType, Index, PostgresEnhancer,
+    with_data::gps::{LegislativePeriod, gps},
 };
 use dotenvy_macro::dotenv;
-use somes_scraper::{decree::RisScraper, AustriaScraper, Thing};
+use somes_scraper::{AustriaScraper, Thing, decree::RisScraper};
 use sqlx::PgPool;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    ai_task::AiTask, enforce_ai_run, ministrial_proposals::get_active_gov_officals,
-    should_update_by_hash, today, AppState, CompareHash, Shutdown,
+    AppState, CompareHash, Shutdown, ai_task::AiTask, enforce_ai_run,
+    ministrial_proposals::get_active_gov_officals, should_update_by_hash, today,
 };
 
 mod ai_tasks;
@@ -194,22 +194,20 @@ pub async fn insert_ministrial_decree(
             check_and_send_decree_email(pg_pool, &decree, decree_id, &new_decree_tx).await;
         }
 
-        if should_update {
-            if let Some(client) = &app_state.redis_client {
-                if let Err(e) =
+        if should_update
+            && let Some(client) = &app_state.redis_client
+                && let Err(e) =
                     crate::notify_update_streamed(Index::Decrees, &decree, &mut client.clone())
                         .await
                 {
                     log::error!("Could not notify for decree update!: {e:?}");
                 }
-            }
-        }
 
         #[cfg(feature = "ai")]
         {
             use tokio::time::Instant;
 
-            use crate::{ai_task::Priority, LATEST_GP};
+            use crate::{LATEST_GP, ai_task::Priority};
 
             let (priority, new_decree_tx) =
                 if decree.publication_date >= (today() - chrono::Duration::days(90)).date_naive() {
@@ -227,7 +225,8 @@ pub async fn insert_ministrial_decree(
                 input: None,
                 priority,
                 score: priority.weight(),
-                task_id: crate::hash!(),
+                pool: pool.clone(),
+                task_id: crate::hash!(app_state.parliament),
                 db_entry_id: decree_id,
                 rerunnable: true,
                 created_at: Instant::now(),

@@ -34,6 +34,7 @@ pub struct AiTask {
     pub task_id: u64,
     pub db_entry_id: i32,
     pub rerunnable: bool,
+    pub pool: PgPool,
     pub created_at: Instant,
     pub task: Box<
         dyn (FnOnce(TaskArgs) -> Pin<Box<dyn Future<Output = combx::Result<()>> + Send>>)
@@ -54,6 +55,7 @@ impl AiTask {
                 + Send
                 + Sync,
         >,
+        pool: PgPool,
     ) -> AiTask {
         AiTask {
             input: None,
@@ -64,6 +66,7 @@ impl AiTask {
             rerunnable: true,
             created_at: Instant::now(),
             task,
+            pool,
         }
     }
     pub fn effective_score(&self, now: Instant) -> u64 {

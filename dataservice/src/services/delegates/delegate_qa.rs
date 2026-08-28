@@ -53,26 +53,25 @@ pub async fn insert_delegate_introduction<'a>(
     .fetch_optional(&mut **tx)
     .await?;
 
-    let id = match id {
-        Some(id) => {
-            return Ok(());
-            /*sqlx::query!(
-                "DELETE FROM transcriptionsQA WHERE transcription_id = $1",
-                id
-            )
-            .execute(&mut **tx)
-            .await?;
-            id*/
-        }
-        None => {
-            sqlx::query_scalar!(
+    let id =
+        match id {
+            Some(_id) => {
+                return Ok(());
+                /*sqlx::query!(
+                    "DELETE FROM transcriptionsQA WHERE transcription_id = $1",
+                    id
+                )
+                .execute(&mut **tx)
+                .await?;
+                id*/
+            }
+            None => sqlx::query_scalar!(
                 "INSERT INTO introduction_transcriptions (delegate_id) VALUES ($1) RETURNING id",
                 delegate_id
             )
             .fetch_one(&mut **tx)
-            .await?
-        }
-    };
+            .await?,
+        };
 
     insert_delegate_qa(id, qa, tx).await?;
 

@@ -102,11 +102,12 @@ macro_rules! location {
 
 #[macro_export]
 macro_rules! hash {
-    () => {{
+    ($parliament:expr) => {{
         use core::hash::{Hash, Hasher};
         let loc = $crate::location_hasher::HashLocation::from((file!(), line!(), column!()));
         let mut hasher = $crate::location_hasher::LocationHasher::default();
         loc.hash(&mut hasher);
+        $parliament.hash(&mut hasher);
         hasher.finish()
     }};
 }

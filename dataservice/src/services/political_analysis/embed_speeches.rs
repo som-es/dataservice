@@ -1,14 +1,14 @@
-use crate::political_analysis::EmbeddingProvider;
 use crate::Result;
+use crate::political_analysis::EmbeddingProvider;
 use chrono::{Datelike, Utc};
-use qdrant_client::qdrant::points_selector::PointsSelectorOneOf;
+use qdrant_client::Qdrant;
 use qdrant_client::qdrant::r#match::MatchValue;
+use qdrant_client::qdrant::points_selector::PointsSelectorOneOf;
 use qdrant_client::qdrant::{
-    condition::ConditionOneOf, vectors_config::Config, Condition, CreateCollection, Distance,
-    FieldCondition, Filter, Match, VectorParams, VectorsConfig,
+    Condition, CreateCollection, Distance, FieldCondition, Filter, Match, VectorParams,
+    VectorsConfig, condition::ConditionOneOf, vectors_config::Config,
 };
 use qdrant_client::qdrant::{DeletePoints, PointStruct, PointsSelector, UpsertPoints};
-use qdrant_client::Qdrant;
 use serde_json::json;
 use sqlx::PgPool;
 use std::collections::HashMap;
@@ -27,12 +27,22 @@ pub struct Speech {
     pub add_date: Option<chrono::DateTime<Utc>>,
     pub legislative_period: Option<String>,
     pub inr: i32,
+    pub document_urls: Vec<String>,
 }
 
 pub async fn get_delegate_ids(pool: &PgPool) -> Result<Vec<Delegate>> {
     let delegates = sqlx::query_as!(
         Delegate,
-        "SELECT id, name FROM delegates WHERE is_active = true"
+        r#"
+        SELECT id, name
+        FROM delegates
+        WHERE EXISTS (
+            SELECT 1
+            FROM mandates
+            WHERE mandates.delegate_id = delegates.id
+              AND mandates.start_date > '2017-01-01'
+        )
+        "#
     )
     .fetch_all(pool)
     .await?;
@@ -51,11 +61,17 @@ pub async fn get_speech_texts(pool: &PgPool, delegate_id: i32) -> Result<Vec<Spe
             debates.about,
             raw_data_created_at as add_date,
             legislative_period,
-            pi.inr
+            pi.inr,
+            COALESCE(
+                array_agg(shu.document_url) FILTER (WHERE shu.document_url IS NOT NULL),
+                '{}'
+            ) as "document_urls!: Vec<String>"
         FROM plenar_speeches ps
         INNER JOIN debates ON debates.id = ps.debate_id
         INNER JOIN plenar_infos pi ON pi.id = debates.plenar_id
+        LEFT JOIN plenar_speech_links shu ON shu.plenar_speech_id = ps.id
         WHERE ps.delegate_id = $1 AND ps.spoken_text IS NOT NULL
+        GROUP BY ps.id, ps.spoken_text, debates.about, raw_data_created_at, legislative_period, pi.inr
         "#,
         delegate_id
     )
@@ -94,7 +110,7 @@ pub fn chunk_speech(
     text: &str,
     chunk_size: usize,
     padding_size: usize,
-) -> Vec<(String, Vec<String>, Vec<String>)> {
+) -> Vec<(String, String, String)> {
     let words: Vec<&str> = text.split(' ').collect();
     let mut chunks = Vec::new();
 
@@ -103,16 +119,18 @@ pub fn chunk_speech(
         let end_idx = start_idx + chunk.len();
 
         let upper_start = start_idx.saturating_sub(padding_size);
-        let upper_padding: Vec<String> = words[upper_start..start_idx]
+        let upper_padding: String = words[upper_start..start_idx]
             .iter()
             .map(|s| s.to_string())
-            .collect();
+            .collect::<Vec<_>>()
+            .join(" ");
 
         let lower_end = (end_idx + padding_size).min(words.len());
-        let lower_padding: Vec<String> = words[end_idx..lower_end]
+        let lower_padding: String = words[end_idx..lower_end]
             .iter()
             .map(|s| s.to_string())
-            .collect();
+            .collect::<Vec<_>>()
+            .join(" ");
 
         let chunk_text = chunk.join(" ");
         chunks.push((chunk_text, upper_padding, lower_padding));
@@ -129,6 +147,8 @@ pub async fn process_delegate(
     delegate: &Delegate,
     update_entries: bool,
 ) -> crate::Result<()> {
+    let embedding_name = embedder.model().await?;
+
     // 1. Check if delegate already exists in Qdrant (Scroll with filter)
     let filter = Filter {
         must: vec![Condition {
@@ -177,8 +197,8 @@ pub async fn process_delegate(
 
         for (chunk_text, upper_padding, lower_padding) in chunked_data {
             let chunk_len = chunk_text.len();
-            let upper_len: usize = upper_padding.iter().map(|s| s.len()).sum();
-            let lower_len: usize = lower_padding.iter().map(|s| s.len()).sum();
+            let upper_len: usize = upper_padding.len();
+            let lower_len: usize = lower_padding.len();
 
             if chunk_len >= 1900 || upper_len >= 32030 || lower_len >= 32030 {
                 log::warn!("Chunk length exceeded limits, skipping chunk.");
@@ -195,6 +215,14 @@ pub async fn process_delegate(
             payload.insert("lower_padding".to_string(), json!(lower_padding).into());
             payload.insert("upper_padding".to_string(), json!(upper_padding).into());
             payload.insert("speech_id".to_string(), json!(speech.id).into());
+            payload.insert(
+                "embedding_model_name".to_string(),
+                json!(embedding_name).into(),
+            );
+            payload.insert(
+                "document_urls".to_string(),
+                json!(speech.document_urls).into(),
+            );
 
             if let Some(about) = &speech.about {
                 payload.insert("about".to_string(), json!(about).into());
@@ -291,7 +319,7 @@ mod tests {
 
         let qdrant_client = Qdrant::from_url("http://10.30.0.164:6334").build().unwrap();
 
-        let pg_pool = connect_pg().await;
+        let pg_pool = connect_pg(crate::DATABASE_URL).await;
 
         process_all_delegates(&pg_pool, &qdrant_client, &ai_client, "delegates")
             .await

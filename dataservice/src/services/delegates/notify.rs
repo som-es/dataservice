@@ -167,7 +167,7 @@ mod tests {
     use std::collections::HashMap;
 
     use crate::{
-        connect_pg,
+        AT_DATABASE_URL, connect_pg2,
         delegates::notify::{populate_delegate_profile_html, send_delegate_activity_mail},
     };
 
@@ -175,7 +175,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_collect_recent_activity_by_delegate() {
-        let pg_pool = connect_pg().await;
+        let pg_pool = connect_pg2(AT_DATABASE_URL).await;
         let delegate_id = 32506;
         let last_n_days = 30;
         let activity = collect_recent_activity_by_delegate(delegate_id, &pg_pool, last_n_days)
@@ -187,7 +187,7 @@ mod tests {
     #[tokio::test]
     async fn test_send_delegate_activity_mail() {
         let mail_to = crate::email::TEST_MAIL_RECEIVER;
-        let pg_pool = connect_pg().await;
+        let pg_pool = connect_pg2(AT_DATABASE_URL).await;
         let last_n_days = 90;
         let delegate_id = 32506;
         let activity = collect_recent_activity_by_delegate(delegate_id, &pg_pool, last_n_days)

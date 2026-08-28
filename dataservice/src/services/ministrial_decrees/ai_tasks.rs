@@ -1,5 +1,6 @@
 use combx::DbAiSummary;
 use somes_common_lib::Document;
+use somes_scraper::language::Language;
 
 use crate::{ai_task::TaskArgs, ai_tasks::summarize_and_save};
 
@@ -36,17 +37,21 @@ pub async fn summarize_decrees_documents(
             .await?;
             Ok(())
         },
+        Language::De,
     )
     .await
 }
 
 #[cfg(test)]
 mod tests {
-    use combx::document_text::{combine_texts, extract_text_from_documents_html_first_stripped};
+    use combx::{
+        document_text::{combine_texts, extract_text_from_documents_html_first_stripped},
+        with_data::unique_topics::unique_topics_for_lang,
+    };
     use somai_client::SomAiClient;
-    use somes_scraper::{decree::RisScraper, AustriaScraper};
+    use somes_scraper::{AustriaScraper, decree::RisScraper};
 
-    use crate::{ai_tasks::summary_prompt2, OCR_ENGINE};
+    use crate::{OCR_ENGINE, ai_tasks::summary_prompt2};
 
     use super::*;
 
@@ -60,12 +65,9 @@ mod tests {
             .await
             .unwrap();
         let pg_pool = combx::connect_pg().await;
-        let unique_topics = sqlx::query_scalar!(
-            "select topic_name as topic from unique_eurovoc_topics order by topic"
-        )
-        .fetch_all(&pg_pool)
-        .await
-        .unwrap();
+        let unique_topics = unique_topics_for_lang(&pg_pool, Language::De)
+            .await
+            .unwrap();
         let documents = decree
             .documents
             .iter()
@@ -80,8 +82,14 @@ mod tests {
             combine_texts(&extract_text_from_documents_html_first_stripped(&documents, None).await);
         println!("input length: {}", input.len());
 
-        let result =
-            summary_prompt2(&somai_client, input, &unique_topics, "Ministerialentwurf").await;
+        let result = summary_prompt2(
+            &somai_client,
+            input,
+            &unique_topics,
+            "Ministerialentwurf",
+            Language::De,
+        )
+        .await;
         dbg!(result.unwrap());
         // println!("input: {}", &input[..std::cmp::min(5000, input.len())]);
     }

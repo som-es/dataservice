@@ -1,18 +1,58 @@
 use crate::{
+    EU_LATEST_GP, LATEST_GP,
     political_analysis::{
-        delegate_context::{collect_delegate_profile, collect_spoken_texts},
         EmbeddingProvider,
+        delegate_context::{collect_delegate_profile, collect_spoken_texts},
     },
-    LATEST_GP,
 };
+use combx::{Error::Custom, Parliament};
 use qdrant_client::Qdrant;
 use schemars::JsonSchema;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use somai_client::SomAiClient;
-use somes_scraper::today;
+use somes_scraper::{language::Language, today};
 use sqlx::prelude::{FromRow, Type};
 
-pub fn create_stance_system_prompt(question: &str, context: &str, profile: &str) -> String {
+pub fn create_stance_system_prompt_en(
+    question: &str,
+    context: &str,
+    profile: &str,
+    legislative_period: &str,
+) -> String {
+    let today = today();
+    format!(
+        r#"
+    You are an AI expert in political analysis and stance detection.
+    Your task is to precisely determine a politician's substantive position (stance) on a specific statement or question – based exclusively on the provided context.
+    QUESTION / STATEMENT TO EVALUATE:
+    "{question}"
+    RULES FOR CONTENT GENERATION:
+    1. Direct opening (`political_stance`): Begin immediately with the politician's position on the question asked. Omit unnecessary introductions. Write a single, coherent paragraph (no bullet points).
+    2. Third person: It must be clear to an outside reader that the stance comes from an external analysis (e.g., "The representative argues that...").
+    3. Zero hallucination: Do not invent anything whatsoever. Your analysis must be 100% derivable from the provided context.
+    4. Missing information: If the context is empty or contains no statements relevant to the question, write in `political_stance`: "The representative has not explicitly taken a position on this question in the statements available." In this case, `stance_detection` must be set to "Neutral".
+    RULES FOR CLASSIFICATION (`stance_detection`):
+    Evaluate the relationship to the question/statement developed in `political_stance`. The ONLY allowed values are: "Positive", "Negative", or "Neutral".
+    - Enter "Positive" if the politician is IN FAVOR of, AGREES WITH, or SUPPORTS the statement or measure.
+    - Enter "Negative" if the politician is OPPOSED TO, DISAGREES WITH, or REJECTS the statement or measure.
+    - Enter "Neutral" if they do not take a clear position, are weighing pros and cons, or no data is available.
+    RULES FOR CITATIONS (`citations`):
+    - Adhere strictly to the sources. For every speech you used to generate the stance, you must add one object to the array.
+    GENERAL RULES:
+    - Historical context: Note that roles, government participation, and party affiliations may have changed over time.
+    - Language: All text values in the JSON must be written in the input language (except for the keys and the predefined English labels such as "Positive").
+    DATA BASIS:
+    Context (speech snippets from the politician):
+    {context}
+    JSON profile (information about the politician):
+    {profile}
+    GENERAL SYSTEM INFORMATION:
+    Today is {today}. Current legislative period: {legislative_period}.
+    "#
+    )
+}
+
+pub fn create_stance_system_prompt_de(question: &str, context: &str, profile: &str) -> String {
     let today = today();
     format!(
         r#"
@@ -39,7 +79,7 @@ pub fn create_stance_system_prompt(question: &str, context: &str, profile: &str)
 
     ALLGEMEINE REGELN:
     - Historischer Kontext: Beachte, dass sich Funktionen, Regierungsbeteiligungen und Parteizugehörigkeiten verändert haben können.
-    - Sprache: Alle Textwerte im JSON müssen zwingend auf Deutsch verfasst sein (außer die Keys und die vorgegebenen englischen Labels wie "Positive").
+    - Sprache: Alle Textwerte im JSON müssen zwingend in der Input-Sprache verfasst sein (außer die Keys und die vorgegebenen englischen Labels wie "Positive").
 
     DATENGRUNDLAGE:
     Kontext (Redesnippets des Politikers):
@@ -59,15 +99,20 @@ pub async fn populate_system_prompt(
     embedder: &impl EmbeddingProvider,
     delegate_id: i32,
     question: &str,
+    language: Language,
+    parliament: Parliament,
 ) -> crate::Result<String> {
-    let spoken_text = collect_spoken_texts(qdrant_client, embedder, delegate_id, question).await?;
+    let spoken_text =
+        collect_spoken_texts(qdrant_client, embedder, delegate_id, question, parliament).await?;
     let http_client = reqwest::Client::builder().build()?;
     let delegate_profile = collect_delegate_profile(&http_client, delegate_id).await?;
-    Ok(create_stance_system_prompt(
-        question,
-        &spoken_text,
-        &delegate_profile,
-    ))
+    Ok(match language {
+        Language::De => create_stance_system_prompt_de(question, &spoken_text, &delegate_profile),
+        Language::En => {
+            create_stance_system_prompt_en(question, &spoken_text, &delegate_profile, EU_LATEST_GP)
+        }
+        _ => return Err(Custom(format!("language {language:?} not supported")).into()),
+    })
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
@@ -83,6 +128,7 @@ pub enum StanceDetection {
 pub struct Citation {
     pub point_uuid: String,
     pub speech_id: i32,
+    pub speech_document_url: Vec<String>,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
@@ -98,10 +144,20 @@ pub async fn rag_pipeline<T: JsonSchema + DeserializeOwned>(
     qdrant_client: &Qdrant,
     delegate_id: i32,
     question: &str,
+    language: Language,
+    parliament: Parliament,
 ) -> crate::Result<T> {
-    let prompt = populate_system_prompt(qdrant_client, ai_client, delegate_id, question).await?;
+    let prompt = populate_system_prompt(
+        qdrant_client,
+        ai_client,
+        delegate_id,
+        question,
+        language,
+        parliament,
+    )
+    .await?;
     log::info!("stance prompt length: {}", prompt.len());
-    Ok(ai_client
+    ai_client
         .make_llm_request_with_schema::<T>(
             question.into(),
             prompt,
@@ -109,15 +165,16 @@ pub async fn rag_pipeline<T: JsonSchema + DeserializeOwned>(
             false,
             Some(|_schema: &mut serde_json::Value| {}),
         )
-        .await?)
+        .await
 }
 
 #[cfg(test)]
 mod tests {
     use qdrant_client::Qdrant;
     use somai_client::SomAiClient;
+    use somes_scraper::language::Language;
 
-    use crate::political_analysis::stance_system::{rag_pipeline, Stance};
+    use crate::political_analysis::stance_system::{Stance, rag_pipeline};
 
     #[tokio::test]
     async fn test_rag_pipeline() {
@@ -135,8 +192,7 @@ mod tests {
         // let question = "Straftäter:innen sollten härter bestraft werden.";
         let question = "Der Staat sollte weniger ins Wirtschaftsleben eingreifen.";
         let question = "Erbschaften sollten besteuert werden.";
-        let question =
-            "Wichtige Entscheidungen sollten stärker auf nationaler Ebene getroffen werden und nicht auf EU-Ebene. ";
+        let question = "Wichtige Entscheidungen sollten stärker auf nationaler Ebene getroffen werden und nicht auf EU-Ebene. ";
         let question = "Österreich sollte seine Neutralität aufgeben.";
 
         let question = "Österreich sollte sich für die Erweiterung der EU einsetzen.";
@@ -145,10 +201,16 @@ mod tests {
         let question = "Die Rechte von Beschuldigten im Strafverfahren müssen gestärkt werden.";
         let question = "Volksbegehren, die eine bestimmte Anzahl an Unterstützungen erreichen, sollten automatisch zu Volksabstimmungen führen";
 
-        let stance: Stance =
-            rag_pipeline::<Stance>(&ai_client, &qdrant_client, delegate_id, question)
-                .await
-                .unwrap();
+        let stance: Stance = rag_pipeline::<Stance>(
+            &ai_client,
+            &qdrant_client,
+            delegate_id,
+            question,
+            Language::De,
+            combx::Parliament::At,
+        )
+        .await
+        .unwrap();
         log::info!("stance: {stance:?}");
     }
 }

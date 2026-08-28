@@ -1,13 +1,13 @@
 use somes_meilisearch_filter::*;
 
 use crate::{
-    OptionalGovProposalFilter, OptionalVoteResultFilter, filtering::to_topics_filter,
-    meilisearch_filters_ai_summary, meilisearch_filters_vote_result,
+    OptionalGovProposalFilter, filtering::to_topics_filter, meilisearch_filters_ai_summary,
+    meilisearch_filters_vote_result,
 };
 
 pub fn meilisearch_filters_gov_props(
     gov_prop_filter: OptionalGovProposalFilter,
-    prefix: Option<&str>,
+    prefix: Option<String>,
 ) -> Vec<String> {
     let mut filter_conditions = vec![];
     let prefix = prefix.map(|prefix| prefix.to_string());

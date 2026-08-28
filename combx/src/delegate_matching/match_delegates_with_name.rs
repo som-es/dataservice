@@ -310,12 +310,9 @@ mod tests {
     use chrono::NaiveDate;
     use somes_scraper::{AustriaScraper, legis_init::LegislativeInitiatives, plenar::Plenar};
 
-    use crate::{connect_pg, reverse_name, today, with_data::active_delegates_at_date};
+    use crate::{connect_pg, reverse_name, with_data::active_delegates_at_date};
 
-    use super::{
-        levenshtein_distance, match_delegate_name_with_delegate_id,
-        match_delegate_names_with_delegate_ids,
-    };
+    use super::{levenshtein_distance, match_delegate_names_with_delegate_ids};
 
     #[tokio::test]
     async fn test_namentlich_name_matching_xxv_i_1() {
@@ -342,6 +339,7 @@ mod tests {
             .iter()
             .chain(pro_contra.contra.iter())
             .cloned()
+            .map(|val| val.name)
             .collect::<Vec<_>>();
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
@@ -414,6 +412,7 @@ mod tests {
             .iter()
             .chain(pro_contra.contra.iter())
             .cloned()
+            .map(|val| val.name)
             .collect::<Vec<_>>();
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
@@ -484,6 +483,7 @@ mod tests {
                 .iter()
                 .chain(pro_contra.contra.iter())
                 .cloned()
+                .map(|val| val.name)
                 .collect::<Vec<_>>();
             let res = match_delegate_names_with_delegate_ids(
                 &active_delegates,
@@ -525,7 +525,11 @@ mod tests {
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
-            &pro_contra.pro,
+            &pro_contra
+                .pro
+                .iter()
+                .map(|val| val.name.clone())
+                .collect::<Vec<String>>(),
             &init.gp,
             init.nr_plenary_activity_date,
         );
@@ -562,7 +566,11 @@ mod tests {
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
-            &pro_contra.pro,
+            &pro_contra
+                .pro
+                .iter()
+                .map(|val| val.name.clone())
+                .collect::<Vec<String>>(),
             &init.gp,
             init.nr_plenary_activity_date,
         );
@@ -600,7 +608,11 @@ mod tests {
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
-            &pro_contra.pro,
+            &pro_contra
+                .pro
+                .iter()
+                .map(|val| val.name.clone())
+                .collect::<Vec<String>>(),
             &init.gp,
             init.nr_plenary_activity_date,
         );
@@ -623,7 +635,7 @@ mod tests {
             for path in scraper.plenar_paths(raw_plenar).unwrap() {
                 let plenar_info = scraper.get_plenar(&path).await.unwrap();
 
-                if plenar_info.absences.is_none() {
+                if plenar_info.absences.is_empty() {
                     println!("skip {path}");
                     continue;
                 }
@@ -640,13 +652,10 @@ mod tests {
 
                 let res = match_delegate_names_with_delegate_ids(
                     &active_delegates,
-                    &&plenar_info
-                        .absences
-                        .as_ref()
-                        .unwrap()
+                    &&plenar_info.absences[0]
                         .absences
                         .iter()
-                        .map(|x| x.as_str())
+                        .map(|x| x.name.as_str())
                         .map(reverse_name)
                         .collect::<Vec<_>>(),
                     &plenar_info.gp,
@@ -691,13 +700,10 @@ mod tests {
 
         let res = match_delegate_names_with_delegate_ids(
             &active_delegates,
-            &&plenar_info
-                .absences
-                .as_ref()
-                .unwrap()
+            &&plenar_info.absences[0]
                 .absences
                 .iter()
-                .map(|x| x.as_str())
+                .map(|x| x.name.as_str())
                 .map(reverse_name)
                 .collect::<Vec<_>>(),
             &plenar_info.gp,
@@ -707,33 +713,6 @@ mod tests {
         println!("res: {:?}", res.correctly_matched);
         println!("res: {:?}", res.lev_or_deep_split_matched);
         assert!(res.lev_or_deep_split_matched.is_empty());
-    }
-
-    #[test]
-    fn test_distance_delegate_match() {
-        let delegates = vec![
-            ("Amon Werner", 1),
-            ("Belakowitsch Dagmar", 2),
-            ("Berlakovich Nikolaus", 3),
-            ("Bacher Walter", 4),
-            ("Bacher Stefan", 4),
-            ("Becher Ruth", 5),
-            ("Duzdar Muna", 6),
-        ]
-        .into_iter()
-        .map(|(a, b)| (a.to_string(), b))
-        .collect::<Vec<_>>();
-        // .iter()
-        // .map(|(name, id)| {
-        //     let name = name.split(' ').collect::<Vec<_>>();
-        //     let firstname = name[1].to_string();
-        //     let surname = name[0].to_string();
-        //     (firstname, surname, *id)
-        // })
-        // .collect::<Vec<_>>();
-        // let delegate_name = "Bacher Stefono";
-        // let scores = match_delegate_name_with_delegate_id(delegates.iter(), delegate_name, false);
-        // print!("scores: {scores:?}");
     }
 
     #[test]

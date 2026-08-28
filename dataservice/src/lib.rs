@@ -10,6 +10,8 @@ pub mod shutdown;
 
 use std::{cell::LazyCell, env::VarError};
 
+use ::combx::Parliament;
+use chrono::Datelike;
 use redis::aio::ConnectionManager;
 #[cfg(feature = "runner")]
 pub use services::*;
@@ -22,7 +24,8 @@ use chrono::{DateTime, Local};
 pub use db::*;
 #[cfg(feature = "runner")]
 pub use shutdown::*;
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use somes_scraper::{AustriaScraper, eu_parliament::EuParliamentScraper};
+use sqlx::{PgPool, postgres::PgPoolOptions};
 
 pub mod location_hasher;
 
@@ -96,8 +99,11 @@ pub fn tessdata_dir() -> std::result::Result<String, VarError> {
 }
 
 pub const DATABASE_URL: &str = dotenv!("DATABASE_URL");
+pub const AT_DATABASE_URL: &str = dotenv!("AT_DATABASE_URL");
+pub const EU_DATABASE_URL: &str = dotenv!("EU_DATABASE_URL");
 pub const REDIS_URL: &str = dotenv!("REDIS_URL");
 pub const LATEST_GP: &str = dotenv!("LATEST_GP");
+pub const EU_LATEST_GP: &str = dotenv!("EU_LATEST_GP");
 pub const GPS: [&str; 9] = [
     LATEST_GP, "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
 ];
@@ -110,6 +116,7 @@ pub struct AppState {
     pub parliament_api_limiter: ApiLimiter,
     #[cfg(feature = "runner")]
     pub cpu_task_tx: Option<Sender<AiTask>>,
+    pub parliament: Parliament,
 }
 
 #[cfg(feature = "runner")]
@@ -127,33 +134,63 @@ pub fn today_and_time() -> chrono::DateTime<Local> {
     chrono::Local::now()
 }
 
-pub async fn connect_pg() -> PgPool {
+pub async fn connect_pg(db_url: &str) -> PgPool {
     PgPoolOptions::new()
         .max_connections(90)
         .min_connections(5)
-        .connect(DATABASE_URL)
+        .connect(db_url)
         .await
         .unwrap()
 }
 
-pub async fn connect_pg2() -> PgPool {
+pub async fn connect_pg2(db_url: &str) -> PgPool {
     PgPoolOptions::new()
         // pool sizes
         .max_connections(6)
-        .connect(DATABASE_URL)
+        .connect(db_url)
         .await
         .unwrap()
 }
 
+pub trait Gps {
+    const PARLIAMENT: Parliament;
+    const LATEST_GP: &'static str;
+    fn gps() -> Vec<String>;
+}
+
+impl Gps for AustriaScraper {
+    const PARLIAMENT: Parliament = Parliament::At;
+
+    fn gps() -> Vec<String> {
+        GPS.iter().map(|gp| gp.to_string()).collect()
+    }
+
+    const LATEST_GP: &'static str = LATEST_GP;
+}
+
+impl Gps for EuParliamentScraper {
+    const PARLIAMENT: Parliament = Parliament::Eu;
+    fn gps() -> Vec<String> {
+        let start = 2014;
+        let end = today().year();
+        (start..=end)
+            .into_iter()
+            .map(|year| year.to_string())
+            .rev()
+            .collect()
+    }
+
+    const LATEST_GP: &'static str = EU_LATEST_GP;
+}
 #[cfg(test)]
 mod tests {
     use sqlx::query;
 
-    use crate::connect_pg;
+    use crate::{AT_DATABASE_URL, connect_pg2};
 
     #[tokio::test]
     async fn test_duplicate_spoken_text_check() {
-        let pg = connect_pg().await;
+        let pg = connect_pg2(AT_DATABASE_URL).await;
 
         let res = query!(
             "SELECT spoken_text, COUNT(*) as c

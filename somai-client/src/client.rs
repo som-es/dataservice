@@ -112,6 +112,16 @@ impl SomAiClient {
         Ok(resp.json().await?)
     }
 
+    pub async fn get_default_embedding_model_name(&self) -> Result<LLMResponse, reqwest::Error> {
+        let resp = self
+            .client
+            .get(format!("{}/api/embedding/default_model", self.base_url))
+            .header("Authorization", self.auth_header().await)
+            .send()
+            .await?;
+        Ok(resp.json().await?)
+    }
+
     pub async fn make_llm_request<T: JsonSchema>(
         &self,
         input: String,
@@ -163,7 +173,7 @@ impl SomAiClient {
         let mut json_schema =
             serde_json::to_value(&T::json_schema(&mut schema_generator.into_generator()))?;
 
-        if let Some(mut patch) = schema_patch {
+        if let Some(patch) = schema_patch {
             patch(&mut json_schema);
         }
 

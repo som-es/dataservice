@@ -20,35 +20,22 @@ pub async fn insert_votes_batch<'a>(
     .await
     {
         log::error!("Cannot delete votes from legis init: {legis_init_id} with error {e:?}");
+        return Err(e);
     }
 
-    let parties: Vec<String> = votes.iter().map(|v| v.party.clone()).collect();
-    let fractions: Vec<i32> = votes.iter().map(|v| v.fraction.clone()).collect();
-    let infavors: Vec<bool> = votes.iter().map(|v| v.infavor).collect();
-    let ids = vec![legis_init_id; votes.len()];
-
-    let res = sqlx::query!(
-        "
-            INSERT INTO votes (party, fraction, infavor, legislative_initiatives_id)
-            SELECT * FROM UNNEST($1::text[], $2::int4[], $3::bool[], $4::int4[])
-            ON CONFLICT (legislative_initiatives_id, party)
-            DO UPDATE SET fraction = EXCLUDED.fraction, infavor = EXCLUDED.infavor
-        ",
-        &parties,
-        &fractions,
-        &infavors,
-        &ids
-    )
-    .execute(&mut *sp)
-    .await;
-
-    match res {
-        Ok(_) => {
-            sp.commit().await?;
-            Ok(())
-        }
-        Err(e) => Err(e),
+    for vote in votes {
+        sqlx::query!(
+            "insert into votes (party, legislative_initiatives_id, infavor_count, against_count, abstention_count, absence_count) values ($1, $2, $3, $4, $5, $6)",
+            vote.party,
+            legis_init_id,
+            vote.infavor_count,
+            vote.against_count,
+            vote.abstention_count,
+            vote.absence_count
+        ).execute(&mut *sp).await?;
     }
+
+    sp.commit().await
 }
 
 pub async fn insert_named_vote_info<'a>(
@@ -82,7 +69,7 @@ pub async fn insert_named_vote_info<'a>(
     match result {
         Ok(record) => Ok(record.id),
         Err(e) => {
-            log::warn!(
+            log::error!(
                 "Error inserting named vote info: '{:?}'. The error occurred for the following named vote info: {:?}",
                 e,
                 named_vote_info
@@ -109,13 +96,14 @@ pub async fn insert_named_votes<'a>(
             "
                 INSERT INTO named_votes (
                     infavor, was_absent, lev, similiarity_score,
-                    searched_with, matched_with, delegate_id, named_vote_info_id, manually_matched
+                    searched_with, matched_with, delegate_id, named_vote_info_id, manually_matched, was_abstention
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
                 ) ON CONFLICT (delegate_id, named_vote_info_id)
                 DO UPDATE SET
                     infavor = EXCLUDED.infavor,
                     was_absent = EXCLUDED.was_absent,
+                    was_abstention = EXCLUDED.was_abstention,
                     lev = EXCLUDED.lev,
                     similiarity_score = EXCLUDED.similiarity_score,
                     searched_with = EXCLUDED.searched_with,
@@ -130,12 +118,13 @@ pub async fn insert_named_votes<'a>(
             named_vote.matched_with,
             named_vote.delegate_id,
             named_vote_info_id,
-            named_vote.manually_matched
+            named_vote.manually_matched,
+            named_vote.was_abstention,
         )
         .execute(&mut **tx)
         .await
         {
-            log::warn!(
+            log::error!(
                 "Error inserting named vote: '{:?}'. The error occurred for the following named vote: {:?}",
                 e,
                 named_vote

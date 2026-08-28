@@ -1,0 +1,162 @@
+[
+  [
+    "Custom",
+    {
+      "id": "8",
+      "label": "Budget und Finanzen",
+      "language": "de"
+    }
+  ],
+  [
+    "Custom",
+    {
+      "id": "0",
+      "label": "Inneres und Recht",
+      "language": "de"
+    }
+  ],
+  [
+    "Custom",
+    {
+      "id": "9",
+      "label": "Klima, Umwelt und Energie",
+      "language": "de"
+    }
+  ],
+  [
+    "Custom",
+    {
+      "id": "12",
+      "label": "Land- und Forstwirtschaft",
+      "language": "de"
+    }
+  ],
+  [
+    "Custom",
+    {
+      "id": "7",
+      "label": "Innovation, Technologie und Forschung",
+      "language": "de"
+    }
+  ],
+  [
+    "Thesaurus",
+    {
+      "id": "3206",
+      "label": "Bildung",
+      "language": "de"
+    }
+  ],
+  [
+    "Custom",
+    {
+      "id": "6",
+      "label": "Parlament und Demokratie",
+      "language": "de"
+    }
+  ],
+  [
+    "Custom",
+    {
+      "id": "3",
+      "label": "Gesundheit und Ernährung",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4543",
+      "label": "Arbeit",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "2500",
+      "label": "Außenpolitik",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4245",
+      "label": "Sport",
+      "language": "de"
+    }
+  ],
+  [
+    "Custom",
+    {
+      "id": "11",
+      "label": "Frauen und Gleichbehandlung",
+      "language": "de"
+    }
+  ],
+  [
+    "Custom",
+    {
+      "id": "5",
+      "label": "Information und Medien",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "4060",
+      "label": "Europäische Union",
+      "language": "de"
+    }
+  ],
+  [
+    "Custom",
+    {
+      "id": "4",
+      "label": "Familie und Generationen",
+      "language": "de"
+    }
+  ],
+  [
+    "Custom",
+    {
+      "id": "10",
+      "label": "Verkehr und Infrastruktur",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "637",
+      "label": "Wirtschaft",
+      "language": "de"
+    }
+  ],
+  [
+    "Custom",
+    {
+      "id": "1",
+      "label": "Soziales",
+      "language": "de"
+    }
+  ],
+  [
+    "Descriptors",
+    {
+      "id": "317",
+      "label": "Kultur",
+      "language": "de"
+    }
+  ],
+  [
+    "Custom",
+    {
+      "id": "2",
+      "label": "Landesverteidigung",
+      "language": "de"
+    }
+  ]
+]

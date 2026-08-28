@@ -1,4 +1,4 @@
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashSet;
 
 pub fn patch_reference_possibility(schema: &mut Value, questions: &[combx::Question]) {
