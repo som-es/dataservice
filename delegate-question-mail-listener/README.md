@@ -23,13 +23,13 @@ MAIL_INBOUND_POLL_SECONDS=5
 The existing `DATASERVICE_URL` variable is also required. Start the listener from the workspace root:
 
 ```bash
-cargo run -p delegate-question-mail-listener
+cargo run -p delegate-question-mail-listener --features pop3
 ```
 
 The same values can also be passed as CLI flags:
 
 ```bash
-cargo run -p delegate-question-mail-listener -- \
+cargo run -p delegate-question-mail-listener --features pop3 -- \
   --database-url postgres://postgres:postgres@127.0.0.1/dataservice \
   --protocol pop3 \
   --host 127.0.0.1 \

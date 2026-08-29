@@ -2,11 +2,11 @@ use clap::{Parser, ValueEnum};
 use delegate_question_mail::{parse_incoming_reply, IncomingReply};
 use imap::{ClientBuilder, ConnectionMode};
 use sqlx::PgPool;
+use std::{error::Error, time::Duration};
+#[cfg(any(test, feature = "pop3"))]
 use std::{
-    error::Error,
     io::{BufRead, BufReader, Write},
     net::TcpStream,
-    time::Duration,
 };
 use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
@@ -16,6 +16,7 @@ type ListenerResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 #[derive(Clone, Copy, Debug, ValueEnum)]
 enum MailProtocol {
     Imap,
+    #[cfg(any(test, feature = "pop3"))]
     Pop3,
 }
 
@@ -40,6 +41,7 @@ struct ListenerArgs {
     poll_seconds: u64,
 }
 
+#[derive(Clone)]
 struct ListenerConfig {
     database_url: String,
     protocol: MailProtocol,
@@ -56,6 +58,7 @@ impl ListenerConfig {
         let port = args.port.unwrap_or_else(|| {
             match args.protocol {
                 MailProtocol::Imap => "993".to_string(),
+                #[cfg(any(test, feature = "pop3"))]
                 MailProtocol::Pop3 => "1110".to_string(),
             }
             .parse()
@@ -106,6 +109,7 @@ async fn main() -> ListenerResult<()> {
 fn log_startup(config: &ListenerConfig) {
     let protocol = match config.protocol {
         MailProtocol::Imap => "IMAP",
+        #[cfg(any(test, feature = "pop3"))]
         MailProtocol::Pop3 => "POP3",
     };
     info!(
@@ -115,33 +119,20 @@ fn log_startup(config: &ListenerConfig) {
         poll_seconds = config.poll_interval.as_secs(),
         "delegate question listener started"
     );
+    #[cfg(any(test, feature = "pop3"))]
     if matches!(config.protocol, MailProtocol::Pop3) {
         warn!("POP3 mode is intended for local Mailpit testing; use IMAP for production mailboxes");
     }
 }
 
 async fn fetch_messages(config: &ListenerConfig) -> ListenerResult<Vec<Vec<u8>>> {
-    let config = config.clone_for_task();
+    let config = config.clone();
     tokio::task::spawn_blocking(move || match config.protocol {
         MailProtocol::Imap => fetch_imap_messages(&config),
+        #[cfg(any(test, feature = "pop3"))]
         MailProtocol::Pop3 => fetch_pop3_messages(&config),
     })
     .await?
-}
-
-impl ListenerConfig {
-    fn clone_for_task(&self) -> Self {
-        Self {
-            database_url: self.database_url.clone(),
-            protocol: self.protocol,
-            host: self.host.clone(),
-            port: self.port,
-            username: self.username.clone(),
-            password: self.password.clone(),
-            mailbox: self.mailbox.clone(),
-            poll_interval: self.poll_interval,
-        }
-    }
 }
 
 fn fetch_imap_messages(config: &ListenerConfig) -> ListenerResult<Vec<Vec<u8>>> {
@@ -167,6 +158,7 @@ fn fetch_imap_messages(config: &ListenerConfig) -> ListenerResult<Vec<Vec<u8>>> 
     Ok(messages)
 }
 
+#[cfg(any(test, feature = "pop3"))]
 fn fetch_pop3_messages(config: &ListenerConfig) -> ListenerResult<Vec<Vec<u8>>> {
     let stream = TcpStream::connect((&*config.host, config.port))?;
     let mut reader = BufReader::new(stream.try_clone()?);
@@ -206,6 +198,7 @@ fn fetch_pop3_messages(config: &ListenerConfig) -> ListenerResult<Vec<Vec<u8>>> 
     Ok(messages)
 }
 
+#[cfg(any(test, feature = "pop3"))]
 fn pop3_command(
     writer: &mut TcpStream,
     reader: &mut BufReader<TcpStream>,
@@ -216,6 +209,7 @@ fn pop3_command(
     expect_ok(reader)
 }
 
+#[cfg(any(test, feature = "pop3"))]
 fn expect_ok(reader: &mut BufReader<TcpStream>) -> ListenerResult<()> {
     let mut line = String::new();
     reader.read_line(&mut line)?;
@@ -226,6 +220,7 @@ fn expect_ok(reader: &mut BufReader<TcpStream>) -> ListenerResult<()> {
     }
 }
 
+#[cfg(any(test, feature = "pop3"))]
 fn read_pop3_multiline(reader: &mut BufReader<TcpStream>) -> ListenerResult<Vec<String>> {
     let mut lines = Vec::new();
     loop {
@@ -263,7 +258,7 @@ async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<()> 
         return Ok(());
     };
 
-    let question_id: Option<i64> = sqlx::query_scalar(
+    let question_id = sqlx::query_scalar!(
         "
         SELECT id
         FROM delegate_questions
@@ -271,8 +266,8 @@ async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<()> 
         ORDER BY id DESC
         LIMIT 1
         ",
+        &reply.related_message_ids
     )
-    .bind(&reply.related_message_ids)
     .fetch_optional(pool)
     .await?;
 
@@ -285,30 +280,30 @@ async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<()> 
         return Ok(());
     };
 
-    let inserted: Option<i64> = sqlx::query_scalar(
+    let inserted = sqlx::query_scalar!(
         "
         INSERT INTO delegate_question_answers (question_id, sender_email, body, raw_message_id)
         VALUES ($1, $2, $3, $4)
         ON CONFLICT (raw_message_id) DO NOTHING
         RETURNING id
         ",
+        question_id,
+        sender_email,
+        reply.body,
+        raw_message_id
     )
-    .bind(question_id)
-    .bind(sender_email)
-    .bind(reply.body)
-    .bind(&raw_message_id)
     .fetch_optional(pool)
     .await?;
 
     if inserted.is_some() {
-        sqlx::query(
+        sqlx::query!(
             "
             UPDATE delegate_questions
             SET status = 'answered', updated_at = NOW()
             WHERE id = $1
             ",
+            question_id
         )
-        .bind(question_id)
         .execute(pool)
         .await?;
         info!(

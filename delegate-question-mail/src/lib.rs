@@ -10,6 +10,52 @@ pub struct IncomingReply {
     pub body: String,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum ContentType {
+    PlainText,
+    Html,
+    Multipart { boundary: String },
+    Other,
+}
+
+impl ContentType {
+    fn parse(value: Option<&str>) -> Self {
+        let Some(value) = value else {
+            return Self::Other;
+        };
+        let media_type = value.split(';').next().map(str::trim).unwrap_or_default();
+
+        if media_type.eq_ignore_ascii_case("text/plain") {
+            Self::PlainText
+        } else if media_type.eq_ignore_ascii_case("text/html") {
+            Self::Html
+        } else if media_type.to_ascii_lowercase().starts_with("multipart/") {
+            boundary_from_content_type(value)
+                .map(|boundary| Self::Multipart { boundary })
+                .unwrap_or(Self::Other)
+        } else {
+            Self::Other
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TransferEncoding {
+    Base64,
+    QuotedPrintable,
+    Identity,
+}
+
+impl TransferEncoding {
+    fn parse(value: Option<&str>) -> Self {
+        match value.map(str::trim) {
+            Some(value) if value.eq_ignore_ascii_case("base64") => Self::Base64,
+            Some(value) if value.eq_ignore_ascii_case("quoted-printable") => Self::QuotedPrintable,
+            _ => Self::Identity,
+        }
+    }
+}
+
 pub fn new_question_message_id() -> String {
     format!("<question-{}@somes.at>", Uuid::new_v4())
 }
@@ -118,15 +164,16 @@ fn extract_email_address(value: &str) -> Option<String> {
 }
 
 fn extract_body(headers: &HashMap<String, String>, body: &str) -> String {
-    let content_type = header(headers, "content-type").unwrap_or_default();
-    if let Some(boundary) = boundary_from_content_type(content_type) {
-        return extract_multipart_body(body, &boundary).unwrap_or_else(|| body.to_string());
-    }
+    let content_type = ContentType::parse(header(headers, "content-type"));
+    let encoding = TransferEncoding::parse(header(headers, "content-transfer-encoding"));
 
-    decode_body(
-        body,
-        header(headers, "content-transfer-encoding").unwrap_or_default(),
-    )
+    match content_type {
+        ContentType::Multipart { boundary } => {
+            extract_multipart_body(body, &boundary).unwrap_or_else(|| body.to_string())
+        }
+        ContentType::Html => somes_scraper::extract_text_from_html(&decode_body(body, encoding)),
+        ContentType::PlainText | ContentType::Other => decode_body(body, encoding),
+    }
 }
 
 fn boundary_from_content_type(content_type: &str) -> Option<String> {
@@ -154,31 +201,32 @@ fn extract_multipart_body(body: &str, boundary: &str) -> Option<String> {
         let (part_headers, part_body) =
             split_headers_and_body(part.trim_start_matches(['\r', '\n']));
         let part_headers = parse_headers(part_headers);
-        let content_type = header(&part_headers, "content-type").unwrap_or_default();
+        let content_type = ContentType::parse(header(&part_headers, "content-type"));
         let decoded = decode_body(
             part_body,
-            header(&part_headers, "content-transfer-encoding").unwrap_or_default(),
+            TransferEncoding::parse(header(&part_headers, "content-transfer-encoding")),
         );
 
-        if content_type.to_ascii_lowercase().starts_with("text/plain") {
-            return Some(decoded);
-        }
-        if content_type.to_ascii_lowercase().starts_with("text/html") {
-            html_body = Some(strip_html(&decoded));
+        match content_type {
+            ContentType::PlainText => return Some(decoded),
+            ContentType::Html => {
+                html_body = Some(somes_scraper::extract_text_from_html(&decoded));
+            }
+            ContentType::Multipart { .. } | ContentType::Other => {}
         }
     }
 
     html_body
 }
 
-fn decode_body(body: &str, transfer_encoding: &str) -> String {
-    match transfer_encoding.trim().to_ascii_lowercase().as_str() {
-        "base64" => STANDARD
+fn decode_body(body: &str, transfer_encoding: TransferEncoding) -> String {
+    match transfer_encoding {
+        TransferEncoding::Base64 => STANDARD
             .decode(body.replace(['\r', '\n'], ""))
             .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
             .unwrap_or_else(|_| body.to_string()),
-        "quoted-printable" => decode_quoted_printable(body),
-        _ => body.to_string(),
+        TransferEncoding::QuotedPrintable => decode_quoted_printable(body),
+        TransferEncoding::Identity => body.to_string(),
     }
 }
 
@@ -220,20 +268,6 @@ fn hex_value(value: u8) -> Option<u8> {
     }
 }
 
-fn strip_html(value: &str) -> String {
-    let mut text = String::new();
-    let mut in_tag = false;
-    for character in value.chars() {
-        match character {
-            '<' => in_tag = true,
-            '>' => in_tag = false,
-            _ if !in_tag => text.push(character),
-            _ => {}
-        }
-    }
-    text
-}
-
 fn strip_quoted_reply(value: &str) -> String {
     let mut reply = Vec::new();
     for line in value.lines() {
@@ -270,5 +304,23 @@ mod tests {
         );
         assert_eq!(reply.related_message_ids, vec!["<question-abc@somes.at>"]);
         assert_eq!(reply.body, "Danke fuer die Antwort.");
+    }
+
+    #[test]
+    fn parses_html_reply_with_html_entities() {
+        let raw_message = b"From: Club <club@example.com>\r\nMessage-ID: <reply-html@example.com>\r\nIn-Reply-To: <question-html@somes.at>\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n<p>Hallo &amp; danke</p>";
+
+        let reply = parse_incoming_reply(raw_message);
+
+        assert_eq!(reply.body, "Hallo & danke");
+    }
+
+    #[test]
+    fn parses_base64_reply() {
+        let raw_message = b"From: Club <club@example.com>\r\nMessage-ID: <reply-base64@example.com>\r\nIn-Reply-To: <question-base64@somes.at>\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\nSGFsbG8=";
+
+        let reply = parse_incoming_reply(raw_message);
+
+        assert_eq!(reply.body, "Hallo");
     }
 }
