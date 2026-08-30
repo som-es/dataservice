@@ -1,6 +1,7 @@
 use combx::Topic;
 use sqlx::{Acquire, Postgres, Transaction};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TopicType {
     Standard,
     Eurovoc,
@@ -58,10 +59,12 @@ pub async fn insert_topics_generic_batch<'a>(
     let topic_names: Vec<String> = topics.iter().map(|t| t.topic.clone()).collect();
     let ids: Vec<i32> = vec![db_entry_id; topics.len()];
 
-    if let Some(unique_table) = info.unique_table {
+    if let Some(unique_table) = info.unique_table
+        && TopicType::Eurovoc != topic_type
+    {
         let unique_sql = format!(
-            "INSERT INTO {unique_table} (topic_name) 
-             SELECT * FROM UNNEST($1::text[]) 
+            "INSERT INTO {unique_table} (topic_name)
+             SELECT * FROM UNNEST($1::text[])
              ON CONFLICT (topic_name) DO NOTHING"
         );
 
@@ -72,9 +75,9 @@ pub async fn insert_topics_generic_batch<'a>(
     }
 
     let insert_topics = format!(
-        "INSERT INTO {} (topic, {}) 
-         SELECT * FROM UNNEST($1::text[], $2::int4[]) 
-         ON CONFLICT ({}, topic) 
+        "INSERT INTO {} (topic, {})
+         SELECT * FROM UNNEST($1::text[], $2::int4[])
+         ON CONFLICT ({}, topic)
          DO UPDATE SET topic = EXCLUDED.topic",
         info.table_name, info.id_field, info.id_field
     );

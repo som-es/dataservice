@@ -1,6 +1,6 @@
 use tokio::sync::mpsc;
 
-use crate::{ai_task::AiTask, AppState, Shutdown};
+use crate::{AppState, Shutdown, ai_task::AiTask};
 
 pub mod ai_task_service;
 pub mod dates;
@@ -14,14 +14,15 @@ pub mod parties;
 pub mod plenar;
 #[cfg(feature = "vectordb")]
 pub mod political_analysis;
+pub mod unique_topics;
 
 pub async fn political_analysis_service(
     _shutdown: Shutdown,
-    _pg_pool: sqlx::PgPool,
+    _app_state: AppState,
     _ai_task_tx: mpsc::Sender<AiTask>,
 ) {
     #[cfg(feature = "vectordb")]
-    political_analysis::run_shut(_shutdown, _pg_pool, _ai_task_tx).await
+    political_analysis::run_shut(_shutdown, _app_state, _ai_task_tx).await
 }
 
 pub async fn parliamentary_qa_service(
@@ -45,14 +46,19 @@ where
     O: std::future::Future<Output = crate::Result<T>>,
 {
     let mut new_proposals = f().await;
+    let mut wait_secs = 1;
     while let Err(e) = new_proposals {
         log::warn!(
-            "Could not scrape data: {e}, INFO for me: {:?}",
+            "Could not scrape data: {e:?}, INFO for me: {:?}",
             e.downcast_ref::<reqwest::Error>()
         );
 
         new_proposals = f().await;
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(wait_secs)).await;
+        wait_secs += 1;
+        if wait_secs >= 500 {
+            panic!("could not complete scrape")
+        }
     }
     new_proposals.expect("Above loop always runs till Ok")
 }

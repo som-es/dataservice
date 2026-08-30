@@ -1,17 +1,17 @@
-use combx::{
-    document_text::{combine_texts, extract_text_from_documents_html_first},
-    AnswerEntryOutput, QuestionEntryOutput,
-};
 use combx::{AbortReason, DbAiInquiry};
+use combx::{
+    AnswerEntryOutput, QuestionEntryOutput,
+    document_text::{combine_texts, extract_text_from_documents_html_first},
+};
 use somai_client::SomAiClient;
 use somes_common_lib::Document;
 use somes_scraper::ParliamentaryQAEntity;
 use sqlx::types::Json;
 
 use crate::{
+    OCR_ENGINE,
     ai_task::TaskArgs,
     parliamentary_qa::{insert_answer_entry, insert_question_entry},
-    OCR_ENGINE,
 };
 
 pub async fn summarize_and_extract_qa(
@@ -47,10 +47,11 @@ pub async fn summarize_and_extract_qa(
     .fetch_optional(&task_args.pg_pool)
     .await?;
 
-    let unique_topics =
-        sqlx::query_scalar!("select topic_name as topic from unique_eurovoc_topics order by topic")
-            .fetch_all(&task_args.pg_pool)
-            .await?;
+    let unique_topics = sqlx::query_scalar!(
+        "select topic_name as topic from unique_eurovoc_topics where language = 'de' order by topic"
+    )
+    .fetch_all(&task_args.pg_pool)
+    .await?;
 
     let questions = match question_entry {
         Some(entry) => entry.full_question_entry.questions.clone(),
@@ -72,7 +73,12 @@ pub async fn summarize_and_extract_qa(
             if extracted_question.abort_reason != AbortReason::None
                 || extracted_question.complete_inquiry_extraction.is_none()
             {
-                log::error!("(question) No documents? provided in context for question {}, documents: {:?}, abort reason: {:?}, skipping", question_id, question.documents, extracted_question.abort_reason);
+                log::error!(
+                    "(question) No documents? provided in context for question {}, documents: {:?}, abort reason: {:?}, skipping",
+                    question_id,
+                    question.documents,
+                    extracted_question.abort_reason
+                );
                 Err(combx::Error::Custom(
                     "No documents provided in context for question, skipping".to_string(),
                 ))?;
@@ -122,7 +128,12 @@ pub async fn summarize_and_extract_qa(
         if extracted_answer.abort_reason != AbortReason::None
             || extracted_answer.answer_entry.is_none()
         {
-            log::error!("(answer) No documents? provided in context for answer {}, documents: {:?}, abort reason: {:?}, skipping", answer_id, answer.documents, extracted_answer.abort_reason);
+            log::error!(
+                "(answer) No documents? provided in context for answer {}, documents: {:?}, abort reason: {:?}, skipping",
+                answer_id,
+                answer.documents,
+                extracted_answer.abort_reason
+            );
             continue;
         }
         let extracted_answer = extracted_answer.answer_entry.unwrap();
@@ -318,12 +329,7 @@ mod tests {
             document_type: Some("DigitalPDF".into()), // using a DigitalPDF here because HTML list items are not counted accordingly (all html tags get simply removed)
         }];
         let pg_pool = combx::connect_pg().await;
-        let unique_topics = sqlx::query_scalar!(
-            "select topic_name as topic from unique_eurovoc_topics order by topic"
-        )
-        .fetch_all(&pg_pool)
-        .await
-        .unwrap();
+        let unique_topics = unique_topics_for_lang(&task_args.pg_pool, Language::De).await?;
         let result = extract_question(&somai_client, &unique_topics, &docs).await;
         dbg!(&result);
         assert!(result.is_ok());
@@ -345,12 +351,7 @@ mod tests {
             document_type: Some("DigitalPDF".into()),
         }];
         let pg_pool = combx::connect_pg().await;
-        let unique_topics = sqlx::query_scalar!(
-            "select topic_name as topic from unique_eurovoc_topics order by topic"
-        )
-        .fetch_all(&pg_pool)
-        .await
-        .unwrap();
+        let unique_topics = unique_topics_for_lang(&task_args.pg_pool, Language::De).await?;
 
         #[rustfmt::skip]
         let questions =

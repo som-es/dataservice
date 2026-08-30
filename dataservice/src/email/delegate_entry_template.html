@@ -1,56 +1,31 @@
-<div style="margin: 24px 0; text-align: left">
-    <table
-        role="presentation"
-        width="100%"
-        cellspacing="0"
-        cellpadding="0"
-        border="0"
-        style="margin-bottom: 12px"
-    >
+<div style="margin: 20px 0; text-align: left;">
+    <!-- Delegate header: avatar + name + party -->
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 16px;">
         <tr>
-            <td style="vertical-align: middle; width: 80px; padding-right: 12px">
+            <td style="vertical-align: middle; width: 72px; padding-right: 14px;">
                 <img
                     src="{*DELEGATE_IMG_URL*}"
-                    alt="Image of delegate {*DELEGATE_NAME*}"
-                    width="80"
-                    height="80"
-                    style="
-                        width: 80px;
-                        height: 80px;
-                        border-radius: 50%;
-                        object-fit: cover;
-                        display: block;
-                    "
+                    alt="{*DELEGATE_NAME*}"
+                    width="72"
+                    height="72"
+                    style="display: block; width: 72px; height: 72px; border-radius: 50%; object-fit: cover;"
                 />
             </td>
-            <td style="vertical-align: middle">
-                <h2
-                    style="
-                        margin: 0;
-                        font-size: 1.25rem;
-                        line-height: 1.3;
-                        word-wrap: break-word;
-                    "
-                >
+            <td style="vertical-align: middle;">
+                <h2 class="dm-card-text" style="margin: 0 0 4px 0; font-family: Arial, sans-serif; font-size: 18px; font-weight: bold; color: #1a1a1a; line-height: 1.3; word-wrap: break-word;">
                     {*DELEGATE_NAME*}
                 </h2>
-                <p
-                    style="
-                        margin: 4px 0 0 0;
-                        color: #777;
-                        word-wrap: break-word;
-                    "
-                >
+                <p class="dm-muted" style="margin: 0; font-family: Arial, sans-serif; font-size: 14px; color: #777777; word-wrap: break-word;">
                     {*DELEGATE_PARTY*}
                 </p>
             </td>
         </tr>
     </table>
 
-    <div>{*DECREES*}</div>
-    <div>{*GOV_PROPOSALS*}</div>
-    <div>{*ISSUED_PROPOSALS*}</div>
-    <div>{*NAMED_VOTES*}</div>
-    <div>{*SPEECHES*}</div>
-    <div>{*CALL_TO_ORDERS*}</div>
+    {*DECREES*}
+    {*GOV_PROPOSALS*}
+    {*ISSUED_PROPOSALS*}
+    {*NAMED_VOTES*}
+    {*SPEECHES*}
+    {*CALL_TO_ORDERS*}
 </div>

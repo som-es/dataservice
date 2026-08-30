@@ -1,15 +1,14 @@
 use std::{collections::BinaryHeap, sync::Arc};
 
 use somai_client::SomAiClient;
-use sqlx::PgPool;
 use tokio::{
-    sync::{mpsc::Receiver, RwLock},
-    time::{sleep, Instant},
+    sync::{RwLock, mpsc::Receiver},
+    time::{Instant, sleep},
 };
 
 use crate::{
-    ai_task::{AiTask, TaskArgs},
     Shutdown,
+    ai_task::{AiTask, TaskArgs},
 };
 
 const REBUILD_HEAP_SECS: u64 = 10;
@@ -17,7 +16,6 @@ const REBUILD_HEAP_SECS: u64 = 10;
 pub async fn ai_task_handler(
     tasks: Arc<RwLock<BinaryHeap<AiTask>>>,
     somai_client: Arc<SomAiClient>,
-    pg_pool: PgPool,
     shutdown: Arc<Shutdown>,
     max_concurrent_tasks: usize,
 ) {
@@ -50,8 +48,8 @@ pub async fn ai_task_handler(
                 let task_args = TaskArgs {
                     db_entry_id: ai_task.db_entry_id,
                     ai_task_input: ai_task.input,
-                    pg_pool: pg_pool.clone(),
                     som_ai_client: somai_client.clone(),
+                    pg_pool: ai_task.pool,
                 };
                 let task = tokio::spawn((ai_task.task)(task_args));
                 task_buffer.push((ai_task.db_entry_id, ai_task.task_id, task));
@@ -65,7 +63,6 @@ pub async fn ai_task_handler(
 
 pub async fn ai_tasks_service(
     shutdown: Shutdown,
-    pg_pool: PgPool,
     mut ai_task_rx: Receiver<AiTask>,
     concurrent_tasks: usize,
 ) {
@@ -93,7 +90,6 @@ pub async fn ai_tasks_service(
         tokio::spawn(ai_task_handler(
             task_queue.clone(),
             somai_client.clone(),
-            pg_pool.clone(),
             shutdown.clone(),
             concurrent_tasks,
         ));
@@ -127,7 +123,7 @@ pub async fn ai_tasks_service(
                 task_queue_guard.push(ai_task);
 
                 if now.elapsed() >= Duration::from_secs(REBUILD_HEAP_SECS) {
-                    let heap = std::mem::replace(&mut *task_queue_guard, BinaryHeap::default());
+                    let heap = std::mem::take(&mut *task_queue_guard);
                     *task_queue_guard = rebuild_with_aging(heap, Instant::now());
                     now = Instant::now();
                 }
@@ -147,7 +143,7 @@ fn rebuild_with_aging(heap: BinaryHeap<AiTask>, now: Instant) -> BinaryHeap<AiTa
 mod tests {
     use tokio::time::Instant;
 
-    use crate::{ai_task::Priority, today_and_time};
+    use crate::{AT_DATABASE_URL, ai_task::Priority, connect_pg2, today_and_time};
 
     #[tokio::test]
     async fn test_ai_task_ordering() {
@@ -162,6 +158,7 @@ mod tests {
             task_id: 1,
             db_entry_id: 1,
             rerunnable: false,
+            pool: connect_pg2(AT_DATABASE_URL).await,
             created_at: Instant::now(),
             task: Box::new(|_args| {
                 Box::pin(async move { Ok(()) })
@@ -171,6 +168,7 @@ mod tests {
 
         let task2 = AiTask {
             input: None,
+            pool: connect_pg2(AT_DATABASE_URL).await,
             priority: Priority::Low,
             score: Priority::Low.weight(),
             task_id: 2,

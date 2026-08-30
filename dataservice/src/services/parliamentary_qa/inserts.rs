@@ -1,6 +1,6 @@
 use combx::{AnswerEntry, QuestionEntry};
 use somes_scraper::ParliamentaryQAEntity;
-use sqlx::{types::Json, PgPool};
+use sqlx::{PgPool, types::Json};
 
 pub async fn insert_pqa(pg: &PgPool, pqa: &ParliamentaryQAEntity) -> sqlx::Result<i64> {
     let proposal = &pqa.base_info;

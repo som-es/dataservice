@@ -1,6 +1,3 @@
-mod activity;
-pub use activity::*;
-
 mod call_to_orders;
 pub use call_to_orders::*;
 mod named_votes;
@@ -30,7 +27,8 @@ pub async fn extract_last_delegate_speeches(
                     ELSE NULL
                 END AS infavor,
                 opinion,
-                document_url
+                start,
+                COALESCE(array_remove(array_agg(document_url), NULL), ARRAY[]::text[]) AS "document_urls"
             FROM plenar_speeches
             INNER JOIN plenar_speech_links ON plenar_speeches.id = plenar_speech_links.plenar_speech_id
             INNER JOIN plenar_speech_legis_inits li ON li.speech_id = plenar_speeches.id
@@ -44,8 +42,8 @@ pub async fn extract_last_delegate_speeches(
                 delegate_id,
                 about,
                 opinion,
-                document_url,
-                raw_data_created_at
+                raw_data_created_at,
+                start
             ORDER BY raw_data_created_at DESC
             "#,
             delegate_id, last_n_days
@@ -68,11 +66,14 @@ pub async fn extract_delegate_speeches(
     // ",
     // delegate_id).fetch_one(pg).await?;
 
-    let all_speeches_of_delegate = query!("
-        select COUNT(*) from plenar_speeches
-        INNER JOIN plenar_speech_links ON plenar_speeches.id = plenar_speech_links.plenar_speech_id where delegate_id = $1
+    let all_speeches_of_delegate = query!(
+        "
+        select COUNT(*) from plenar_speeches where delegate_id = $1
     ",
-    delegate_id).fetch_one(pg).await?;
+        delegate_id
+    )
+    .fetch_one(pg)
+    .await?;
 
     Ok((
         all_speeches_of_delegate.count.unwrap_or_default(),
@@ -90,7 +91,8 @@ pub async fn extract_delegate_speeches(
                     ELSE NULL
                 END AS infavor,
                 opinion,
-                document_url
+                start,
+                COALESCE(array_remove(array_agg(document_url), NULL), ARRAY[]::text[]) AS "document_urls"
             FROM plenar_speeches
             INNER JOIN plenar_speech_links ON plenar_speeches.id = plenar_speech_links.plenar_speech_id
             INNER JOIN plenar_speech_legis_inits li ON li.speech_id = plenar_speeches.id
@@ -103,8 +105,8 @@ pub async fn extract_delegate_speeches(
                 delegate_id,
                 about,
                 opinion,
-                document_url,
-                raw_data_created_at
+                raw_data_created_at,
+                start
             ORDER BY raw_data_created_at DESC, plenar_speeches.id
             OFFSET $2 LIMIT $3
             "#,

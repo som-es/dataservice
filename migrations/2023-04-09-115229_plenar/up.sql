@@ -44,9 +44,10 @@ CREATE TABLE IF NOT EXISTS plenar_speeches (
     duration_in_seconds int not null default 0,
     ty varchar(40) not null,
     delegate_display_name varchar(255) not null,
+    start time,
     FOREIGN KEY (debate_id) REFERENCES debates(id),
     FOREIGN KEY (delegate_id) REFERENCES delegates(id),
-    UNIQUE (delegate_id, debate_id, duration_in_seconds, ty)
+    UNIQUE NULLS NOT DISTINCT (delegate_id, debate_id, duration_in_seconds, start)
 );
 
 -- index is too large for speech text

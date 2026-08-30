@@ -1,9 +1,9 @@
 use chrono_tz::Europe::Vienna;
 use combx::GovProposal;
-use sqlx::{query, PgPool};
+use sqlx::{PgPool, query};
 use std::collections::HashMap;
 
-use crate::email::{send_mail, MAILER};
+use crate::email::{MAILER, send_mail};
 
 #[derive(Debug, Clone)]
 pub(crate) struct SimpleGovOfficial {
@@ -64,7 +64,7 @@ pub async fn find_notifiers_ministrial_props<'a>(
         .unwrap_or_default();
     let mut to_notify_emails = HashMap::new();
     for id in ids {
-        let user_topics = query!("select topic_name from user_topics inner join unique_eurovoc_topics ut on ut.id = topic_id where user_id = $1", id.id).fetch_all(pool).await.unwrap_or_default().into_iter().map(|x| x.topic_name).collect::<Vec<_>>();
+        let user_topics = query!("select topic_name from user_topics inner join unique_eurovoc_topics ut on ut.id_as_hash = topic_id where user_id = $1", id.id).fetch_all(pool).await.unwrap_or_default().into_iter().map(|x| x.topic_name).collect::<Vec<_>>();
         let favo_dels = query!(
             "select delegate_id from favo_dels where user_id = $1",
             id.id
@@ -135,7 +135,7 @@ pub(crate) fn send_new_ministrial_prop_info_mail(
         for (idx, (_id, ministrial_prop)) in ministrial_props.iter().enumerate() {
             if idx >= 5 {
                 if ministrial_props.len() >= 6 {
-                    ministrial_props_html.push_str(&"Und weitere ...");
+                    ministrial_props_html.push_str("Und weitere ...");
                 }
                 break;
             }
@@ -162,7 +162,7 @@ pub(crate) fn send_new_ministrial_prop_info_mail(
             );
 
             let ministrial_prop_html_entry = crate::email::MINISTRIAL_PROP_ENTRY_TEMPLATE
-                .replace("{*PROPOSAL_DESCRIPTION*}", &description)
+                .replace("{*PROPOSAL_DESCRIPTION*}", description)
                 .replace(
                     "{*PROPOSAL_MINISTRY*}",
                     &ministrial_prop.ministrial_proposal.ressort_shortform,
@@ -175,7 +175,7 @@ pub(crate) fn send_new_ministrial_prop_info_mail(
                 .replace("{*PROPOSAL_GOV_OFFICIAL_NAME*}", &gov_official.name)
                 .replace(
                     "{*PROPOSAL_DELEGATE_IMG_URL*}",
-                    &gov_official
+                    gov_official
                         .image_url
                         .as_ref()
                         .unwrap_or(&"https://somes.at/images/somes_logo.png".to_string()),
@@ -225,14 +225,14 @@ pub(crate) fn notify_users(
 mod tests {
     use std::{collections::HashMap, sync::Arc};
 
-    use combx::{create_gov_officials_map, GovProposal};
+    use combx::{GovProposal, create_gov_officials_map};
     use somes_scraper::{
-        ministrial_proposals::{GegenstandInfo, MinistrialProposalScraper},
         AustriaScraper,
+        ministrial_proposals::{GegenstandInfo, MinistrialProposalScraper},
     };
 
     use crate::{
-        connect_pg,
+        AT_DATABASE_URL, connect_pg2,
         ministrial_proposals::{
             notify::get_active_gov_officals, send_new_ministrial_prop_info_mail,
         },
@@ -241,7 +241,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_send_new_ministerial_prop_mail() {
-        let pg_pool = connect_pg().await;
+        let pg_pool = connect_pg2(AT_DATABASE_URL).await;
         let simple_gov_officials = get_active_gov_officals(&pg_pool).await;
 
         let simple_gov_officials = simple_gov_officials
@@ -264,7 +264,13 @@ mod tests {
             GovProposal::from_ministerial_proposal(ministerial_proposal, gov_officials);
         println!("gov proposal: {gov_proposal:?}");
         let gov_proposals = [&(0, gov_proposal)];
-        send_new_ministrial_prop_info_mail("", &gov_proposals, &simple_gov_officials).unwrap();
-        loop {}
+        send_new_ministrial_prop_info_mail(
+            crate::email::TEST_MAIL_RECEIVER,
+            &gov_proposals,
+            &simple_gov_officials,
+        )
+        .unwrap();
+
+        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
     }
 }

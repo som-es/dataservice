@@ -1,10 +1,10 @@
 use chrono_tz::Europe::Vienna;
 use combx::Decree;
-use sqlx::{query, PgPool};
+use sqlx::{PgPool, query};
 use std::collections::HashMap;
 
 use crate::{
-    email::{send_mail, MAILER},
+    email::{MAILER, send_mail},
     ministrial_proposals::SimpleGovOfficial,
 };
 
@@ -18,7 +18,7 @@ pub async fn find_notifiers_decrees<'a>(
         .unwrap_or_default();
     let mut to_notify_emails = HashMap::new();
     for id in ids {
-        let user_topics = query!("select topic_name from user_topics inner join unique_eurovoc_topics ut on ut.id = topic_id where user_id = $1", id.id).fetch_all(pool).await.unwrap_or_default().into_iter().map(|x| x.topic_name).collect::<Vec<_>>();
+        let user_topics = query!("select topic_name from user_topics inner join unique_eurovoc_topics ut on ut.id_as_hash = topic_id where user_id = $1", id.id).fetch_all(pool).await.unwrap_or_default().into_iter().map(|x| x.topic_name).collect::<Vec<_>>();
         let favo_dels = query!(
             "select delegate_id from favo_dels where user_id = $1",
             id.id
@@ -76,7 +76,7 @@ pub(crate) fn send_new_decree_info_mail(
         for (idx, (_id, decree)) in decrees.iter().enumerate() {
             if idx >= 5 {
                 if decrees.len() >= 6 {
-                    decrees_html.push_str(&"Und weitere ...");
+                    decrees_html.push_str("Und weitere ...");
                 }
                 break;
             }
@@ -113,7 +113,7 @@ pub(crate) fn send_new_decree_info_mail(
                 .replace("{*DECREE_GOV_OFFICIAL_NAME*}", &gov_official.name)
                 .replace(
                     "{*DECREE_DELEGATE_IMG_URL*}",
-                    &gov_official
+                    gov_official
                         .image_url
                         .as_ref()
                         .unwrap_or(&"https://somes.at/images/somes_logo.png".to_string()),

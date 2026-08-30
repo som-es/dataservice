@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use chrono::Months;
 use somes_scraper::{
-    dates::{DateFilter, DateRange, Dates, Gremium, ParliamentDate, Terminart},
     AustriaScraper,
+    dates::{DateFilter, DateRange, Dates, Gremium, ParliamentDate, Terminart},
 };
 use sqlx::PgPool;
 
-use crate::{today_and_time, ApiLimiter, Shutdown};
+use crate::{ApiLimiter, Shutdown, today_and_time};
 
 pub async fn save_dates(
     pg_pool: &PgPool,
@@ -62,7 +62,7 @@ pub async fn save_dates(
             .await?;
 
         for date in date_group {
-            save_date(date, &mut *tx).await?;
+            save_date(date, &mut tx).await?;
         }
 
         tx.commit().await?;

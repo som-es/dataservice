@@ -1,3 +1,4 @@
+#[cfg(not(feature = "tesseract"))]
 use image::DynamicImage;
 
 #[cfg(not(feature = "tesseract"))]

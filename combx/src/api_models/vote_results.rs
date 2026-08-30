@@ -15,9 +15,11 @@ use somai_client::SomAiClient;
 use somes_common_lib::Document;
 use somes_scraper::{LegislativeInitiative, Opinion};
 use sqlx::{FromRow, PgPool, prelude::Type};
+use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::{CombinedData, models::*};
+use crate::with_data::DelegateParty;
+use crate::{CombinedData, Parliament, models::*};
 use crate::{
     FromScrapedType, Topic, api_models::vote_results::hidden_vote_translation::translate_votes,
 };
@@ -72,7 +74,7 @@ pub struct VoteResult {
 
     pub legislative_initiative: DbLegislativeInitiativeQuery,
     pub votes: Vec<DbVote>,
-    pub speeches: Vec<DbSpeechWithLink>,
+    pub speeches: Vec<FullSpeech>,
 
     pub named_votes: Option<DbNamedVotes>,
     pub topics: Vec<Topic>,
@@ -108,7 +110,7 @@ pub struct OptionalVoteResult {
     pub id: Option<i32>,
     pub legislative_initiative: Option<DbLegislativeInitiativeQuery>,
     pub votes: Option<Vec<DbVote>>,
-    pub speeches: Option<Vec<DbSpeechWithLink>>,
+    pub speeches: Option<Vec<FullSpeech>>,
     pub named_votes: Option<DbNamedVotes>,
     pub topics: Option<Vec<Topic>>,
     pub eurovoc_topics: Option<Vec<Topic>>,
@@ -146,20 +148,23 @@ impl<T: VoteResultEnhancer> FromScrapedType<T> for VoteResult {
     type ScrapedType = LegislativeInitiative;
 
     async fn from_scraped_type(db_enhancer: T, ty: Self::ScrapedType) -> Self {
-        Self::from_legis_init(db_enhancer, ty, None).await
+        Self::from_legis_init(db_enhancer, ty, Parliament::At, None)
+            .await
+            .unwrap()
     }
 }
 
 impl VoteResult {
     // move to other crate
-    pub async fn from_db(pool: &PgPool, legis_init_id: i32) -> Self {
+    pub async fn from_db(_pool: &PgPool, _legis_init_id: i32) -> Self {
         todo!()
     }
     pub async fn from_legis_init(
         db_enhancer: impl VoteResultEnhancer,
         legis_init: LegislativeInitiative,
-        somai_client: Option<Arc<SomAiClient>>,
-    ) -> Self {
+        parliament: Parliament,
+        _somai_client: Option<Arc<SomAiClient>>,
+    ) -> crate::Result<Self> {
         let plenary_session_id = db_enhancer.retrieve_plenary_session_id(&legis_init).await;
 
         let LegisInitInfo {
@@ -215,11 +220,20 @@ impl VoteResult {
         let mut votes = legis_init
             .votes
             .iter()
-            .map(|vote| DbVote {
-                party: vote.party.name.clone(),
-                code: Some(vote.party.code.clone()),
-                fraction: vote.party.fraction as i32,
-                infavor: vote.infavor,
+            .map(|vote| {
+                let (infavor_count, against_count) = if vote.infavor {
+                    (vote.party.fraction as i32, 0)
+                } else {
+                    (0, vote.party.fraction as i32)
+                };
+                DbVote {
+                    party: vote.party.name.clone(),
+                    code: Some(vote.party.code.clone()),
+                    infavor_count,
+                    against_count,
+                    absence_count: 0,
+                    abstention_count: 0,
+                }
             })
             .collect::<Vec<_>>();
 
@@ -229,7 +243,9 @@ impl VoteResult {
         {
             let (all_parties, code_to_parties) = db_enhancer
                 .gen_code_to_parties_with_date(
-                    &db_legis_init.nr_plenary_activity_date,
+                    &legis_init
+                        .vote_date
+                        .unwrap_or(legis_init.nr_plenary_activity_date),
                     &db_legis_init.gp,
                 )
                 .await;
@@ -263,15 +279,25 @@ impl VoteResult {
                 };
 
                 let named_votes = match &voted_by_name_data.delegates_pro_contra {
-                    Some(pro_contra) => db_enhancer
-                        .create_db_named_votes(
-                            pro_contra,
-                            legis_init.nr_plenary_activity_date,
-                            &legis_init.gp,
-                            "NR",
-                        )
-                        .await
-                        .ok(),
+                    Some(pro_contra) => {
+                        let date = legis_init
+                            .vote_date
+                            .unwrap_or(legis_init.nr_plenary_activity_date);
+                        let function = match parliament {
+                            Parliament::At => "NR",
+                            Parliament::Eu => "MEP",
+                        };
+                        let delegate_parties = db_enhancer
+                            .active_delegates_party_at_date(date, function)
+                            .await?;
+                        let named_votes = db_enhancer
+                            .create_db_named_votes(pro_contra, date, &legis_init.gp, function)
+                            .await?;
+
+                        votes = build_db_votes(&named_votes, &delegate_parties);
+
+                        Some(named_votes)
+                    }
                     None => None,
                 };
                 Some(DbNamedVotes {
@@ -318,21 +344,33 @@ impl VoteResult {
                     Opinion::None => None,
                 };
 
-                DbSpeechWithLink {
+                FullSpeech {
+                    id: 0,
+                    debate_id: 0,
                     delegate_id: speech.delegate_id as i32,
-                    infavor: match speech.opinion {
-                        Opinion::Infavor => Some(true),
-                        Opinion::Against => Some(false),
-                        _ => None,
+                    ai_summary: None,
+                    relations: vec![],
+                    speech: DbSpeechWithLink {
+                        delegate_id: speech.delegate_id as i32,
+                        infavor: match speech.opinion {
+                            Opinion::Infavor => Some(true),
+                            Opinion::Against => Some(false),
+                            _ => None,
+                        },
+                        duration_in_seconds: None,
+                        opinion,
+                        document_urls: Some(
+                            speech
+                                .spoken_text_html_urls
+                                .iter()
+                                .map(|html_url| html_url.document_url.clone())
+                                .collect(),
+                        ),
+
+                        about: None,
+                        vote_result_ids: None,
+                        start: None,
                     },
-                    duration_in_seconds: None,
-                    opinion,
-                    document_url: speech
-                        .spoken_text_html_urls
-                        .first()
-                        .map(|html_url| html_url.document_url.clone()),
-                    about: None,
-                    vote_result_ids: None,
                 }
             })
             .collect::<Vec<_>>();
@@ -342,7 +380,17 @@ impl VoteResult {
                 .get_plenar_speeches(&db_legis_init, maybe_legis_init_id)
                 .await
             {
-                speeches = plenar_speeches;
+                speeches = plenar_speeches
+                    .into_iter()
+                    .map(|speech| FullSpeech {
+                        id: 0,
+                        debate_id: 0,
+                        delegate_id: speech.delegate_id,
+                        speech,
+                        ai_summary: None,
+                        relations: vec![],
+                    })
+                    .collect();
             }
 
             let absences = db_enhancer
@@ -360,7 +408,7 @@ impl VoteResult {
             (None, None)
         };
 
-        VoteResult {
+        Ok(VoteResult {
             id,
             legislative_initiative: db_legis_init,
             ai_summary: None,
@@ -392,17 +440,57 @@ impl VoteResult {
                     .collect()
             }),
             meilisearch_helper: Some(MeilisearchHelper::default()),
-        }
+        })
     }
 }
 
+pub fn build_db_votes(
+    named_votes: &[DbNamedVote],
+    delegate_parties: &[DelegateParty],
+) -> Vec<DbVote> {
+    let party_by_delegate: HashMap<i32, String> = delegate_parties
+        .into_iter()
+        .map(|dp| (dp.id, dp.party.clone().unwrap_or_else(|| "OK".to_string())))
+        .collect();
+
+    let mut grouped: HashMap<String, DbVote> = HashMap::new();
+
+    for vote in named_votes {
+        let party = party_by_delegate
+            .get(&vote.delegate_id)
+            .cloned()
+            .unwrap_or_else(|| "OK".to_string());
+
+        let entry = grouped.entry(party.clone()).or_insert_with(|| DbVote {
+            party: party.clone(),
+            code: None,
+            infavor_count: 0,
+            against_count: 0,
+            abstention_count: 0,
+            absence_count: 0,
+        });
+
+        if vote.was_abstention {
+            entry.abstention_count += 1;
+        } else if vote.was_absent.unwrap_or(false) {
+            entry.absence_count += 1;
+        } else {
+            match vote.infavor {
+                Some(true) => entry.infavor_count += 1,
+                Some(false) => entry.against_count += 1,
+                None => {}
+            }
+        }
+    }
+
+    grouped.into_values().collect()
+}
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
     use somai_client::SomAiClient;
     use somes_common_lib::Document;
-    use somes_scraper::{AustriaScraper, legis_init::LegislativeInitiatives};
 
     use crate::document_text::{combine_texts, extract_text_from_documents_html_first_stripped};
 

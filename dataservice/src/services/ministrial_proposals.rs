@@ -3,25 +3,25 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
-use chrono::{Months, Utc};
-use combx::{create_gov_officials_map, FromScrapedType, GovProposal};
+use chrono::Utc;
+use combx::{FromScrapedType, GovProposal, create_gov_officials_map};
 use dotenvy_macro::dotenv;
 use somes_scraper::{
+    AustriaScraper, GovOfficial,
     ministrial_proposals::{GegenstandInfo, MinistrialProposal, MinistrialProposalScraper},
     proposals::ProposalsPayload,
-    AustriaScraper, GovOfficial,
 };
 use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{
+    AppState, CompareHash, GPS, Shutdown,
     ai_task::AiTask,
     api_limiter::ApiLimiter,
     enforce_ai_run,
     services::scrape_untill_success,
     should_update::StoredUpdatedAt,
     today,
-    topics::{insert_topics_generic_batch, TableType, TopicType},
-    AppState, CompareHash, Shutdown, GPS,
+    topics::{TableType, TopicType, insert_topics_generic_batch},
 };
 
 mod notify;
@@ -34,7 +34,6 @@ mod inserts;
 pub use inserts::*;
 
 mod db;
-pub use db::*;
 
 pub async fn scrape_new_ministrial_props(
     scraper: &AustriaScraper,
@@ -138,8 +137,7 @@ impl StoredUpdatedAt for MinistrialProposal {
         .await
         .ok()
         .flatten()
-        .map(|x| x.raw_data_updated_at)
-        .flatten()
+        .and_then(|x| x.raw_data_updated_at)
     }
 }
 
@@ -187,7 +185,7 @@ pub async fn update_or_insert_ministerial_proposal(
     );
     // log::info!("inserting single ministrial prop");
 
-    let start = Instant::now();
+    let _start = Instant::now();
     // Insert or update the ministrial proposal
     let ministrial_prop_id = sqlx::query!(
                 r#"
@@ -241,7 +239,7 @@ pub async fn update_or_insert_ministerial_proposal(
 
     #[cfg(feature = "ai")]
     if let Some(ai_task_tx) = &ai_task_tx {
-        use crate::{ai_task::Priority, LATEST_GP};
+        use crate::{LATEST_GP, ai_task::Priority};
 
         let (priority, inner_gov_prop_mail_tx) =
             if gov_proposal.ministrial_proposal.raw_data_created_at
@@ -261,8 +259,9 @@ pub async fn update_or_insert_ministerial_proposal(
         let summarization_task = AiTask {
             input: None,
             priority,
+            pool: pool.clone(),
             score: priority.weight(),
-            task_id: crate::hash!(),
+            task_id: crate::hash!(app_state.parliament),
             db_entry_id: ministrial_prop_id,
             rerunnable: true,
             created_at: Instant::now(),
@@ -311,10 +310,10 @@ pub async fn update_or_insert_ministerial_proposal(
         };
 
         log::info!(
-                    "Sending AI task for ministerial prop summarization: {ministrial_prop_id} / {}/ME/{} with priority {priority:?}",
-                    gov_proposal.ministrial_proposal.gp,
-                    gov_proposal.ministrial_proposal.inr
-                );
+            "Sending AI task for ministerial prop summarization: {ministrial_prop_id} / {}/ME/{} with priority {priority:?}",
+            gov_proposal.ministrial_proposal.gp,
+            gov_proposal.ministrial_proposal.inr
+        );
 
         if let Err(e) = ai_task_tx.send(summarization_task).await {
             log::error!("Could not send AI task for ministerial prop summarization: {e:?}");
@@ -341,7 +340,9 @@ pub async fn update_or_insert_ministerial_proposal(
     .execute(&mut *tx)
     .await
     {
-        log::error!("Cannot delete all ministrial proposal issuers from {ministrial_prop_id} because of: {e:}");
+        log::error!(
+            "Cannot delete all ministrial proposal issuers from {ministrial_prop_id} because of: {e:}"
+        );
     }
 
     for issuer_id in &gov_proposal.ministerial_issuers {
@@ -431,9 +432,9 @@ pub async fn update_or_insert_ministerial_proposal(
 
     tx.commit().await?;
 
-    if should_update {
-        if let Some(client) = &app_state.redis_client {
-            if let Err(e) = crate::notify_update_streamed(
+    if should_update
+        && let Some(client) = &app_state.redis_client
+            && let Err(e) = crate::notify_update_streamed(
                 combx::Index::GovProposals,
                 &gov_proposal,
                 &mut client.clone(),
@@ -442,8 +443,6 @@ pub async fn update_or_insert_ministerial_proposal(
             {
                 log::error!("Could not notify for gov prop update!: {e:?}");
             }
-        }
-    }
     Ok(())
 }
 
@@ -660,7 +659,7 @@ fn sort_ministerial_prop_paths_desc(prop_paths: &mut Vec<GegenstandInfo>) {
 #[cfg(test)]
 mod tests {
     use chrono::NaiveDateTime;
-    use somes_scraper::{ministrial_proposals::GegenstandInfo, AustriaScraper};
+    use somes_scraper::{AustriaScraper, ministrial_proposals::GegenstandInfo};
 
     use crate::{ministrial_proposals::sort_ministerial_prop_paths_desc, today};
 

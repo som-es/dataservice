@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::email::{send_mail, DELEGATE_ACTIVITY_TEMPLATE, MAILER};
+use crate::email::{DELEGATE_ACTIVITY_TEMPLATE, MAILER, send_mail};
 
 pub(super) fn send_delegate_activity_mail(
     mail_to: &str,

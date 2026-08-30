@@ -1,21 +1,26 @@
-use combx::absence_matching;
-use somes_scraper::{plenar::PlenarInfo, AustriaScraper, Scraper};
+use combx::{Parliament, absence_matching};
+use somes_scraper::plenar::PlenarInfo;
 use sqlx::PgPool;
+use tokio::sync::mpsc::Sender;
 
 use crate::{
-    plenar::{insert_call_to_order, insert_debate, insert_plenar_info, insert_plenar_speech},
-    ApiLimiter,
+    ai_task::AiTask,
+    plenar::{
+        SpeechInsertArgs, insert_absences, insert_call_to_orders, insert_debate,
+        insert_plenar_info, insert_plenar_speech,
+    },
 };
 
 pub async fn update_plenar_infos_in_db(
     plenar_info: &PlenarInfo,
     pg_pool: &PgPool,
-    api_limiter: ApiLimiter,
+    ai_task_tx: Option<&Sender<AiTask>>,
+    parliament: Parliament,
 ) {
     log::info!("Updating plenar infos in database...");
 
     // disable with setting
-    let mut text_extractor = somes_scraper::TextExtractor::new();
+    let mut text_extractor = somes_scraper::TextExtractor::default();
 
     if !crate::should_update_by_time(plenar_info, pg_pool).await {
         return;
@@ -27,16 +32,16 @@ pub async fn update_plenar_infos_in_db(
         Ok(id) => id,
         Err(e) => {
             log::error!(
-                    "Error inserting plenar info: '{e}'. Error occured for plenar info: {plenar_info:?}. Skipping adding call to orders and debates."
-                );
+                "Error inserting plenar info: '{e}'. Error occured for plenar info: {plenar_info:?}. Skipping adding call to orders and debates."
+            );
             return;
         }
     };
 
-    for call_to_order_entry in &plenar_info.call_to_orders {
-        if let Err(e) = insert_call_to_order(pg_pool, call_to_order_entry, plenar_id).await {
-            log::error!("Error inserting call to order: '{e}'. Error occured for call to order: {call_to_order_entry:?}");
-        }
+    if let Err(e) = insert_call_to_orders(pg_pool, plenar_id, plenar_info).await {
+        log::error!(
+            "could not insert call to orders for plenary session {plenar_id} because of {e:?}"
+        );
     }
 
     log::info!("inserting debates");
@@ -46,7 +51,10 @@ pub async fn update_plenar_infos_in_db(
         let debate_id = match insert_debate(pg_pool, debate, plenar_id).await {
             Ok(debate_id) => debate_id,
             Err(e) => {
-                log::error!("Error inserting debate: '{e}'. Error occured for debate: {debate:?}");
+                log::error!(
+                    "Error inserting debate: '{e}'. Error occured for debate: {:?}",
+                    debate.info
+                );
                 continue;
             }
         };
@@ -67,22 +75,28 @@ pub async fn update_plenar_infos_in_db(
             )
         }*/
 
+        let speech_insert_args = SpeechInsertArgs {
+            corresponding_debate: &debate.info,
+            debate_id,
+            plenar_date: plenar_info.created_at,
+            council: &plenar_info.council,
+            ai_task_tx,
+        };
+
         for plenar_speech in &debate.speeches {
             if let Err(e) = insert_plenar_speech(
+                pg_pool.clone(),
                 &mut tx,
                 plenar_speech,
-                &debate.info,
-                debate_id,
                 &mut text_extractor,
-                &api_limiter,
-                plenar_info.created_at,
-                &plenar_info.council,
+                &speech_insert_args,
+                parliament,
             )
             .await
             {
                 log::error!(
-                        "Error inserting plenar speech: '{e}'. Error occured for plenar speech: {plenar_speech:?}"
-                    );
+                    "Error inserting plenar speech: '{e}'. Error occured for plenar speech: {plenar_speech:?}"
+                );
             }
         }
 
@@ -91,37 +105,55 @@ pub async fn update_plenar_infos_in_db(
         }
     }
 
-    if let Some(absences) = &plenar_info.absences {
+    if let Err(e) = insert_all_absences(pg_pool, plenar_id, plenar_info, parliament).await {
+        log::error!("cannot insert all absences: {e:?}");
+    }
+}
+
+pub async fn insert_all_absences(
+    pg_pool: &PgPool,
+    plenar_id: i32,
+    plenar_info: &PlenarInfo,
+    parliament: Parliament,
+) -> sqlx::Result<()> {
+    let mut tx = pg_pool.begin().await?;
+
+    sqlx::query!(
+        "delete from absences where plenary_session_id = $1",
+        plenar_id
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    for absences in plenar_info.absences.iter() {
+        let mandate_function = match parliament {
+            Parliament::At => plenar_info.council.as_str(),
+            Parliament::Eu => "MEP",
+        };
         match absence_matching(
             pg_pool,
             &absences.absences,
             plenar_info.created_at.date_naive(),
             plenar_info.gp.clone(),
-            &plenar_info.council,
+            mandate_function,
         )
         .await
         {
             Ok(matching) => {
-                for match_res in matching
-                    .correctly_matched
-                    .iter()
-                    .chain(matching.lev_or_deep_split_matched.iter())
+                log::info!("inserting absences: {:?}", matching.correctly_matched);
+
+                if let Err(e) = insert_absences(
+                    &mut tx,
+                    plenar_id,
+                    matching,
+                    absences.date,
+                    &absences.source_document,
+                )
+                .await
                 {
-                    if let Err(e) = sqlx::query!(
-                        "
-                        INSERT INTO absences (lev, similiarity_score, searched_with, matched_with, delegate_id, manually_matched, plenary_session_id)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7)
-                        ON CONFLICT (delegate_id, plenary_session_id)
-                        DO UPDATE SET
-                            lev = EXCLUDED.lev,
-                            similiarity_score = EXCLUDED.similiarity_score,
-                            searched_with = EXCLUDED.searched_with,
-                            matched_with = EXCLUDED.matched_with,
-                            manually_matched = EXCLUDED.manually_matched
-                        ", match_res.lev as i64, match_res.similiarity_score as i64, match_res.searched_with, match_res.matched_with, match_res.delegate_id as i32, match_res.manually_matched, plenar_id
-                    ).execute(pg_pool).await {
-                        log::error!("Error inserting absene {e:?} for absence {match_res:?}");
-                    }
+                    log::error!(
+                        "could not insert absences for plenary session {plenar_id} because of {e:?}"
+                    );
                 }
             }
             Err(e) => {
@@ -129,4 +161,6 @@ pub async fn update_plenar_infos_in_db(
             }
         }
     }
+    tx.commit().await?;
+    Ok(())
 }

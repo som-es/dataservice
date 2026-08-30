@@ -14,7 +14,8 @@ pub async fn gps(pg: &PgPool) -> sqlx::Result<Vec<LegislativePeriod>> {
     Ok(sqlx::query!(
         "SELECT legislative_period as gp, MIN(raw_data_created_at) as start_date
             FROM plenar_infos
-            GROUP BY gp 
+            WHERE legislative_period != 'BR'
+            GROUP BY gp
             HAVING COUNT(*) > 1
             ORDER BY start_date desc
         "

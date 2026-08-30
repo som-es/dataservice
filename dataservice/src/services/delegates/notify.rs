@@ -137,20 +137,25 @@ pub async fn notify_delegate_activity_users(pg: &PgPool) -> sqlx::Result<()> {
             continue;
         }
 
-        if let Ok(_x) = tokio::task::spawn_blocking(move || {
+        let send_result = tokio::task::spawn_blocking(move || {
             match send_delegate_activity_mail(&mail_to, &delegate_activities) {
-                Ok(()) => return Ok(()),
+                Ok(()) => true,
                 Err(e) => {
                     log::error!("could not send delegate activity mail: {e:?}");
-                    return Err("Could not send delegate activity mail");
+                    false
                 }
             }
         })
-        .await
-        {
-            if let Some(user_id) = user_id {
-                mark_delegate_activity_mail_sent(pg, user_id, &sent_delegate_ids, now).await?;
+        .await;
+
+        match send_result {
+            Ok(true) => {
+                if let Some(user_id) = user_id {
+                    mark_delegate_activity_mail_sent(pg, user_id, &sent_delegate_ids, now).await?;
+                }
             }
+            Ok(false) => {}
+            Err(e) => log::error!("delegate activity mail task panicked: {e:?}"),
         }
     }
 
@@ -162,7 +167,7 @@ mod tests {
     use std::collections::HashMap;
 
     use crate::{
-        connect_pg,
+        AT_DATABASE_URL, connect_pg2,
         delegates::notify::{populate_delegate_profile_html, send_delegate_activity_mail},
     };
 
@@ -170,7 +175,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_collect_recent_activity_by_delegate() {
-        let pg_pool = connect_pg().await;
+        let pg_pool = connect_pg2(AT_DATABASE_URL).await;
         let delegate_id = 32506;
         let last_n_days = 30;
         let activity = collect_recent_activity_by_delegate(delegate_id, &pg_pool, last_n_days)
@@ -181,20 +186,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_send_delegate_activity_mail() {
-        let mail_to = "flurl.nagy@gmail.com";
-        let pg_pool = connect_pg().await;
-        let last_n_days = 30;
+        let mail_to = crate::email::TEST_MAIL_RECEIVER;
+        let pg_pool = connect_pg2(AT_DATABASE_URL).await;
+        let last_n_days = 90;
         let delegate_id = 32506;
         let activity = collect_recent_activity_by_delegate(delegate_id, &pg_pool, last_n_days)
             .await
             .unwrap();
         let html = populate_delegate_profile_html(&activity).await;
-        println!("html: {html}");
         let mut delegate_activities = HashMap::new();
         delegate_activities.insert(delegate_id, html);
         send_delegate_activity_mail(mail_to, &delegate_activities).unwrap();
-        loop {
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        }
     }
 }

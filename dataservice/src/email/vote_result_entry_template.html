@@ -1,34 +1,32 @@
-<a href="{*VOTE_RESULT_SOMES_URL*}" style="text-decoration: none; color: inherit; display: block">
+<a href="{*VOTE_RESULT_SOMES_URL*}" style="text-decoration: none; color: inherit; display: block; margin-top: 12px;">
     <table
         role="presentation"
         width="100%"
         cellspacing="0"
         cellpadding="0"
         border="0"
-        style="
-            margin-top: 20px;
-            font-family: Arial, sans-serif;
-            color: black;
-            table-layout: fixed;
-            width: 100%;
-            border-collapse: separate;
-        "
+        style="font-family: Arial, sans-serif; border-collapse: separate; width: 100%;"
     >
         <tr>
             <td
+                bgcolor="#c3cdd9"
+                class="dm-item-card"
                 style="
-                    border-radius: 0.9rem;
-                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-                    background-color: rgb(195, 205, 217);
-                    padding: 20px;
+                    background-color: #c3cdd9;
+                    border-radius: 10px;
+                    padding: 16px 18px;
+                    color: #1a1a1a;
                 "
             >
-                <!-- VOTE RESULT DESCRIPTION -->
+                <!-- Description -->
                 <div
+                    class="dm-card-text"
                     style="
+                        font-family: Arial, sans-serif;
                         font-size: 14px;
-                        line-height: 1.4;
-                        margin-bottom: 8px;
+                        line-height: 1.5;
+                        color: #1a1a1a;
+                        margin-bottom: 12px;
                         word-wrap: break-word;
                         overflow-wrap: break-word;
                         word-break: break-word;
@@ -37,13 +35,15 @@
                     {*VOTE_RESULT_DESCRIPTION*}
                 </div>
 
-                <!-- TAG BADGES (inline-block so they wrap) -->
-                <div style="font-size: 0; line-height: 0">
+                <!-- Tag badges -->
+                <div style="font-size: 0; line-height: 0; margin-bottom: 10px;">
                     <span
+                        class="dm-badge"
                         style="
                             display: inline-block;
-                            background-color: rgb(250, 233, 218);
-                            color: black;
+                            background-color: #fae9da;
+                            color: #000000;
+                            font-family: Arial, sans-serif;
                             font-size: 12px;
                             line-height: 16px;
                             font-weight: 600;
@@ -54,10 +54,12 @@
                         "
                         >{*VOTE_RESULT_GP*}</span
                     ><span
+                        class="dm-badge"
                         style="
                             display: inline-block;
-                            background-color: rgb(250, 233, 218);
-                            color: black;
+                            background-color: #fae9da;
+                            color: #000000;
+                            font-family: Arial, sans-serif;
                             font-size: 12px;
                             line-height: 16px;
                             font-weight: 600;
@@ -68,10 +70,12 @@
                         "
                         >{*VOTE_RESULT_TYPE*}</span
                     ><span
+                        class="dm-badge"
                         style="
                             display: inline-block;
-                            background-color: rgb(250, 233, 218);
-                            color: black;
+                            background-color: #fae9da;
+                            color: #000000;
+                            font-family: Arial, sans-serif;
                             font-size: 12px;
                             line-height: 16px;
                             font-weight: 600;
@@ -81,21 +85,27 @@
                             white-space: nowrap;
                         "
                         >{*VOTE_RESULT_OUTCOME*}</span
-                    >
+                    >{*VOTE_RESULT_DATE_BADGE*}
                 </div>
 
-                <!-- VOTE PARTY RESULTS -->
+                <!-- Party vote results -->
                 <div
+                    class="dm-muted"
                     style="
-                        margin-top: 10px;
+                        font-family: Arial, sans-serif;
                         font-size: 13px;
-                        line-height: 1.4;
-                        color: #333;
+                        line-height: 1.5;
+                        color: #444444;
                         word-wrap: break-word;
                         overflow-wrap: break-word;
                     "
                 >
                     {*VOTE_RESULT_PARTY_VOTES*}
+                </div>
+
+                <!-- Link -->
+                <div style="margin-top: 12px;">
+                    <span class="dm-link" style="font-family: Arial, sans-serif; font-size: 13px; color: #d8806f; font-weight: 600;">Auf somes ansehen &#8594;</span>
                 </div>
             </td>
         </tr>

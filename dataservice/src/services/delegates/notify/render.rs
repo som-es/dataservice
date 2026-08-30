@@ -37,7 +37,7 @@ fn render_section(title: &str, content: String) -> String {
     }
 
     format!(
-        r#"<h3 style="font-size: 1rem; margin: 18px 0 8px 0; color: #333;">{}</h3>{}"#,
+        r#"<h3 class="dm-section-title" style="font-family: Arial, sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; margin: 20px 0 8px 0; color: #555555;">{}</h3>{}"#,
         escape_html(title),
         content
     )
@@ -46,21 +46,33 @@ fn render_section(title: &str, content: String) -> String {
 fn render_text_entry(title: &str, description: &str, url: Option<&str>) -> String {
     let title = escape_html(title);
     let description = escape_html(description);
-    let link = url.map(|url| {
-        format!(
-            r#"<a href="{}" style="color: #d8806f; text-decoration: none;">Auf somes ansehen</a>"#,
-            escape_html(url)
-        )
-    });
+    let link_cta = if url.is_some() {
+        r#"<div style="margin-top: 10px;"><span class="dm-link" style="font-family: Arial, sans-serif; font-size: 13px; color: #d8806f; font-weight: 600;">Auf somes ansehen &#8594;</span></div>"#
+    } else {
+        ""
+    };
 
-    format!(
-        r#"<div style="border: 1px solid #eee; border-radius: 8px; padding: 12px; margin: 8px 0; background: #fff;">
-            <div style="font-weight: 700; margin-bottom: 6px;">{title}</div>
-            <div style="color: #555; line-height: 1.35;">{description}</div>
-            {}
-        </div>"#,
-        link.unwrap_or_default()
-    )
+    let inner = format!(
+        r##"<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="font-family: Arial, sans-serif; border-collapse: separate; width: 100%;">
+            <tr>
+                <td bgcolor="#c3cdd9" class="dm-item-card" style="background-color: #c3cdd9; border-radius: 10px; padding: 16px 18px; color: #1a1a1a;">
+                    <div class="dm-card-text" style="font-family: Arial, sans-serif; font-size: 14px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; word-wrap: break-word;">{title}</div>
+                    <div class="dm-muted" style="font-family: Arial, sans-serif; font-size: 13px; color: #555555; line-height: 1.5; word-wrap: break-word;">{description}</div>
+                    {link_cta}
+                </td>
+            </tr>
+        </table>"##
+    );
+
+    if let Some(url) = url {
+        format!(
+            r#"<a href="{}" style="text-decoration: none; color: inherit; display: block; margin-top: 12px;">{}</a>"#,
+            escape_html(url),
+            inner
+        )
+    } else {
+        format!(r#"<div style="margin-top: 12px;">{}</div>"#, inner)
+    }
 }
 
 fn render_gov_proposals(activity: &RecentActivity) -> String {
@@ -211,7 +223,7 @@ fn render_issued_proposals(activity: &RecentActivity) -> String {
                 votes
                     .iter()
                     .map(|vote| {
-                        let symbol = if vote.infavor {
+                        let symbol = if vote.infavor_count > 0 {
                             "<span style=\"color: #22c55e;\">✓</span>"
                         } else {
                             "<span style=\"color: #ef4444;\">✗</span>"
@@ -219,7 +231,17 @@ fn render_issued_proposals(activity: &RecentActivity) -> String {
                         format!("{} {}", escape_html(&vote.party), symbol)
                     })
                     .collect::<Vec<_>>()
-                    .join(", ")
+                    .join("  ")
+            })
+            .unwrap_or_default();
+
+        let vote_date_badge = legis_init
+            .vote_date
+            .map(|d| {
+                format!(
+                    r#"<span class="dm-badge" style="display: inline-block; background-color: #fae9da; color: #000000; font-family: Arial, sans-serif; font-size: 12px; line-height: 16px; font-weight: 600; border-radius: 6px; padding: 4px 8px; margin: 0 6px 6px 0; white-space: nowrap;">{}</span>"#,
+                    d.format("%d.%m.%Y")
+                )
             })
             .unwrap_or_default();
 
@@ -228,6 +250,7 @@ fn render_issued_proposals(activity: &RecentActivity) -> String {
             .replace("{*VOTE_RESULT_GP*}", &escape_html(&legis_init.gp))
             .replace("{*VOTE_RESULT_TYPE*}", &escape_html(vote_type))
             .replace("{*VOTE_RESULT_OUTCOME*}", vote_outcome)
+            .replace("{*VOTE_RESULT_DATE_BADGE*}", &vote_date_badge)
             .replace("{*VOTE_RESULT_PARTY_VOTES*}", &party_votes_html)
             .replace(
                 "{*VOTE_RESULT_SOMES_URL*}",
@@ -277,6 +300,7 @@ fn render_named_votes(activity: &RecentActivity) -> String {
                 "{*VOTE_RESULT_OUTCOME*}",
                 &named_vote.vote_date.format("%d.%m.%Y").to_string(),
             )
+            .replace("{*VOTE_RESULT_DATE_BADGE*}", "")
             .replace("{*VOTE_RESULT_PARTY_VOTES*}", &escape_html(vote))
             .replace(
                 "{*VOTE_RESULT_SOMES_URL*}",
@@ -309,7 +333,11 @@ fn render_speeches(activity: &RecentActivity) -> String {
         html.push_str(&render_text_entry(
             speech.about.as_deref().unwrap_or("Rede im Plenum"),
             &description,
-            speech.document_url.as_deref(),
+            speech
+                .document_urls
+                .as_ref()
+                .and_then(|urls| urls.first())
+                .map(|url| url.as_str()),
         ));
     }
 

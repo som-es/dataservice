@@ -4,6 +4,7 @@ use serde_derive::{Deserialize, Serialize};
 use somes_meilisearch_filter::{FilterArgument, FilterOp};
 
 use somes_macro::{CompositeType, MeilisearchFilter};
+use somes_scraper::language::Language;
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
@@ -267,6 +268,16 @@ pub struct DbParty {
     pub color: String,
 }
 
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+pub struct OrientationQuestion {
+    pub id: i32,
+    pub question: String,
+    pub is_left: Option<bool>,
+    pub is_liberal: Option<bool>,
+    pub is_part_of: Option<Vec<String>>,
+}
+
 #[optional_struct]
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(
@@ -285,6 +296,28 @@ pub struct DbParty {
 )]
 pub struct Topic {
     pub topic: String,
+}
+
+#[optional_struct]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(
+    Debug,
+    Deserialize,
+    Serialize,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    CompositeType,
+    Type,
+    MeilisearchFilter,
+    Hash,
+    Default,
+)]
+pub struct TopicWithId {
+    pub topic: String,
+    pub id: String,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

@@ -10,3 +10,5 @@ nohup.out
 unique-topics/models
 .fastembed_cache
 .kilo
+.diesel_lock
+unique-topics/id_*.json

@@ -14,6 +14,7 @@ pub use gov_officials::*;
 mod filtering;
 mod pdf;
 pub use pdf::*;
+pub mod topic_map;
 
 use sqlx::{PgPool, postgres::PgPoolOptions};
 

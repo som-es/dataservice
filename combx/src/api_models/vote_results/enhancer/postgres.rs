@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::NaiveDate;
-use somes_scraper::{LegislativeInitiative, Party, ProContra};
+use somes_scraper::{LegislativeInitiative, NamedVoteProContra, Party};
 use sqlx::PgPool;
 
 use crate::{
@@ -11,7 +11,7 @@ use crate::{
         named_votes::pg_create_db_named_votes,
     },
     enhancer::{Enhancer, PostgresEnhancer},
-    with_data::all_parties_by_most_recent_gp,
+    with_data::{active_delegates_with_party_at_date, all_parties_by_most_recent_gp},
 };
 
 impl VoteResultEnhancer for PostgresEnhancer {
@@ -39,7 +39,7 @@ impl VoteResultEnhancer for PostgresEnhancer {
 
     fn create_db_named_votes(
         &self,
-        votes: &ProContra,
+        votes: &NamedVoteProContra,
         voted_on: NaiveDate,
         gp: &str,
         function: &str,
@@ -77,6 +77,14 @@ impl VoteResultEnhancer for PostgresEnhancer {
     ) -> impl Future<Output = Result<Vec<i32>, sqlx::Error>> {
         pg_get_referenced_by_other_ids(self.source(), db_legis_init)
     }
+
+    fn active_delegates_party_at_date(
+        &self,
+        at: NaiveDate,
+        function: &str,
+    ) -> impl Future<Output = Result<Vec<crate::with_data::DelegateParty>, sqlx::Error>> {
+        active_delegates_with_party_at_date(self.source(), at, function)
+    }
 }
 
 pub async fn pg_get_plenar_speeches(
@@ -97,8 +105,9 @@ pub async fn pg_get_plenar_speeches(
             END AS infavor,
             duration_in_seconds,
             opinion,
-            document_url,
-            about
+            about,
+            start,
+            COALESCE(array_remove(array_agg(document_url), NULL), ARRAY[]::text[]) AS "document_urls"
         FROM plenar_speeches
         INNER JOIN plenar_speech_links psl ON plenar_speeches.id = psl.plenar_speech_id
         INNER JOIN plenar_speech_legis_inits pl ON pl.speech_id = plenar_speeches.id
@@ -113,8 +122,9 @@ pub async fn pg_get_plenar_speeches(
             delegate_id,
             duration_in_seconds,
             opinion,
-            document_url,
-            about
+            about,
+            start,
+            opinion
         "#,
         maybe_legis_init_id,
         db_legis_init.pre_declined_type
@@ -229,12 +239,13 @@ mod tests {
                 opinion: Some(
                     "Contra".into(),
                 ),
-                document_url: Some(
-                    "https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/63/A_-_18_16_03_00898949.html#142".into(),
+                document_urls: Some(
+                    vec!["https://www.parlament.gv.at/dokument/XXVIII/NRSITZ/63/A_-_18_16_03_00898949.html#142".into()],
                 ),
                 about: Some(
                     "Asylstopp-Novelle 2025".into(),
                 ),
+                start: None
             };
         assert!(speeches.contains(&speech));
     }

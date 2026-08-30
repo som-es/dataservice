@@ -16,6 +16,9 @@ pub use ai_summary::*;
 pub mod parliamentary_qa;
 pub use parliamentary_qa::*;
 
+pub mod speeches;
+pub use speeches::*;
+
 pub trait FromScrapedType<DbEnhancer> {
     type ScrapedType;
     fn from_scraped_type(

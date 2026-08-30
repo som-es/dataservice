@@ -1,6 +1,15 @@
-use crate::{scrape_untill_success, should_update::StoredUpdatedAt, ApiLimiter, Shutdown, GPS};
-use somes_scraper::{plenar::PlenarInfo, AustriaScraper};
+use crate::{
+    ApiLimiter, GPS, Gps, Shutdown, ai_task::AiTask, scrape_untill_success,
+    should_update::StoredUpdatedAt,
+};
+use combx::Parliament;
+use somes_scraper::{
+    AustriaScraper,
+    eu_parliament::EuParliamentScraper,
+    plenar::{Plenar, PlenarInfo},
+};
 use sqlx::PgPool;
+use tokio::sync::mpsc::Sender;
 
 mod scraping;
 pub use scraping::*;
@@ -14,11 +23,15 @@ pub use inserts::*;
 mod extract_interjection;
 pub use extract_interjection::*;
 
+mod ai_tasks;
+pub use ai_tasks::*;
+
 const MAX_TASKS: usize = 1;
 
 pub async fn plenar_info_once(
     pg_pool: &PgPool,
     parliament_api_limiter: ApiLimiter,
+    ai_task_tx: Option<Sender<AiTask>>,
     only_latest: bool,
 ) {
     log::info!("Try scraping plenar info");
@@ -29,6 +42,7 @@ pub async fn plenar_info_once(
         for gp in GPS {
             let pg_pool = pg_pool.clone();
             let parliament_api_limiter = parliament_api_limiter.clone();
+            let ai_task_tx = ai_task_tx.clone();
 
             let handle = tokio::spawn(async move {
                 let mut scraper = AustriaScraper::default();
@@ -54,11 +68,16 @@ pub async fn plenar_info_once(
                     }
 
                     let pg_pool = pg_pool.clone();
-                    let parliament_api_limiter = parliament_api_limiter.clone();
+                    let ai_task_tx = ai_task_tx.clone();
 
                     inner_handles.push(tokio::spawn(async move {
-                        update_plenar_infos_in_db(&plenar_info, &pg_pool, parliament_api_limiter)
-                            .await;
+                        update_plenar_infos_in_db(
+                            &plenar_info,
+                            &pg_pool,
+                            ai_task_tx.as_ref(),
+                            Parliament::At,
+                        )
+                        .await;
                     }));
                 }
 
@@ -84,6 +103,69 @@ pub async fn plenar_info_once(
     }
 }
 
+pub async fn plenar_gps_once<S: Plenar + Gps + Default + Send + Sync>(
+    pg_pool: &PgPool,
+    parliament_api_limiter: ApiLimiter,
+    ai_task_tx: Option<Sender<AiTask>>,
+) {
+    for gp in S::gps().iter().rev() {
+        let mut scraper = S::default();
+        log::info!("PLENAR info once GP: {gp}");
+        scraper.scrape_info_mut().gp = vec![gp.into()];
+
+        let new_plenar_infos = scrape_untill_success::<Vec<PlenarInfo>, _>(|| async {
+            scrape_new_plenar_infos(&scraper, parliament_api_limiter.clone()).await
+        })
+        .await;
+
+        for plenar_info in new_plenar_infos {
+            update_plenar_infos_in_db(&plenar_info, pg_pool, ai_task_tx.as_ref(), S::PARLIAMENT)
+                .await;
+        }
+    }
+}
+
+#[async_trait::async_trait]
+pub trait PlenarService: Plenar + Send + Sync + Default + Gps {
+    async fn run(
+        pg_pool: &PgPool,
+        parliament_api_limiter: ApiLimiter,
+        ai_task_tx: Sender<AiTask>,
+        only_latest: bool,
+    );
+}
+
+#[async_trait::async_trait]
+impl PlenarService for EuParliamentScraper {
+    async fn run(
+        pg_pool: &PgPool,
+        parliament_api_limiter: ApiLimiter,
+        ai_task_tx: Sender<AiTask>,
+        _only_latest: bool,
+    ) {
+        plenar_gps_once::<EuParliamentScraper>(pg_pool, parliament_api_limiter, Some(ai_task_tx))
+            .await;
+    }
+}
+
+#[async_trait::async_trait]
+impl PlenarService for AustriaScraper {
+    async fn run(
+        pg_pool: &PgPool,
+        parliament_api_limiter: ApiLimiter,
+        ai_task_tx: Sender<AiTask>,
+        only_latest: bool,
+    ) {
+        plenar_info_once(
+            pg_pool,
+            parliament_api_limiter,
+            Some(ai_task_tx),
+            only_latest,
+        )
+        .await;
+    }
+}
+
 impl StoredUpdatedAt for PlenarInfo {
     async fn stored_updated_at(&self, pg: &PgPool) -> Option<chrono::DateTime<chrono::Utc>> {
         sqlx::query!(
@@ -95,15 +177,15 @@ impl StoredUpdatedAt for PlenarInfo {
         .await
         .ok()
         .flatten()
-        .map(|x| x.raw_data_updated_at)
-        .flatten()
+        .and_then(|x| x.raw_data_updated_at)
     }
 }
 
-pub async fn run_shut_latest(
+pub async fn run_shut_latest<S: PlenarService>(
     mut shutdown: Shutdown,
     pg_pool: PgPool,
     parliament_api_limiter: ApiLimiter,
+    ai_task_tx: Sender<AiTask>,
 ) {
     // insert_all_serially().await;
     // return;
@@ -129,7 +211,7 @@ pub async fn run_shut_latest(
                 let pg_pool = pg_pool.clone();
                 let parliament_api_limiter = parliament_api_limiter.clone();
                 log::info!("Starting latest plenar info scraper");
-                plenar_info_once(&pg_pool, parliament_api_limiter, true).await;
+                S::run(&pg_pool, parliament_api_limiter.clone(), ai_task_tx.clone(), true).await;
                 // legis_init_once().await;
                 log::info!("Latest Plenar info scraper service sleeps for {plenar_sleep} seconds...");
                 tokio::time::sleep(tokio::time::Duration::from_secs(plenar_sleep)).await;
@@ -138,10 +220,11 @@ pub async fn run_shut_latest(
     }
 }
 
-pub async fn run_shut(
+pub async fn run_shut<S: PlenarService>(
     mut shutdown: Shutdown,
     pg_pool: PgPool,
     parliament_api_limiter: ApiLimiter,
+    ai_task_tx: Sender<AiTask>,
     only_latest: bool,
 ) {
     if only_latest {
@@ -171,7 +254,7 @@ pub async fn run_shut(
                 let pg_pool = pg_pool.clone();
                 let parliament_api_limiter = parliament_api_limiter.clone();
                 log::info!("Starting plenar info scraper");
-                plenar_info_once(&pg_pool, parliament_api_limiter, false).await;
+                S::run(&pg_pool, parliament_api_limiter.clone(), ai_task_tx.clone(), false).await;
                 // legis_init_once().await;
                 log::info!("Plenar info scraper service sleeps for {plenar_sleep} seconds...");
                 tokio::time::sleep(tokio::time::Duration::from_secs(plenar_sleep)).await;
@@ -190,10 +273,10 @@ mod tests {
     use chrono::NaiveDateTime;
     use combx::GPS;
     use rand::Rng;
-    use somes_scraper::{plenar::Plenar, AustriaScraper};
+    use somes_scraper::{AustriaScraper, plenar::Plenar};
 
     use crate::{
-        connect_pg,
+        AT_DATABASE_URL, connect_pg2 as connect_pg,
         plenar::{scrape_new_plenar_infos, update_plenar_infos_in_db},
     };
 
@@ -205,7 +288,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_duplicate_speeches() {
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
 
         println!("stating selecting");
         let speeches = sqlx::query!("select * from plenar_speeches")
@@ -254,10 +337,9 @@ mod tests {
 
         log::info!("legis init: {res:?}");
 
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
 
-        let parliament_api_limiter = crate::ApiLimiter::new(32);
-        update_plenar_infos_in_db(&res, &pool, parliament_api_limiter).await;
+        update_plenar_infos_in_db(&res, &pool, None, combx::Parliament::At).await;
     }
 
     #[tokio::test]
@@ -335,10 +417,9 @@ mod tests {
             .await
             .unwrap();
 
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
 
-        let parliament_api_limiter = crate::ApiLimiter::new(32);
-        update_plenar_infos_in_db(&res, &pool, parliament_api_limiter).await;
+        update_plenar_infos_in_db(&res, &pool, None, combx::Parliament::At).await;
     }
 
     #[tokio::test]
@@ -348,14 +429,46 @@ mod tests {
         simple_logger::init_with_level(log::Level::Info).unwrap();
         let scraper: AustriaScraper = AustriaScraper::default();
         let res = scraper
-            .get_plenar("/gegenstand/XXVIII/NRSITZ/79")
+            .get_plenar("/gegenstand/XXVIII/NRSITZ/66")
             .await
             .unwrap();
 
-        let pool = connect_pg().await;
+        let pool = connect_pg(AT_DATABASE_URL).await;
 
-        let parliament_api_limiter = crate::ApiLimiter::new(32);
-        update_plenar_infos_in_db(&res, &pool, parliament_api_limiter).await;
+        update_plenar_infos_in_db(&res, &pool, None, combx::Parliament::At).await;
+    }
+    #[tokio::test]
+    async fn test_brsitz_979_db_insertion() {
+        unsafe { std::env::set_var("MIND_UPDATE_TIME", "false") };
+        unsafe { std::env::set_var("DISABLE_SPEECH_TEXT", "false") };
+        let _ = simple_logger::init_with_level(log::Level::Info);
+        let scraper: AustriaScraper = AustriaScraper::default();
+        let res = scraper
+            .get_plenar("/gegenstand/BR/BRSITZ/979")
+            .await
+            .unwrap();
+
+        let pool = connect_pg(AT_DATABASE_URL).await;
+
+        update_plenar_infos_in_db(&res, &pool, None, combx::Parliament::At).await;
+    }
+
+    #[tokio::test]
+    async fn test_nrsitz_91_db_insertion() {
+        unsafe { std::env::set_var("MIND_UPDATE_TIME", "false") };
+        unsafe { std::env::set_var("DISABLE_SPEECH_TEXT", "true") };
+        let _ = simple_logger::init_with_level(log::Level::Info);
+        let scraper: AustriaScraper = AustriaScraper::default();
+        let res = scraper
+            .get_plenar("/gegenstand/XXVIII/NRSITZ/91")
+            .await
+            .unwrap();
+
+        let pool = connect_pg(AT_DATABASE_URL).await;
+        log::info!("absences: {:?}", res.absences);
+
+        log::info!("start update");
+        update_plenar_infos_in_db(&res, &pool, None, combx::Parliament::At).await;
     }
 
     #[tokio::test]

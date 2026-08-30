@@ -1,6 +1,13 @@
-use somes_scraper::{parties::Parties, AustriaScraper, Party};
+mod eu;
+use somes_scraper::{
+    AustriaScraper, Party,
+    eu_parliament::EuParliamentScraper,
+    parties::{DelegateMandate, Parties},
+};
 
-use crate::{scrape_untill_success, ApiLimiter, Shutdown, GPS};
+use crate::{
+    ApiLimiter, GPS, Gps, Shutdown, parties::eu::get_delegate_mandates, scrape_untill_success,
+};
 
 use sqlx::PgPool;
 
@@ -31,7 +38,7 @@ pub async fn update_parties_in_db2(pool: &PgPool, parties: &[Party], gp: &str) {
 }
 
 pub async fn get_parties(scraper: &AustriaScraper) -> crate::Result<Vec<Party>> {
-    Ok(scraper.get_parties().await?)
+    Ok(scraper.get_parties(&[]).await?)
 }
 
 pub async fn parties_once(pg_pool: &PgPool, parliament_api_limiter: ApiLimiter) {
@@ -43,17 +50,9 @@ pub async fn parties_once(pg_pool: &PgPool, parliament_api_limiter: ApiLimiter) 
         let handle = tokio::task::spawn(async move {
             let pg_pool = pg_pool;
             let mut scraper = AustriaScraper::default();
-            scraper.scrape_info.gp = vec![gp.clone().into()];
+            scraper.scrape_info.gp = vec![gp.clone()];
 
-            let parties = scrape_untill_success::<Vec<_>, _>(|| async {
-                parliament_api_limiter
-                    .run(scraper.get_parties())
-                    .await
-                    .map_err(|e| e.into())
-            })
-            .await;
-
-            update_parties_in_db2(&pg_pool, &parties, &gp).await;
+            scrape_and_update(&parliament_api_limiter, gp, pg_pool, &scraper, &[]).await;
         });
         handles.push(handle);
     }
@@ -66,8 +65,64 @@ pub async fn parties_once(pg_pool: &PgPool, parliament_api_limiter: ApiLimiter) 
     }
 }
 
-pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool, parliament_api_limiter: ApiLimiter) {
-    let party_sleep = std::env::var("PARTY_SLEEP")
+#[async_trait::async_trait]
+pub trait PartyService: Parties + Send + Sync + Default + Gps {
+    async fn run(pg_pool: &PgPool, parliament_api_limiter: ApiLimiter) -> crate::Result<()>;
+}
+
+#[async_trait::async_trait]
+impl PartyService for EuParliamentScraper {
+    async fn run(pg_pool: &PgPool, parliament_api_limiter: ApiLimiter) -> crate::Result<()> {
+        let mut scraper = EuParliamentScraper::default();
+        let delegates = get_delegate_mandates(pg_pool).await?;
+
+        for gp in ["7", "8", "9", "10"] {
+            scraper.scrape_info.gp = vec![gp.into()];
+            scrape_and_update(
+                &parliament_api_limiter,
+                gp.into(),
+                pg_pool.clone(),
+                &scraper,
+                &delegates,
+            )
+            .await;
+        }
+        Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl PartyService for AustriaScraper {
+    async fn run(pg_pool: &PgPool, parliament_api_limiter: ApiLimiter) -> crate::Result<()> {
+        let _: () = parties_once(pg_pool, parliament_api_limiter).await;
+        Ok(())
+    }
+}
+
+async fn scrape_and_update<S: Parties>(
+    parliament_api_limiter: &ApiLimiter,
+    gp: String,
+    pg_pool: sqlx::Pool<sqlx::Postgres>,
+    scraper: &S,
+    delegates: &[DelegateMandate],
+) {
+    let parties = scrape_untill_success::<Vec<_>, _>(|| async {
+        parliament_api_limiter
+            .run(scraper.get_parties(delegates))
+            .await
+            .map_err(|e| e.into())
+    })
+    .await;
+
+    update_parties_in_db2(&pg_pool, &parties, &gp).await;
+}
+
+pub async fn run_shut<S: PartyService>(
+    _shutdown: Shutdown,
+    _pg_pool: PgPool,
+    _parliament_api_limiter: ApiLimiter,
+) {
+    let _party_sleep = std::env::var("PARTY_SLEEP")
         .unwrap_or_else(|_| "10000".to_string())
         .parse()
         .unwrap_or_else(|e| {
@@ -76,7 +131,6 @@ pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool, parliament_api_li
             );
             10000
         });
-
     #[cfg(feature = "parties")]
     while !shutdown.is_shutdown() {
         tokio::select! {
@@ -90,7 +144,8 @@ pub async fn run_shut(mut shutdown: Shutdown, pg_pool: PgPool, parliament_api_li
                 let parliament_api_limiter = parliament_api_limiter.clone();
                 if let Err(e) = tokio::task::spawn(async move {
                     log::info!("Starting party scraper");
-                    parties_once(&pg_pool, parliament_api_limiter).await;
+
+                    S::run(&pg_pool, parliament_api_limiter).await.unwrap()
                 }).await {
                     log::error!("Error in party scraper: {:?}", e);
                 }
