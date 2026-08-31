@@ -10,12 +10,13 @@ use qdrant_client::{
 };
 use somai_client::SomAiClient;
 use somes_scraper::language::Language;
+use std::sync::Arc;
 use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{
     AppState, Result, Shutdown,
     ai_task::{AiTask, TaskArgs},
-    ai_tasks::somai_connect,
+    ai_tasks::{somai_connect, somai_url},
     political_analysis::{
         embed_speeches::{get_delegate_ids, setup_qdrant_collection},
         stance_system::{Citation, Stance, rag_pipeline},
@@ -227,15 +228,18 @@ async fn evaluate_and_save_opinion(
     Ok(())
 }
 
-async fn political_analysis(app_state: AppState, ai_task_tx: &Sender<AiTask>) -> Result<()> {
+async fn political_analysis(
+    app_state: AppState,
+    ai_task_tx: &Sender<AiTask>,
+    ai_client: Arc<SomAiClient>,
+    qdrant_client: &Qdrant,
+) -> Result<()> {
     let pg_pool = &app_state.pg_pool;
-    let ai_client = somai_connect().await?;
     let used_llm = ai_client.get_model().await?.result;
-
-    let qdrant_client = Qdrant::from_url(
-        &std::env::var("QDRANT_URL").unwrap_or_else(|_| "http://127.0.0.1:6334".to_string()),
-    )
-    .build()?;
+    log::info!(
+        "Political analysis of {:?} uses llm {used_llm}",
+        app_state.parliament
+    );
 
     setup_qdrant_collection(
         &qdrant_client,
@@ -343,7 +347,7 @@ async fn political_analysis(app_state: AppState, ai_task_tx: &Sender<AiTask>) ->
 
 async fn run_embed_for_delegate(
     pg_pool: &sqlx::Pool<sqlx::Postgres>,
-    ai_client: &std::sync::Arc<SomAiClient>,
+    ai_client: &Arc<SomAiClient>,
     qdrant_client: &Qdrant,
     vector_update_skip: bool,
     today: chrono::prelude::DateTime<chrono::prelude::Utc>,
@@ -387,6 +391,53 @@ async fn run_embed_for_delegate(
     };
 }
 
+fn qdrant_url() -> String {
+    std::env::var("QDRANT_URL").unwrap_or_else(|_| "http://127.0.0.1:6334".to_string())
+}
+
+async fn connect_ai_client() -> Option<Arc<SomAiClient>> {
+    let somai_url = somai_url();
+    match somai_connect().await {
+        Ok(ai_client) => {
+            log::info!("Connected to somes ai api at {somai_url}");
+            Some(ai_client)
+        }
+        Err(e) => {
+            log::error!("Could not connect to somes ai api at {somai_url}: {e}");
+            None
+        }
+    }
+}
+
+async fn connect_qdrant_client() -> Option<Qdrant> {
+    let qdrant_url = qdrant_url();
+    let qdrant_client = match Qdrant::from_url(&qdrant_url)
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .build()
+    {
+        Ok(qdrant_client) => qdrant_client,
+        Err(e) => {
+            log::error!("Could not create qdrant client for {qdrant_url}: {e}");
+            return None;
+        }
+    };
+
+    match qdrant_client.health_check().await {
+        Ok(info) => {
+            log::info!(
+                "Connected to {} {} at {qdrant_url}",
+                info.title,
+                info.version
+            );
+            Some(qdrant_client)
+        }
+        Err(e) => {
+            log::error!("Could not connect to qdrant at {qdrant_url}: {e}");
+            None
+        }
+    }
+}
+
 pub async fn run_shut(mut shutdown: Shutdown, app_state: AppState, ai_task_tx: Sender<AiTask>) {
     let political_analysis_sleep = std::env::var("POLITICAL_ANALYSIS_SLEEP")
         .unwrap_or_else(|_| "800".to_string())
@@ -398,6 +449,15 @@ pub async fn run_shut(mut shutdown: Shutdown, app_state: AppState, ai_task_tx: S
             800
         });
 
+    let Some(ai_client) = connect_ai_client().await else {
+        log::error!("political analysis service stops because it has no somes ai client");
+        return;
+    };
+    let Some(qdrant_client) = connect_qdrant_client().await else {
+        log::error!("political analysis service stops because it has no qdrant client");
+        return;
+    };
+
     while !shutdown.is_shutdown() {
         tokio::select! {
             _ = shutdown.recv() => {
@@ -408,7 +468,10 @@ pub async fn run_shut(mut shutdown: Shutdown, app_state: AppState, ai_task_tx: S
             _ = async {
                 let app_state = app_state.clone();
                 log::info!("Starting political analysis service");
-                if let Err(e) = political_analysis(app_state, &ai_task_tx).await {
+                if let Err(e) =
+                    political_analysis(app_state, &ai_task_tx, ai_client.clone(), &qdrant_client)
+                        .await
+                {
                     log::error!("could not complete political analysis run: {e:?}")
                 }
                 // plenar_info_once(&pg_pool, true).await;
