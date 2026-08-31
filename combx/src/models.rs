@@ -4,7 +4,6 @@ use serde_derive::{Deserialize, Serialize};
 use somes_meilisearch_filter::{FilterArgument, FilterOp};
 
 use somes_macro::{CompositeType, MeilisearchFilter};
-use somes_scraper::language::Language;
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
