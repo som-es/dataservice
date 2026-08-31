@@ -1,25 +1,26 @@
+mod answers;
+mod clients;
+mod config;
 pub mod delegate_context;
 mod embed_speeches;
 mod stance_system;
 
-use chrono::TimeDelta;
+use chrono::{DateTime, Utc};
 use combx::{OrientationQuestion, Parliament};
-use qdrant_client::{
-    Qdrant,
-    qdrant::{GetPoints, PointId},
-};
+use qdrant_client::Qdrant;
 use somai_client::SomAiClient;
 use somes_scraper::language::Language;
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 use tokio::{sync::mpsc::Sender, time::Instant};
 
 use crate::{
     AppState, Result, Shutdown,
-    ai_task::{AiTask, TaskArgs},
-    ai_tasks::{somai_connect, somai_url},
+    ai_task::AiTask,
     political_analysis::{
-        embed_speeches::{get_delegate_ids, setup_qdrant_collection},
-        stance_system::{Citation, Stance, rag_pipeline},
+        answers::{process_delegate_stance, recently_answered_pairs},
+        clients::{connect_ai_client, connect_qdrant_client},
+        config::{is_fresh, sleep_seconds, stance_update_skip, update_days, vector_update_skip},
+        embed_speeches::{Delegate, get_delegate_ids, setup_qdrant_collection},
     },
     today,
 };
@@ -56,178 +57,6 @@ pub fn collection_name(parliament: Parliament) -> &'static str {
     }
 }
 
-pub async fn process_delegate_stance(
-    task_args: &TaskArgs,
-    ai_client: &SomAiClient,
-    qdrant_client: &Qdrant,
-    delegate_id: i32,
-    question_id: i32,
-    question_text: &str,
-    used_llm: &str,
-    language: Language,
-    parliament: Parliament,
-) -> crate::Result<()> {
-    let stance = rag_pipeline::<Stance>(
-        ai_client,
-        qdrant_client,
-        delegate_id,
-        question_text,
-        language,
-        parliament,
-    )
-    .await?;
-
-    let stance_llm = match stance.stance_detection {
-        stance_system::StanceDetection::Postive => "Positive",
-        stance_system::StanceDetection::Neutral => "Neutral",
-        stance_system::StanceDetection::Negative => "Negative",
-    };
-
-    let answer_id = sqlx::query_scalar!(
-        r#"
-        INSERT INTO political_answers(question_id, delegate_id, answer, stance_llm, model_used, full_stance)
-        VALUES ($1, $2, $3, $4, $5, $6) RETURNING id
-        "#,
-        question_id,
-        delegate_id,
-        stance.political_stance,
-        stance_llm,
-        used_llm,
-        serde_json::to_value(&stance)?,
-    )
-    .fetch_one(&task_args.pg_pool)
-    .await?;
-
-    save_citations(
-        &task_args.pg_pool,
-        qdrant_client,
-        answer_id,
-        &stance.citations,
-    )
-    .await?;
-
-    evaluate_and_save_opinion(
-        &task_args.pg_pool,
-        ai_client,
-        delegate_id,
-        question_id,
-        answer_id,
-        stance_llm,
-        &stance.political_stance,
-    )
-    .await?;
-
-    Ok(())
-}
-
-async fn save_citations(
-    pg_pool: &sqlx::PgPool,
-    qdrant_client: &Qdrant,
-    answer_id: i32,
-    citations: &[Citation],
-) -> crate::Result<()> {
-    for citation in citations {
-        let point_id = PointId::from(citation.point_uuid.clone());
-
-        let get_points_req = GetPoints {
-            collection_name: "delegates".to_string(),
-            ids: vec![point_id],
-            with_payload: Some(true.into()),
-            ..Default::default()
-        };
-
-        let qdrant_res = qdrant_client.get_points(get_points_req).await?;
-
-        let mut text_snippet: Option<String> = None;
-
-        if let Some(point) = qdrant_res.result.first()
-            && let Some(text_value) = point.payload.get("text")
-            && let Some(qdrant_client::qdrant::value::Kind::StringValue(text)) = &text_value.kind
-        {
-            text_snippet = Some(text.clone());
-        }
-
-        let Ok(parsed_uuid) = uuid::Uuid::parse_str(&citation.point_uuid) else {
-            log::warn!("Skipping citation insertion because of malformed uuid: {citation:?}");
-            continue;
-        };
-
-        sqlx::query!(
-            r#"
-            INSERT INTO stance_citations
-                (answer_id, speech_id, point_uuid, text_snippet)
-            VALUES
-                ($1, $2, $3, $4)
-            ON CONFLICT (answer_id, point_uuid) DO NOTHING
-            "#,
-            answer_id,
-            citation.speech_id,
-            parsed_uuid,
-            text_snippet
-        )
-        .execute(pg_pool)
-        .await?;
-    }
-
-    Ok(())
-}
-
-async fn evaluate_and_save_opinion(
-    pg_pool: &sqlx::PgPool,
-    ai_client: &SomAiClient,
-    delegate_id: i32,
-    question_id: i32,
-    answer_id: i32,
-    stance_llm: &str,
-    political_stance: &str,
-) -> crate::Result<()> {
-    let ref_answers = sqlx::query!(
-        r#"
-        SELECT stance_llm, answer, question_id
-        FROM political_answers
-        WHERE question_id = $1 AND is_strong_reference
-        ORDER BY stance_llm;
-        "#,
-        question_id
-    )
-    .fetch_all(pg_pool)
-    .await?;
-
-    let negative_ref = &ref_answers[0].answer;
-    let positive_ref = &ref_answers[1].answer;
-
-    let pro_sim = ai_client
-        .embedding_embed_and_cosine(positive_ref.to_string(), political_stance.to_string())
-        .await?
-        .cosine_similarity;
-
-    let contra_sim = ai_client
-        .embedding_embed_and_cosine(negative_ref.to_string(), political_stance.to_string())
-        .await?
-        .cosine_similarity;
-
-    let score = 10.0 * (pro_sim - contra_sim).powi(2);
-
-    sqlx::query!(
-        r#"
-        INSERT INTO political_opinions
-        (delegate_id, question_id, answer_id, stance, pro_strong_ref_score, contra_strong_ref_score, ref_score)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        "#,
-        delegate_id,
-        question_id,
-        answer_id,
-        stance_llm,
-        pro_sim,
-        contra_sim,
-        score
-    )
-    .execute(pg_pool)
-    .await?;
-
-    Ok(())
-}
-
 async fn political_analysis(
     app_state: AppState,
     ai_task_tx: &Sender<AiTask>,
@@ -248,15 +77,8 @@ async fn political_analysis(
     )
     .await?;
 
-    let vector_update_skip = std::env::var("VECTOR_UPDATE_SKIP")
-        .unwrap_or("false".into())
-        .parse::<bool>()
-        .unwrap_or_default();
-
-    let stance_update_skip = std::env::var("STANCE_UPDATE_SKIP")
-        .unwrap_or("false".into())
-        .parse::<bool>()
-        .unwrap_or_default();
+    let vector_update_skip = vector_update_skip();
+    let stance_update_skip = stance_update_skip();
 
     let delegates = get_delegate_ids(pg_pool).await?;
     let questions = sqlx::query_as!(
@@ -269,7 +91,7 @@ async fn political_analysis(
     let mut entry_id = 0;
     let today = today().to_utc();
 
-    let mut to_analyse = if !stance_update_skip && vector_update_skip {
+    let mut to_analyse: Vec<Delegate> = if !stance_update_skip && vector_update_skip {
         delegates.clone()
     } else {
         vec![]
@@ -291,9 +113,20 @@ async fn political_analysis(
     }
 
     if !stance_update_skip {
+        let recently_answered = if vector_update_skip {
+            recently_answered_pairs(pg_pool, today).await?
+        } else {
+            HashSet::new()
+        };
+        let mut skipped_answers = 0;
+
         for delegate in to_analyse {
             let priority = crate::ai_task::Priority::Medium;
             for question in &questions {
+                if recently_answered.contains(&(delegate.id, question.id)) {
+                    skipped_answers += 1;
+                    continue;
+                }
                 let ai_client = ai_client.clone();
                 let qdrant_client = qdrant_client.clone();
                 let question_text = question.question.clone();
@@ -340,19 +173,26 @@ async fn political_analysis(
                 entry_id += 1;
             }
         }
+
+        if skipped_answers > 0 {
+            log::info!(
+                "Skipped {skipped_answers} answers that are newer than {} days",
+                update_days()
+            );
+        }
     }
 
     Ok(())
 }
 
 async fn run_embed_for_delegate(
-    pg_pool: &sqlx::Pool<sqlx::Postgres>,
+    pg_pool: &sqlx::PgPool,
     ai_client: &Arc<SomAiClient>,
     qdrant_client: &Qdrant,
     vector_update_skip: bool,
-    today: chrono::prelude::DateTime<chrono::prelude::Utc>,
-    to_analyse: &mut Vec<embed_speeches::Delegate>,
-    delegate: embed_speeches::Delegate,
+    today: DateTime<Utc>,
+    to_analyse: &mut Vec<Delegate>,
+    delegate: Delegate,
     parliament: Parliament,
 ) {
     let last_updated_at = sqlx::query_scalar!(
@@ -367,9 +207,7 @@ async fn run_embed_for_delegate(
         );
         return;
     };
-    if today - last_updated_at.unwrap_or(today) < TimeDelta::days(30 * 3)
-        && last_updated_at.is_some()
-    {
+    if is_fresh(last_updated_at, today) {
         log::info!("Skip delegate {}, time delta too low", delegate.id);
         return;
     }
@@ -391,63 +229,8 @@ async fn run_embed_for_delegate(
     };
 }
 
-fn qdrant_url() -> String {
-    std::env::var("QDRANT_URL").unwrap_or_else(|_| "http://127.0.0.1:6334".to_string())
-}
-
-async fn connect_ai_client() -> Option<Arc<SomAiClient>> {
-    let somai_url = somai_url();
-    match somai_connect().await {
-        Ok(ai_client) => {
-            log::info!("Connected to somes ai api at {somai_url}");
-            Some(ai_client)
-        }
-        Err(e) => {
-            log::error!("Could not connect to somes ai api at {somai_url}: {e}");
-            None
-        }
-    }
-}
-
-async fn connect_qdrant_client() -> Option<Qdrant> {
-    let qdrant_url = qdrant_url();
-    let qdrant_client = match Qdrant::from_url(&qdrant_url)
-        .connect_timeout(std::time::Duration::from_secs(10))
-        .build()
-    {
-        Ok(qdrant_client) => qdrant_client,
-        Err(e) => {
-            log::error!("Could not create qdrant client for {qdrant_url}: {e}");
-            return None;
-        }
-    };
-
-    match qdrant_client.health_check().await {
-        Ok(info) => {
-            log::info!(
-                "Connected to {} {} at {qdrant_url}",
-                info.title,
-                info.version
-            );
-            Some(qdrant_client)
-        }
-        Err(e) => {
-            log::error!("Could not connect to qdrant at {qdrant_url}: {e}");
-            None
-        }
-    }
-}
-
 pub async fn run_shut(mut shutdown: Shutdown, app_state: AppState, ai_task_tx: Sender<AiTask>) {
-    let political_analysis_sleep = std::env::var("POLITICAL_ANALYSIS_SLEEP")
-        .unwrap_or_else(|_| "800".to_string())
-        .parse()
-        .unwrap_or_else(|e| {
-            log::warn!(
-                "Could not parse POLITICAL_ANALYSIS_SLEEP env var: {e}. Using default value of 800 seconds"
-            );
-            800
-        });
+    let political_analysis_sleep = sleep_seconds();
 
     let Some(ai_client) = connect_ai_client().await else {
         log::error!("political analysis service stops because it has no somes ai client");
