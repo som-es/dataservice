@@ -34,4 +34,6 @@ pub struct FullSpeech {
     pub ai_summary: Option<DbSpeechAiSummary>,
     #[filter(skip)]
     pub relations: Vec<DbSpeechRelations>,
+    #[filter(skip)]
+    pub received_interjections: Vec<DbInterjection>,
 }

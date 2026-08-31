@@ -335,6 +335,7 @@ pub struct TopicWithId {
     MeilisearchFilter,
     Hash,
 )]
+#[sqlx(type_name = "interjection")]
 pub struct Interjection {
     pub interjection_text: Option<String>,
     pub interjector_delegate_id: i32,
@@ -344,6 +345,31 @@ pub struct Interjection {
     pub rel_start_idx: i32,
     pub rel_end_idx: i32,
     pub delegate_match: DelegateMatch,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(
+    Debug,
+    Deserialize,
+    Serialize,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    CompositeType,
+    Type,
+    MeilisearchFilter,
+    Hash,
+)]
+#[sqlx(type_name = "db_interjection")]
+pub struct DbInterjection {
+    pub interjection_text: Option<String>,
+    pub interjector_delegate_id: i32,
+    pub plenar_speech_id: i32,
+    pub rel_start_idx: i32,
+    pub rel_end_idx: i32,
+    pub delegate_matching_id: i32,
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]

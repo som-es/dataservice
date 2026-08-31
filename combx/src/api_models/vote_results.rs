@@ -371,6 +371,7 @@ impl VoteResult {
                         vote_result_ids: None,
                         start: None,
                     },
+                    received_interjections: vec![],
                 }
             })
             .collect::<Vec<_>>();
@@ -389,6 +390,7 @@ impl VoteResult {
                         speech,
                         ai_summary: None,
                         relations: vec![],
+                        received_interjections: vec![],
                     })
                     .collect();
             }
