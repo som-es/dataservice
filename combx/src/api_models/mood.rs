@@ -47,5 +47,5 @@ pub struct MoodBarometer {
     pub mood_id: i64,
     pub auto_mood: f64,
     pub pre_aggregated_user_mood: Option<f64>,
-    pub user_mood: Option<f64>,
+    pub user_moods: Vec<f64>,
 }
