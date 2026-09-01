@@ -22,6 +22,9 @@ pub use speeches::*;
 pub mod mood;
 pub use mood::*;
 
+pub mod volksbg;
+pub use volksbg::*;
+
 pub trait FromScrapedType<DbEnhancer> {
     type ScrapedType;
     fn from_scraped_type(

@@ -483,6 +483,10 @@ pub async fn run_at_services(
             app_state.clone(),
             llm_ai_task_tx.clone(),
             false,
+        )),
+        tokio::spawn(services::volksbg::run_shut(
+            Shutdown::new(notify_shutdown.subscribe()),
+            app_state.clone(),
         ))
     )
     .0
