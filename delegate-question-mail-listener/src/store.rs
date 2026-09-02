@@ -3,6 +3,12 @@ use delegate_question_mail::IncomingReply;
 use sqlx::PgPool;
 use tracing::{debug, info, warn};
 
+#[derive(Debug)]
+struct Question {
+    id: i64,
+    recipient_email: String,
+}
+
 pub async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<()> {
     let Some(raw_message_id) = reply.message_id else {
         warn!("skipping incoming mail without Message-ID");
@@ -27,9 +33,10 @@ pub async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<
         return Ok(());
     };
 
-    let question_id = sqlx::query_scalar!(
+    let question = sqlx::query_as!(
+        Question,
         "
-        SELECT id
+        SELECT id, recipient_email
         FROM delegate_questions
         WHERE outgoing_message_id = ANY($1)
         ORDER BY id DESC
@@ -40,7 +47,7 @@ pub async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<
     .fetch_optional(pool)
     .await?;
 
-    let Some(question_id) = question_id else {
+    let Some(question) = question else {
         debug!(
             raw_message_id,
             related_message_ids = ?reply.related_message_ids,
@@ -48,6 +55,19 @@ pub async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<
         );
         return Ok(());
     };
+
+    if !question.recipient_email.eq_ignore_ascii_case(&sender_email) {
+        warn!(
+            raw_message_id,
+            sender_email,
+            recipient_email = %question.recipient_email,
+            question_id = question.id,
+            "skipping incoming mail from an address that was not asked"
+        );
+        return Ok(());
+    }
+
+    let question_id = question.id;
 
     let inserted = sqlx::query_scalar!(
         "
