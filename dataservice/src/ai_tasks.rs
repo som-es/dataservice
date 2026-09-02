@@ -10,9 +10,12 @@ pub use summarization::*;
 
 use crate::ai_task::TaskArgs;
 
+pub fn somai_url() -> String {
+    std::env::var("SOMAI_URL").unwrap_or_else(|_| "http://127.0.0.1:8000".to_string())
+}
+
 pub async fn somai_connect() -> crate::Result<Arc<SomAiClient>> {
-    let somai_url =
-        &std::env::var("SOMAI_URL").unwrap_or_else(|_| "http://127.0.0.1:8000".to_string());
+    let somai_url = &somai_url();
     Ok(if somai_url.starts_with("http://127.0.0.1") {
         Arc::new(SomAiClient::new_local(somai_url).await?)
     } else {

@@ -196,12 +196,11 @@ pub async fn insert_ministrial_decree(
 
         if should_update
             && let Some(client) = &app_state.redis_client
-                && let Err(e) =
-                    crate::notify_update_streamed(Index::Decrees, &decree, &mut client.clone())
-                        .await
-                {
-                    log::error!("Could not notify for decree update!: {e:?}");
-                }
+            && let Err(e) =
+                crate::notify_update_streamed(Index::Decrees, &decree, &mut client.clone()).await
+        {
+            log::error!("Could not notify for decree update!: {e:?}");
+        }
 
         #[cfg(feature = "ai")]
         {
