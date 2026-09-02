@@ -6,6 +6,10 @@ Cargo.lock
 caching
 *.png
 .env
+.env.*
+!.env.example
+!.env.dev
+!.env.prod.example
 nohup.out
 unique-topics/models
 .fastembed_cache

@@ -1,0 +1,87 @@
+use crate::ListenerResult;
+use delegate_question_mail::IncomingReply;
+use sqlx::PgPool;
+use tracing::{debug, info, warn};
+
+pub async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<()> {
+    let Some(raw_message_id) = reply.message_id else {
+        warn!("skipping incoming mail without Message-ID");
+        return Ok(());
+    };
+    if reply.related_message_ids.is_empty() {
+        debug!(
+            raw_message_id,
+            "skipping incoming mail without In-Reply-To/References"
+        );
+        return Ok(());
+    }
+    if reply.body.is_empty() {
+        warn!(raw_message_id, "skipping empty reply");
+        return Ok(());
+    }
+    let Some(sender_email) = reply.sender_email else {
+        warn!(
+            raw_message_id,
+            "skipping incoming mail without From address"
+        );
+        return Ok(());
+    };
+
+    let question_id = sqlx::query_scalar!(
+        "
+        SELECT id
+        FROM delegate_questions
+        WHERE outgoing_message_id = ANY($1)
+        ORDER BY id DESC
+        LIMIT 1
+        ",
+        &reply.related_message_ids
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    let Some(question_id) = question_id else {
+        debug!(
+            raw_message_id,
+            related_message_ids = ?reply.related_message_ids,
+            "skipping incoming mail without matching delegate question"
+        );
+        return Ok(());
+    };
+
+    let inserted = sqlx::query_scalar!(
+        "
+        INSERT INTO delegate_question_answers (question_id, sender_email, body, raw_message_id)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (raw_message_id) DO NOTHING
+        RETURNING id
+        ",
+        question_id,
+        sender_email,
+        reply.body,
+        raw_message_id
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    if inserted.is_some() {
+        sqlx::query!(
+            "
+            UPDATE delegate_questions
+            SET status = 'answered', updated_at = NOW()
+            WHERE id = $1
+            ",
+            question_id
+        )
+        .execute(pool)
+        .await?;
+        info!(
+            question_id,
+            raw_message_id, "stored delegate question answer"
+        );
+    } else {
+        debug!(question_id, raw_message_id, "reply was already stored");
+    }
+
+    Ok(())
+}

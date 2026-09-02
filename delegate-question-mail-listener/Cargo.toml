@@ -3,10 +3,6 @@ name = "delegate-question-mail-listener"
 version = "0.1.0"
 edition = "2021"
 
-[features]
-default = []
-pop3 = []
-
 [dependencies]
 clap = { version = "4.5.53", features = ["derive", "env"] }
 delegate-question-mail = { path = "../delegate-question-mail" }
