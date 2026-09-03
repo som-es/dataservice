@@ -7,7 +7,7 @@ use crate::config::{Config, ListenerArgs};
 use clap::Parser;
 use delegate_question_mail::parse_incoming_reply;
 use sqlx::PgPool;
-use std::error::Error;
+use std::{collections::HashSet, error::Error};
 use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
@@ -27,11 +27,22 @@ async fn main() -> ListenerResult<()> {
     let pool = PgPool::connect(&config.database_url).await?;
 
     log_startup(&config);
+
+    let mut answers_message_ids = HashSet::new();
+
     loop {
         match mailbox::fetch_messages(&config).await {
             Ok(messages) => {
                 for raw_message in messages {
                     let reply = parse_incoming_reply(&raw_message);
+                    let Some(raw_message_id) = &reply.message_id else {
+                        warn!("skipping incoming mail without Message-ID");
+                        continue;
+                    };
+                    if answers_message_ids.contains(raw_message_id) {
+                        continue;
+                    }
+                    answers_message_ids.insert(raw_message_id.clone());
                     if let Err(error) = store::store_reply(&pool, reply).await {
                         error!(%error, "could not store incoming reply");
                     }
