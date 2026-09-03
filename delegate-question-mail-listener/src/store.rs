@@ -56,7 +56,7 @@ pub async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<
         return Ok(());
     };
 
-    if !question.recipient_email.eq_ignore_ascii_case(&sender_email) {
+    /*if !question.recipient_email.eq_ignore_ascii_case(&sender_email) {
         warn!(
             raw_message_id,
             sender_email,
@@ -65,7 +65,7 @@ pub async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<
             "skipping incoming mail from an address that was not asked"
         );
         return Ok(());
-    }
+    }*/
 
     let question_id = question.id;
 

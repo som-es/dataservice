@@ -6,6 +6,7 @@ pub enum Index {
     GovProposals,
     Decrees,
     Delegates,
+    DelegateQuestions,
 }
 
 impl Index {
@@ -15,6 +16,7 @@ impl Index {
             Index::GovProposals => "gov_props",
             Index::Decrees => "decrees",
             Index::Delegates => "delegates",
+            Index::DelegateQuestions => "delegate_questions",
         }
     }
 

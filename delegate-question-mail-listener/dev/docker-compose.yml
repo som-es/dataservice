@@ -21,5 +21,19 @@ services:
         -Dgreenmail.users=questions:questions@somes.local
         -Dgreenmail.users.login=email
     ports:
-      - "127.0.0.1:2525:3025" # SMTP, matches dev/send-reply.py defaults
-      - "127.0.0.1:10993:3993" # IMAPS, matches .env.dev MAIL_INBOUND_HOST/PORT
+      - "2525:3025" # SMTP, matches dev/send-reply.py defaults
+      - "10993:3993" # IMAPS, matches .env.dev MAIL_INBOUND_HOST/PORT
+  webmail:
+    image: roundcube/roundcubemail:latest
+    container_name: dqmail-dev-webmail
+    restart: unless-stopped
+    depends_on:
+      - mail
+    environment:
+      ROUNDCUBEMAIL_DB_TYPE: sqlite
+      ROUNDCUBEMAIL_DEFAULT_HOST: mail
+      ROUNDCUBEMAIL_DEFAULT_PORT: 3143
+      ROUNDCUBEMAIL_SMTP_SERVER: mail
+      ROUNDCUBEMAIL_SMTP_PORT: 3025
+    ports:
+      - "17080:80"

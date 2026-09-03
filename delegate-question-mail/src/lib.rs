@@ -273,7 +273,7 @@ fn strip_quoted_reply(value: &str) -> String {
     for line in value.lines() {
         let is_quoted_reply_start = line.starts_with("On ") && line.contains(" wrote:");
         if is_quoted_reply_start || line.starts_with('>') {
-            break;
+            continue;
         }
         reply.push(line);
     }
