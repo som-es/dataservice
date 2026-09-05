@@ -65,9 +65,10 @@ pub async fn scrape_new_legis_inits<S: VoteResultService>(
         if handles.len() >= max_tasks {
             for handle in handles.drain(..max_tasks) {
                 if let Err(e) = handle.await
-                    && e.is_panic() {
-                        log::error!("join Error: {e:?}")
-                    }
+                    && e.is_panic()
+                {
+                    log::error!("join Error: {e:?}")
+                }
             }
         }
 
@@ -173,9 +174,10 @@ pub async fn scrape_new_legis_inits<S: VoteResultService>(
 
     for handle in handles.drain(..) {
         if let Err(e) = handle.await
-            && e.is_panic() {
-                log::warn!("join Error: {e:?}")
-            }
+            && e.is_panic()
+        {
+            log::warn!("join Error: {e:?}")
+        }
     }
     collect_mail_vote_results.await?;
     Ok(vec![])

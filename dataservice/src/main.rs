@@ -487,6 +487,16 @@ pub async fn run_at_services(
         tokio::spawn(services::volksbg::run_shut(
             Shutdown::new(notify_shutdown.subscribe()),
             app_state.clone(),
+        )),
+        tokio::spawn(services::news_linking_service(
+            Shutdown::new(notify_shutdown.subscribe()),
+            app_state.clone(),
+            true
+        )),
+        tokio::spawn(services::news_linking_service(
+            Shutdown::new(notify_shutdown.subscribe()),
+            app_state.clone(),
+            false
         ))
     )
     .0

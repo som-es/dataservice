@@ -3,6 +3,8 @@ pub mod db;
 
 #[cfg(feature = "runner")]
 pub mod api_limiter;
+#[cfg(all(feature = "runner", any(feature = "vectordb", feature = "news")))]
+pub mod clients;
 #[cfg(feature = "runner")]
 pub mod services;
 #[cfg(feature = "runner")]

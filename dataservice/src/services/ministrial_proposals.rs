@@ -434,15 +434,15 @@ pub async fn update_or_insert_ministerial_proposal(
 
     if should_update
         && let Some(client) = &app_state.redis_client
-            && let Err(e) = crate::notify_update_streamed(
-                combx::Index::GovProposals,
-                &gov_proposal,
-                &mut client.clone(),
-            )
-            .await
-            {
-                log::error!("Could not notify for gov prop update!: {e:?}");
-            }
+        && let Err(e) = crate::notify_update_streamed(
+            combx::Index::GovProposals,
+            &gov_proposal,
+            &mut client.clone(),
+        )
+        .await
+    {
+        log::error!("Could not notify for gov prop update!: {e:?}");
+    }
     Ok(())
 }
 

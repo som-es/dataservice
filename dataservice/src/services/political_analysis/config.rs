@@ -20,10 +20,6 @@ pub fn is_fresh(updated_at: Option<DateTime<Utc>>, today: DateTime<Utc>) -> bool
     updated_at.is_some_and(|updated_at| today - updated_at < update_delta())
 }
 
-pub fn qdrant_url() -> String {
-    std::env::var("QDRANT_URL").unwrap_or_else(|_| "http://127.0.0.1:6334".to_string())
-}
-
 pub fn vector_update_skip() -> bool {
     std::env::var("VECTOR_UPDATE_SKIP")
         .unwrap_or("false".into())

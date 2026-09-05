@@ -1,5 +1,4 @@
 mod answers;
-mod clients;
 mod config;
 pub mod delegate_context;
 mod embed_speeches;
@@ -16,9 +15,9 @@ use tokio::{sync::mpsc::Sender, time::Instant};
 use crate::{
     AppState, Result, Shutdown,
     ai_task::AiTask,
+    clients::{connect_ai_client, connect_qdrant_client},
     political_analysis::{
         answers::{process_delegate_stance, recently_answered_pairs},
-        clients::{connect_ai_client, connect_qdrant_client},
         config::{is_fresh, sleep_seconds, stance_update_skip, update_days, vector_update_skip},
         embed_speeches::{Delegate, get_delegate_ids, setup_qdrant_collection},
     },

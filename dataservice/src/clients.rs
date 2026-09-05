@@ -3,10 +3,11 @@ use std::sync::Arc;
 use qdrant_client::Qdrant;
 use somai_client::SomAiClient;
 
-use crate::{
-    ai_tasks::{somai_connect, somai_url},
-    political_analysis::config::qdrant_url,
-};
+use crate::ai_tasks::{somai_connect, somai_url};
+
+pub fn qdrant_url() -> String {
+    std::env::var("QDRANT_URL").unwrap_or_else(|_| "http://127.0.0.1:6334".to_string())
+}
 
 pub async fn connect_ai_client() -> Option<Arc<SomAiClient>> {
     let somai_url = somai_url();

@@ -273,55 +273,57 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
         }
 
         #[cfg(feature = "ai")]
-        if (enforce_ai_run() || should_update) && false
-            && let Some(ai_task_tx) = &app_state.cpu_task_tx {
-                use tokio::time::Instant;
-                let pool = app_state.pg_pool.clone();
-                let task = crate::ai_task::AiTask {
-                    input: None,
-                    priority: crate::ai_task::Priority::Low,
-                    score: crate::ai_task::Priority::Low.weight(),
-                    task_id: crate::hash!(app_state.parliament),
-                    db_entry_id: delegate.id as i32,
-                    rerunnable: true,
-                    pool: pool.clone(),
-                    created_at: Instant::now(),
-                    task: Box::new(move |task_args| {
-                        Box::pin(async move {
-                            if delegate_qa::delegate_introduction_id_sqlx(
-                                &task_args.pg_pool,
-                                task_args.db_entry_id,
-                            )
-                            .await?
-                            .is_some()
-                            {
-                                return Ok(());
-                            }
-                            let qa = delegate_qa::generate_delegate_introduction(
-                                task_args.db_entry_id,
-                                &task_args.som_ai_client,
-                            )
-                            .await?;
-                            let mut tx = task_args.pg_pool.begin().await?;
-                            delegate_qa::insert_delegate_introduction(
-                                task_args.db_entry_id,
-                                &qa,
-                                &mut tx,
-                            )
-                            .await?;
+        if (enforce_ai_run() || should_update)
+            && false
+            && let Some(ai_task_tx) = &app_state.cpu_task_tx
+        {
+            use tokio::time::Instant;
+            let pool = app_state.pg_pool.clone();
+            let task = crate::ai_task::AiTask {
+                input: None,
+                priority: crate::ai_task::Priority::Low,
+                score: crate::ai_task::Priority::Low.weight(),
+                task_id: crate::hash!(app_state.parliament),
+                db_entry_id: delegate.id as i32,
+                rerunnable: true,
+                pool: pool.clone(),
+                created_at: Instant::now(),
+                task: Box::new(move |task_args| {
+                    Box::pin(async move {
+                        if delegate_qa::delegate_introduction_id_sqlx(
+                            &task_args.pg_pool,
+                            task_args.db_entry_id,
+                        )
+                        .await?
+                        .is_some()
+                        {
+                            return Ok(());
+                        }
+                        let qa = delegate_qa::generate_delegate_introduction(
+                            task_args.db_entry_id,
+                            &task_args.som_ai_client,
+                        )
+                        .await?;
+                        let mut tx = task_args.pg_pool.begin().await?;
+                        delegate_qa::insert_delegate_introduction(
+                            task_args.db_entry_id,
+                            &qa,
+                            &mut tx,
+                        )
+                        .await?;
 
-                            tx.commit().await?;
-                            Ok(())
-                        })
-                    }),
-                };
-                if let Err(e) = ai_task_tx.send(task).await {
-                    log::error!(
-                        "Could not send generate introduction AI task for delegate {}: {e:?}",
-                        delegate.id
-                    );
-                }
+                        tx.commit().await?;
+                        Ok(())
+                    })
+                }),
+            };
+            if let Err(e) = ai_task_tx.send(task).await {
+                log::error!(
+                    "Could not send generate introduction AI task for delegate {}: {e:?}",
+                    delegate.id
+                );
             }
+        }
 
         if !should_update {
             continue;
@@ -353,9 +355,9 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
                 app_state.parliament,
             )
             .await
-            {
-                log::error!("error adding seat: {e:?}",);
-            }
+        {
+            log::error!("error adding seat: {e:?}",);
+        }
 
         for mandate in &delegate.mandates {
             if let Err(e) =
@@ -388,9 +390,9 @@ async fn update_delegates_in_db(new_delegates: &[Delegate], app_state: &AppState
                     &mut client.clone(),
                 )
                 .await
-                {
-                    log::error!("Could not notify for delegate update!: {e:?}");
-                }
+            {
+                log::error!("Could not notify for delegate update!: {e:?}");
+            }
             if let Err(e) =
                 sqlx::query!("REFRESH MATERIALIZED VIEW CONCURRENTLY delegates_with_mandates;")
                     .execute(pg_pool)
@@ -482,18 +484,21 @@ pub async fn insert_mandate(
         is_ministry: mandate.is_ministry,
         function: mandate.function.clone(),
     };
-    if name_lowercase.contains("abgeordnete") && mandate.function.as_deref() != Some("AH")
-        && !mandate.is_nr {
-            log::error!(
-                "Mandate name contains 'abgeordnete' but is isn't set to is_nr: {db_mandate:?}"
-            );
-        }
+    if name_lowercase.contains("abgeordnete")
+        && mandate.function.as_deref() != Some("AH")
+        && !mandate.is_nr
+    {
+        log::error!(
+            "Mandate name contains 'abgeordnete' but is isn't set to is_nr: {db_mandate:?}"
+        );
+    }
     if (name_lowercase.contains("minister") || name_lowercase.contains("kanzler"))
-        && !mandate.is_gov {
-            log::warn!(
-                "Could be a minister or kanzler thing, but no GOV in mandate!!! mandate: {mandate:?}, delegate: {delegate_id}"
-            );
-        }
+        && !mandate.is_gov
+    {
+        log::warn!(
+            "Could be a minister or kanzler thing, but no GOV in mandate!!! mandate: {mandate:?}, delegate: {delegate_id}"
+        );
+    }
 
     sqlx::query!(
         "

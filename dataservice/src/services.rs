@@ -8,6 +8,8 @@ pub mod delegates;
 pub mod legislative_initiatives;
 pub mod ministrial_decrees;
 pub mod ministrial_proposals;
+#[cfg(all(feature = "runner", feature = "news"))]
+pub mod news_linking;
 #[cfg(feature = "parliamentary_qa")]
 pub mod parliamentary_qa;
 pub mod parties;
@@ -40,6 +42,11 @@ pub async fn parliamentary_qa_service(
         _only_latest,
     )
     .await
+}
+
+pub async fn news_linking_service(_shutdown: Shutdown, _app_state: AppState, _only_recents: bool) {
+    #[cfg(all(feature = "runner", feature = "news"))]
+    news_linking::run_shut(_shutdown, _app_state, _only_recents).await
 }
 
 pub async fn scrape_untill_success<T, O>(f: impl Fn() -> O) -> T
