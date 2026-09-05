@@ -1,4 +1,6 @@
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use std::hash::Hash;
+
+use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, Utc};
 use optional_struct::optional_struct;
 use serde_derive::{Deserialize, Serialize};
 use somes_meilisearch_filter::{FilterArgument, FilterOp};
@@ -392,4 +394,32 @@ pub struct DelegateMatch {
     pub matched_with: String,
     pub delegate_id: i32,
     pub manually_matched: bool,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(
+    Debug,
+    Deserialize,
+    Serialize,
+    Clone,
+    PartialEq,
+    PartialOrd,
+    CompositeType,
+    Type,
+    MeilisearchFilter,
+)]
+#[sqlx(type_name = "article_link")]
+pub struct ArticleLink {
+    pub provider: String,
+    pub url: String,
+    pub score: f32,
+    pub lastmod: DateTime<FixedOffset>,
+}
+
+impl Hash for ArticleLink {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.provider.hash(state);
+        self.url.hash(state);
+        self.lastmod.hash(state);
+    }
 }

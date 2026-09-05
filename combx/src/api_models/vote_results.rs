@@ -71,11 +71,9 @@ pub struct MeilisearchHelper {
 pub struct VoteResult {
     #[filter(make_vec)]
     pub id: Option<i32>,
-
     pub legislative_initiative: DbLegislativeInitiativeQuery,
     pub votes: Vec<DbVote>,
     pub speeches: Vec<FullSpeech>,
-
     pub named_votes: Option<DbNamedVotes>,
     pub topics: Vec<Topic>,
     pub eurovoc_topics: Vec<Topic>,
@@ -87,6 +85,7 @@ pub struct VoteResult {
     pub referenced_by_others_ids: Option<Vec<i32>>,
     pub references_to: Option<Vec<DbReference>>,
     pub ai_summary: Option<DbAiSummary>,
+    pub article_links: Vec<ArticleLink>,
     #[serde(default)]
     pub meilisearch_helper: Option<MeilisearchHelper>,
 }
@@ -122,6 +121,7 @@ pub struct OptionalVoteResult {
     pub referenced_by_others_ids: Option<Vec<i32>>,
     pub references: Option<Vec<DbReference>>,
     pub ai_summary: Option<DbAiSummary>,
+    pub article_links: Option<Vec<ArticleLink>>,
     #[serde(default)]
     pub meilisearch_helper: Option<MeilisearchHelper>,
 }
@@ -442,6 +442,7 @@ impl VoteResult {
                     .collect()
             }),
             meilisearch_helper: Some(MeilisearchHelper::default()),
+            article_links: vec![],
         })
     }
 }

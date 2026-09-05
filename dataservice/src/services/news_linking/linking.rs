@@ -12,14 +12,6 @@ use crate::{AppState, news_linking::ARTICLE_URLS_COLLECTION};
 
 pub const TOP_ARTICLE_URLS: usize = 12;
 
-#[derive(Debug, Clone)]
-pub struct ArticleLink {
-    pub provider: String,
-    pub url: String,
-    pub score: f32,
-    pub lastmod: DateTime<FixedOffset>,
-}
-
 fn start_of_day(date: NaiveDate) -> Timestamp {
     Timestamp {
         seconds: date.and_time(NaiveTime::MIN).and_utc().timestamp(),
