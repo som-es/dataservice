@@ -15,7 +15,7 @@ use fasttext::FastText;
 use petgraph::Undirected;
 use petgraph::stable_graph::StableGraph;
 
-use crate::unique_topics::{all_used_topics, hallucinated_ai_topics_by_model, TopicSource};
+use crate::unique_topics::{TopicSource, all_used_topics, hallucinated_ai_topics_by_model};
 
 mod unique_topics;
 
@@ -184,8 +184,7 @@ async fn main() -> combx::Result<()> {
     let pg = connect_pg().await;
 
     let unique_topics = all_used_topics(&pg, TopicSource::Eurovoc).await?;
-    let hallucinated_topics =
-        hallucinated_ai_topics_by_model(&pg, TopicSource::Eurovoc).await?;
+    let hallucinated_topics = hallucinated_ai_topics_by_model(&pg, TopicSource::Eurovoc).await?;
     let topic_records = collect_topic_records(unique_topics, hallucinated_topics);
     let (topics, fastembed_asyl_similarity, layout_label) = if args.use_fastembed {
         let cache_dir = fastembed_cache_dir(&args);
@@ -434,9 +433,7 @@ fn place_ai_nodes(
         let secondary_index = anchors.get(1).map(|anchor| anchor.used_index);
         let group_key = (anchor.used_index, secondary_index);
         let group_order = *group_orders.entry(group_key).or_insert_with(|| {
-            let next_order = primary_group_counts
-                .entry(anchor.used_index)
-                .or_default();
+            let next_order = primary_group_counts.entry(anchor.used_index).or_default();
             let order = *next_order;
             *next_order += 1;
             order
@@ -451,12 +448,8 @@ fn place_ai_nodes(
         let similarity_radius = CLUSTER_MIN_RADIUS
             + (1.0 - normalized_similarity).powf(SIMILARITY_RADIUS_EXPONENT)
                 * (CLUSTER_MAX_RADIUS - CLUSTER_MIN_RADIUS);
-        let group_direction = anchor_group_direction(
-            primary_center,
-            secondary_index,
-            group_order,
-            used_positions,
-        );
+        let group_direction =
+            anchor_group_direction(primary_center, secondary_index, group_order, used_positions);
         let semantic_offset = (semantic_center - primary_center) * INTER_CLUSTER_PULL;
         let subgroup_offset = group_direction
             * (SUBCLUSTER_BASE_OFFSET + similarity_radius * SUBCLUSTER_RADIUS_FACTOR);
@@ -530,10 +523,7 @@ fn nearest_used_anchors(
         .iter()
         .map(|&used_index| SimilarityAnchor {
             used_index,
-            similarity: cosine_similarity(
-                &topics[topic_index].vector,
-                &topics[used_index].vector,
-            ),
+            similarity: cosine_similarity(&topics[topic_index].vector, &topics[used_index].vector),
         })
         .collect::<Vec<_>>();
 

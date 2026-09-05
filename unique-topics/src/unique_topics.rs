@@ -86,26 +86,22 @@ pub async fn ai_topics_by_model(pg: &PgPool) -> sqlx::Result<HashMap<String, Has
 /// Distinct "used topics" for the given [`TopicSource`] table.
 pub async fn all_used_topics(pg: &PgPool, source: TopicSource) -> sqlx::Result<HashSet<String>> {
     match source {
-        TopicSource::Eurovoc => {
-            sqlx::query_scalar!(
-                r#"
+        TopicSource::Eurovoc => sqlx::query_scalar!(
+            r#"
                 select distinct topic from eurovoc_topics_legis_init
                 "#,
-            )
-            .fetch_all(pg)
-            .await
-            .map(|topics| topics.into_iter().collect())
-        }
-        TopicSource::LegisInit => {
-            sqlx::query_scalar!(
-                r#"
+        )
+        .fetch_all(pg)
+        .await
+        .map(|topics| topics.into_iter().collect()),
+        TopicSource::LegisInit => sqlx::query_scalar!(
+            r#"
                 select distinct topic from topics_legis_init
                 "#,
-            )
-            .fetch_all(pg)
-            .await
-            .map(|topics| topics.into_iter().collect())
-        }
+        )
+        .fetch_all(pg)
+        .await
+        .map(|topics| topics.into_iter().collect()),
     }
 }
 
