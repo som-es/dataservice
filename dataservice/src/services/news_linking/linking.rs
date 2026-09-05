@@ -109,8 +109,8 @@ pub async fn run_news_linking(
     only_recents: bool,
 ) -> crate::Result<()> {
     let legis_inits = sqlx::query!(
-        "select
-            li.id as legis_init_id, short_title, vote_date, nr_plenary_activity_date
+        r#"select
+            li.id as legis_init_id, short_title, raw_data_created_at as "start", nr_plenary_activity_date
         from
             legislative_initiative_summaries lis
         inner join summaries on lis.summary_id = summaries.id
@@ -118,21 +118,20 @@ pub async fn run_news_linking(
         where
             not $1
             or nr_plenary_activity_date >= current_date - interval '30 days'
-        order by lis.legis_init_id",
+        order by lis.legis_init_id"#,
         only_recents
     )
     .fetch_all(&app_state.pg_pool)
     .await?;
 
     for legis_init in legis_inits {
-        let end = legis_init.vote_date.unwrap_or(
-            legis_init
-                .nr_plenary_activity_date
-                .checked_add_days(Days::new(10))
-                .unwrap(),
-        );
-        let start = legis_init
+        let end = legis_init
             .nr_plenary_activity_date
+            .checked_add_days(Days::new(10))
+            .unwrap();
+        let start = legis_init
+            .start
+            .date_naive()
             .checked_sub_days(Days::new(10))
             .unwrap();
 
