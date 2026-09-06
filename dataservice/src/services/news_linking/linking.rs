@@ -17,6 +17,7 @@ use crate::{
 };
 
 pub const TOP_ARTICLE_URLS: usize = 20;
+pub const SCORE_STORE_THRESHOLD: f32 = -1.5;
 
 fn start_of_day(date: NaiveDate) -> Timestamp {
     Timestamp {
@@ -143,7 +144,7 @@ pub async fn run_news_linking(
         where
             not $1
             or nr_plenary_activity_date >= current_date - interval '30 days'
-        order by lis.legis_init_id"#,
+        order by nr_plenary_activity_date desc"#,
         only_recents
     )
     .fetch_all(&app_state.pg_pool)
@@ -190,7 +191,7 @@ pub async fn run_news_linking(
 
                 for articles in top_articles.values() {
                     for article in articles {
-                        if article.score < -1.5 {
+                        if article.score < SCORE_STORE_THRESHOLD {
                             continue;
                         }
                         if let Err(e) = sqlx::query!(
