@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Days, FixedOffset, NaiveDate, NaiveTime};
+use combx::ArticleLink;
 use qdrant_client::{
     Qdrant,
-    qdrant::{Condition, DatetimeRange, Filter, SearchPoints, Timestamp, value::Kind},
+    qdrant::{
+        Condition, DatetimeRange, Filter, SearchParams, SearchPoints, Timestamp, value::Kind,
+    },
 };
 use sitemaps::Config;
 use somai_client::SomAiClient;
@@ -50,6 +53,10 @@ pub async fn top_article_urls(
             filter: Some(Filter::must(must)),
             limit: TOP_ARTICLE_URLS as u64,
             with_payload: Some(true.into()),
+            params: Some(SearchParams {
+                exact: Some(true),
+                ..Default::default()
+            }),
             ..Default::default()
         })
         .await?;
@@ -156,7 +163,7 @@ pub async fn run_news_linking(
 
                 for articles in top_articles.values() {
                     for article in articles {
-                        if article.score < 0.56 {
+                        if article.score < 0.76 {
                             continue;
                         }
                         if let Err(e) = sqlx::query!(
@@ -205,6 +212,21 @@ mod tests {
                 "Günstiger-Strom-Gesetz zur Reform der Elektrizitätswirtschaft",
                 NaiveDate::from_ymd_opt(2025, 11, 20).unwrap(),
                 NaiveDate::from_ymd_opt(2025, 12, 12).unwrap(),
+            ),
+            (
+                "Novelle zum Parteiengesetz: Ausnahmen, Online‑Kennzeichnung & EP‑Fraktionsausgaben",
+                NaiveDate::from_ymd_opt(2025, 6, 18).unwrap(),
+                NaiveDate::from_ymd_opt(2025, 7, 11).unwrap(),
+            ),
+            (
+                "UWG-Novelle 2025: Schutz vor Greenwashing und Obsoleszenz",
+                NaiveDate::from_ymd_opt(2026, 6, 10).unwrap(),
+                NaiveDate::from_ymd_opt(2026, 7, 8).unwrap(),
+            ),
+            (
+                "Erneuerbaren‑Ausbau‑Beschleunigungsgesetz (EABG)",
+                NaiveDate::from_ymd_opt(2026, 3, 26).unwrap(),
+                NaiveDate::from_ymd_opt(2026, 6, 15).unwrap(),
             ),
         ];
 

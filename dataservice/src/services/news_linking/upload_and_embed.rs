@@ -13,11 +13,21 @@ use qdrant_client::{
     },
 };
 use serde_json::json;
-use sitemaps::{Config, Crawler, DateRange, KIND_ARCHIVE, Query, SitemapEntry};
+use sitemaps::{Config, Crawler, DateRange, KIND_ARCHIVE, KIND_NEWS, Query, SitemapEntry};
 use somai_client::SomAiClient;
 use xxhash_rust::xxh3::xxh3_64;
 
 use crate::{AppState, news_linking::ARTICLE_URLS_COLLECTION};
+
+pub fn extract_relevant_parts_from_loc(url: &str) -> String {
+    let mut loc = url.split('/');
+    loc.next();
+    loc.next();
+    loc.next();
+    loc.next();
+    let res = loc.collect::<Vec<_>>().join("/");
+    if res.is_empty() { url.to_string() } else { res }
+}
 
 fn point_id(provider: &str, url: &str) -> u64 {
     xxh3_64(format!("{provider}\u{1}{url}").as_bytes())
@@ -80,17 +90,18 @@ async fn known_ids(qdrant: &Qdrant, ids: &[PointId]) -> crate::Result<HashSet<u6
     Ok(known)
 }
 
-async fn upload_and_embed_urls(
+async fn upload_and_embed_urls<'a, 'b, I: IntoIterator<Item = &'a SitemapEntry>>(
     qdrant: &Qdrant,
     ai_client: &SomAiClient,
     embedding_model: &str,
     provider: &str,
-    entries: &[SitemapEntry],
+    entries: I,
 ) -> crate::Result<()> {
     let ids: Vec<(u64, &SitemapEntry)> = entries
-        .iter()
+        .into_iter()
         .map(|entry| (point_id(provider, &entry.loc), entry))
         .collect();
+    let ids_len = ids.len();
     let known = known_ids(
         qdrant,
         &ids.iter()
@@ -105,7 +116,7 @@ async fn upload_and_embed_urls(
     log::info!(
         "{provider}: embed {} of {} urls ({} already embedded)",
         new.len(),
-        entries.len(),
+        ids_len,
         known.len()
     );
 
@@ -113,7 +124,13 @@ async fn upload_and_embed_urls(
         let mut batch = Vec::with_capacity(chunk.len());
         for (id, entry) in chunk {
             let embedding = ai_client
-                .embedding_embed(entry.loc.to_string(), None)
+                .embedding_embed(
+                    entry
+                        .title
+                        .clone()
+                        .unwrap_or_else(|| extract_relevant_parts_from_loc(&entry.loc)),
+                    None,
+                )
                 .await?
                 .embedding;
             let mut payload: HashMap<String, qdrant_client::qdrant::Value> = HashMap::new();
@@ -128,6 +145,7 @@ async fn upload_and_embed_urls(
                 json!(entry.lastmod.map(|lastmod| lastmod.to_rfc3339())).into(),
             );
             payload.insert("embedding_model_name".into(), json!(embedding_model).into());
+            payload.insert("title".into(), json!(&entry.title).into());
             payload.insert("add_date".into(), json!(Utc::now().to_rfc3339()).into());
             batch.push(PointStruct::new(
                 PointId::from(*id),
@@ -169,21 +187,31 @@ pub async fn upload_and_embed_article_urls(
     let embedding_model = ai_client.get_default_embedding_model_name().await?.result;
 
     let today = Utc::now().date_naive();
-    let since = today - TimeDelta::days(2);
+    let since = today - TimeDelta::days(4);
     let range = recent_articles.then(|| DateRange::between(since, today));
 
     for provider in config.provider_ids() {
-        let mut query = Query::new(provider).kind(KIND_ARCHIVE);
-        if let Some(range) = range.clone() {
-            query = query.range(range);
-        }
-        let entries = match crawler.crawl(&query).await {
-            Ok(crawl) => crawl.into_entries(),
-            Err(e) => {
-                log::warn!("Could not crawl urls of {provider}: {e}");
-                continue;
-            }
+        let base_kind = if recent_articles {
+            KIND_NEWS
+        } else {
+            KIND_ARCHIVE
         };
+
+        let mut entries = run_crawler_with_kind(&crawler, range, provider, base_kind)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .collect::<HashSet<_>>();
+
+        if recent_articles {
+            entries.extend(
+                run_crawler_with_kind(&crawler, range, provider, KIND_ARCHIVE)
+                    .await
+                    .unwrap_or_default()
+                    .into_iter(),
+            );
+        }
+
         if let Err(e) = upload_and_embed_urls(
             qdrant_client,
             &ai_client,
@@ -198,4 +226,24 @@ pub async fn upload_and_embed_article_urls(
     }
 
     Ok(())
+}
+
+async fn run_crawler_with_kind(
+    crawler: &Crawler,
+    range: Option<DateRange>,
+    provider: &str,
+    kind: &str,
+) -> Option<Vec<SitemapEntry>> {
+    let mut query = Query::new(provider).kind(kind);
+    if let Some(range) = range.clone() {
+        query = query.range(range);
+    }
+    let entries = match crawler.crawl(&query).await {
+        Ok(crawl) => crawl.into_entries(),
+        Err(e) => {
+            log::warn!("Could not crawl urls of {provider}: {e}");
+            return None;
+        }
+    };
+    Some(entries)
 }

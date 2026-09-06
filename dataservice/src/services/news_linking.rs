@@ -13,7 +13,7 @@ use crate::{
     clients::{connect_ai_client, connect_qdrant_client},
 };
 
-pub const ARTICLE_URLS_COLLECTION: &str = "news_article_urls";
+pub const ARTICLE_URLS_COLLECTION: &str = "news_article_urls_2";
 
 fn sleep_seconds() -> u64 {
     std::env::var("NEWS_LINKING_SLEEP")

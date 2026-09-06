@@ -1,6 +1,6 @@
 use somai_client::SomAiClient;
 
-use crate::news_linking::tests::urls::URLS;
+use crate::news_linking::{tests::urls::URLS, upload_and_embed::extract_relevant_parts_from_loc};
 
 mod urls;
 
@@ -42,4 +42,37 @@ async fn test_embedding_comparison() {
         }
         dbg!(title, sims);
     }
+}
+
+#[test]
+fn test_url_relevant_part_extraction() {
+    let loc = "https://www.heute.at/s/zecke-gefunden-darum-sollst-du-sie-einsenden-120213902";
+    let res = extract_relevant_parts_from_loc(loc);
+    assert_eq!(
+        res,
+        "zecke-gefunden-darum-sollst-du-sie-einsenden-120213902"
+    );
+
+    let loc = "https://www.profil.at/wirtschaft/oebag-vorstand-ausschreibung-hlawati-ofner-hattmannsdorfer/403186836";
+    let res = extract_relevant_parts_from_loc(loc);
+    assert_eq!(
+        res,
+        "oebag-vorstand-ausschreibung-hlawati-ofner-hattmannsdorfer/403186836"
+    );
+
+    let loc = "https://www.derstandard.at/story/3000000338370/niederlage-fuer-trump-gericht-in-missouri-kippt-neuzuschnitt-der-wahlkreise";
+
+    let res = extract_relevant_parts_from_loc(loc);
+    assert_eq!(
+        res,
+        "3000000338370/niederlage-fuer-trump-gericht-in-missouri-kippt-neuzuschnitt-der-wahlkreise"
+    );
+
+    let loc = "https://kurier.at/politik/ausland/kolumbien-erdbeben-trump-aussetzung-der-zoelle/403184220";
+
+    let res = extract_relevant_parts_from_loc(loc);
+    assert_eq!(
+        res,
+        "ausland/kolumbien-erdbeben-trump-aussetzung-der-zoelle/403184220"
+    );
 }
