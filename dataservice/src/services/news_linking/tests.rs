@@ -50,14 +50,14 @@ fn test_url_relevant_part_extraction() {
     let res = extract_relevant_parts_from_loc(loc);
     assert_eq!(
         res,
-        "zecke-gefunden-darum-sollst-du-sie-einsenden-120213902"
+        "zecke gefunden darum sollst du sie einsenden 120213902"
     );
 
     let loc = "https://www.profil.at/wirtschaft/oebag-vorstand-ausschreibung-hlawati-ofner-hattmannsdorfer/403186836";
     let res = extract_relevant_parts_from_loc(loc);
     assert_eq!(
         res,
-        "oebag-vorstand-ausschreibung-hlawati-ofner-hattmannsdorfer/403186836"
+        "oebag vorstand ausschreibung hlawati ofner hattmannsdorfer"
     );
 
     let loc = "https://www.derstandard.at/story/3000000338370/niederlage-fuer-trump-gericht-in-missouri-kippt-neuzuschnitt-der-wahlkreise";
@@ -65,14 +65,11 @@ fn test_url_relevant_part_extraction() {
     let res = extract_relevant_parts_from_loc(loc);
     assert_eq!(
         res,
-        "3000000338370/niederlage-fuer-trump-gericht-in-missouri-kippt-neuzuschnitt-der-wahlkreise"
+        "niederlage fuer trump gericht in missouri kippt neuzuschnitt der wahlkreise"
     );
 
     let loc = "https://kurier.at/politik/ausland/kolumbien-erdbeben-trump-aussetzung-der-zoelle/403184220";
 
     let res = extract_relevant_parts_from_loc(loc);
-    assert_eq!(
-        res,
-        "ausland/kolumbien-erdbeben-trump-aussetzung-der-zoelle/403184220"
-    );
+    assert_eq!(res, "kolumbien erdbeben trump aussetzung der zoelle");
 }

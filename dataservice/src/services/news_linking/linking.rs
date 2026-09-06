@@ -11,9 +11,12 @@ use qdrant_client::{
 use sitemaps::Config;
 use somai_client::SomAiClient;
 
-use crate::{AppState, news_linking::ARTICLE_URLS_COLLECTION};
+use crate::{
+    AppState,
+    news_linking::{ARTICLE_URLS_COLLECTION, upload_and_embed::extract_relevant_parts_from_loc},
+};
 
-pub const TOP_ARTICLE_URLS: usize = 12;
+pub const TOP_ARTICLE_URLS: usize = 20;
 
 fn start_of_day(date: NaiveDate) -> Timestamp {
     Timestamp {
@@ -83,20 +86,43 @@ pub async fn top_article_urls(
         .collect())
 }
 
-pub async fn top_articles_per_provider(
+pub async fn top_articles_per_provider_reranked(
     qdrant: &Qdrant,
     ai_client: &SomAiClient,
     title: &str,
+    summary: &str,
     date_range: Option<(NaiveDate, NaiveDate)>,
 ) -> crate::Result<HashMap<String, Vec<ArticleLink>>> {
     let config = Config::builtin();
 
     let mut provider_articles = HashMap::new();
     for provider in config.provider_ids() {
-        provider_articles.insert(
-            provider.to_string(),
-            top_article_urls(qdrant, ai_client, provider, title, date_range).await?,
-        );
+        let articles = top_article_urls(qdrant, ai_client, provider, title, date_range).await?;
+        if articles.is_empty() {
+            continue;
+        }
+        let to_rerank = articles
+            .iter()
+            .map(|article| extract_relevant_parts_from_loc(&article.url))
+            .collect::<Vec<_>>();
+        let reranked_docs = ai_client
+            .embedding_rerank(summary.to_string(), to_rerank.clone(), None, None)
+            .await
+            .unwrap();
+
+        let mut scores = vec![];
+        for doc in reranked_docs.results {
+            let mut article = articles[doc.index].clone();
+            article.score = doc.score as f32;
+            scores.push(article);
+        }
+        scores.sort_by(|a, b| {
+            a.score
+                .partial_cmp(&b.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        provider_articles.insert(provider.to_string(), scores);
     }
     Ok(provider_articles)
 }
@@ -109,7 +135,7 @@ pub async fn run_news_linking(
 ) -> crate::Result<()> {
     let legis_inits = sqlx::query!(
         r#"select
-            li.id as legis_init_id, short_title, raw_data_created_at as "start", nr_plenary_activity_date
+            li.id as legis_init_id, short_title, detailed_summary, short_summary, raw_data_created_at as "start", nr_plenary_activity_date
         from
             legislative_initiative_summaries lis
         inner join summaries on lis.summary_id = summaries.id
@@ -134,10 +160,11 @@ pub async fn run_news_linking(
             .checked_sub_days(Days::new(10))
             .unwrap();
 
-        match top_articles_per_provider(
+        match top_articles_per_provider_reranked(
             qdrant,
             ai_client,
             &legis_init.short_title,
+            &legis_init.detailed_summary,
             Some((start, end)),
         )
         .await
@@ -163,7 +190,7 @@ pub async fn run_news_linking(
 
                 for articles in top_articles.values() {
                     for article in articles {
-                        if article.score < 0.76 {
+                        if article.score < -1.5 {
                             continue;
                         }
                         if let Err(e) = sqlx::query!(
@@ -198,35 +225,34 @@ mod tests {
     use qdrant_client::Qdrant;
     use somai_client::SomAiClient;
 
-    use crate::news_linking::linking::top_article_urls;
+    use crate::news_linking::linking::top_articles_per_provider_reranked;
 
     #[tokio::test]
     async fn test_top_articles_for_query() {
         let titles_to_compare = vec![
             (
                 "Kurzfristige Margenbegrenzung bei Kraftstoffpreisen",
+                "Der Gesetzentwurf ergänzt das Preisgesetz 1992 um eine Verordnungsermächtigung, mit der die Bundesregierung bei außergewöhnlichen Preissteigerungen von Diesel oder Euro‑Super (mehr als 30 % im Vergleich zu den Preisen zwei Monate zuvor) vorübergehend Margen festlegen kann. Die festgelegten Margen dürfen die Versorgungssicherheit und den Wirtschaftsstandort nicht gefährden; sie gelten höchstens einen Monat und werden von der Regulierungsbehörde E‑Control überwacht. Der neue Artikel I verankert die Kompetenz der Bundesregierung, solche Maßnahmen zu ergreifen, während weitere formale Änderungen das Wort „ist“ im § 8 Abs. 1 entfernen und die Befristung der Regelung bis zum 30.12.2026 festlegen.",
                 NaiveDate::from_ymd_opt(2026, 3, 23).unwrap(),
                 NaiveDate::from_ymd_opt(2026, 3, 25).unwrap(),
             ),
             (
                 "Günstiger-Strom-Gesetz zur Reform der Elektrizitätswirtschaft",
+                "Dieses umfassende Gesetzpaket, bekannt als 'Günstiger-Strom-Gesetz', reformiert die gesamte österreichische Elektrizitätswirtschaft. Es führt das Elektrizitätswirtschaftsgesetz (ElWG) ein, das den Markt für Strom neu organisiert, um die Ziele der Klimaneutralität bis 2040 und den Ausbau erneuerbarer Energien zu unterstützen. Ein zentraler Pfeiler ist die Stärkung der Endkundinnen und Endkunden durch neue Rechte wie die Wahl zwischen dynamischen und festen Strompreisen, vereinfachte Kündigungsfristen und das Recht auf Ratenzahlung bei Nachzahlungen. Zudem wird ein System zur Bekämpfung von Energiearmut etabliert, das Haushalte mit geringem Einkommen durch gestützte Strompreise entlastet. Das Gesetz regelt zudem detailliert die Pflichten der Netzbetreiber, die Anforderungen an intelligente Messgeräte (Smart Meter) sowie die Organisation des Netzes durch neue Akteure wie Aggregatoren und Bürgerenergiegemeinschaften.",
                 NaiveDate::from_ymd_opt(2025, 11, 20).unwrap(),
                 NaiveDate::from_ymd_opt(2025, 12, 12).unwrap(),
             ),
             (
                 "Novelle zum Parteiengesetz: Ausnahmen, Online‑Kennzeichnung & EP‑Fraktionsausgaben",
+                "Der Gesetzentwurf ändert das Parteiengesetz 2012, indem er die Definition von „nahestehenden Organisationen“ präzisiert und bestimmte Gruppen – parlamentarische Klubs, Rechtsträger, Landtagsklubs, landesförderte Bildungseinrichtungen, Fraktionen im Europäischen Parlament sowie internationale und europäische Parteiverbände, deren Tätigkeit nicht primär auf Österreich ausgerichtet ist – ausdrücklich von dieser Definition ausschließt. Zusätzlich werden neue Unterpunkte j, k und l zu § 2 Z 5b eingefügt, die die Bereitstellung von Inhalten durch Regierungsmitarbeiter, Klubmitarbeiter und die Ausgaben für EP‑Fraktionen regeln und dabei Kennzeichnungspflichten sowie Impressum‑Hinweise festlegen. § 4 Abs 6 befreit die Ausgaben der EP‑Fraktionen von den üblichen Beschränkungen und Berichtspflichten, während § 16 Abs 12 das Inkrafttreten zum 1. Juli 2025 bestimmt und Übergangsregelungen für bereits realisierte Fälle enthält.",
                 NaiveDate::from_ymd_opt(2025, 6, 18).unwrap(),
                 NaiveDate::from_ymd_opt(2025, 7, 11).unwrap(),
             ),
             (
                 "UWG-Novelle 2025: Schutz vor Greenwashing und Obsoleszenz",
+                "Diese Gesetzesnovelle dient der Umsetzung von EU-Richtlinien zur Stärkung des Verbraucherschutzes im ökologischen Wandel und im digitalen Bereich. Ein zentraler Schwerpunkt liegt auf der Bekämpfung von irreführenden Umweltaussagen (Greenwashing). Künftig müssen allgemeine Aussagen wie 'umweltfreundlich' durch nachgewiesene, hervorragende Umweltleistungen belegt oder präzisiert werden. Zudem werden Nachhaltigkeitssiegel strengeren Regeln unterworfen, indem sie entweder von staatlichen Stellen stammen oder auf transparenten, unabhängigen Zertifizierungssystemen beruhen müssen. Ein weiterer wichtiger Aspekt ist der Schutz vor frühzeitiger Obsoleszenz: Es wird untersagt, Informationen über die begrenzte Haltbarkeit von Waren zurückzuhalten oder Produkte fälschlicherweise als reparierbar darzustellen. Schließlich werden manipulative Online-Methoden (Dark Patterns) im Finanzsektor sowie rechtsmissbräuchliche Abmahnpraktiken gesetzlich unterbunden.",
                 NaiveDate::from_ymd_opt(2026, 6, 10).unwrap(),
                 NaiveDate::from_ymd_opt(2026, 7, 8).unwrap(),
-            ),
-            (
-                "Erneuerbaren‑Ausbau‑Beschleunigungsgesetz (EABG)",
-                NaiveDate::from_ymd_opt(2026, 3, 26).unwrap(),
-                NaiveDate::from_ymd_opt(2026, 6, 15).unwrap(),
             ),
         ];
 
@@ -241,19 +267,27 @@ mod tests {
             .build()
             .unwrap();
 
-        for (title, start, end) in titles_to_compare {
+        for (title, desc, start, end) in titles_to_compare {
+            dbg!(title, start, end);
             let start = start.checked_sub_days(Days::new(5)).unwrap();
             let end = end.checked_add_days(Days::new(5)).unwrap();
-            let articles = top_article_urls(
+
+            let res = top_articles_per_provider_reranked(
                 &qdrant,
                 &somai_client,
-                "derstandard",
                 title,
+                desc,
                 Some((start, end)),
             )
-            .await
-            .unwrap();
-            dbg!(&articles);
+            .await;
+            dbg!(&res);
+
+            // for (article, doc_score, score) in scores {
+            //     println!(
+            //         "\nscore: {}, embed score: {}, doc score: {} \nurl: {}",
+            //         score, article.score, doc_score, article.url
+            //     );
+            // }
         }
     }
 }

@@ -74,7 +74,7 @@ pub async fn run_shut(mut shutdown: Shutdown, app_state: AppState, only_recents:
                 tokio::time::sleep(tokio::time::Duration::from_secs(news_linking_sleep)).await;
             } => {}
         }
-        if only_recents {
+        if !only_recents {
             break;
         }
     }

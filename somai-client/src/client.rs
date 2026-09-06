@@ -122,6 +122,19 @@ impl SomAiClient {
         Ok(resp.json().await?)
     }
 
+    pub async fn get_default_rerank_model_name(&self) -> Result<LLMResponse, reqwest::Error> {
+        let resp = self
+            .client
+            .get(format!(
+                "{}/api/embedding/reranking/default_model",
+                self.base_url
+            ))
+            .header("Authorization", self.auth_header().await)
+            .send()
+            .await?;
+        Ok(resp.json().await?)
+    }
+
     pub async fn make_llm_request<T: JsonSchema>(
         &self,
         input: String,
@@ -361,6 +374,29 @@ impl SomAiClient {
         Ok(resp.json().await?)
     }
 
+    pub async fn embedding_rerank(
+        &self,
+        input: String,
+        to_rerank: Vec<String>,
+        model: Option<String>,
+        top_n: Option<usize>,
+    ) -> Result<RerankingResponse, reqwest::Error> {
+        let req = RerankingRequest {
+            input,
+            to_rerank,
+            model,
+            top_n,
+        };
+        let resp = self
+            .client
+            .post(format!("{}/api/embedding/reranking", self.base_url))
+            .header("Authorization", self.auth_header().await)
+            .json(&req)
+            .send()
+            .await?;
+        Ok(resp.json().await?)
+    }
+
     pub async fn political_stance_generate(
         &self,
         delegate_id: i32,
@@ -426,6 +462,27 @@ mod tests {
                 (0..1000).fold("".into(), |acc: String, x: i32| format!("{acc} again")),
                 // "again test this embedding model again".into(),
                 Some("Qwen/Qwen3-Embedding-4B".into()),
+            )
+            .await
+            .unwrap();
+        dbg!(res);
+    }
+
+    #[tokio::test]
+    async fn test_somai_client_rerank() {
+        let client = SomAiClient::new_local("http://127.0.0.1:8000")
+            .await
+            .unwrap();
+
+        let res = client
+            .embedding_rerank(
+                "Who wrote 'To Kill a Mockingbird'?".into(),
+                vec![
+                    "Harper Lee wrote 'To Kill a Mockingbird', published in 1960.".into(),
+                    "Moby-Dick was written by Herman Melville.".into(),
+                ],
+                None,
+                Some(2),
             )
             .await
             .unwrap();

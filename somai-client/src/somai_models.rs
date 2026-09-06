@@ -95,6 +95,27 @@ pub struct CosineResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct RerankingRequest {
+    pub input: String,
+    pub to_rerank: Vec<String>,
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub top_n: Option<usize>,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RerankedDocument {
+    pub index: usize,
+    pub text: String,
+    pub score: f64,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RerankingResponse {
+    pub model: String,
+    pub results: Vec<RerankedDocument>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PoliticalStanceRequest {
     pub delegate_id: i32,
     pub question_or_input: String,

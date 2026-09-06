@@ -21,12 +21,12 @@ use crate::{AppState, news_linking::ARTICLE_URLS_COLLECTION};
 
 pub fn extract_relevant_parts_from_loc(url: &str) -> String {
     let mut loc = url.split('/');
-    loc.next();
-    loc.next();
-    loc.next();
-    loc.next();
-    let res = loc.collect::<Vec<_>>().join("/");
-    if res.is_empty() { url.to_string() } else { res }
+    while let Some(part) = loc.next() {
+        if part.contains('-') {
+            return part.replace('-', " ");
+        }
+    }
+    url.to_string()
 }
 
 fn point_id(provider: &str, url: &str) -> u64 {
