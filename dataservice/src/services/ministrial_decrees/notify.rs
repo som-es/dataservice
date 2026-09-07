@@ -17,10 +17,22 @@ pub async fn find_notifiers_decrees<'a>(
     pool: &PgPool,
     decrees: &'a [(i32, Decree)],
 ) -> HashMap<String, Vec<&'a (i32, Decree)>> {
-    let ids = query!("select id, email, send_new_decree_mails, send_new_decree_by_favo_mails from somes_user where is_email_hashed is false and (send_new_decree_mails or send_new_decree_by_favo_mails)")
-        .fetch_all(pool)
-        .await
-        .unwrap_or_default();
+    let ids = query!(
+        r#"
+        select
+            u.id as "id!",
+            u.email as "email!",
+            coalesce(s.send_new_decree, false) as "send_new_decree!",
+            coalesce(s.send_new_decree_by_favo, false) as "send_new_decree_by_favo!"
+        from somes_user u
+        left join user_notification_settings s on s.user_id = u.id and s.platform = 'web'
+        where u.is_email_hashed is false
+            and (coalesce(s.send_new_decree, false) or coalesce(s.send_new_decree_by_favo, false))
+        "#
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
     let mut to_notify_emails = HashMap::new();
     for id in ids {
         let user_topics = query!("select topic_name from user_topics inner join unique_eurovoc_topics ut on ut.id_as_hash = topic_id where user_id = $1", id.id).fetch_all(pool).await.unwrap_or_default().into_iter().map(|x| x.topic_name).collect::<Vec<_>>();
@@ -35,7 +47,7 @@ pub async fn find_notifiers_decrees<'a>(
         let relevant_decrees = decrees
             .iter()
             .filter(|(_id, decree)| {
-                if id.send_new_decree_mails {
+                if id.send_new_decree {
                     let topics = decree
                         .ai_summary
                         .as_ref()
@@ -48,7 +60,7 @@ pub async fn find_notifiers_decrees<'a>(
                         }
                     }
                 }
-                if id.send_new_decree_by_favo_mails {
+                if id.send_new_decree_by_favo {
                     // Check if user has the decree's gov official as favorite
                     favo_dels
                         .iter()

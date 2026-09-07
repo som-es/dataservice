@@ -65,10 +65,22 @@ pub async fn find_notifiers_ministrial_props<'a>(
     pool: &PgPool,
     gov_props: &'a [(i32, GovProposal)],
 ) -> HashMap<String, Vec<&'a (i32, GovProposal)>> {
-    let ids = query!("select id, email, send_new_ministrial_prop_mails, send_new_ministrial_prop_by_favo_mails from somes_user where is_email_hashed is false and (send_new_ministrial_prop_mails or send_new_ministrial_prop_by_favo_mails)")
-        .fetch_all(pool)
-        .await
-        .unwrap_or_default();
+    let ids = query!(
+        r#"
+        select
+            u.id as "id!",
+            u.email as "email!",
+            coalesce(s.send_new_ministrial_prop, false) as "send_new_ministrial_prop!",
+            coalesce(s.send_new_ministrial_prop_by_favo, false) as "send_new_ministrial_prop_by_favo!"
+        from somes_user u
+        left join user_notification_settings s on s.user_id = u.id and s.platform = 'web'
+        where u.is_email_hashed is false
+            and (coalesce(s.send_new_ministrial_prop, false) or coalesce(s.send_new_ministrial_prop_by_favo, false))
+        "#
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
     let mut to_notify_emails = HashMap::new();
     for id in ids {
         let user_topics = query!("select topic_name from user_topics inner join unique_eurovoc_topics ut on ut.id_as_hash = topic_id where user_id = $1", id.id).fetch_all(pool).await.unwrap_or_default().into_iter().map(|x| x.topic_name).collect::<Vec<_>>();
@@ -83,7 +95,7 @@ pub async fn find_notifiers_ministrial_props<'a>(
         let relevant_gov_props = gov_props
             .iter()
             .filter(|(_id, gov_prop)| {
-                if id.send_new_ministrial_prop_mails {
+                if id.send_new_ministrial_prop {
                     let topics = if gov_prop.eurovoc_topics.is_empty() {
                         gov_prop
                             .ai_summary
@@ -104,7 +116,7 @@ pub async fn find_notifiers_ministrial_props<'a>(
                     }
                 }
 
-                if id.send_new_ministrial_prop_by_favo_mails {
+                if id.send_new_ministrial_prop_by_favo {
                     favo_dels
                         .iter()
                         .find(|favo_del| {

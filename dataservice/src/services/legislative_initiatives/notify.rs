@@ -32,20 +32,41 @@ pub async fn find_notifiers_legis_init<'a>(
     is_finished: bool,
 ) -> HashMap<String, Vec<&'a (i32, VoteResult)>> {
     let ids = if is_finished {
-        query_as!(ToNotify, "select id, email, send_new_vote_results_mails as by_topics, send_new_vote_result_by_favo_mails as by_person_favo from somes_user where is_email_hashed is false and (send_new_vote_results_mails or send_new_vote_result_by_favo_mails)")
-            .fetch_all(pool)
-            .await
-            .unwrap_or_default()
-    } else {
-        query_as!(ToNotify, "
+        query_as!(
+            ToNotify,
+            r#"
             select
-                id, email,
-                send_new_proposal_mails as by_topics,
-                send_new_proposal_by_favo_mails as by_person_favo
-            from somes_user where is_email_hashed is false and (send_new_proposal_mails or send_new_proposal_by_favo_mails)")
-            .fetch_all(pool)
-            .await
-            .unwrap_or_default()
+                u.id as "id!",
+                u.email as "email!",
+                coalesce(s.send_new_vote_results, true) as "by_topics!",
+                coalesce(s.send_new_vote_result_by_favo, false) as "by_person_favo!"
+            from somes_user u
+            left join user_notification_settings s on s.user_id = u.id and s.platform = 'web'
+            where u.is_email_hashed is false
+                and (coalesce(s.send_new_vote_results, true) or coalesce(s.send_new_vote_result_by_favo, false))
+            "#
+        )
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default()
+    } else {
+        query_as!(
+            ToNotify,
+            r#"
+            select
+                u.id as "id!",
+                u.email as "email!",
+                coalesce(s.send_new_proposal, false) as "by_topics!",
+                coalesce(s.send_new_proposal_by_favo, false) as "by_person_favo!"
+            from somes_user u
+            left join user_notification_settings s on s.user_id = u.id and s.platform = 'web'
+            where u.is_email_hashed is false
+                and (coalesce(s.send_new_proposal, false) or coalesce(s.send_new_proposal_by_favo, false))
+            "#
+        )
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default()
     };
     let mut to_notify_emails = HashMap::new();
     for id in ids {
