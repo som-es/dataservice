@@ -21,7 +21,16 @@ pub struct DelegateNotification {
 
 async fn find_notifiers(pg: &PgPool) -> sqlx::Result<HashMap<String, Vec<DelegateNotification>>> {
     let mut notifiers = HashMap::new();
-    let users = sqlx::query!("select email, id from somes_user where not is_email_hashed and send_new_delegate_activity_mails").fetch_all(pg).await?;
+    let users = sqlx::query!(
+        r#"
+        select u.email as "email!", u.id as "id!"
+        from somes_user u
+        left join user_notification_settings s on s.user_id = u.id and s.platform = 'web'
+        where not u.is_email_hashed and coalesce(s.send_new_delegate_activity, true)
+        "#
+    )
+    .fetch_all(pg)
+    .await?;
 
     for user in users {
         let delegate_ids = sqlx::query_as!(
