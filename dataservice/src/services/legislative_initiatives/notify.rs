@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use combx::{DbVote, Delegate, VoteResult};
+use combx::{DbVote, Delegate, Parliament, VoteResult};
 use image::Rgba;
 use imageproc::{
     drawing::{draw_filled_circle_mut, draw_filled_rect_mut},
@@ -12,7 +12,12 @@ use sqlx::{PgPool, query, query_as, query_scalar};
 use crate::{
     LATEST_GP,
     email::{LEGIS_INIT_EMAIL_TEMPLATE, MAILER, VOTE_RESULT_ENTRY_TEMPLATE, send_mail},
+    push::{ExpoPushMessage, PUSH_CLIENT, PushTarget, parliament_country, send_expo_push_notifications, truncate_for_push},
 };
+
+/// Push is one item per message, so a phone push is capped tighter than the
+/// email digest (which shows up to 5 entries).
+const MAX_PUSH_PER_TOKEN: usize = 3;
 
 struct ToNotify {
     id: i32,
@@ -82,6 +87,90 @@ pub async fn find_notifiers_legis_init<'a>(
         }
     }
     to_notify_emails
+}
+
+struct PushToNotify {
+    push_token: String,
+    user_id: i32,
+    by_topics: bool,
+    by_person_favo: bool,
+}
+
+pub async fn find_push_notifiers_legis_init<'a>(
+    pool: &PgPool,
+    legis_inits: &'a [(i32, VoteResult)],
+    is_finished: bool,
+) -> HashMap<String, Vec<(&'a (i32, VoteResult), &'static str)>> {
+    let (by_topics_category, by_favo_category) = if is_finished {
+        ("send_new_vote_results", "send_new_vote_result_by_favo")
+    } else {
+        ("send_new_proposal", "send_new_proposal_by_favo")
+    };
+
+    let rows = if is_finished {
+        query_as!(PushToNotify, "
+            select ept.push_token, ept.user_id,
+                uns.send_new_vote_results as by_topics,
+                uns.send_new_vote_result_by_favo as by_person_favo
+            from expo_push_tokens ept
+            inner join user_notification_settings uns on uns.id = ept.notification_settings_id
+            where ept.enabled and (uns.send_new_vote_results or uns.send_new_vote_result_by_favo)")
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default()
+    } else {
+        query_as!(PushToNotify, "
+            select ept.push_token, ept.user_id,
+                uns.send_new_proposal as by_topics,
+                uns.send_new_proposal_by_favo as by_person_favo
+            from expo_push_tokens ept
+            inner join user_notification_settings uns on uns.id = ept.notification_settings_id
+            where ept.enabled and (uns.send_new_proposal or uns.send_new_proposal_by_favo)")
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default()
+    };
+
+    let mut to_notify_push = HashMap::new();
+    for row in rows {
+        let user_topics = query!("select topic_name from user_topics inner join unique_eurovoc_topics ut on ut.id_as_hash = topic_id where user_id = $1", row.user_id).fetch_all(pool).await.unwrap_or_default().into_iter().map(|x| x.topic_name).collect::<Vec<_>>();
+
+        let favo_dels = query_scalar!(
+            "select delegate_id from favo_dels where user_id = $1",
+            row.user_id
+        )
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        let relevant_legis_inits = legis_inits
+            .iter()
+            .filter_map(|legis_init| {
+                if row.by_person_favo
+                    && legis_init
+                        .1
+                        .issued_by_dels
+                        .iter()
+                        .any(|issued_by_del| favo_dels.contains(&issued_by_del.delegate_id))
+                {
+                    return Some((legis_init, by_favo_category));
+                }
+                if row.by_topics {
+                    for topic in &legis_init.1.eurovoc_topics {
+                        if user_topics.contains(&topic.topic) {
+                            return Some((legis_init, by_topics_category));
+                        }
+                    }
+                }
+                None
+            })
+            .collect::<Vec<_>>();
+
+        if !relevant_legis_inits.is_empty() {
+            to_notify_push.insert(row.push_token, relevant_legis_inits);
+        }
+    }
+    to_notify_push
 }
 
 pub fn gen_half_circle(n: usize, r: f32, w: u32, h: u32) -> Option<Vec<(f32, f32)>> {
@@ -475,6 +564,84 @@ pub fn notify_users(
         }
     }
     // for notifier_mail in find_notifiers(pool, legis_init_topics).await {}
+}
+
+fn vote_result_push_copy(vote_result: &VoteResult, is_finished: bool) -> (String, String) {
+    let vote_outcome = match &vote_result.legislative_initiative.accepted {
+        Some(status) if status == "a" => "Angenommen",
+        Some(status) if status == "d" || status == "p" => "Abgelehnt",
+        _ => "In Bearbeitung",
+    };
+
+    let vote_type = match vote_result
+        .legislative_initiative
+        .voting
+        .clone()
+        .unwrap_or("_".into())
+        .as_str()
+    {
+        "Law" => "Gesetz",
+        "Report" => "Bericht",
+        "Amendment" => "Abänderung",
+        "Resolution" => "Entschließung",
+        _ => &vote_result.legislative_initiative.ityp,
+    };
+
+    let vote_description = vote_result
+        .ai_summary
+        .as_ref()
+        .map(|summary| summary.short_title.as_str())
+        .unwrap_or(&vote_result.legislative_initiative.description);
+
+    let title = if is_finished {
+        format!("Neues Abstimmungsergebnis: {vote_outcome}")
+    } else {
+        format!("Neuer Antrag: {vote_type}")
+    };
+
+    (title, truncate_for_push(vote_description))
+}
+
+pub async fn send_push_for_legis_init(
+    pool: &PgPool,
+    parliament: Parliament,
+    push_notifiers: &HashMap<String, Vec<(&(i32, VoteResult), &'static str)>>,
+    is_finished: bool,
+) {
+    let country = parliament_country(parliament);
+    let mut messages = Vec::new();
+
+    for (push_token, items) in push_notifiers {
+        if items.len() > MAX_PUSH_PER_TOKEN {
+            log::info!(
+                "capping legis_init pushes to {push_token} at {MAX_PUSH_PER_TOKEN} ({} skipped)",
+                items.len() - MAX_PUSH_PER_TOKEN
+            );
+        }
+
+        for entry in items.iter().take(MAX_PUSH_PER_TOKEN) {
+            let vote_result = &entry.0.1;
+            let category = entry.1;
+            let (title, body) = vote_result_push_copy(vote_result, is_finished);
+
+            messages.push(ExpoPushMessage {
+                to: push_token.clone(),
+                title,
+                body,
+                channel_id: "default",
+                sound: None,
+                data: PushTarget::Vote {
+                    country,
+                    gp: vote_result.legislative_initiative.gp.clone(),
+                    ityp: vote_result.legislative_initiative.ityp.clone(),
+                    inr: vote_result.legislative_initiative.inr,
+                    category,
+                },
+            });
+        }
+    }
+
+    send_expo_push_notifications(&PUSH_CLIENT, pool, messages).await;
 }
 
 #[cfg(test)]

@@ -6,6 +6,8 @@ pub mod api_limiter;
 #[cfg(all(feature = "runner", any(feature = "vectordb", feature = "news")))]
 pub mod clients;
 #[cfg(feature = "runner")]
+pub mod push;
+#[cfg(feature = "runner")]
 pub mod services;
 #[cfg(feature = "runner")]
 pub mod shutdown;
@@ -14,6 +16,7 @@ use std::{cell::LazyCell, env::VarError};
 
 use ::combx::Parliament;
 use chrono::Datelike;
+use once_cell::sync::Lazy;
 use redis::aio::ConnectionManager;
 #[cfg(feature = "runner")]
 pub use services::*;
@@ -100,6 +103,10 @@ pub fn tessdata_dir() -> std::result::Result<String, VarError> {
     std::env::var("TESSDATA_DIR")
 }
 
+pub fn env_var(key: &str) -> String {
+    std::env::var(key).unwrap_or_else(|_| panic!("{key} env var must be set"))
+}
+
 pub const DATABASE_URL: &str = dotenv!("DATABASE_URL");
 pub const AT_DATABASE_URL: &str = dotenv!("AT_DATABASE_URL");
 pub const EU_DATABASE_URL: &str = dotenv!("EU_DATABASE_URL");
@@ -109,6 +116,12 @@ pub const EU_LATEST_GP: &str = dotenv!("EU_LATEST_GP");
 pub const GPS: [&str; 9] = [
     LATEST_GP, "XXVII", "XXVI", "XXV", "XXIV", "XXIII", "XXII", "XXI", "XX",
 ];
+pub static EXPO_PUSH_URL: Lazy<String> = Lazy::new(|| env_var("EXPO_PUSH_URL"));
+pub static EXPO_PUSH_ACCESS_TOKEN: Lazy<Option<String>> = Lazy::new(|| {
+    std::env::var("EXPO_PUSH_ACCESS_TOKEN")
+        .ok()
+        .filter(|token| !token.trim().is_empty())
+});
 
 #[derive(Clone)]
 pub struct AppState {

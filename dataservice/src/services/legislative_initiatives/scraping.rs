@@ -12,8 +12,9 @@ use crate::{
     legislative_initiatives::{
         VoteResultService,
         notify::{
-            create_color_map, find_notifiers_legis_init, get_current_delegates,
-            get_current_parties, get_current_seats, notify_users,
+            create_color_map, find_notifiers_legis_init, find_push_notifiers_legis_init,
+            get_current_delegates, get_current_parties, get_current_seats, notify_users,
+            send_push_for_legis_init,
         },
         update_or_insert_legis_init_in_db,
     },
@@ -155,6 +156,10 @@ pub async fn scrape_new_legis_inits<S: VoteResultService>(
                 true,
             );
 
+            let notify_push_legis_inits =
+                find_push_notifiers_legis_init(&pg_pool, &all_vote_results, true).await;
+            send_push_for_legis_init(&pg_pool, parliament, &notify_push_legis_inits, true).await;
+
             let notify_user_legis_inits =
                 find_notifiers_legis_init(&pg_pool, &proposals, false).await;
             log::info!(
@@ -169,6 +174,10 @@ pub async fn scrape_new_legis_inits<S: VoteResultService>(
                 colors.clone(),
                 false,
             );
+
+            let notify_push_legis_inits =
+                find_push_notifiers_legis_init(&pg_pool, &proposals, false).await;
+            send_push_for_legis_init(&pg_pool, parliament, &notify_push_legis_inits, false).await;
         }
     });
 

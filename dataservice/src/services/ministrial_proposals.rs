@@ -505,6 +505,11 @@ pub async fn update_ministrial_proposals_in_db2(
                 find_notifiers_ministrial_props(&pool, &all_gov_proposals).await;
 
             notify_users(&notify_user_gov_props, &simple_gov_officials);
+
+            let notify_push_gov_props =
+                find_push_notifiers_ministrial_props(&pool, &all_gov_proposals).await;
+
+            send_push_for_ministrial_props(&pool, &notify_push_gov_props).await;
         }
     });
 

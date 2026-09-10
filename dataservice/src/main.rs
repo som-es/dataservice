@@ -430,6 +430,12 @@ pub async fn run_at_services(
             )
         ),
         tokio::spawn(
+            services::delegates::run_shut_delegate_activity_notify(
+                Shutdown::new(notify_shutdown.subscribe()),
+                app_state.clone()
+            )
+        ),
+        tokio::spawn(
             services::parties::run_shut::<somes_scraper::AustriaScraper>(
                 Shutdown::new(notify_shutdown.subscribe()),
                 pool.clone(),

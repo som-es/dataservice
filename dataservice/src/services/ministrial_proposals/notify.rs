@@ -1,9 +1,16 @@
 use chrono_tz::Europe::Vienna;
 use combx::GovProposal;
-use sqlx::{PgPool, query};
+use sqlx::{PgPool, query, query_as, query_scalar};
 use std::collections::HashMap;
 
-use crate::email::{MAILER, send_mail};
+use crate::{
+    email::{MAILER, send_mail},
+    push::{ExpoPushMessage, PUSH_CLIENT, PushTarget, send_expo_push_notifications, truncate_for_push},
+};
+
+/// Push is one item per message, so a phone push is capped tighter than the
+/// email digest (which shows up to 5 entries).
+const MAX_PUSH_PER_TOKEN: usize = 3;
 
 #[derive(Debug, Clone)]
 pub(crate) struct SimpleGovOfficial {
@@ -118,6 +125,82 @@ pub async fn find_notifiers_ministrial_props<'a>(
     to_notify_emails
 }
 
+struct PushToNotify {
+    push_token: String,
+    user_id: i32,
+    send_new_ministrial_prop: bool,
+    send_new_ministrial_prop_by_favo: bool,
+}
+
+pub async fn find_push_notifiers_ministrial_props<'a>(
+    pool: &PgPool,
+    gov_props: &'a [(i32, GovProposal)],
+) -> HashMap<String, Vec<(&'a (i32, GovProposal), &'static str)>> {
+    let rows = query_as!(PushToNotify, "
+        select ept.push_token, ept.user_id,
+            uns.send_new_ministrial_prop, uns.send_new_ministrial_prop_by_favo
+        from expo_push_tokens ept
+        inner join user_notification_settings uns on uns.id = ept.notification_settings_id
+        where ept.enabled and (uns.send_new_ministrial_prop or uns.send_new_ministrial_prop_by_favo)")
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+    let mut to_notify_push = HashMap::new();
+    for row in rows {
+        let user_topics = query!("select topic_name from user_topics inner join unique_eurovoc_topics ut on ut.id_as_hash = topic_id where user_id = $1", row.user_id).fetch_all(pool).await.unwrap_or_default().into_iter().map(|x| x.topic_name).collect::<Vec<_>>();
+        let favo_dels = query_scalar!(
+            "select delegate_id from favo_dels where user_id = $1",
+            row.user_id
+        )
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        let relevant_gov_props = gov_props
+            .iter()
+            .filter_map(|item| {
+                let gov_prop = &item.1;
+                if row.send_new_ministrial_prop {
+                    let topics = if gov_prop.eurovoc_topics.is_empty() {
+                        gov_prop
+                            .ai_summary
+                            .as_ref()
+                            .map(|summary| summary.full_summary.topics.clone())
+                            .unwrap_or_default()
+                    } else {
+                        gov_prop
+                            .eurovoc_topics
+                            .iter()
+                            .map(|x| x.topic.clone())
+                            .collect::<Vec<_>>()
+                    };
+                    for topic in &topics {
+                        if user_topics.contains(topic) {
+                            return Some((item, "send_new_ministrial_prop"));
+                        }
+                    }
+                }
+
+                if row.send_new_ministrial_prop_by_favo
+                    && favo_dels
+                        .iter()
+                        .any(|favo_del| gov_prop.ministerial_issuers.contains(favo_del))
+                {
+                    return Some((item, "send_new_ministrial_prop_by_favo"));
+                }
+
+                None
+            })
+            .collect::<Vec<_>>();
+
+        if !relevant_gov_props.is_empty() {
+            to_notify_push.insert(row.push_token, relevant_gov_props);
+        }
+    }
+    to_notify_push
+}
+
 pub(crate) fn send_new_ministrial_prop_info_mail(
     mail_to: &str,
     ministrial_props: &[&(i32, GovProposal)],
@@ -219,6 +302,48 @@ pub(crate) fn notify_users(
             log::error!("could not send ministrial prop info mail: {e:?}");
         }
     }
+}
+
+pub(crate) async fn send_push_for_ministrial_props(
+    pool: &PgPool,
+    push_notifiers: &HashMap<String, Vec<(&(i32, GovProposal), &'static str)>>,
+) {
+    let mut messages = Vec::new();
+
+    for (push_token, items) in push_notifiers {
+        if items.len() > MAX_PUSH_PER_TOKEN {
+            log::info!(
+                "capping ministrial prop pushes to {push_token} at {MAX_PUSH_PER_TOKEN} ({} skipped)",
+                items.len() - MAX_PUSH_PER_TOKEN
+            );
+        }
+
+        for entry in items.iter().take(MAX_PUSH_PER_TOKEN) {
+            let gov_prop = &entry.0.1;
+            let category = entry.1;
+            let description = gov_prop
+                .ai_summary
+                .as_ref()
+                .map(|summary| summary.short_title.as_str())
+                .unwrap_or(&gov_prop.ministrial_proposal.description);
+
+            messages.push(ExpoPushMessage {
+                to: push_token.clone(),
+                title: "Neuer Ministerialentwurf".to_string(),
+                body: truncate_for_push(description),
+                channel_id: "default",
+                sound: None,
+                data: PushTarget::MinisterialProposal {
+                    country: "at",
+                    gp: gov_prop.ministrial_proposal.gp.clone(),
+                    inr: gov_prop.ministrial_proposal.inr,
+                    category,
+                },
+            });
+        }
+    }
+
+    send_expo_push_notifications(&PUSH_CLIENT, pool, messages).await;
 }
 
 #[cfg(test)]

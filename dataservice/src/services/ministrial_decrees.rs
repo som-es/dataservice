@@ -104,6 +104,10 @@ pub async fn save_ministrial_decrees(
             let notify_user_decrees = find_notifiers_decrees(&pool, &all_decrees).await;
 
             notify_users(&notify_user_decrees, &simple_gov_officials);
+
+            let notify_push_decrees = find_push_notifiers_decrees(&pool, &all_decrees).await;
+
+            send_push_for_decrees(&pool, &notify_push_decrees).await;
         });
     }
 }

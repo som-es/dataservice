@@ -1,15 +1,20 @@
 use std::collections::HashMap;
 
+use ::combx::Parliament;
 use chrono::{DateTime, Duration, Utc};
 use sqlx::PgPool;
 
 mod activity;
 mod mail;
+mod push;
 mod render;
 
 pub use activity::collect_recent_activity_by_delegate;
 use mail::send_delegate_activity_mail;
+use push::send_delegate_activity_push;
 use render::populate_delegate_profile_html;
+
+use crate::{AppState, Shutdown};
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct DelegateNotification {
@@ -19,34 +24,77 @@ pub struct DelegateNotification {
     last_sent_at: Option<DateTime<Utc>>,
 }
 
-async fn find_notifiers(pg: &PgPool) -> sqlx::Result<HashMap<String, Vec<DelegateNotification>>> {
-    let mut notifiers = HashMap::new();
-    let users = sqlx::query!("select email, id from somes_user where not is_email_hashed and send_new_delegate_activity_mails").fetch_all(pg).await?;
+/// A user can be reachable by mail, push, both, or (for those with neither
+/// enabled for delegate activity) not at all, in which case they never show
+/// up here.
+struct NotifyRecipient {
+    user_id: i32,
+    mail_to: Option<String>,
+    push_tokens: Vec<String>,
+}
 
-    for user in users {
-        let delegate_ids = sqlx::query_as!(
-            DelegateNotification,
-            r#"
-            select
-                fd.user_id,
-                fd.delegate_id,
-                fd.user_info_days,
-                delegate_activity_email_info.last_sent_at
-            from favo_dels fd
-            left join delegate_activity_email_info
-                on delegate_activity_email_info.user_id = fd.user_id
-                and delegate_activity_email_info.delegate_id = fd.delegate_id
-            where fd.user_id = $1
-            "#,
-            user.id
-        )
-        .fetch_all(pg)
-        .await?;
+async fn find_notifiers(pg: &PgPool) -> sqlx::Result<Vec<NotifyRecipient>> {
+    let mail_users = sqlx::query!("select id, email from somes_user where not is_email_hashed and send_new_delegate_activity_mails").fetch_all(pg).await?;
 
-        notifiers.insert(user.email, delegate_ids);
+    let push_rows = sqlx::query!(
+        "select distinct ept.user_id, ept.push_token
+        from expo_push_tokens ept
+        inner join user_notification_settings uns on uns.id = ept.notification_settings_id
+        where ept.enabled and uns.send_new_delegate_activity"
+    )
+    .fetch_all(pg)
+    .await?;
+
+    let mut recipients: HashMap<i32, NotifyRecipient> = HashMap::new();
+
+    for user in mail_users {
+        recipients
+            .entry(user.id)
+            .or_insert_with(|| NotifyRecipient {
+                user_id: user.id,
+                mail_to: None,
+                push_tokens: Vec::new(),
+            })
+            .mail_to = Some(user.email);
     }
 
-    Ok(notifiers)
+    for row in push_rows {
+        recipients
+            .entry(row.user_id)
+            .or_insert_with(|| NotifyRecipient {
+                user_id: row.user_id,
+                mail_to: None,
+                push_tokens: Vec::new(),
+            })
+            .push_tokens
+            .push(row.push_token);
+    }
+
+    Ok(recipients.into_values().collect())
+}
+
+async fn delegate_notifications_for_user(
+    pg: &PgPool,
+    user_id: i32,
+) -> sqlx::Result<Vec<DelegateNotification>> {
+    sqlx::query_as!(
+        DelegateNotification,
+        r#"
+        select
+            fd.user_id,
+            fd.delegate_id,
+            fd.user_info_days,
+            delegate_activity_email_info.last_sent_at
+        from favo_dels fd
+        left join delegate_activity_email_info
+            on delegate_activity_email_info.user_id = fd.user_id
+            and delegate_activity_email_info.delegate_id = fd.delegate_id
+        where fd.user_id = $1
+        "#,
+        user_id
+    )
+    .fetch_all(pg)
+    .await
 }
 
 fn should_send_delegate_activity(
@@ -91,18 +139,17 @@ async fn mark_delegate_activity_mail_sent(
     Ok(())
 }
 
-pub async fn notify_delegate_activity_users(pg: &PgPool) -> sqlx::Result<()> {
-    let notifiers = find_notifiers(pg).await?;
+pub async fn notify_delegate_activity_users(pg: &PgPool, parliament: Parliament) -> sqlx::Result<()> {
+    let recipients = find_notifiers(pg).await?;
 
-    for (mail_to, delegate_notifications) in notifiers {
+    for recipient in recipients {
         let now = Utc::now();
+        let delegate_notifications = delegate_notifications_for_user(pg, recipient.user_id).await?;
+
         let mut delegate_activities = HashMap::new();
         let mut sent_delegate_ids = Vec::new();
-        let mut user_id = None;
 
         for delegate_notification in delegate_notifications {
-            user_id = Some(delegate_notification.user_id);
-
             if !should_send_delegate_activity(
                 delegate_notification.last_sent_at,
                 delegate_notification.user_info_days,
@@ -119,8 +166,7 @@ pub async fn notify_delegate_activity_users(pg: &PgPool) -> sqlx::Result<()> {
             .await
             {
                 Ok(activity) if activity.has_activity() => {
-                    let html = populate_delegate_profile_html(&activity).await;
-                    delegate_activities.insert(delegate_notification.delegate_id, html);
+                    delegate_activities.insert(delegate_notification.delegate_id, activity);
                     sent_delegate_ids.push(delegate_notification.delegate_id);
                 }
                 Ok(_) => {}
@@ -137,29 +183,71 @@ pub async fn notify_delegate_activity_users(pg: &PgPool) -> sqlx::Result<()> {
             continue;
         }
 
-        let send_result = tokio::task::spawn_blocking(move || {
-            match send_delegate_activity_mail(&mail_to, &delegate_activities) {
-                Ok(()) => true,
-                Err(e) => {
-                    log::error!("could not send delegate activity mail: {e:?}");
-                    false
-                }
-            }
-        })
-        .await;
+        let mut sent_any = false;
 
-        match send_result {
-            Ok(true) => {
-                if let Some(user_id) = user_id {
-                    mark_delegate_activity_mail_sent(pg, user_id, &sent_delegate_ids, now).await?;
-                }
+        if let Some(mail_to) = recipient.mail_to.clone() {
+            let mut htmls = HashMap::new();
+            for (delegate_id, activity) in &delegate_activities {
+                htmls.insert(*delegate_id, populate_delegate_profile_html(activity).await);
             }
-            Ok(false) => {}
-            Err(e) => log::error!("delegate activity mail task panicked: {e:?}"),
+
+            let send_result = tokio::task::spawn_blocking(move || {
+                match send_delegate_activity_mail(&mail_to, &htmls) {
+                    Ok(()) => true,
+                    Err(e) => {
+                        log::error!("could not send delegate activity mail: {e:?}");
+                        false
+                    }
+                }
+            })
+            .await;
+
+            match send_result {
+                Ok(true) => sent_any = true,
+                Ok(false) => {}
+                Err(e) => log::error!("delegate activity mail task panicked: {e:?}"),
+            }
+        }
+
+        if !recipient.push_tokens.is_empty() {
+            send_delegate_activity_push(pg, parliament, &recipient.push_tokens, &delegate_activities)
+                .await;
+            sent_any = true;
+        }
+
+        if sent_any {
+            mark_delegate_activity_mail_sent(pg, recipient.user_id, &sent_delegate_ids, now).await?;
         }
     }
 
     Ok(())
+}
+
+pub async fn run_shut_delegate_activity_notify(mut shutdown: Shutdown, app_state: AppState) {
+    let sleep_secs: u64 = std::env::var("DELEGATE_ACTIVITY_NOTIFY_SLEEP")
+        .unwrap_or_else(|_| "3600".to_string())
+        .parse()
+        .unwrap_or_else(|e| {
+            log::warn!(
+                "Could not parse DELEGATE_ACTIVITY_NOTIFY_SLEEP env var: {e}. Using default value of 3600 seconds"
+            );
+            3600
+        });
+
+    while !shutdown.is_shutdown() {
+        tokio::select! {
+            _ = shutdown.recv() => {
+                break;
+            }
+            _ = async {
+                if let Err(e) = notify_delegate_activity_users(&app_state.pg_pool, app_state.parliament).await {
+                    log::error!("Error notifying delegate activity users: {e:?}");
+                }
+                log::info!("delegate activity notify service sleeps for {sleep_secs} seconds...");
+                tokio::time::sleep(tokio::time::Duration::from_secs(sleep_secs)).await;
+            } => {}
+        }
+    }
 }
 
 #[cfg(test)]

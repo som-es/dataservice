@@ -1,12 +1,17 @@
 use chrono_tz::Europe::Vienna;
 use combx::Decree;
-use sqlx::{PgPool, query};
+use sqlx::{PgPool, query, query_as, query_scalar};
 use std::collections::HashMap;
 
 use crate::{
     email::{MAILER, send_mail},
     ministrial_proposals::SimpleGovOfficial,
+    push::{ExpoPushMessage, PUSH_CLIENT, PushTarget, send_expo_push_notifications, truncate_for_push},
 };
+
+/// Push is one item per message, so a phone push is capped tighter than the
+/// email digest (which shows up to 5 entries).
+const MAX_PUSH_PER_TOKEN: usize = 3;
 
 pub async fn find_notifiers_decrees<'a>(
     pool: &PgPool,
@@ -60,6 +65,73 @@ pub async fn find_notifiers_decrees<'a>(
         }
     }
     to_notify_emails
+}
+
+struct PushToNotify {
+    push_token: String,
+    user_id: i32,
+    send_new_decree: bool,
+    send_new_decree_by_favo: bool,
+}
+
+pub async fn find_push_notifiers_decrees<'a>(
+    pool: &PgPool,
+    decrees: &'a [(i32, Decree)],
+) -> HashMap<String, Vec<(&'a (i32, Decree), &'static str)>> {
+    let rows = query_as!(PushToNotify, "
+        select ept.push_token, ept.user_id,
+            uns.send_new_decree, uns.send_new_decree_by_favo
+        from expo_push_tokens ept
+        inner join user_notification_settings uns on uns.id = ept.notification_settings_id
+        where ept.enabled and (uns.send_new_decree or uns.send_new_decree_by_favo)")
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+    let mut to_notify_push = HashMap::new();
+    for row in rows {
+        let user_topics = query!("select topic_name from user_topics inner join unique_eurovoc_topics ut on ut.id_as_hash = topic_id where user_id = $1", row.user_id).fetch_all(pool).await.unwrap_or_default().into_iter().map(|x| x.topic_name).collect::<Vec<_>>();
+        let favo_dels = query_scalar!(
+            "select delegate_id from favo_dels where user_id = $1",
+            row.user_id
+        )
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        let relevant_decrees = decrees
+            .iter()
+            .filter_map(|item| {
+                let decree = &item.1;
+                if row.send_new_decree {
+                    let topics = decree
+                        .ai_summary
+                        .as_ref()
+                        .map(|summary| summary.full_summary.topics.clone())
+                        .unwrap_or_default();
+
+                    for topic in &topics {
+                        if user_topics.contains(topic) {
+                            return Some((item, "send_new_decree"));
+                        }
+                    }
+                }
+                if row.send_new_decree_by_favo
+                    && favo_dels
+                        .iter()
+                        .any(|favo_del| decree.gov_official_id == Some(*favo_del))
+                {
+                    return Some((item, "send_new_decree_by_favo"));
+                }
+                None
+            })
+            .collect::<Vec<_>>();
+
+        if !relevant_decrees.is_empty() {
+            to_notify_push.insert(row.push_token, relevant_decrees);
+        }
+    }
+    to_notify_push
 }
 
 pub(crate) fn send_new_decree_info_mail(
@@ -145,4 +217,45 @@ pub(crate) fn notify_users(
             log::error!("could not send decree info mail: {e:?}");
         }
     }
+}
+
+pub(crate) async fn send_push_for_decrees(
+    pool: &PgPool,
+    push_notifiers: &HashMap<String, Vec<(&(i32, Decree), &'static str)>>,
+) {
+    let mut messages = Vec::new();
+
+    for (push_token, items) in push_notifiers {
+        if items.len() > MAX_PUSH_PER_TOKEN {
+            log::info!(
+                "capping decree pushes to {push_token} at {MAX_PUSH_PER_TOKEN} ({} skipped)",
+                items.len() - MAX_PUSH_PER_TOKEN
+            );
+        }
+
+        for entry in items.iter().take(MAX_PUSH_PER_TOKEN) {
+            let decree = &entry.0.1;
+            let category = entry.1;
+            let description = decree
+                .ai_summary
+                .as_ref()
+                .map(|s| s.short_title.as_str())
+                .unwrap_or(&decree.short_title);
+
+            messages.push(ExpoPushMessage {
+                to: push_token.clone(),
+                title: "Neue Verordnung".to_string(),
+                body: truncate_for_push(description),
+                channel_id: "default",
+                sound: None,
+                data: PushTarget::Decree {
+                    country: "at",
+                    ris_id: decree.ris_id.clone(),
+                    category,
+                },
+            });
+        }
+    }
+
+    send_expo_push_notifications(&PUSH_CLIENT, pool, messages).await;
 }
