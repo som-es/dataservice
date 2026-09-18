@@ -1,78 +1,112 @@
-# Delegate Question Mail Listener
+# Delegate question mail listener
 
-> Historical local Mailpit notes: upstream has removed POP3 support and the
-> `pop3` feature. The POP3 commands below and the retained `tests/mailpit_e2e.rs`
-> test cannot currently run. The listener now uses IMAP; `--once` remains supported.
-> Upstream also caches message IDs during a run, so the retry description below
-> no longer applies to failures within the same process.
+The listener reads an IMAP mailbox, matches `In-Reply-To` or `References` against
+`delegate_questions.outgoing_message_id`, and stores replies in PostgreSQL.
+An answer and its question's `answered` status are committed in one transaction.
+The unique `raw_message_id` prevents duplicate answers, including after a restart.
+Failed writes are retried on the next poll. Messages are not deleted by the listener.
 
-This service polls an inbound mailbox, matches replies through `In-Reply-To` and `References`, and stores matching answers in the dataservice database.
+## Automated GreenMail tests
 
-The service shares mail parsing and message ID handling with the API through the `delegate-question-mail` library crate.
+From the dataservice workspace:
 
-For production mailboxes, prefer IMAP. POP3 support is kept for local Mailpit testing.
-Messages are not deleted from the mailbox by this service. If storing an answer fails, the same inbound message can be retried on the next poll. Duplicate answers are prevented by the `raw_message_id` unique constraint.
+```bash
+./delegate-question-mail-listener/dev/test-mailflow.sh
+```
 
-## Local Mailpit
+Requirements:
 
-Mailpit is only used as a local test mailbox. Start it with POP3 enabled and configure the listener as follows:
+- Docker Engine with Compose v2, running and accessible to your user.
+- Python 3.10+, Cargo/Rust, and the normal native build dependencies of the project.
+- The sibling `../scraper` and `../common-scrapes` repositories used by the mail parser.
+- Network access on the first run to download container images and Rust dependencies.
+
+No running API, existing database, `.env`, Mailpit, or manual test data is needed.
+If Docker on your machine requires sudo, authenticate first and use:
+
+```bash
+sudo -v
+DOCKER='sudo -n docker' ./delegate-question-mail-listener/dev/test-mailflow.sh
+```
+
+Do not run the entire script with `sudo`: Cargo should run as your normal user,
+using your Rust installation and build cache. The runner checks this before
+starting containers. From the `dev/` directory, use
+`DOCKER='sudo -n docker' ./test-mailflow.sh` after `sudo -v`.
+
+The runner:
+
+1. Starts `dev/docker-compose.test.yml` under a unique Compose project name.
+   GreenMail and PostgreSQL use randomly assigned ports bound to localhost. The
+   database lives in tmpfs; the interactive development containers are unaffected.
+2. Waits for PostgreSQL, SMTP and authenticated IMAPS to be ready.
+3. Creates minimal user/delegate parent keys and applies the actual
+   `2026-06-26-120000_delegate_questions/up.sql` migration. This is a focused
+   listener schema, not the application's complete database schema.
+4. Copies the real listener, parser and their sibling dependencies into a temporary
+   workspace, preserving the workspace dependency declarations. This avoids Cargo
+   resolving unrelated workspace members such as `eurovoc`. The original sources,
+   lockfile and environment files are not changed. An existing Cargo.lock is used
+   as a starting point; build artifacts are cached in `target/mailflow-tests`.
+5. Runs the parser's Rust unit tests and builds the actual listener against the
+   test database (including SQLx compile-time query validation).
+6. Sends real SMTP messages to GreenMail, waits for IMAP delivery, runs the listener,
+   and checks the database. Each case resets the mailbox and question tables.
+7. Prints the test results, shows container logs on failure, and removes the
+   containers and temporary workspace in a `finally` block, including on Ctrl+C.
+
+The Python runner uses only the standard library; it needs no pip packages.
+External operations have timeouts, and readiness checks poll with a deadline.
+An exit code of zero means all parser and integration tests passed. A killed host
+or `SIGKILL` cannot run cleanup; any leftover projects are named `mailflow-test-*`.
+
+### Coverage
+
+- Correct question, sender, body and `answered` status; unrelated questions unchanged.
+- Duplicate protection when a new listener process reads the same mail again.
+- Matching via `References` without `In-Reply-To`.
+- Unknown references, missing references, empty body and missing sender are ignored.
+- A message without `Message-ID` is ignored. This malformed case uses IMAP APPEND
+  because an SMTP server may automatically add that header.
+- HTML entities, Base64, quoted-printable UTF-8 and multipart replies with quoted text.
+- A database trigger deliberately rejects the status update: the answer insert
+  must roll back, `--once` must fail, and the next attempt must succeed.
+- The continuously running listener retries a failed write without a restart.
+- Wrong IMAP credentials produce a nonzero exit code in `--once` mode.
+
+These tests cover incoming mail through storage. Creating/approving questions via
+HTTP, outgoing API mail delivery, authorization, and search indexing are outside
+this suite. The existing API database tests cover a separate part of that flow.
+The old POP3/Mailpit test has been replaced; the listener uses IMAP.
+
+## Interactive development mailbox
+
+The existing GreenMail + Roundcube environment is still available separately:
+
+```bash
+docker compose -f delegate-question-mail-listener/dev/docker-compose.yml up -d
+```
+
+SMTP is on `localhost:2525`, IMAPS on `localhost:10993`, and Roundcube on
+`http://localhost:17080`. The test account is `questions@somes.local` with password
+`questions`. Configure the listener with your development database:
 
 ```env
-MAIL_INBOUND_PROTOCOL=pop3
+DATASERVICE_URL=postgres://user:password@localhost/dataservice
 MAIL_INBOUND_HOST=127.0.0.1
-MAIL_INBOUND_PORT=1110
-MAIL_INBOUND_USERNAME=test
-MAIL_INBOUND_PASSWORD=test
-MAIL_INBOUND_POLL_SECONDS=5
+MAIL_INBOUND_PORT=10993
+MAIL_INBOUND_USERNAME=questions@somes.local
+MAIL_INBOUND_PASSWORD=questions
+MAIL_INBOUND_TLS_MODE=tls
+MAIL_INBOUND_TLS_SKIP_VERIFY=true
+MAIL_INBOUND_POLL_SECONDS=1
 ```
 
-The existing `DATASERVICE_URL` variable is also required. Start the listener from the workspace root:
+The TLS exception is needed only for GreenMail's self-signed development certificate.
+Run `cargo run -p delegate-question-mail-listener -- --once` for one poll, or omit
+`--once` for continuous polling. A one-shot poll exits nonzero if fetching or storing
+mail fails. Invalid/unrelated messages are skipped without failing the poll.
 
-```bash
-cargo run -p delegate-question-mail-listener --features pop3
-```
-
-The same values can also be passed as CLI flags:
-
-```bash
-cargo run -p delegate-question-mail-listener --features pop3 -- \
-  --database-url postgres://postgres:postgres@127.0.0.1/dataservice \
-  --protocol pop3 \
-  --host 127.0.0.1 \
-  --port 1110 \
-  --username test \
-  --password test
-```
-
-## Production IMAP
-
-Use a dedicated inbound mailbox for question replies:
-
-```env
-MAIL_INBOUND_PROTOCOL=imap
-MAIL_INBOUND_HOST=imap.example.org
-MAIL_INBOUND_PORT=993
-MAIL_INBOUND_USERNAME=questions@example.org
-MAIL_INBOUND_PASSWORD=replace-me
-MAIL_INBOUND_MAILBOX=INBOX
-MAIL_INBOUND_POLL_SECONDS=15
-```
-
-The listener does not send mail. It only reads incoming messages and records replies whose headers reference a stored outgoing question message ID.
-
-## Mailpit end-to-end test
-
-The ignored integration test sends a real SMTP message to Mailpit, polls it through POP3,
-and verifies the stored answer, question status, and duplicate protection in PostgreSQL.
-It selects an existing user and delegate, creates isolated test records, and removes them
-again before finishing.
-
-Start Mailpit with SMTP on port `1025` and POP3 on port `1110`, ensure `DATABASE_URL`
-points to a migrated local dataservice database, then run:
-
-```bash
-cargo test -p delegate-question-mail-listener --features pop3 \
-  --test mailpit_e2e -- --ignored --nocapture
-```
-
-For a single manual poll, pass `--once` to the listener.
+`dev/simulate-answer.sh <question-id>` sends an answer to an existing question using
+its stored message ID. It reads `DATASERVICE_URL` from the listener's `.env` and
+requires `psql`. `dev/send-reply.py` can also send custom test messages directly.
