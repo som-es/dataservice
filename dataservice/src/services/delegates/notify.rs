@@ -32,10 +32,17 @@ struct NotifyRecipient {
     mail_to: Option<String>,
     push_tokens: Vec<String>,
 }
-
 async fn find_notifiers(pg: &PgPool) -> sqlx::Result<Vec<NotifyRecipient>> {
-    let mail_users = sqlx::query!("select id, email from somes_user where not is_email_hashed and send_new_delegate_activity_mails").fetch_all(pg).await?;
-
+    let mail_users = sqlx::query!(
+        r#"
+            select u.email as "email!", u.id as "id!"
+            from somes_user u
+            left join user_notification_settings s on s.user_id = u.id and s.platform = 'web'
+            where not u.is_email_hashed and coalesce(s.send_new_delegate_activity, true)
+            "#
+    )
+    .fetch_all(pg)
+    .await?;
     let push_rows = sqlx::query!(
         "select distinct ept.user_id, ept.push_token
         from expo_push_tokens ept
@@ -139,7 +146,10 @@ async fn mark_delegate_activity_mail_sent(
     Ok(())
 }
 
-pub async fn notify_delegate_activity_users(pg: &PgPool, parliament: Parliament) -> sqlx::Result<()> {
+pub async fn notify_delegate_activity_users(
+    pg: &PgPool,
+    parliament: Parliament,
+) -> sqlx::Result<()> {
     let recipients = find_notifiers(pg).await?;
 
     for recipient in recipients {
@@ -191,16 +201,17 @@ pub async fn notify_delegate_activity_users(pg: &PgPool, parliament: Parliament)
                 htmls.insert(*delegate_id, populate_delegate_profile_html(activity).await);
             }
 
-            let send_result = tokio::task::spawn_blocking(move || {
-                match send_delegate_activity_mail(&mail_to, &htmls) {
-                    Ok(()) => true,
-                    Err(e) => {
-                        log::error!("could not send delegate activity mail: {e:?}");
-                        false
+            let send_result =
+                tokio::task::spawn_blocking(move || {
+                    match send_delegate_activity_mail(&mail_to, &htmls) {
+                        Ok(()) => true,
+                        Err(e) => {
+                            log::error!("could not send delegate activity mail: {e:?}");
+                            false
+                        }
                     }
-                }
-            })
-            .await;
+                })
+                .await;
 
             match send_result {
                 Ok(true) => sent_any = true,
@@ -210,13 +221,19 @@ pub async fn notify_delegate_activity_users(pg: &PgPool, parliament: Parliament)
         }
 
         if !recipient.push_tokens.is_empty() {
-            send_delegate_activity_push(pg, parliament, &recipient.push_tokens, &delegate_activities)
-                .await;
+            send_delegate_activity_push(
+                pg,
+                parliament,
+                &recipient.push_tokens,
+                &delegate_activities,
+            )
+            .await;
             sent_any = true;
         }
 
         if sent_any {
-            mark_delegate_activity_mail_sent(pg, recipient.user_id, &sent_delegate_ids, now).await?;
+            mark_delegate_activity_mail_sent(pg, recipient.user_id, &sent_delegate_ids, now)
+                .await?;
         }
     }
 
