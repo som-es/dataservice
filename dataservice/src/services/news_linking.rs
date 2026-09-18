@@ -41,6 +41,15 @@ pub async fn run_news_linking_and_embed(
     )
     .await?;
 
+    if !only_recents
+        && !std::env::var("FULL_NEWS_LINKING")
+            .unwrap_or_else(|_| "false".to_string())
+            .parse::<bool>()
+            .unwrap_or_default()
+    {
+        return Ok(());
+    }
+
     run_news_linking(app_state, qdrant_client, &ai_client, only_recents).await?;
     Ok(())
 }

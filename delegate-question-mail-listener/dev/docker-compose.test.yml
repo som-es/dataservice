@@ -1,0 +1,28 @@
+# Separate from the interactive dev mailbox. The runner assigns a unique project.
+services:
+  mail:
+    image: greenmail/standalone:2.1.13
+    environment:
+      GREENMAIL_OPTS: >-
+        -Dgreenmail.setup.test.all
+        -Dgreenmail.hostname=0.0.0.0
+        -Dgreenmail.users=questions:questions@somes.local
+        -Dgreenmail.users.login=email
+    ports:
+      - "127.0.0.1::3025"
+      - "127.0.0.1::3993"
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: mailflow
+      POSTGRES_PASSWORD: mailflow-test-only
+      POSTGRES_DB: mailflow_test
+    ports:
+      - "127.0.0.1::5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mailflow -d mailflow_test"]
+      interval: 1s
+      timeout: 3s
+      retries: 60

@@ -26,6 +26,8 @@ pub async fn connect_ai_client() -> Option<Arc<SomAiClient>> {
 pub async fn connect_qdrant_client() -> Option<Qdrant> {
     let qdrant_url = qdrant_url();
     let qdrant_client = match Qdrant::from_url(&qdrant_url)
+        .timeout(std::time::Duration::from_secs(30))
+        .keep_alive_while_idle()
         .connect_timeout(std::time::Duration::from_secs(10))
         .build()
     {

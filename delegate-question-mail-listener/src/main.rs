@@ -31,6 +31,7 @@ async fn main() -> ListenerResult<()> {
     let mut answers_message_ids = HashSet::new();
 
     loop {
+        let mut poll_failed = false;
         match mailbox::fetch_messages(&config).await {
             Ok(messages) => {
                 for raw_message in messages {
@@ -42,17 +43,35 @@ async fn main() -> ListenerResult<()> {
                     if answers_message_ids.contains(raw_message_id) {
                         continue;
                     }
-                    answers_message_ids.insert(raw_message_id.clone());
-                    if let Err(error) = store::store_reply(&pool, reply).await {
-                        error!(%error, "could not store incoming reply");
+                    let raw_message_id = raw_message_id.clone();
+                    match store::store_reply(&pool, reply).await {
+                        Ok(true) => {
+                            answers_message_ids.insert(raw_message_id);
+                        }
+                        Ok(false) => {}
+                        Err(error) => {
+                            poll_failed = true;
+                            error!(%error, "could not store incoming reply");
+                        }
                     }
                 }
             }
-            Err(error) => error!(%error, "could not fetch incoming mail"),
+            Err(error) => {
+                poll_failed = true;
+                error!(%error, "could not fetch incoming mail");
+            }
         }
 
+        if config.once {
+            if poll_failed {
+                return Err("mailbox poll failed; see previous errors".into());
+            }
+            break;
+        }
         tokio::time::sleep(config.poll_interval).await;
     }
+
+    Ok(())
 }
 
 fn log_startup(config: &Config) {
@@ -61,6 +80,7 @@ fn log_startup(config: &Config) {
         port = config.port,
         tls_mode = config.tls_mode.as_str(),
         poll_seconds = config.poll_interval.as_secs(),
+        once = config.once,
         "delegate question listener started"
     );
     if config.tls_skip_verify {

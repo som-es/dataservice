@@ -33,11 +33,7 @@ fn get_table_info(topic_type: &TopicType, table_type: &TableType) -> TableInfo {
 
     TableInfo {
         table_name: format!("{table_prefix}_{table_suffix}"),
-        // In your original code, OtherKeyword did not have a unique table insert
-        unique_table: match topic_type {
-            TopicType::OtherKeyword => None,
-            _ => Some(format!("unique_{table_prefix}")),
-        },
+        unique_table: None,
         id_field: id_field.to_string(),
     }
 }

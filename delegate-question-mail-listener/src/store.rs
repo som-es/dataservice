@@ -9,28 +9,30 @@ struct Question {
     recipient_email: String,
 }
 
-pub async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<()> {
+/// Returns true only when the reply is stored or already present in the database.
+/// Skipped replies remain eligible for a later poll (e.g. a not-yet-visible question).
+pub async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<bool> {
     let Some(raw_message_id) = reply.message_id else {
         warn!("skipping incoming mail without Message-ID");
-        return Ok(());
+        return Ok(false);
     };
     if reply.related_message_ids.is_empty() {
         debug!(
             raw_message_id,
             "skipping incoming mail without In-Reply-To/References"
         );
-        return Ok(());
+        return Ok(false);
     }
     if reply.body.is_empty() {
         warn!(raw_message_id, "skipping empty reply");
-        return Ok(());
+        return Ok(false);
     }
     let Some(sender_email) = reply.sender_email else {
         warn!(
             raw_message_id,
             "skipping incoming mail without From address"
         );
-        return Ok(());
+        return Ok(false);
     };
 
     let question = sqlx::query_as!(
@@ -53,7 +55,7 @@ pub async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<
             related_message_ids = ?reply.related_message_ids,
             "skipping incoming mail without matching delegate question"
         );
-        return Ok(());
+        return Ok(false);
     };
 
     /*if !question.recipient_email.eq_ignore_ascii_case(&sender_email) {
@@ -64,11 +66,12 @@ pub async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<
             question_id = question.id,
             "skipping incoming mail from an address that was not asked"
         );
-        return Ok(());
+        return Ok(false);
     }*/
 
     let question_id = question.id;
 
+    let mut transaction = pool.begin().await?;
     let inserted = sqlx::query_scalar!(
         "
         INSERT INTO delegate_question_answers (question_id, sender_email, body, raw_message_id)
@@ -81,7 +84,7 @@ pub async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<
         reply.body,
         raw_message_id
     )
-    .fetch_optional(pool)
+    .fetch_optional(&mut *transaction)
     .await?;
 
     if inserted.is_some() {
@@ -93,8 +96,12 @@ pub async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<
             ",
             question_id
         )
-        .execute(pool)
+        .execute(&mut *transaction)
         .await?;
+    }
+
+    transaction.commit().await?;
+    if inserted.is_some() {
         info!(
             question_id,
             raw_message_id, "stored delegate question answer"
@@ -103,5 +110,5 @@ pub async fn store_reply(pool: &PgPool, reply: IncomingReply) -> ListenerResult<
         debug!(question_id, raw_message_id, "reply was already stored");
     }
 
-    Ok(())
+    Ok(true)
 }

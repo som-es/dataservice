@@ -226,9 +226,59 @@ mod tests {
     use qdrant_client::Qdrant;
     use somai_client::SomAiClient;
 
-    use crate::news_linking::linking::top_articles_per_provider_reranked;
+    use crate::{
+        AT_DATABASE_URL, connect_pg2, news_linking::linking::top_articles_per_provider_reranked,
+    };
 
     #[tokio::test]
+    async fn test_legis_init_by_path() {
+        let _ = simple_logger::init_with_level(log::Level::Info);
+        let somai_client =
+            SomAiClient::new("http://10.30.0.164:8000", "API_USER", "supersicher123!")
+                .await
+                .unwrap();
+
+        let qdrant = Qdrant::from_url("http://10.30.0.164:6334")
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .build()
+            .unwrap();
+
+        let pg = connect_pg2(AT_DATABASE_URL).await;
+
+        let legis_init = sqlx::query!(
+            r#"select
+                    li.id as legis_init_id, short_title, detailed_summary, short_summary, raw_data_created_at as "start", nr_plenary_activity_date
+                from
+                    legislative_initiative_summaries lis
+                inner join summaries on lis.summary_id = summaries.id
+                inner join legislative_initiatives li on li.id = lis.legis_init_id
+                where gp = 'XXVIII' and ityp = 'A' and inr = 504"#
+        ).fetch_one(&pg).await.unwrap();
+
+        let end = legis_init
+            .nr_plenary_activity_date
+            .checked_add_days(Days::new(10))
+            .unwrap();
+        let start = legis_init
+            .start
+            .date_naive()
+            .checked_sub_days(Days::new(10))
+            .unwrap();
+
+        let res = top_articles_per_provider_reranked(
+            &qdrant,
+            &somai_client,
+            &legis_init.short_title,
+            &legis_init.detailed_summary,
+            Some((start, end)),
+        )
+        .await
+        .unwrap();
+        dbg!(res);
+    }
+
+    #[tokio::test]
+    // #[ignore]
     async fn test_top_articles_for_query() {
         let titles_to_compare = vec![
             (
