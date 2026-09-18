@@ -51,8 +51,13 @@ async fn main() -> ListenerResult<()> {
             Err(error) => error!(%error, "could not fetch incoming mail"),
         }
 
+        if config.once {
+            break;
+        }
         tokio::time::sleep(config.poll_interval).await;
     }
+
+    Ok(())
 }
 
 fn log_startup(config: &Config) {
@@ -61,6 +66,7 @@ fn log_startup(config: &Config) {
         port = config.port,
         tls_mode = config.tls_mode.as_str(),
         poll_seconds = config.poll_interval.as_secs(),
+        once = config.once,
         "delegate question listener started"
     );
     if config.tls_skip_verify {

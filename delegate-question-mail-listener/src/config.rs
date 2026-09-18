@@ -52,6 +52,9 @@ pub struct ListenerArgs {
     mailbox: String,
     #[arg(long, env = "MAIL_INBOUND_POLL_SECONDS", default_value_t = 15)]
     poll_seconds: u64,
+    /// Poll the mailbox once and exit.
+    #[arg(long)]
+    once: bool,
     #[arg(long, env = "MAIL_INBOUND_TLS_MODE", value_enum, default_value_t = TlsMode::AutoTls)]
     tls_mode: TlsMode,
     #[arg(
@@ -72,6 +75,7 @@ pub struct Config {
     pub password: String,
     pub mailbox: String,
     pub poll_interval: Duration,
+    pub once: bool,
     pub tls_mode: TlsMode,
     pub tls_skip_verify: bool,
 }
@@ -86,6 +90,7 @@ impl Config {
             password: args.password,
             mailbox: args.mailbox,
             poll_interval: Duration::from_secs(args.poll_seconds),
+            once: args.once,
             tls_mode: args.tls_mode,
             tls_skip_verify: args.tls_skip_verify,
         }
