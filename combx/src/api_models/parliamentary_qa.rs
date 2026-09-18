@@ -13,7 +13,7 @@ use utoipa::ToSchema;
 
 use crate::{AbortReason, DbReference};
 
-// #[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Type, Hash, CompositeType)]
 #[sqlx(type_name = "parliament_raw_data")]
 pub struct ParliamentRawData {
@@ -33,7 +33,7 @@ pub struct ParliamentRawData {
     pub raw_data_created_at: DateTime<Utc>,
     pub raw_data_updated_at: DateTime<Utc>,
 }
-// #[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Type, Hash, CompositeType)]
 #[sqlx(type_name = "parliament_inquiry")]
 pub struct ParliamentInquiry {
@@ -41,7 +41,7 @@ pub struct ParliamentInquiry {
     pub ai_question: Option<DbAiInquiry>,
     pub refs: Vec<DbReference>,
 }
-// #[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Type, Hash, CompositeType)]
 #[sqlx(type_name = "parliament_answer")]
 pub struct ParliamentAnswer {
@@ -49,7 +49,7 @@ pub struct ParliamentAnswer {
     pub ai_answer: Option<DbAnswerEntry>,
     pub refs: Vec<DbReference>,
 }
-// #[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, FromRow, Type, Hash, CompositeType)]
 #[sqlx(type_name = "parliament_inquiry_response")]
 pub struct ParliamentInquiryResponse {
@@ -57,6 +57,7 @@ pub struct ParliamentInquiryResponse {
     pub answer: Option<Vec<ParliamentAnswer>>,
 }
 
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Hash, Debug, Deserialize, PartialEq, Serialize, Type, Clone, FromRow, CompositeType)]
 #[sqlx(type_name = "db_answer_entry")]
 pub struct DbAnswerEntry {
@@ -65,6 +66,7 @@ pub struct DbAnswerEntry {
     pub short_title: String,
     pub full_answer_summary: String,
     pub detailed_full_answer_summary: String,
+    #[cfg_attr(feature = "utoipa", schema(value_type = AnswerEntry))]
     pub full_answer_entry: Json<AnswerEntry>,
     pub model_used: String,
     pub version: String,
@@ -132,6 +134,7 @@ pub enum Confidence {
     NotConfident,
 }
 
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Hash, Debug, Deserialize, PartialEq, Serialize, Type, Clone, FromRow, CompositeType)]
 #[sqlx(type_name = "db_ai_inquiry")]
 pub struct DbAiInquiry {
@@ -145,6 +148,7 @@ pub struct DbAiInquiry {
     pub detailed_info_summary: String,
     pub question_summary: String,
     pub detailed_question_summary: String,
+    #[cfg_attr(feature = "utoipa", schema(value_type = QuestionEntry))]
     pub full_question_entry: Json<QuestionEntry>,
     pub model_used: String,
     pub version: String,

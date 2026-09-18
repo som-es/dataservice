@@ -3,6 +3,10 @@ use chrono_tz::Europe::Vienna;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
+#[cfg(feature = "utoipa")]
+use utoipa::ToSchema;
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LegislativePeriod {
     pub gp: String,
