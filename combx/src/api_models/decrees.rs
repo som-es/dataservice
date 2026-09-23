@@ -4,16 +4,19 @@ use serde::{Deserialize, Serialize};
 use somes_common_lib::Document;
 use somes_macro::MeilisearchFilter;
 use somes_meilisearch_filter::{FilterArgument, FilterOp};
+#[cfg(feature = "db")]
 use somes_scraper::Thing;
 use sqlx::FromRow;
+#[cfg(feature = "db")]
 use std::sync::Arc;
 
-use crate::{
-    CombinedData, DbAiSummary, DbAiSummaryFilter, FromScrapedType,
-    api_models::decrees::enhancer::DecreeEnhancer, with_data::gps::LegislativePeriod,
-};
+use crate::{CombinedData, DbAiSummary, DbAiSummaryFilter};
 
+#[cfg(feature = "db")]
 mod enhancer;
+
+#[cfg(feature = "db")]
+use crate::{FromScrapedType, LegislativePeriod, api_models::decrees::enhancer::DecreeEnhancer};
 
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
@@ -52,6 +55,7 @@ pub struct Decree {
     pub ai_summary: Option<DbAiSummary>,
 }
 
+#[cfg(feature = "db")]
 impl<T: DecreeEnhancer> FromScrapedType<T> for Decree {
     type ScrapedType = (Thing, Arc<[LegislativePeriod]>);
 
@@ -70,6 +74,7 @@ impl CombinedData for Decree {
 }
 
 impl Decree {
+    #[cfg(feature = "db")]
     pub async fn from_thing(
         db_enhancer: impl DecreeEnhancer,
         decree: Thing,

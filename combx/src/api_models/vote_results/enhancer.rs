@@ -4,8 +4,7 @@ pub use postgres::*;
 use std::collections::HashMap;
 
 use crate::{
-    DbLegislativeInitiativeQuery, DbNamedVote, DbSpeechWithLink, enhancer::Enhancer,
-    with_data::DelegateParty,
+    DbLegislativeInitiativeQuery, DbNamedVote, DbSpeechWithLink, DelegateParty, enhancer::Enhancer,
 };
 use chrono::{DateTime, NaiveDate, Utc};
 use somes_scraper::{LegislativeInitiative, NamedVoteProContra, Party};

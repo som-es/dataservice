@@ -1,25 +1,34 @@
+#[cfg(feature = "db")]
 mod delegate_matching;
 pub mod index;
 pub mod models;
 use chrono::NaiveDate;
+#[cfg(feature = "db")]
 pub use delegate_matching::*;
 use dotenvy_macro::dotenv;
 pub use index::*;
 pub use models::*;
 pub mod api_models;
 pub use api_models::*;
+#[cfg(feature = "ocr")]
 pub mod document_text;
 mod gov_officials;
 pub use gov_officials::*;
 mod filtering;
+#[cfg(feature = "ocr")]
 mod pdf;
+#[cfg(feature = "ocr")]
 pub use pdf::*;
 pub mod topic_map;
 
 use sqlx::{PgPool, postgres::PgPoolOptions};
 
+#[cfg(feature = "db")]
 mod enhancer;
+#[cfg(feature = "db")]
 pub use enhancer::*;
+
+#[cfg(feature = "db")]
 pub mod with_data;
 
 pub mod schemars {

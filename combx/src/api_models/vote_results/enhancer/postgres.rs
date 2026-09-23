@@ -82,7 +82,7 @@ impl VoteResultEnhancer for PostgresEnhancer {
         &self,
         at: NaiveDate,
         function: &str,
-    ) -> impl Future<Output = Result<Vec<crate::with_data::DelegateParty>, sqlx::Error>> {
+    ) -> impl Future<Output = Result<Vec<crate::DelegateParty>, sqlx::Error>> {
         active_delegates_with_party_at_date(self.source(), at, function)
     }
 }

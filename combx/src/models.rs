@@ -11,6 +11,19 @@ use utoipa::ToSchema;
 
 pub use crate::api_models::*;
 
+#[derive(PartialEq, Eq, Hash, Debug, Clone, Serialize, Deserialize)]
+pub struct DelegateParty {
+    pub party: Option<String>,
+    pub id: i32,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct LegislativePeriod {
+    pub gp: String,
+    pub start_date: NaiveDate,
+}
+
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 // #[diesel(table_name = proposals)]

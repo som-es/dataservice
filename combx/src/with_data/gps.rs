@@ -1,17 +1,7 @@
-use chrono::NaiveDate;
 use chrono_tz::Europe::Vienna;
-use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
-#[cfg(feature = "utoipa")]
-use utoipa::ToSchema;
-
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct LegislativePeriod {
-    pub gp: String,
-    pub start_date: NaiveDate,
-}
+use crate::LegislativePeriod;
 
 pub async fn gps(pg: &PgPool) -> sqlx::Result<Vec<LegislativePeriod>> {
     use chrono::TimeZone;

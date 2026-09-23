@@ -1,14 +1,7 @@
 use chrono::NaiveDate;
-use serde::{Deserialize, Serialize};
 use sqlx::{Executor, Postgres, query_as};
 
-use crate::models::DbDelegate;
-
-#[derive(PartialEq, Eq, Hash, Debug, Clone, Serialize, Deserialize)]
-pub struct DelegateParty {
-    pub party: Option<String>,
-    pub id: i32,
-}
+use crate::{DelegateParty, models::DbDelegate};
 
 pub async fn active_delegates_with_party_at_date<'a>(
     pg: impl Executor<'a, Database = Postgres>,

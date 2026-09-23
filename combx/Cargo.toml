@@ -39,9 +39,10 @@ serde_qs = "0.15"
 simple_logger = { version="5"}
 
 [features]
-default = ["utoipa", "ocrs", "ocr"]
+default = ["db", "utoipa", "ocrs", "ocr"]
 
 ocrs = ["dep:ocrs", "rten", "rten-imageproc", "rten-tensor"]
 utoipa = ["dep:utoipa"]
 tesseract = ["dep:tesseract-rs", "ocr"]
 ocr = []
+db = []

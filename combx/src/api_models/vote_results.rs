@@ -1,28 +1,39 @@
+#[cfg(feature = "db")]
 mod enhancer;
 mod filtering;
+
+#[cfg(feature = "db")]
 mod hidden_vote_translation;
 mod models;
 pub use models::*;
 use somes_macro::{CompositeType, MeilisearchFilter};
 use somes_meilisearch_filter::{FilterArgument, FilterOp};
+#[cfg(feature = "db")]
 mod named_votes;
 
+#[cfg(feature = "db")]
 pub use enhancer::*;
 pub use filtering::*;
 use optional_struct::optional_struct;
 use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "db")]
 use somai_client::SomAiClient;
 use somes_common_lib::Document;
+#[cfg(feature = "db")]
 use somes_scraper::{LegislativeInitiative, Opinion};
 use sqlx::{FromRow, PgPool, prelude::Type};
 use std::collections::HashMap;
+#[cfg(feature = "db")]
 use std::sync::Arc;
 
-use crate::with_data::DelegateParty;
-use crate::{CombinedData, Parliament, models::*};
+#[cfg(feature = "db")]
 use crate::{
-    FromScrapedType, Topic, api_models::vote_results::hidden_vote_translation::translate_votes,
+    FromScrapedType, Parliament, api_models::vote_results::hidden_vote_translation::translate_votes,
 };
+
+use crate::Topic;
+use crate::{CombinedData, models::*};
 #[cfg(feature = "utoipa")]
 use utoipa::ToSchema;
 
@@ -144,6 +155,7 @@ impl CombinedData for VoteResult {
     }
 }
 
+#[cfg(feature = "db")]
 impl<T: VoteResultEnhancer> FromScrapedType<T> for VoteResult {
     type ScrapedType = LegislativeInitiative;
 
@@ -159,6 +171,8 @@ impl VoteResult {
     pub async fn from_db(_pool: &PgPool, _legis_init_id: i32) -> Self {
         todo!()
     }
+
+    #[cfg(feature = "db")]
     pub async fn from_legis_init(
         db_enhancer: impl VoteResultEnhancer,
         legis_init: LegislativeInitiative,
@@ -490,15 +504,18 @@ pub fn build_db_votes(
 }
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    use somai_client::SomAiClient;
-    use somes_common_lib::Document;
-
-    use crate::document_text::{combine_texts, extract_text_from_documents_html_first_stripped};
-
+    #[cfg(feature = "ocr")]
     #[tokio::test]
     async fn test_ai_summary_from_vote_result() {
+        use std::sync::Arc;
+
+        use somai_client::SomAiClient;
+        use somes_common_lib::Document;
+
+        use crate::document_text::{
+            combine_texts, extract_text_from_documents_html_first_stripped,
+        };
+
         let url = "https://www.parlament.gv.at/dokument/XXVIII/A/468/fname_1715462.pdf";
         let documents = vec![Document {
             title: Some("Test Document".to_string()),
