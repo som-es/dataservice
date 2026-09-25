@@ -91,7 +91,7 @@ async fn delegate_notifications_for_user(
             fd.user_id,
             fd.delegate_id,
             fd.user_info_days,
-            delegate_activity_email_info.last_sent_at
+            delegate_activity_email_info.last_sent_at as "last_sent_at?"
         from favo_dels fd
         left join delegate_activity_email_info
             on delegate_activity_email_info.user_id = fd.user_id
@@ -101,8 +101,7 @@ async fn delegate_notifications_for_user(
         user_id
     )
     .fetch_all(pg)
-    .await
-    .unwrap();
+    .await?;
     Ok(res)
 }
 
@@ -273,12 +272,18 @@ pub async fn run_shut_delegate_activity_notify(mut shutdown: Shutdown, app_state
 mod tests {
     use std::collections::HashMap;
 
+    use chrono::{DateTime, Utc};
+    use sqlx::PgPool;
+
     use crate::{
         AT_DATABASE_URL, connect_pg2,
         delegates::notify::{populate_delegate_profile_html, send_delegate_activity_mail},
     };
 
-    use super::collect_recent_activity_by_delegate;
+    use super::{
+        collect_recent_activity_by_delegate, delegate_notifications_for_user, find_notifiers,
+        mark_delegate_activity_mail_sent, should_send_delegate_activity,
+    };
 
     #[tokio::test]
     async fn test_collect_recent_activity_by_delegate() {
@@ -304,5 +309,191 @@ mod tests {
         let mut delegate_activities = HashMap::new();
         delegate_activities.insert(delegate_id, html);
         send_delegate_activity_mail(mail_to, &delegate_activities).unwrap();
+    }
+
+    fn at(rfc3339: &str) -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339(rfc3339).unwrap().with_timezone(&Utc)
+    }
+
+    #[test]
+    fn test_should_send_delegate_activity() {
+        let now = at("2026-03-01T00:00:00Z");
+        let long_ago = at("2026-01-01T00:00:00Z");
+        let recently = at("2026-02-28T00:00:00Z");
+        assert!(should_send_delegate_activity(None, 30, now));
+        assert!(should_send_delegate_activity(Some(long_ago), 30, now));
+        assert!(!should_send_delegate_activity(Some(recently), 30, now));
+        assert!(!should_send_delegate_activity(None, 0, now));
+        assert!(!should_send_delegate_activity(None, -5, now));
+    }
+
+    #[sqlx::test(fixtures("fixtures/delegate_notify.sql"))]
+    async fn test_delegate_notifications_for_user(pg: PgPool) {
+        let user_id: i32 =
+            sqlx::query_scalar("insert into somes_user (email) values ('mail@example.com') returning id")
+                .fetch_one(&pg)
+                .await
+                .unwrap();
+        let delegate_1: i32 =
+            sqlx::query_scalar("insert into delegates (name) values ('Del One') returning id")
+                .fetch_one(&pg)
+                .await
+                .unwrap();
+        let delegate_2: i32 =
+            sqlx::query_scalar("insert into delegates (name) values ('Del Two') returning id")
+                .fetch_one(&pg)
+                .await
+                .unwrap();
+        sqlx::query(
+            "insert into favo_dels (user_id, delegate_id, user_info_days) values ($1, $2, $3)",
+        )
+        .bind(user_id)
+        .bind(delegate_1)
+        .bind(30)
+        .execute(&pg)
+        .await
+        .unwrap();
+        sqlx::query(
+            "insert into favo_dels (user_id, delegate_id, user_info_days) values ($1, $2, $3)",
+        )
+        .bind(user_id)
+        .bind(delegate_2)
+        .bind(7)
+        .execute(&pg)
+        .await
+        .unwrap();
+
+        let last_sent = at("2026-01-15T12:00:00Z");
+        mark_delegate_activity_mail_sent(&pg, user_id, &[delegate_1], last_sent)
+            .await
+            .unwrap();
+
+        let notifications = delegate_notifications_for_user(&pg, user_id)
+            .await
+            .unwrap();
+        assert_eq!(notifications.len(), 2);
+        let with_info = notifications
+            .iter()
+            .find(|n| n.delegate_id == delegate_1)
+            .unwrap();
+        assert_eq!(with_info.user_id, user_id);
+        assert_eq!(with_info.user_info_days, 30);
+        assert_eq!(with_info.last_sent_at, Some(last_sent));
+        let without_info = notifications
+            .iter()
+            .find(|n| n.delegate_id == delegate_2)
+            .unwrap();
+        assert_eq!(without_info.user_info_days, 7);
+        assert_eq!(without_info.last_sent_at, None);
+    }
+
+    #[sqlx::test(fixtures("fixtures/delegate_notify.sql"))]
+    async fn test_find_notifiers(pg: PgPool) {
+        let mail_user: i32 =
+            sqlx::query_scalar("insert into somes_user (email) values ('mail@example.com') returning id")
+                .fetch_one(&pg)
+                .await
+                .unwrap();
+        sqlx::query("insert into user_notification_settings (user_id, platform) values ($1, 'web')")
+            .bind(mail_user)
+            .execute(&pg)
+            .await
+            .unwrap();
+
+        let mobile_user: i32 = sqlx::query_scalar(
+            "insert into somes_user (email, is_email_hashed) values ('mobile@example.com', true) returning id",
+        )
+        .fetch_one(&pg)
+        .await
+        .unwrap();
+        let mobile_settings: i64 = sqlx::query_scalar(
+            "insert into user_notification_settings (user_id, platform) values ($1, 'ios') returning id",
+        )
+        .bind(mobile_user)
+        .fetch_one(&pg)
+        .await
+        .unwrap();
+        sqlx::query(
+            "insert into expo_push_tokens (user_id, notification_settings_id, push_token, platform) values ($1, $2, 'ExponentPushToken(test)', 'ios')",
+        )
+        .bind(mobile_user)
+        .bind(mobile_settings)
+        .execute(&pg)
+        .await
+        .unwrap();
+
+        let muted_user: i32 =
+            sqlx::query_scalar("insert into somes_user (email) values ('muted@example.com') returning id")
+                .fetch_one(&pg)
+                .await
+                .unwrap();
+        sqlx::query(
+            "insert into user_notification_settings (user_id, platform, send_new_delegate_activity) values ($1, 'web', false)",
+        )
+        .bind(muted_user)
+        .execute(&pg)
+        .await
+        .unwrap();
+
+        let no_settings_user: i32 =
+            sqlx::query_scalar("insert into somes_user (email) values ('plain@example.com') returning id")
+                .fetch_one(&pg)
+                .await
+                .unwrap();
+
+        let recipients = find_notifiers(&pg).await.unwrap();
+        let mail = recipients.iter().find(|r| r.user_id == mail_user).unwrap();
+        assert_eq!(mail.mail_to.as_deref(), Some("mail@example.com"));
+        assert!(mail.push_tokens.is_empty());
+        let mobile = recipients.iter().find(|r| r.user_id == mobile_user).unwrap();
+        assert_eq!(mobile.mail_to, None);
+        assert_eq!(mobile.push_tokens, vec!["ExponentPushToken(test)".to_string()]);
+        let plain = recipients.iter().find(|r| r.user_id == no_settings_user).unwrap();
+        assert_eq!(plain.mail_to.as_deref(), Some("plain@example.com"));
+        assert!(!recipients.iter().any(|r| r.user_id == muted_user));
+        assert_eq!(recipients.len(), 3);
+    }
+
+    #[sqlx::test(fixtures("fixtures/delegate_notify.sql"))]
+    async fn test_mark_delegate_activity_mail_sent(pg: PgPool) {
+        let user_id: i32 =
+            sqlx::query_scalar("insert into somes_user (email) values ('mail@example.com') returning id")
+                .fetch_one(&pg)
+                .await
+                .unwrap();
+        let delegate_id: i32 =
+            sqlx::query_scalar("insert into delegates (name) values ('Del One') returning id")
+                .fetch_one(&pg)
+                .await
+                .unwrap();
+        let early = at("2026-01-01T00:00:00Z");
+        let late = at("2026-02-01T00:00:00Z");
+        mark_delegate_activity_mail_sent(&pg, user_id, &[delegate_id], early)
+            .await
+            .unwrap();
+        mark_delegate_activity_mail_sent(&pg, user_id, &[delegate_id], late)
+            .await
+            .unwrap();
+        let last_sent: Option<DateTime<Utc>> = sqlx::query_scalar(
+            "select last_sent_at from delegate_activity_email_info where user_id = $1 and delegate_id = $2",
+        )
+        .bind(user_id)
+        .bind(delegate_id)
+        .fetch_one(&pg)
+        .await
+        .unwrap();
+        assert_eq!(last_sent, Some(late));
+        mark_delegate_activity_mail_sent(&pg, user_id, &[delegate_id], early)
+            .await
+            .unwrap();
+        let last_sent: Option<DateTime<Utc>> = sqlx::query_scalar(
+            "select last_sent_at from delegate_activity_email_info where user_id = $1 and delegate_id = $2",
+        )
+        .bind(user_id)
+        .bind(delegate_id)
+        .fetch_one(&pg)
+        .await
+        .unwrap();
+        assert_eq!(last_sent, Some(late));
     }
 }

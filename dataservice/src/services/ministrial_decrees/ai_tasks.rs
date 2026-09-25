@@ -1,3 +1,4 @@
+use chrono::Days;
 use combx::{DbAiSummary, Decree};
 use somes_common_lib::Document;
 use somes_scraper::language::Language;
@@ -52,11 +53,36 @@ impl RisExtension for Decree {
     ) -> impl Future<Output = sqlx::Result<Vec<Document>>> {
         let pool = pool.clone();
         async move {
-            sqlx::query_as!(
-                Document,
-                "select title, document_type, document_url from ris_amendments ra inner join ministrial_decrees_documents mdd on mdd.ministrial_decree_id = norm_id where decree_id = $1",
+            let gesetzesnummern = sqlx::query_scalar!(
+                "select gesetzesnummer from ris_amendments ra inner join ministrial_decrees md on md.id = norm_id where decree_id = $1",
                 entry_id
-            ).fetch_all(&pool).await
+            ).fetch_all(&pool).await?;
+
+            let Some(gesetzesnummer) = gesetzesnummern.first().cloned().flatten() else {
+                return Ok(vec![]);
+            };
+
+            let date = sqlx::query_scalar!(
+                "select publication_date from ministrial_decrees where id = $1",
+                entry_id
+            )
+            .fetch_one(&pool)
+            .await?
+            .checked_sub_days(Days::new(1))
+            .unwrap();
+
+            let date = date.format("%Y-%m-%d").to_string();
+            let url = format!(
+                "https://www.ris.bka.gv.at/GeltendeFassung/Bundesnormen/{gesetzesnummer}/file.pdf?FassungVom={date}"
+            );
+
+            Ok(vec![Document {
+                title: Some(format!(
+                    "Fassung vom {date} (Erweitert durch das RIS – RIS-ANREICHERUNG WURDE AUFGERUFEN)"
+                )),
+                document_url: Some(url),
+                document_type: Some("DigitalPDF".into()),
+            }])
         }
     }
 }
@@ -75,13 +101,24 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    async fn test_ris_doc_extension() {
+        // https://www.ris.bka.gv.at/GeltendeFassung/Bundesnormen/20011636/file.pdf?FassungVom=2026-09-06
+        let id = 1;
+        let pg_pool = combx::connect_pg().await;
+        let documents = Decree::extend_docs(&pg_pool, id).await.unwrap();
+        dbg!(&documents);
+        let input =
+            combine_texts(&extract_text_from_documents_html_first_stripped(&documents, None).await);
+        assert_eq!(input.len(), 134386);
+        dbg!(input.len());
+    }
+
+    #[tokio::test]
     async fn test_summary_prompt_decree_bgbla_2025_ii_74() {
         let scraper = AustriaScraper::default();
 
         let decree = scraper
-            .fetch_single_ris_entry("BGBLA_2026_II_261")
-            // .fetch_single_ris_entry("BGBLA_2026_II_273")
-            // .fetch_single_ris_entry("BGBLA_2025_II_74")
+            .fetch_single_ris_entry("BGBLA_2025_II_74")
             .await
             .unwrap();
 
@@ -97,7 +134,7 @@ mod tests {
         let unique_topics = unique_topics_for_lang(&pg_pool, Language::De)
             .await
             .unwrap();
-        let documents = decree
+        let mut documents = decree
             .documents
             .iter()
             .map(|doc| Document {
@@ -119,6 +156,25 @@ mod tests {
             Language::De,
         )
         .await;
+
+        dbg!(result.unwrap());
+
+        let extend_docs = Decree::extend_docs(&pg_pool, 1).await;
+        documents.extend(extend_docs.unwrap().into_iter());
+
+        let input =
+            combine_texts(&extract_text_from_documents_html_first_stripped(&documents, None).await);
+        println!("input length: {}", input.len());
+
+        let result = summary_prompt(
+            &somai_client,
+            input,
+            &unique_topics,
+            "Verordnung",
+            Language::De,
+        )
+        .await;
+
         dbg!(result.unwrap());
     }
 

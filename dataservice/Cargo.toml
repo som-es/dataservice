@@ -6,7 +6,7 @@ edition = "2024"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sqlx = { workspace = true }
+sqlx = { workspace = true, features = ["macros"] }
 somes-scraper = { workspace = true }
 chrono = { workspace = true, optional = true }
 serde = { workspace = true }

@@ -63,11 +63,12 @@ pub async fn summarize_documents<T: RisExtension>(
     let summary = summarize_documents_inner(task_args, docs, summarization_of, language).await?;
 
     if summary.retry_state == RetryState::ExtendDocsViaRis {
-        let mut extend_ris_docs = T::extend_docs(&task_args.pg_pool, task_args.db_entry_id).await?;
+        let extend_ris_docs = T::extend_docs(&task_args.pg_pool, task_args.db_entry_id).await?;
         if extend_ris_docs.is_empty() {
             return Ok(summary);
         }
-        extend_ris_docs.extend_from_slice(docs);
+        let mut docs = docs.to_vec();
+        docs.extend_from_slice(&extend_ris_docs);
         return summarize_documents_inner(task_args, &extend_ris_docs, summarization_of, language)
             .await;
     }
@@ -337,7 +338,9 @@ pub(crate) async fn summary_prompt(
 
             1. Habe ich Schritt 0 wirklich zuerst durchgeführt — nicht übersprungen?
             2. Falls `summary` = `null`: Sind wirklich **alle** anderen Felder ebenfalls `null`/leer, oder habe ich versehentlich doch Inhalte generiert?
-            3. Falls `summary` ≠ `null`: Ist `abort_reason` = `"None"`?                        "#
+            3. Falls `summary` ≠ `null`: Ist `abort_reason` = `"None"`?
+            4. Ist die Zusammenfassung wirklich für Laien und junge Menschen verständlich – **ohne** juristische Formulierungen und Paragraphenverweise zu verwenden?
+            "#
         ),
         _ => return Err(Custom("language not supported".into()).into()),
     };

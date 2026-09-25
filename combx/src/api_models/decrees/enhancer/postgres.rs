@@ -43,3 +43,47 @@ pub async fn pg_gov_officials_at_date(
     .fetch_all(pg_pool)
     .await
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use chrono::NaiveDate;
+    use somes_common_lib::ALL_GPS;
+    use somes_scraper::decree::RisScraper;
+
+    use crate::{
+        Decree, LegislativePeriod, PostgresEnhancer, connect_pg,
+        decrees::enhancer::postgres::pg_gov_officials_at_date, today, with_data::gps::gps,
+    };
+
+    #[tokio::test]
+    async fn test_gov_officials_at_date() {
+        let pg = connect_pg().await;
+        let gov_officials =
+            pg_gov_officials_at_date(&pg, NaiveDate::from_ymd_opt(2021, 8, 18).unwrap())
+                .await
+                .unwrap();
+        dbg!(gov_officials);
+        let scraper = somes_scraper::AustriaScraper::default();
+        let thing = scraper
+            .fetch_single_ris_entry("BGBLA_2021_II_363")
+            .await
+            .unwrap();
+        dbg!(&thing);
+
+        let mut all_gps = gps(&pg).await.unwrap();
+        all_gps.insert(
+            0,
+            LegislativePeriod {
+                gp: "".into(),
+                start_date: today(),
+            },
+        );
+
+        let all_gps: Arc<[LegislativePeriod]> = Arc::from(all_gps);
+
+        let decree = Decree::from_thing(PostgresEnhancer(pg), thing, all_gps).await;
+        dbg!(decree);
+    }
+}

@@ -9,7 +9,7 @@ use combx::{
 };
 use dotenvy_macro::dotenv;
 use somes_scraper::{AustriaScraper, Thing, decree::RisScraper};
-use sqlx::PgPool;
+use sqlx::{Connection, PgPool};
 use tokio::{sync::mpsc::Sender, time::sleep};
 
 use crate::{
@@ -56,27 +56,6 @@ pub async fn save_ministrial_decrees(
     for page in 1..=pages {
         log::info!("Currently on page {page}..");
 
-        let Ok(decrees) = scraper.fetch_consolidated_decrees(page).await else {
-            log::error!("Cannot scrape consolidated ministrial decrees on page {page}");
-            continue;
-        };
-
-        sleep(Duration::from_secs(2)).await;
-
-        for decree in decrees {
-            if let Err(e) = insert_ministrial_decree(
-                decree,
-                &app_state,
-                all_gps.clone(),
-                &ai_task_tx,
-                new_decree_tx.clone(),
-            )
-            .await
-            {
-                log::error!("Cannot insert consolidated decree: {e:?}");
-            }
-        }
-
         let Ok(decrees) = scraper.fetch_and_parse_ministrial_decrees(page).await else {
             log::error!("Cannot scrape ministrial decrees on page {page}");
             continue;
@@ -93,6 +72,27 @@ pub async fn save_ministrial_decrees(
             .await
             {
                 log::error!("Cannot insert decree: {e:?}");
+            }
+        }
+
+        sleep(Duration::from_secs(2)).await;
+
+        let Ok(decrees) = scraper.fetch_consolidated_decrees(page).await else {
+            log::error!("Cannot scrape consolidated ministrial decrees on page {page}");
+            continue;
+        };
+
+        for decree in decrees {
+            if let Err(e) = insert_ministrial_decree(
+                decree,
+                &app_state,
+                all_gps.clone(),
+                &ai_task_tx,
+                new_decree_tx.clone(),
+            )
+            .await
+            {
+                log::error!("Cannot insert consolidated decree: {e:?}");
             }
         }
 
@@ -168,9 +168,16 @@ pub async fn insert_ministrial_decree(
         return Ok(());
     }
 
-    if let Some(gov_official_id) = decree.gov_official_id {
-        let decree_id = sqlx::query!(
-            "
+    if decree.gov_official_id.is_none() && !decree.is_norm {
+        log::warn!(
+            "Could not find fitting gov official for decree {}",
+            decree.ris_id
+        );
+        return Ok(());
+    }
+
+    let decree_id = sqlx::query!(
+        "
             INSERT INTO ministrial_decrees (
                 gov_official_id,
                 ris_id,
@@ -183,8 +190,9 @@ pub async fn insert_ministrial_decree(
                 eli,
                 gp,
                 hash,
-                is_norm
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                is_norm,
+                gesetzesnummer
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             ON CONFLICT (ris_id) DO UPDATE
             SET
                 gov_official_id = EXCLUDED.gov_official_id,
@@ -197,117 +205,119 @@ pub async fn insert_ministrial_decree(
                 gp = EXCLUDED.gp,
                 updated_at = NOW(),
                 hash = EXCLUDED.hash,
-                is_norm = EXCLUDED.is_norm
+                is_norm = EXCLUDED.is_norm,
+                gesetzesnummer = EXCLUDED.gesetzesnummer
             RETURNING id;
             ",
-            gov_official_id,
-            decree.ris_id,
-            decree.ministrial_issuer,
-            decree.title,
-            decree.short_title,
-            decree.publication_date,
-            decree.part,
-            decree.document_url,
-            decree.eli,
-            decree.gp,
-            hash as i64,
-            decree.is_norm,
-        )
-        .fetch_one(pg_pool)
-        .await?;
+        decree.gov_official_id,
+        decree.ris_id,
+        decree.ministrial_issuer,
+        decree.title,
+        decree.short_title,
+        decree.publication_date,
+        decree.part,
+        decree.document_url,
+        decree.eli,
+        decree.gp,
+        hash as i64,
+        decree.is_norm,
+        decree.gesetzesnummer,
+    )
+    .fetch_one(pg_pool)
+    .await?;
 
-        decree.id = Some(decree_id.id);
-        let decree_id = decree_id.id;
+    decree.id = Some(decree_id.id);
+    let decree_id = decree_id.id;
 
-        // Check and send email notification for new decree
-        #[cfg(not(feature = "ai"))]
-        if let Some(new_decree_tx) = new_decree_tx {
-            check_and_send_decree_email(pg_pool, &decree, decree_id, &new_decree_tx).await;
-        }
+    // Check and send email notification for new decree
+    #[cfg(not(feature = "ai"))]
+    if let Some(new_decree_tx) = new_decree_tx {
+        check_and_send_decree_email(pg_pool, &decree, decree_id, &new_decree_tx).await;
+    }
 
-        if should_update
-            && let Some(client) = &app_state.redis_client
-            && let Err(e) =
-                crate::notify_update_streamed(Index::Decrees, &decree, &mut client.clone()).await
-        {
-            log::error!("Could not notify for decree update!: {e:?}");
-        }
+    if should_update
+        && let Some(client) = &app_state.redis_client
+        && let Err(e) =
+            crate::notify_update_streamed(Index::Decrees, &decree, &mut client.clone()).await
+    {
+        log::error!("Could not notify for decree update!: {e:?}");
+    }
 
-        #[cfg(feature = "ai")]
-        {
-            use tokio::time::Instant;
+    #[cfg(feature = "ai")]
+    {
+        use tokio::time::Instant;
 
-            use crate::{LATEST_GP, ai_task::Priority};
+        use crate::{LATEST_GP, ai_task::Priority};
 
-            let (priority, new_decree_tx) =
-                if decree.publication_date >= (today() - chrono::Duration::days(90)).date_naive() {
-                    (Priority::Highest, new_decree_tx.clone())
-                } else if decree.gp.as_deref() == Some(LATEST_GP) {
-                    (Priority::High, None)
-                } else {
-                    (Priority::Lowest, None)
-                };
-
-            let inner_decree = decree.clone();
-            let pool = pg_pool.clone();
-            let documents = decree.documents.clone();
-            let summarization_task = AiTask {
-                input: None,
-                priority,
-                score: priority.weight(),
-                pool: pool.clone(),
-                task_id: crate::hash!(app_state.parliament),
-                db_entry_id: decree_id,
-                rerunnable: true,
-                created_at: Instant::now(),
-                task: Box::new(move |task_args| {
-                    let inner_decree = inner_decree.clone();
-                    let pool = pool.clone();
-                    let documents = documents.clone();
-                    let new_decree_tx = new_decree_tx.clone();
-                    Box::pin(async move {
-                        use crate::ministrial_decrees::ai_tasks::summarize_decrees_documents;
-
-                        let ai_summary = summarize_decrees_documents(task_args, &documents).await?;
-
-                        // not returning on None to still send decree
-                        let mut inner_decree = inner_decree;
-                        inner_decree.ai_summary = ai_summary;
-                        if let Some(decree_mail_tx) = new_decree_tx {
-                            check_and_send_decree_email(
-                                &pool,
-                                &inner_decree,
-                                decree_id,
-                                &decree_mail_tx,
-                            )
-                            .await;
-                        }
-
-                        Ok(())
-                        // TODO: update meilisearch index on finish
-                    })
-                }),
+        let (priority, new_decree_tx) =
+            if decree.publication_date >= (today() - chrono::Duration::days(90)).date_naive() {
+                (Priority::Highest, new_decree_tx.clone())
+            } else if decree.gp.as_deref() == Some(LATEST_GP) {
+                (Priority::High, None)
+            } else {
+                (Priority::Lowest, None)
             };
 
-            log::info!(
-                "Sending AI task for ministerial decree summarization: {} ({:?}) with priority {priority:?}",
-                decree_id,
-                decree.gp,
-            );
+        let inner_decree = decree.clone();
+        let pool = pg_pool.clone();
+        let documents = decree.documents.clone();
+        let summarization_task = AiTask {
+            input: None,
+            priority,
+            score: priority.weight(),
+            pool: pool.clone(),
+            task_id: crate::hash!(app_state.parliament),
+            db_entry_id: decree_id,
+            rerunnable: true,
+            created_at: Instant::now(),
+            task: Box::new(move |task_args| {
+                let inner_decree = inner_decree.clone();
+                let pool = pool.clone();
+                let documents = documents.clone();
+                let new_decree_tx = new_decree_tx.clone();
+                Box::pin(async move {
+                    use crate::ministrial_decrees::ai_tasks::summarize_decrees_documents;
 
-            if let Err(e) = ai_task_tx.send(summarization_task).await {
-                log::error!("Could not send AI task for ministerial decree summarization: {e:?}");
-            }
+                    let ai_summary = summarize_decrees_documents(task_args, &documents).await?;
+
+                    // not returning on None to still send decree
+                    let mut inner_decree = inner_decree;
+                    inner_decree.ai_summary = ai_summary;
+                    if let Some(decree_mail_tx) = new_decree_tx {
+                        check_and_send_decree_email(
+                            &pool,
+                            &inner_decree,
+                            decree_id,
+                            &decree_mail_tx,
+                        )
+                        .await;
+                    }
+
+                    Ok(())
+                    // TODO: update meilisearch index on finish
+                })
+            }),
+        };
+
+        log::info!(
+            "Sending AI task for ministerial decree summarization: {} ({:?}) with priority {priority:?}",
+            decree_id,
+            decree.gp,
+        );
+
+        if let Err(e) = ai_task_tx.send(summarization_task).await {
+            log::error!("Could not send AI task for ministerial decree summarization: {e:?}");
         }
+    }
 
-        if enforce_ai_run() && !should_update {
-            log::info!("No need to update further!");
-            return Ok(());
-        }
+    if enforce_ai_run() && !should_update {
+        log::info!("No need to update further!");
+        return Ok(());
+    }
 
-        for document in &decree.documents {
-            sqlx::query!(
-                "
+    for document in &decree.documents {
+        sqlx::query!(
+            "
                 INSERT INTO ministrial_decrees_documents (
                     ministrial_decree_id,
                     title,
@@ -320,40 +330,54 @@ pub async fn insert_ministrial_decree(
                     document_type = EXCLUDED.document_type,
                     document_url = EXCLUDED.document_url;
                 ",
-                decree_id,
-                document.title,
-                document.document_type,
-                document.document_url
-            )
-            .execute(pg_pool)
-            .await?;
-        }
-        let mut tx = pg_pool.begin().await?;
-
-        sqlx::query!("delete from ris_amendments where norm_id = $1", decree_id)
-            .execute(&mut *tx)
-            .await?;
-
-        for amendment in decree.amendments {
-            let norm_id = decree_id;
-            let decree_id = sqlx::query_scalar!(
-                "select id from ministrial_decrees where ris_id = $1",
-                amendment.doc_number,
-            )
-            .fetch_optional(&mut *tx)
-            .await?;
-
-            sqlx::query!(
-                "insert into ris_amendments (bgbl, ris_id, norm_id, decree_id) values ($1, $2, $3, $4)",
-                amendment.bgbl,
-                amendment.doc_number,
-                norm_id,
-                decree_id
-            ).execute(&mut *tx).await?;
-        }
-
-        tx.commit().await?;
+            decree_id,
+            document.title,
+            document.document_type,
+            document.document_url
+        )
+        .execute(pg_pool)
+        .await?;
     }
+    let mut tx = pg_pool.begin().await?;
+
+    sqlx::query!("delete from ris_amendments where norm_id = $1", decree_id)
+        .execute(&mut *tx)
+        .await?;
+
+    for amendment in &decree.amendments {
+        if amendment.doc_number.is_empty() {
+            continue;
+        }
+        let norm_id = decree_id;
+        let decree_id = sqlx::query_scalar!(
+            "select id from ministrial_decrees where ris_id = $1",
+            amendment.doc_number,
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let mut sp = tx.begin().await?;
+
+        if let Err(e) = sqlx::query!(
+            "insert into ris_amendments (bgbl, ris_id, norm_id, decree_id) values ($1, $2, $3, $4)",
+            amendment.bgbl,
+            amendment.doc_number,
+            norm_id,
+            decree_id
+        )
+        .execute(&mut *sp)
+        .await
+        {
+            log::error!(
+                "Could not insert ris amendment because of {e:?} for norm_id: {norm_id} and ris id: {}",
+                amendment.doc_number
+            );
+        } else {
+            sp.commit().await?;
+        }
+    }
+
+    tx.commit().await?;
 
     Ok(())
 }

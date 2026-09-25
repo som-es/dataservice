@@ -1,9 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use combx::{Parliament, VoteResult};
-use somes_scraper::{
-    LegislativeInitiative, error::ScraperError, legis_init::LegislativeInitiatives,
-};
+use somes_scraper::{LegislativeInitiative, error::ScraperError};
 use tokio::sync::mpsc::Sender;
 
 use crate::{
@@ -35,10 +33,17 @@ pub async fn scrape_new_legis_inits<S: VoteResultService>(
     max_tasks: usize,
 ) -> crate::Result<Vec<LegislativeInitiative>> {
     let legis_inits = scrape_untill_success(async || {
-        let legis_inits = state
-            .parliament_api_limiter
-            .run(scraper.post_legis_payload(searched_doktyps))
-            .await?;
+        let legis_inits = if only_latest {
+            state
+                .parliament_api_limiter
+                .run(scraper.post_legis_payload_latest(searched_doktyps))
+                .await?
+        } else {
+            state
+                .parliament_api_limiter
+                .run(scraper.post_legis_payload(searched_doktyps))
+                .await?
+        };
         Ok(legis_inits)
     })
     .await;
