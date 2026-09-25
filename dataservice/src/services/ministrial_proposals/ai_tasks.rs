@@ -1,5 +1,8 @@
-use crate::{ai_task::TaskArgs, ai_tasks::summarize_and_save};
-use combx::DbAiSummary;
+use crate::{
+    ai_task::TaskArgs,
+    ai_tasks::{RisExtension, summarize_and_save},
+};
+use combx::{DbAiSummary, GovProposal};
 use somes_common_lib::Document;
 use somes_scraper::language::Language;
 
@@ -22,13 +25,15 @@ pub async fn summarize_ministerial_proposal_documents(
         return Ok(None);
     }
 
-    summarize_and_save(task_args, docs, "Ministerialentwurf", |task_args: TaskArgs, summary_id: i32| async move {
+    summarize_and_save::<GovProposal>(task_args, docs, "Ministerialentwurf", |task_args: TaskArgs, summary_id: i32| async move {
         sqlx::query!("insert into ministerial_proposal_summaries (ministerial_proposal_id, summary_id) values ($1, $2)", task_args.db_entry_id, summary_id)
             .execute(&task_args.pg_pool)
             .await?;
         Ok(())
     }, Language::De).await
 }
+
+impl RisExtension for GovProposal {}
 
 #[cfg(test)]
 mod tests {
@@ -43,7 +48,7 @@ mod tests {
         ministrial_proposals::{GegenstandInfo, MinistrialProposalScraper},
     };
 
-    use crate::{OCR_ENGINE, ai_tasks::summary_prompt2, today};
+    use crate::{OCR_ENGINE, ai_tasks::summary_prompt, today};
 
     use super::*;
 
@@ -148,7 +153,7 @@ mod tests {
         let input =
             combine_texts(&extract_text_from_documents_html_first_stripped(&docs, None).await);
 
-        let result = summary_prompt2(
+        let result = summary_prompt(
             &somai_client,
             input,
             &unique_topics,
@@ -194,7 +199,7 @@ mod tests {
             combine_texts(&extract_text_from_documents_html_first_stripped(&documents, None).await);
         println!("input length: {}", input.len());
 
-        let result = summary_prompt2(
+        let result = summary_prompt(
             &somai_client,
             input,
             &unique_topics,
@@ -240,7 +245,7 @@ mod tests {
             combine_texts(&extract_text_from_documents_html_first_stripped(&documents, None).await);
         println!("input length: {}", input.len());
 
-        let result = summary_prompt2(
+        let result = summary_prompt(
             &somai_client,
             input,
             &unique_topics,

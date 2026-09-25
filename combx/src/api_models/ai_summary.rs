@@ -360,6 +360,7 @@ pub struct EuroLawReference {
 )]
 pub struct SummarizeOutput {
     pub summary: Option<AiSummary>,
+    pub retry_state: RetryState,
     pub abort_reason: AbortReason,
 }
 
@@ -367,5 +368,12 @@ pub struct SummarizeOutput {
 #[derive(JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone, Type)]
 pub enum AbortReason {
     NoDocumentsProvidedInContext,
+    None,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(JsonSchema, Hash, Debug, Deserialize, PartialEq, Serialize, Clone, Type)]
+pub enum RetryState {
+    ExtendDocsViaRis,
     None,
 }

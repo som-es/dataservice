@@ -1,8 +1,11 @@
-use combx::DbAiSummary;
+use combx::{DbAiSummary, VoteResult};
 use somes_common_lib::Document;
 use somes_scraper::language::Language;
 
-use crate::{ai_task::TaskArgs, ai_tasks::summarize_and_save};
+use crate::{
+    ai_task::TaskArgs,
+    ai_tasks::{RisExtension, summarize_and_save},
+};
 
 pub async fn summarize_legis_init_documents(
     task_args: TaskArgs,
@@ -25,13 +28,15 @@ pub async fn summarize_legis_init_documents(
         return Ok(None);
     }
 
-    summarize_and_save(task_args, docs, summarization_of, |task_args: TaskArgs, summary_id: i32| async move {
+    summarize_and_save::<VoteResult>(task_args, docs, summarization_of, |task_args: TaskArgs, summary_id: i32| async move {
         sqlx::query!("insert into legislative_initiative_summaries (legis_init_id, summary_id) values ($1, $2)", task_args.db_entry_id, summary_id)
             .execute(&task_args.pg_pool)
             .await?;
         Ok(())
     }, language).await
 }
+
+impl RisExtension for VoteResult {}
 
 #[cfg(test)]
 mod tests {
@@ -44,7 +49,7 @@ mod tests {
     use somai_client::SomAiClient;
     use somes_scraper::language::Language;
 
-    use crate::{OCR_ENGINE, ai_tasks::summary_prompt2};
+    use crate::{OCR_ENGINE, ai_tasks::summary_prompt};
 
     use super::*;
 
@@ -85,7 +90,7 @@ mod tests {
         let input =
             combine_texts(&extract_text_from_documents_html_first_stripped(&docs, None).await);
 
-        let result = summary_prompt2(
+        let result = summary_prompt(
             &somai_client,
             input,
             &unique_topics,
@@ -134,7 +139,7 @@ mod tests {
         let input =
             combine_texts(&extract_text_from_documents_html_first_stripped(&docs, None).await);
 
-        let result = summary_prompt2(
+        let result = summary_prompt(
             &somai_client,
             input,
             &unique_topics,
@@ -219,7 +224,7 @@ mod tests {
         let input =
             combine_texts(&extract_text_from_documents_html_first_stripped(&docs, None).await);
 
-        let result = summary_prompt2(
+        let result = summary_prompt(
             &somai_client,
             input,
             &unique_topics,
@@ -319,7 +324,7 @@ mod tests {
             &extract_text_from_documents_html_first_stripped(&docs, OCR_ENGINE.clone()).await,
         );
 
-        let result = summary_prompt2(
+        let result = summary_prompt(
             &somai_client,
             input,
             &unique_topics,
@@ -402,7 +407,7 @@ mod tests {
 
         let input =
             combine_texts(&extract_text_from_documents_html_first_stripped(&docs, None).await);
-        let result = summary_prompt2(
+        let result = summary_prompt(
             &somai_client,
             input,
             &unique_topics,
@@ -438,7 +443,7 @@ mod tests {
         let input = combine_texts(
             &extract_text_from_documents_html_first_stripped(&docs, OCR_ENGINE.clone()).await,
         );
-        let result = summary_prompt2(
+        let result = summary_prompt(
             &somai_client,
             input,
             &unique_topics,
@@ -503,7 +508,7 @@ mod tests {
         let input = combine_texts(
             &extract_text_from_documents_html_first_stripped(&docs, OCR_ENGINE.clone()).await,
         );
-        let result = summary_prompt2(
+        let result = summary_prompt(
             &somai_client,
             input,
             &unique_topics,

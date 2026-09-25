@@ -30,14 +30,14 @@ pub async fn somai_connect() -> crate::Result<Arc<SomAiClient>> {
     })
 }
 
-pub(crate) async fn summarize_and_save(
+pub(crate) async fn summarize_and_save<T: RisExtension>(
     task_args: TaskArgs,
     docs: &[Document],
     summarization_of: &str,
     summariation_of_save_cb: impl AsyncFnOnce(TaskArgs, i32) -> combx::Result<()>,
     language: Language,
 ) -> combx::Result<Option<DbAiSummary>> {
-    let summary = summarize_documents(&task_args, docs, summarization_of, language).await?;
+    let summary = summarize_documents::<T>(&task_args, docs, summarization_of, language).await?;
     if let Some(summary) = summary.summary {
         let summary_id = insert_ai_summary_sqlx(
             &task_args.pg_pool,

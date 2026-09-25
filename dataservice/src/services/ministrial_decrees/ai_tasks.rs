@@ -1,8 +1,11 @@
-use combx::DbAiSummary;
+use combx::{DbAiSummary, Decree};
 use somes_common_lib::Document;
 use somes_scraper::language::Language;
 
-use crate::{ai_task::TaskArgs, ai_tasks::summarize_and_save};
+use crate::{
+    ai_task::TaskArgs,
+    ai_tasks::{RisExtension, summarize_and_save},
+};
 
 pub async fn summarize_decrees_documents(
     task_args: TaskArgs,
@@ -23,7 +26,7 @@ pub async fn summarize_decrees_documents(
         return Ok(None);
     }
 
-    summarize_and_save(
+    summarize_and_save::<Decree>(
         task_args,
         docs,
         "Verordnung",
@@ -42,6 +45,15 @@ pub async fn summarize_decrees_documents(
     .await
 }
 
+impl RisExtension for Decree {
+    fn extend_docs(
+        _pool: &sqlx::PgPool,
+        _entry_id: i32,
+    ) -> impl Future<Output = sqlx::Result<Vec<Document>>> {
+        async { Ok(vec![]) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use combx::{
@@ -51,19 +63,29 @@ mod tests {
     use somai_client::SomAiClient;
     use somes_scraper::{AustriaScraper, decree::RisScraper};
 
-    use crate::{OCR_ENGINE, ai_tasks::summary_prompt2};
+    use crate::{OCR_ENGINE, ai_tasks::summary_prompt};
 
     use super::*;
 
     #[tokio::test]
-    async fn test_summary_prompt_xxviii_me_49() {
+    async fn test_summary_prompt_decree_bgbla_2025_ii_74() {
         let scraper = AustriaScraper::default();
-        let decree = scraper.fetch_and_parse_ministrial_decrees(1).await.unwrap()[0].clone();
 
-        dbg!(&decree);
-        let somai_client = SomAiClient::new_local("http://localhost:8000")
+        let decree = scraper
+            .fetch_single_ris_entry("BGBLA_2026_II_261")
+            // .fetch_single_ris_entry("BGBLA_2026_II_273")
+            // .fetch_single_ris_entry("BGBLA_2025_II_74")
             .await
             .unwrap();
+
+        dbg!(&decree);
+
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let somai_client =
+            SomAiClient::new("http://10.30.0.164:8000", "API_USER", "supersicher123!")
+                .await
+                .unwrap();
+
         let pg_pool = combx::connect_pg().await;
         let unique_topics = unique_topics_for_lang(&pg_pool, Language::De)
             .await
@@ -82,11 +104,53 @@ mod tests {
             combine_texts(&extract_text_from_documents_html_first_stripped(&documents, None).await);
         println!("input length: {}", input.len());
 
-        let result = summary_prompt2(
+        let result = summary_prompt(
             &somai_client,
             input,
             &unique_topics,
-            "Ministerialentwurf",
+            "Verordnung",
+            Language::De,
+        )
+        .await;
+        dbg!(result.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_summary_prompt_decree_any_first() {
+        let scraper = AustriaScraper::default();
+        let decree = scraper.fetch_and_parse_ministrial_decrees(1).await.unwrap()[0].clone();
+
+        dbg!(&decree);
+
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+        let somai_client =
+            SomAiClient::new("http://10.30.0.164:8000", "API_USER", "supersicher123!")
+                .await
+                .unwrap();
+
+        let pg_pool = combx::connect_pg().await;
+        let unique_topics = unique_topics_for_lang(&pg_pool, Language::De)
+            .await
+            .unwrap();
+        let documents = decree
+            .documents
+            .iter()
+            .map(|doc| Document {
+                title: Some(doc.title.clone()),
+                document_url: Some(doc.link.clone()),
+                document_type: Some(doc.ftype.to_string()),
+            })
+            .collect::<Vec<_>>();
+
+        let input =
+            combine_texts(&extract_text_from_documents_html_first_stripped(&documents, None).await);
+        println!("input length: {}", input.len());
+
+        let result = summary_prompt(
+            &somai_client,
+            input,
+            &unique_topics,
+            "Verordnung",
             Language::De,
         )
         .await;

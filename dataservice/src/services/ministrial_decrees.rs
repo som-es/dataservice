@@ -4,8 +4,7 @@ use std::{
 };
 
 use combx::{
-    Decree, FromScrapedType, Index, PostgresEnhancer,
-    with_data::gps::{LegislativePeriod, gps},
+    Decree, FromScrapedType, Index, LegislativePeriod, PostgresEnhancer, with_data::gps::gps,
 };
 use dotenvy_macro::dotenv;
 use somes_scraper::{AustriaScraper, Thing, decree::RisScraper};
