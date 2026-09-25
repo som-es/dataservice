@@ -84,7 +84,7 @@ async fn delegate_notifications_for_user(
     pg: &PgPool,
     user_id: i32,
 ) -> sqlx::Result<Vec<DelegateNotification>> {
-    sqlx::query_as!(
+    let res = sqlx::query_as!(
         DelegateNotification,
         r#"
         select
@@ -102,6 +102,8 @@ async fn delegate_notifications_for_user(
     )
     .fetch_all(pg)
     .await
+    .unwrap();
+    Ok(res)
 }
 
 fn should_send_delegate_activity(

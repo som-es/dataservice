@@ -47,10 +47,17 @@ pub async fn summarize_decrees_documents(
 
 impl RisExtension for Decree {
     fn extend_docs(
-        _pool: &sqlx::PgPool,
-        _entry_id: i32,
+        pool: &sqlx::PgPool,
+        entry_id: i32,
     ) -> impl Future<Output = sqlx::Result<Vec<Document>>> {
-        async { Ok(vec![]) }
+        let pool = pool.clone();
+        async move {
+            sqlx::query_as!(
+                Document,
+                "select title, document_type, document_url from ris_amendments ra inner join ministrial_decrees_documents mdd on mdd.ministrial_decree_id = norm_id where decree_id = $1",
+                entry_id
+            ).fetch_all(&pool).await
+        }
     }
 }
 

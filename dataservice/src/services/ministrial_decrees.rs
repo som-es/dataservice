@@ -349,7 +349,7 @@ pub async fn insert_ministrial_decree(
                 amendment.doc_number,
                 norm_id,
                 decree_id
-            );
+            ).execute(&mut *tx).await?;
         }
 
         tx.commit().await?;

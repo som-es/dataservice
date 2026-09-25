@@ -32,6 +32,7 @@ pub struct DelegateParty {
     MeilisearchFilter,
     Hash,
 )]
+#[sqlx(type_name = "db_ris_amendment_ref")]
 pub struct DbRisAmendmentRef {
     pub bgbl: String,
     pub doc_number: String,

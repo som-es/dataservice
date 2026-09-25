@@ -56,6 +56,7 @@ pub struct Decree {
     #[filter(skip)]
     pub amendments: Vec<DbRisAmendmentRef>,
     pub is_norm: bool,
+    pub parent_decree_ris_id: Option<String>,
 }
 
 #[cfg(feature = "db")]
@@ -137,6 +138,7 @@ impl Decree {
                     doc_number: amendment.doc_number,
                 })
                 .collect(),
+            parent_decree_ris_id: None,
         }
     }
 }
