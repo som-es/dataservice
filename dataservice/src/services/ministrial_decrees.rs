@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     sync::{Arc, LazyLock},
+    time::Duration,
 };
 
 use combx::{
@@ -9,7 +10,7 @@ use combx::{
 use dotenvy_macro::dotenv;
 use somes_scraper::{AustriaScraper, Thing, decree::RisScraper};
 use sqlx::PgPool;
-use tokio::sync::mpsc::Sender;
+use tokio::{sync::mpsc::Sender, time::sleep};
 
 use crate::{
     AppState, CompareHash, Shutdown, ai_task::AiTask, enforce_ai_run,
@@ -54,6 +55,28 @@ pub async fn save_ministrial_decrees(
 
     for page in 1..=pages {
         log::info!("Currently on page {page}..");
+
+        let Ok(decrees) = scraper.fetch_consolidated_decrees(page).await else {
+            log::error!("Cannot scrape consolidated ministrial decrees on page {page}");
+            continue;
+        };
+
+        sleep(Duration::from_secs(2)).await;
+
+        for decree in decrees {
+            if let Err(e) = insert_ministrial_decree(
+                decree,
+                &app_state,
+                all_gps.clone(),
+                &ai_task_tx,
+                new_decree_tx.clone(),
+            )
+            .await
+            {
+                log::error!("Cannot insert consolidated decree: {e:?}");
+            }
+        }
+
         let Ok(decrees) = scraper.fetch_and_parse_ministrial_decrees(page).await else {
             log::error!("Cannot scrape ministrial decrees on page {page}");
             continue;
@@ -76,6 +99,8 @@ pub async fn save_ministrial_decrees(
         if only_latest && page >= 2 {
             break;
         }
+
+        sleep(Duration::from_secs(2)).await;
     }
 
     drop(new_decree_tx);
@@ -157,8 +182,9 @@ pub async fn insert_ministrial_decree(
                 document_url,
                 eli,
                 gp,
-                hash
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                hash,
+                is_norm
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             ON CONFLICT (ris_id) DO UPDATE
             SET
                 gov_official_id = EXCLUDED.gov_official_id,
@@ -170,7 +196,8 @@ pub async fn insert_ministrial_decree(
                 eli = EXCLUDED.eli,
                 gp = EXCLUDED.gp,
                 updated_at = NOW(),
-                hash = EXCLUDED.hash
+                hash = EXCLUDED.hash,
+                is_norm = EXCLUDED.is_norm
             RETURNING id;
             ",
             gov_official_id,
@@ -184,6 +211,7 @@ pub async fn insert_ministrial_decree(
             decree.eli,
             decree.gp,
             hash as i64,
+            decree.is_norm,
         )
         .fetch_one(pg_pool)
         .await?;
@@ -300,6 +328,31 @@ pub async fn insert_ministrial_decree(
             .execute(pg_pool)
             .await?;
         }
+        let mut tx = pg_pool.begin().await?;
+
+        sqlx::query!("delete from ris_amendments where norm_id = $1", decree_id)
+            .execute(&mut *tx)
+            .await?;
+
+        for amendment in decree.amendments {
+            let norm_id = decree_id;
+            let decree_id = sqlx::query_scalar!(
+                "select id from ministrial_decrees where ris_id = $1",
+                amendment.doc_number,
+            )
+            .fetch_optional(&mut *tx)
+            .await?;
+
+            sqlx::query!(
+                "insert into ris_amendments (bgbl, ris_id, norm_id, decree_id) values ($1, $2, $3, $4)",
+                amendment.bgbl,
+                amendment.doc_number,
+                norm_id,
+                decree_id
+            );
+        }
+
+        tx.commit().await?;
     }
 
     Ok(())
@@ -359,7 +412,7 @@ pub async fn run_shut_pages(
         });
 
     if !only_latest {
-        decree_sleep *= 60;
+        decree_sleep *= 150;
     }
 
     let latest_info = if only_latest { "latest" } else { "" };

@@ -10,7 +10,7 @@ use sqlx::FromRow;
 #[cfg(feature = "db")]
 use std::sync::Arc;
 
-use crate::{CombinedData, DbAiSummary, DbAiSummaryFilter};
+use crate::{CombinedData, DbAiSummary, DbAiSummaryFilter, DbRisAmendmentRef};
 
 #[cfg(feature = "db")]
 mod enhancer;
@@ -53,6 +53,9 @@ pub struct Decree {
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
     pub ai_summary: Option<DbAiSummary>,
+    #[filter(skip)]
+    pub amendments: Vec<DbRisAmendmentRef>,
+    pub is_norm: bool,
 }
 
 #[cfg(feature = "db")]
@@ -125,6 +128,15 @@ impl Decree {
             created_at: None,
             updated_at: None,
             ai_summary: None,
+            is_norm: decree.is_norm,
+            amendments: decree
+                .amendments
+                .into_iter()
+                .map(|amendment| DbRisAmendmentRef {
+                    bgbl: amendment.bgbl,
+                    doc_number: amendment.doc_number,
+                })
+                .collect(),
         }
     }
 }

@@ -18,6 +18,26 @@ pub struct DelegateParty {
 }
 
 #[cfg_attr(feature = "utoipa", derive(ToSchema))]
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Type,
+    CompositeType,
+    MeilisearchFilter,
+    Hash,
+)]
+pub struct DbRisAmendmentRef {
+    pub bgbl: String,
+    pub doc_number: String,
+}
+
+#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LegislativePeriod {
     pub gp: String,
