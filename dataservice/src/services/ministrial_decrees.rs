@@ -53,6 +53,8 @@ pub async fn save_ministrial_decrees(
         (None, None)
     };
 
+    let mut auth_decrees = vec![];
+
     for page in 1..=pages {
         log::info!("Currently on page {page}..");
 
@@ -63,20 +65,24 @@ pub async fn save_ministrial_decrees(
 
         for decree in decrees {
             if let Err(e) = insert_ministrial_decree(
-                decree,
+                decree.clone(),
                 &app_state,
                 all_gps.clone(),
                 &ai_task_tx,
                 new_decree_tx.clone(),
+                false,
             )
             .await
             {
                 log::error!("Cannot insert decree: {e:?}");
             }
+            auth_decrees.push(decree);
         }
 
         sleep(Duration::from_secs(2)).await;
+    }
 
+    for page in 1..=pages {
         let Ok(decrees) = scraper.fetch_consolidated_decrees(page).await else {
             log::error!("Cannot scrape consolidated ministrial decrees on page {page}");
             continue;
@@ -89,6 +95,7 @@ pub async fn save_ministrial_decrees(
                 all_gps.clone(),
                 &ai_task_tx,
                 new_decree_tx.clone(),
+                true,
             )
             .await
             {
@@ -101,6 +108,21 @@ pub async fn save_ministrial_decrees(
         }
 
         sleep(Duration::from_secs(2)).await;
+    }
+
+    for decree in auth_decrees {
+        if let Err(e) = insert_ministrial_decree(
+            decree.clone(),
+            &app_state,
+            all_gps.clone(),
+            &ai_task_tx,
+            new_decree_tx.clone(),
+            true,
+        )
+        .await
+        {
+            log::error!("Cannot insert decree: {e:?}");
+        }
     }
 
     drop(new_decree_tx);
@@ -156,6 +178,7 @@ pub async fn insert_ministrial_decree(
     all_gps: Arc<[LegislativePeriod]>,
     ai_task_tx: &Sender<AiTask>,
     new_decree_tx: Option<Sender<(i32, Decree)>>,
+    run_ai: bool,
 ) -> crate::Result<()> {
     let pg_pool = &app_state.pg_pool;
     let mut decree =
@@ -244,7 +267,7 @@ pub async fn insert_ministrial_decree(
     }
 
     #[cfg(feature = "ai")]
-    {
+    if run_ai {
         use tokio::time::Instant;
 
         use crate::{LATEST_GP, ai_task::Priority};
